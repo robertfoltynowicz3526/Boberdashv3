@@ -1,1192 +1,723 @@
-import { db } from "./firebase-config.js";
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  doc,
-  deleteDoc,
-  updateDoc,
-  getDoc,
-  runTransaction,
-  addDoc,
-  setDoc,
-} from "firebase/firestore";
-import Papa from "papaparse";
+// --- USTAWIENIA I ZMIENNE GLOBALNE ---
+const db = firebase.firestore();
+const currentMonth = new Date();
+let clientsData = {}; // Globalna mapa klientów do szybkiego wyszukiwania
+let machinesData = {}; // Globalna mapa maszyn
+let ordersData = {}; // Globalna mapa wszystkich zleceń
+let calendarAssignments = {}; // Przypisania do kalendarza
 
-initializeApp();
+// --- FUNKCJE POMOCNICZE ---
 
-function initializeApp() {
-  // --- STAŁE I ZMIENNE GLOBALNE ---
-  const STAWKI = {
-    S: { nazwa: "Wyjazdowe", stawka: 45 },
-    W: { nazwa: "Warsztat", stawka: 35 },
-    G: { nazwa: "Gwarancja", stawka: 35 },
-    Z: { nazwa: "Zbrojenie", stawka: 30 },
-    P: { nazwa: "Poprawka", stawka: 0 },
-  };
-  let wszystkieZlecenia = [],
-    wszystkieProdukty = [],
-    wszystkiePrzejazdy = [],
-    czesciDoZlecenia = [],
-    wszystkieMaszyny = [],
-    wszystkieKlienci = [],
-    wszystkieWpisyKalendarza = [];
-  const NISKI_STAN_MAGAZYNOWY = 5;
-  let calendar;
-  let edytowanyPrzejazdId = null;
-  let stockChangeOperation = null;
-
-  // --- SELEKTORY ---
-  const miesiacSummaryInput = document.getElementById("miesiac-summary");
-  const miesiacPrzejazdyInput = document.getElementById("miesiac-przejazdy");
-  const zlecenieKlientSelect = document.getElementById(
-    "zlecenie-klient-select"
-  );
-  const zlecenieMaszynaSelect = document.getElementById(
-    "zlecenie-maszyna-select"
-  );
-  const kalendarzContainer = document.getElementById("kalendarz");
-  const kalendarzModal = document.getElementById("kalendarz-modal");
-  const kalendarzForm = document.getElementById("kalendarz-form");
-  const kalendarzModalTitle = document.getElementById("kalendarz-modal-title");
-  const kalendarzPodsumowanieDiv = document.getElementById(
-    "kalendarz-podsumowanie"
-  );
-  const assignModal = document.getElementById("assign-zlecenie-modal");
-  const assignForm = document.getElementById("assign-zlecenie-form");
-  const klientForm = document.getElementById("klient-form");
-  const listaKlientowUl = document.getElementById("lista-klientow");
-  const maszynaKlientSelect = document.getElementById("maszyna-klient-select");
-  const maszynaForm = document.getElementById("maszyna-form");
-  const listaMaszynUl = document.getElementById("lista-maszyn");
-  const przejazdForm = document.getElementById("przejazd-form");
-  const listaPrzejazdowDiv = document.getElementById("lista-przejazdow");
-  const zlecenieForm = document.getElementById("zlecenie-form");
-  const aktywneZleceniaLista = document.getElementById(
-    "aktywne-zlecenia-lista"
-  );
-  const ukonczoneZleceniaLista = document.getElementById(
-    "ukonczone-zlecenia-lista"
-  );
-  const completeModal = document.getElementById("complete-zlecenie-modal");
-  const completeModalForm = document.getElementById("complete-zlecenie-form");
-  const closeModalButton = completeModal.querySelector(".close-button");
-  const summaryContainer = document.getElementById("summary-container");
-  const modalMagazynLista = document.getElementById("modal-magazyn-lista");
-  const partsToRemoveList = document.getElementById("parts-to-remove-list");
-  const magazynForm = document.getElementById("magazyn-form");
-  const magazynLista = document.getElementById("magazyn-lista");
-  const bulkAddForm = document.getElementById("bulk-add-form");
-  const stockModal = document.getElementById("stock-change-modal");
-  const stockModalForm = document.getElementById("stock-change-form");
-  const stockModalCloseButton = stockModal.querySelector(".close-button");
-  const addOilBtn = document.getElementById("add-oil-btn");
-  const oilTypeSelect = document.getElementById("oil-type");
-  const oilContainerSizeSelect = document.getElementById("oil-container-size");
-  const converterLitryInput = document.getElementById("converter-litry");
-  const converterSztukiInput = document.getElementById("converter-sztuki");
-  const resultSztuki = document.getElementById("result-sztuki");
-  const resultLitry = document.getElementById("result-litry");
-
-  // --- INICJALIZACJA ---
-  window.openTab = (evt, tabName) => {
-    document
-      .querySelectorAll(".tab-content")
-      .forEach((tab) => (tab.style.display = "none"));
-    document
-      .querySelectorAll(".tab-button")
-      .forEach((button) => button.classList.remove("active"));
-    document.getElementById(tabName).style.display = "block";
-    evt.currentTarget.classList.add("active");
-  };
-  const now = new Date();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const year = now.getFullYear();
-  const currentMonth = `${year}-${month}`;
-  if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-  if (miesiacPrzejazdyInput) miesiacPrzejazdyInput.value = currentMonth;
-  document.querySelector(".tab-button").click();
-
-  // --- KALENDARZ ---
-  function inicjalizujKalendarz() {
-    if (!kalendarzContainer) return;
-    calendar = new FullCalendar.Calendar(kalendarzContainer, {
-      initialView: "dayGridMonth",
-      locale: "pl",
-      headerToolbar: {
-        left: "prev,next today",
-        center: "title",
-        right: "dayGridMonth",
-      },
-      eventContent: (arg) => {
-        let eventEl = document.createElement("div");
-        eventEl.innerHTML = `<div>${arg.event.title}</div>`;
-        if (arg.event.extendedProps.notatka) {
-          eventEl.innerHTML += ` <small title="${arg.event.extendedProps.notatka}">📝</small>`;
-        }
-        let actionsEl = document.createElement("div");
-        actionsEl.classList.add("event-actions");
-        actionsEl.innerHTML = `<button type="button" class="btn-edit event-edit-btn" data-date="${arg.event.startStr}">E</button><button type="button" class="btn-remove event-delete-btn" data-date="${arg.event.startStr}">X</button>`;
-        eventEl.appendChild(actionsEl);
-        return { domNodes: [eventEl] };
-      },
-      dateClick: (info) => otworzModalGodzin(info.dateStr),
-      datesSet: (view) => {
-        obliczSumeGodzinZKalendarza(
-          view.view.currentStart,
-          view.view.currentEnd
-        );
-      },
+/** Funkcja do przełączania widoczności sekcji. */
+function showSection(sectionId) {
+    document.querySelectorAll('section').forEach(section => {
+        section.classList.add('hidden');
     });
-    calendar.render();
-    wyswietlWpisyKalendarza();
-  }
-  async function otworzModalGodzin(data) {
-    kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
-    kalendarzForm.reset();
-    document.getElementById("kalendarz-data").value = data;
-    const docSnap = await getDoc(doc(db, "godziny_pracy", data));
-    if (docSnap.exists()) {
-      const dane = docSnap.data();
-      kalendarzForm["godziny-pracy"].value = dane.praca || 0;
-      kalendarzForm["godziny-fakturowane"].value = dane.fakturowane || 0;
-      kalendarzForm["nadgodziny"].value = dane.nadgodziny || 0;
-      kalendarzForm["kalendarz-notatka"].value = dane.notatka || "";
-    }
-    kalendarzModal.style.display = "block";
-  }
-  async function obslugaZapisuGodzin(event) {
-    event.preventDefault();
-    const data = kalendarzForm["kalendarz-data"].value;
-    const dane = {
-      praca: Number(kalendarzForm["godziny-pracy"].value) || 0,
-      fakturowane: Number(kalendarzForm["godziny-fakturowane"].value) || 0,
-      nadgodziny: Number(kalendarzForm["nadgodziny"].value) || 0,
-      notatka: kalendarzForm["kalendarz-notatka"].value || "",
-    };
-    try {
-      await setDoc(doc(db, "godziny_pracy", data), dane);
-      kalendarzModal.style.display = "none";
-    } catch (e) {
-      console.error("Błąd zapisu godzin: ", e);
-    }
-  }
-  function wyswietlWpisyKalendarza() {
-    onSnapshot(collection(db, "godziny_pracy"), (snapshot) => {
-      wszystkieWpisyKalendarza = [];
-      const events = [];
-      snapshot.forEach((doc) => {
-        const dane = doc.data();
-        const id = doc.id;
-        wszystkieWpisyKalendarza.push({ id, ...dane });
-        let title = "";
-        if (dane.praca > 0) title += `P: ${dane.praca}h<br>`;
-        if (dane.fakturowane > 0) title += `F: ${dane.fakturowane}h<br>`;
-        if (dane.nadgodziny > 0) title += `N: ${dane.nadgodziny}h`;
-        if (title) {
-          events.push({
-            id: id,
-            title: title.trim(),
-            start: id,
-            allDay: true,
-            classNames: ["fc-event-custom"],
-            extendedProps: { notatka: dane.notatka },
-          });
-        }
-      });
-      if (calendar) {
-        calendar.removeAllEvents();
-        calendar.addEventSource(events);
-        obliczSumeGodzinZKalendarza(
-          calendar.view.currentStart,
-          calendar.view.currentEnd
-        );
-      }
-    });
-  }
-  function obliczSumeGodzinZKalendarza(start, end) {
-    const wpisyZMiesiaca = wszystkieWpisyKalendarza.filter((wpis) => {
-      const dataWpisu = new Date(wpis.id);
-      return dataWpisu >= start && dataWpisu < end;
-    });
-    const sumy = wpisyZMiesiaca.reduce(
-      (acc, wpis) => {
-        acc.praca += wpis.praca || 0;
-        acc.fakturowane += wpis.fakturowane || 0;
-        acc.nadgodziny += wpis.nadgodziny || 0;
-        return acc;
-      },
-      { praca: 0, fakturowane: 0, nadgodziny: 0 }
-    );
-    kalendarzPodsumowanieDiv.innerHTML = `<p>Praca w miesiącu: <strong>${sumy.praca.toFixed(
-      1
-    )} h</strong></p><p>Fakturowane: <strong>${sumy.fakturowane.toFixed(
-      1
-    )} h</strong></p><p>Nadgodziny: <strong>${sumy.nadgodziny.toFixed(
-      1
-    )} h</strong></p>`;
-  }
-  async function obslugaKalendarza(event) {
-    const target = event.target;
-    if (target.classList.contains("event-edit-btn")) {
-      otworzModalGodzin(target.dataset.date);
-    }
-    if (target.classList.contains("event-delete-btn")) {
-      const data = target.dataset.date;
-      if (confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
-        await deleteDoc(doc(db, "godziny_pracy", data));
-      }
-    }
-  }
-
-  // --- FUNKCJE OGÓLNE ---
-  function aktualizujPulpit() {
-    const aktywneZlecenia = wszystkieZlecenia.filter(
-      (z) => z.status === "aktywne" || z.status === "nieprzypisane"
-    ).length;
-    document.getElementById("db-aktywne-zlecenia").textContent =
-      aktywneZlecenia;
-    const podsumowanie = obliczPodsumowanieFinansowe(
-      currentMonth,
-      wszystkieZlecenia
-    );
-    document.getElementById(
-      "db-przychod-brutto"
-    ).textContent = `${podsumowanie.sumaBrutto.toFixed(2)} zł`;
-    document.getElementById(
-      "db-przychod-netto"
-    ).textContent = `${podsumowanie.sumaNetto.toFixed(2)} zł`;
-    const produktyNiskiStan = wszystkieProdukty.filter(
-      (p) => p.ilosc <= NISKI_STAN_MAGAZYNOWY && p.ilosc > 0
-    );
-    document.getElementById("db-niski-stan").innerHTML =
-      produktyNiskiStan.length > 0
-        ? produktyNiskiStan
-            .map((p) => `<li>${p.nazwa} (${p.ilosc} szt.)</li>`)
-            .join("")
-        : "<li>Brak</li>";
-  }
-  function obliczPodsumowanieFinansowe(wybranyMiesiac, zlecenia) {
-    let sumaGodzin = 0,
-      sumaBrutto = 0;
-    if (!wybranyMiesiac || zlecenia.length === 0)
-      return { sumaGodzin, sumaBrutto, sumaNetto: 0 };
-    const zleceniaZMiesiaca = zlecenia.filter(
-      (z) =>
-        z.status === "ukończone" &&
-        z.dataUkonczenia &&
-        z.dataUkonczenia.startsWith(wybranyMiesiac)
-    );
-    zleceniaZMiesiaca.forEach((zlecenie) => {
-      sumaGodzin += zlecenie.wyfakturowaneGodziny || 0;
-      if (STAWKI[zlecenie.typZlecenia] && zlecenie.wyfakturowaneGodziny) {
-        sumaBrutto +=
-          zlecenie.wyfakturowaneGodziny * STAWKI[zlecenie.typZlecenia].stawka;
-      }
-    });
-    const sumaNetto = sumaBrutto * 0.7;
-    return { sumaGodzin, sumaBrutto, sumaNetto };
-  }
-  function eksportujDoCSV(dane, nazwaPliku) {
-    if (dane.length === 0) {
-      alert("Brak danych do wyeksportowania.");
-      return;
-    }
-    const csv = Papa.unparse(dane);
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = nazwaPliku;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  // --- KLIENCI ---
-  async function dodajKlienta(event) {
-    event.preventDefault();
-    const dane = {
-      nazwa: klientForm["klient-nazwa"].value,
-      nip: klientForm["klient-nip"].value || "---",
-      adres: klientForm["klient-adres"].value || "---",
-      telefon: klientForm["klient-telefon"].value || "---",
-      createdAt: new Date(),
-    };
-    try {
-      await addDoc(collection(db, "klienci"), dane);
-      klientForm.reset();
-    } catch (e) {
-      console.error("Błąd dodawania klienta: ", e);
-    }
-  }
-  function wyswietlKlientow() {
-    onSnapshot(
-      query(collection(db, "klienci"), orderBy("nazwa")),
-      (snapshot) => {
-        wszystkieKlienci = [];
-        let klienciHtml = "",
-          selectHtml = '<option value="">-- Wybierz klienta --</option>',
-          selectZleceniaHtml =
-            '<option value="">-- Wybierz klienta --</option><option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
-        snapshot.forEach((doc) => {
-          const klient = { id: doc.id, ...doc.data() };
-          wszystkieKlienci.push(klient);
-          klienciHtml += `<li data-id="${klient.id}"><span><strong>${klient.nazwa}</strong> (NIP: ${klient.nip})<br><small>${klient.adres} | ${klient.telefon}</small></span><div><button class="delete-btn">Usuń</button></div></li>`;
-          selectHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
-          selectZleceniaHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
-        });
-        listaKlientowUl.innerHTML = klienciHtml
-          ? `<ul>${klienciHtml}</ul>`
-          : "<p>Brak klientów w bazie.</p>";
-        maszynaKlientSelect.innerHTML = selectHtml;
-        zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
-        document.getElementById("assign-klient-select").innerHTML = selectHtml;
-      }
-    );
-  }
-  async function obslugaListyKlientow(event) {
-    const li = event.target.closest("li");
-    if (!li) return;
-    if (event.target.classList.contains("delete-btn")) {
-      if (
-        confirm(
-          "Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?"
-        )
-      ) {
-        await deleteDoc(doc(db, "klienci", li.dataset.id));
-      }
-    }
-  }
-
-  // --- MASZYNY ---
-  async function dodajMaszyne(event) {
-    event.preventDefault();
-    const wybranyKlientId = maszynaKlientSelect.value;
-    if (!wybranyKlientId) {
-      alert("Proszę wybrać klienta!");
-      return;
-    }
-    const klient = wszystkieKlienci.find((k) => k.id === wybranyKlientId);
-    const dane = {
-      klientId: wybranyKlientId,
-      klientNazwa: klient.nazwa,
-      typMaszyny: maszynaForm["maszyna-typ"].value,
-      model: maszynaForm["maszyna-model"].value,
-      nrSeryjny: maszynaForm["maszyna-serial"].value || "---",
-      rokProdukcji: Number(maszynaForm["maszyna-rok"].value) || null,
-      motogodziny: Number(maszynaForm["maszyna-mth"].value) || 0,
-      createdAt: new Date(),
-    };
-    try {
-      await addDoc(collection(db, "maszyny"), dane);
-      maszynaForm.reset();
-    } catch (e) {
-      console.error("Błąd dodawania maszyny: ", e);
-    }
-  }
-  function wyswietlMaszyny() {
-    onSnapshot(
-      query(collection(db, "maszyny"), orderBy("klientNazwa")),
-      (snapshot) => {
-        wszystkieMaszyny = [];
-        snapshot.forEach((doc) => {
-          wszystkieMaszyny.push({ id: doc.id, ...doc.data() });
-        });
-        const pogrupowaneMaszyny = wszystkieMaszyny.reduce((acc, maszyna) => {
-          (acc[maszyna.klientNazwa] = acc[maszyna.klientNazwa] || []).push(
-            maszyna
-          );
-          return acc;
-        }, {});
-        let maszynyHtml = "";
-        for (const klientNazwa in pogrupowaneMaszyny) {
-          maszynyHtml += `<div class="client-group"><div class="client-header"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div><ul class="machine-list">${pogrupowaneMaszyny[
-            klientNazwa
-          ]
-            .map(
-              (maszyna) =>
-                `<li data-id="${maszyna.id}"><span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span><div><button class="delete-btn">Usuń</button></div></li>`
-            )
-            .join("")}</ul></div>`;
-        }
-        listaMaszynUl.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie.</p>";
-        zlecenieKlientSelect.dispatchEvent(new Event("change"));
-      }
-    );
-  }
-  async function obslugaListyMaszyn(event) {
-    const element = event.target;
-    if (element.closest(".client-header")) {
-      const header = element.closest(".client-header");
-      header.classList.toggle("open");
-      header.nextElementSibling.classList.toggle("open");
-      return;
-    }
-    const li = element.closest("li");
-    if (!li) return;
-    if (element.classList.contains("delete-btn")) {
-      if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-        await deleteDoc(doc(db, "maszyny", li.dataset.id));
-      }
-    }
-  }
-
-  // --- PRZEJAZDY ---
-  function wyswietlPrzejazdy() {
-    onSnapshot(
-      query(collection(db, "przejazdy"), orderBy("data", "desc")),
-      (snapshot) => {
-        wszystkiePrzejazdy = [];
-        snapshot.forEach((doc) =>
-          wszystkiePrzejazdy.push({ id: doc.id, ...doc.data() })
-        );
-        filtrujIwyswietlPrzejazdy();
-      }
-    );
-  }
-  function filtrujIwyswietlPrzejazdy() {
-    const przefiltrowane = wszystkiePrzejazdy.filter(
-      (p) => p.data && p.data.startsWith(miesiacPrzejazdyInput.value)
-    );
-    listaPrzejazdowDiv.innerHTML =
-      przefiltrowane.length === 0
-        ? "<p>Brak przejazdów w tym miesiącu.</p>"
-        : `<ul>${przegiltrowane
-            .map(
-              (p) =>
-                `<li data-id="${p.id}"><span><strong>${p.data}</strong>: ${p.skad} → ${p.dokad} (<strong>${p.dystans} km</strong>)</span><div><button class="edit-btn">Edytuj</button><button class="delete-btn">Usuń</button></div></li>`
-            )
-            .join("")}</ul>`;
-  }
-  async function dodajLubEdytujPrzejazd(event) {
-    event.preventDefault();
-    const dane = {
-      data: przejazdForm.data.value,
-      skad: przejazdForm.skad.value,
-      dokad: przejazdForm.dokad.value,
-      dystans: Number(przejazdForm.dystans.value),
-    };
-    try {
-      if (edytowanyPrzejazdId) {
-        await updateDoc(doc(db, "przejazdy", edytowanyPrzejazdId), dane);
-        edytowanyPrzejazdId = null;
-      } else {
-        dane.createdAt = new Date();
-        await addDoc(collection(db, "przejazdy"), dane);
-      }
-      przejazdForm.reset();
-      przejazdForm.querySelector("button").textContent = "Zapisz Przejazd";
-    } catch (e) {
-      console.error("Błąd zapisu przejazdu: ", e);
-    }
-  }
-  async function obslugaListyPrzejazdow(event) {
-    const li = event.target.closest("li");
-    if (!li) return;
-    const docId = li.dataset.id;
-    if (event.target.classList.contains("delete-btn")) {
-      if (confirm("Na pewno usunąć?")) {
-        await deleteDoc(doc(db, "przejazdy", docId));
-      }
-    }
-    if (event.target.classList.contains("edit-btn")) {
-      const przejazd = wszystkiePrzejazdy.find((p) => p.id === docId);
-      if (przejazd) {
-        przejazdForm.data.value = przejazd.data;
-        przejazdForm.skad.value = przejazd.skad;
-        przejazdForm.dokad.value = przejazd.dokad;
-        przejazdForm.dystans.value = przejazd.dystans;
-        edytowanyPrzejazdId = docId;
-        przejazdForm.querySelector("button").textContent =
-          "Zaktualizuj Przejazd";
-        window.scrollTo(0, 0);
-      }
-    }
-  }
-
-  // --- ZLECENIA ---
-  function wyswietlZlecenia() {
-    onSnapshot(
-      query(collection(db, "zlecenia"), orderBy("createdAt", "desc")),
-      (snapshot) => {
-        let aktywneHtml = "",
-          ukonczoneHtml = "";
-        wszystkieZlecenia = [];
-        snapshot.forEach((doc) => {
-          const zlecenie = doc.data();
-          zlecenie.id = doc.id;
-          wszystkieZlecenia.push(zlecenie);
-          if (
-            zlecenie.status === "aktywne" ||
-            zlecenie.status === "nieprzypisane"
-          ) {
-            const nazwa = zlecenie.klientNazwa
-              ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}`
-              : zlecenie.nrZlecenia;
-            const przycisk =
-              zlecenie.status === "nieprzypisane"
-                ? `<button class="assign-btn btn-edit">Przypisz</button>`
-                : `<button class="complete-btn">Zakończ</button>`;
-            aktywneHtml += `<li data-id="${
-              zlecenie.id
-            }"><span><strong>${nazwa}</strong><br><em>${
-              zlecenie.opis || ""
-            }</em></span><div>${przycisk}<button class="delete-btn">Usuń</button></div></li>`;
-          } else {
-            const nazwaMaszyny = zlecenie.klientNazwa
-              ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}`
-              : zlecenie.nrZlecenia || "Zlecenie usuniętej maszyny";
-            const uzyteCzesciHtml =
-              zlecenie.uzyteCzesci?.length > 0
-                ? `<br><small>Użyto: ${zlecenie.uzyteCzesci
-                    .map((c) => `${c.nazwa} (x${c.ilosc})`)
-                    .join(", ")}</small>`
-                : "";
-            ukonczoneHtml += `<li data-id="${
-              zlecenie.id
-            }"><span><strong>${nazwaMaszyny}</strong> (Nr: ${
-              zlecenie.nrZlecenia
-            })<br><em>Ukończono (${
-              zlecenie.dataUkonczenia || "b.d."
-            })</em><br>Fakturowano: <strong>${
-              zlecenie.wyfakturowaneGodziny || 0
-            }h</strong> | Typ: <strong>${
-              zlecenie.typZlecenia || "?"
-            }</strong>${uzyteCzesciHtml}</span><div><button class="delete-btn">Usuń</button></div></li>`;
-          }
-        });
-        aktywneZleceniaLista.innerHTML = aktywneHtml
-          ? `<ul>${aktywneHtml}</ul>`
-          : "<p>Brak aktywnych zleceň.</p>";
-        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml
-          ? `<ul>${ukonczoneHtml}</ul>`
-          : "<p>Brak ukończonych zleceň.</p>";
-        obliczIPokazPodsumowanieFinansowe();
-        aktualizujPulpit();
-      }
-    );
-  }
-
-  async function dodajZlecenie(event) {
-    event.preventDefault();
-    const wybranyKlientId = zlecenieKlientSelect.value;
-    const wybranaMaszynaId = zlecenieMaszynaSelect.value;
-    let dane;
-    if (wybranyKlientId === "szybkie-zlecenie") {
-      dane = {
-        status: "nieprzypisane",
-        nrZlecenia: zlecenieForm["nr-zlecenia"].value,
-        opis: zlecenieForm["opis-usterki"].value,
-        createdAt: new Date(),
-      };
-    } else if (wybranyKlientId && wybranaMaszynaId) {
-      const maszyna = wszystkieMaszyny.find((m) => m.id === wybranaMaszynaId);
-      dane = {
-        maszynaId: wybranaMaszynaId,
-        klientId: maszyna.klientId,
-        klientNazwa: maszyna.klientNazwa,
-        typMaszyny: maszyna.typMaszyny,
-        model: maszyna.model,
-        status: "aktywne",
-        nrZlecenia: zlecenieForm["nr-zlecenia"].value,
-        opis: zlecenieForm["opis-usterki"].value,
-        motogodziny:
-          Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
-        createdAt: new Date(),
-      };
+    document.getElementById(sectionId).classList.remove('hidden');
+    // Ustawia tytuł sekcji
+    const sectionTitleElement = document.getElementById(sectionId).querySelector('h2');
+    if (sectionTitleElement) {
+        document.getElementById('current-section-title').textContent = sectionTitleElement.textContent;
     } else {
-      alert("Wybierz klienta i maszynę LUB opcję 'Szybkie Zlecenie'.");
-      return;
+         document.getElementById('current-section-title').textContent = sectionId.charAt(0).toUpperCase() + sectionId.slice(1);
     }
-    try {
-      await addDoc(collection(db, "zlecenia"), dane);
-      if (dane.maszynaId && zlecenieForm.motogodziny.value) {
-        await updateDoc(doc(db, "maszyny", dane.maszynaId), {
-          motogodziny: dane.motogodziny,
-        });
-      }
-      zlecenieForm.reset();
-      zlecenieKlientSelect.value = "";
-      zlecenieMaszynaSelect.innerHTML =
-        '<option value="">-- Najpierw wybierz klienta --</option>';
-      zlecenieMaszynaSelect.disabled = true;
-    } catch (e) {
-      console.error("Błąd dodawania zlecenia: ", e);
+    
+    // Specyficzne ładowanie dla kalendarza
+    if (sectionId === 'kalendarz') {
+        renderCalendar(currentMonth);
     }
-  }
-
-  function obliczIPokazPodsumowanieFinansowe() {
-    const podsumowanie = obliczPodsumowanieFinansowe(
-      miesiacSummaryInput.value,
-      wszystkieZlecenia
-    );
-    summaryContainer.innerHTML = `<p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(
-      2
-    )} h</strong></p><p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(
-      2
-    )} zł</strong></p><p>Wartość Netto (po 30%): <strong>${podsumowanie.sumaNetto.toFixed(
-      2
-    )} zł</strong></p>`;
-  }
-
-  async function obslugaListyZlecen(event) {
-    const li = event.target.closest("li");
-    if (!li) return;
-    const docId = li.dataset.id;
-    if (event.target.classList.contains("delete-btn")) {
-      if (confirm("Na pewno usunąć?")) {
-        await deleteDoc(doc(db, "zlecenia", docId));
-      }
-    }
-    if (event.target.classList.contains("assign-btn")) {
-      const zlecenie = wszystkieZlecenia.find((z) => z.id === docId);
-      if (zlecenie) {
-        document.getElementById("assign-zlecenie-id").value = docId;
-        document.getElementById("assign-zlecenie-opis").textContent =
-          zlecenie.nrZlecenia;
-        document.getElementById("assign-machine-section").style.display =
-          "none";
-        assignForm.reset();
-        assignModal.style.display = "block";
-      }
-    }
-    if (event.target.classList.contains("complete-btn")) {
-      const docSnap = await getDoc(doc(db, "zlecenia", docId));
-      if (docSnap.exists()) {
-        const zlecenie = docSnap.data();
-        document.getElementById("modal-zlecenie-nazwa").textContent =
-          zlecenie.klientNazwa
-            ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}`
-            : zlecenie.nrZlecenia;
-        document.getElementById("complete-zlecenie-id").value = docId;
-        const czesciSection = document.getElementById("modal-czesci-section");
-        if (zlecenie.klientNazwa) {
-          czesciSection.style.display = "block";
-          renderMagazynWModalu();
-        } else {
-          czesciSection.style.display = "none";
-        }
-        czesciDoZlecenia = [];
-        renderCzesciDoZlecenia();
-        completeModal.style.display = "block";
-      }
-    }
-  }
-
-  async function zapiszPrzypisanie(event) {
-    event.preventDefault();
-    const zlecenieId = assignForm["assign-zlecenie-id"].value;
-    let klientId = assignForm["assign-klient-select"].value;
-    let maszynaId = assignForm["assign-maszyna-select"].value;
-    const nowyKlientNazwa = assignForm["assign-nowy-klient"].value.trim();
-    const nowaMaszynaTyp = assignForm["assign-nowa-maszyna-typ"].value;
-    const nowaMaszynaModel =
-      assignForm["assign-nowa-maszyna-model"].value.trim();
-    try {
-      if (!klientId && nowyKlientNazwa) {
-        const nowyKlientDoc = await addDoc(collection(db, "klienci"), {
-          nazwa: nowyKlientNazwa,
-          createdAt: new Date(),
-        });
-        klientId = nowyKlientDoc.id;
-      }
-      if (!klientId) {
-        alert("Musisz wybrać lub dodać klienta.");
-        return;
-      }
-      if (!maszynaId && nowaMaszynaModel && nowaMaszynaTyp) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const klient = wszystkieKlienci.find((k) => k.id === klientId);
-        const nowaMaszynaDoc = await addDoc(collection(db, "maszyny"), {
-          klientId: klientId,
-          klientNazwa: klient.nazwa,
-          typMaszyny: nowaMaszynaTyp,
-          model: nowaMaszynaModel,
-          createdAt: new Date(),
-        });
-        maszynaId = nowaMaszynaDoc.id;
-      }
-      if (!maszynaId) {
-        alert("Musisz wybrać lub dodać maszynę.");
-        return;
-      }
-      setTimeout(async () => {
-        const maszyna = wszystkieMaszyny.find((m) => m.id === maszynaId);
-        if (!maszyna) {
-          alert("Błąd: Nie znaleziono danych maszyny. Spróbuj ponownie.");
-          return;
-        }
-        const daneDoAktualizacji = {
-          maszynaId: maszynaId,
-          klientId: maszyna.klientId,
-          klientNazwa: maszyna.klientNazwa,
-          typMaszyny: maszyna.typMaszyny,
-          model: maszyna.model,
-          status: "aktywne",
-        };
-        await updateDoc(doc(db, "zlecenia", zlecenieId), daneDoAktualizacji);
-        assignModal.style.display = "none";
-      }, 700);
-    } catch (error) {
-      console.error("Błąd podczas przypisywania:", error);
-    }
-  }
-
-  function renderMagazynWModalu() {
-    modalMagazynLista.innerHTML = wszystkieProdukty
-      .filter((p) => p.ilosc > 0)
-      .map(
-        (p) =>
-          `<div class="modal-stock-item" data-id="${p.id}" data-name="${
-            p.nazwa
-          }" data-qty="${p.ilosc}" data-is-oil="${
-            p.jestOlejem || false
-          }"><span>${p.nazwa}</span><span class="item-qty">Na stanie: ${
-            p.ilosc
-          }</span></div>`
-      )
-      .join("");
-  }
-  function dodajCzescDoZlecenia(event) {
-    const itemDiv = event.target.closest(".modal-stock-item");
-    if (!itemDiv) return;
-    const id = itemDiv.dataset.id,
-      nazwa = itemDiv.dataset.name,
-      iloscNaStanie = Number(itemDiv.dataset.qty),
-      isOil = itemDiv.dataset.isOil === "true";
-    const iloscText = prompt(
-      `Ile sztuk "${nazwa}" chcesz zdjąć ze stanu?`,
-      "1"
-    );
-    if (iloscText === null) return;
-    const ilosc = Number(iloscText);
-    if (isNaN(ilosc) || ilosc <= 0) {
-      alert("Wpisz poprawną, dodatnią liczbę.");
-      return;
-    }
-    if (!isOil && ilosc % 1 !== 0) {
-      alert("Dla tego produktu można podawać tylko liczby całkowite.");
-      return;
-    }
-    if (ilosc > iloscNaStanie) {
-      alert(`Błąd: Na stanie jest tylko ${iloscNaStanie} szt.`);
-      return;
-    }
-    if (czesciDoZlecenia.some((c) => c.id === id)) {
-      alert("Ta część jest już na liście do zdjęcia.");
-      return;
-    }
-    czesciDoZlecenia.push({ id, nazwa, ilosc, isOil });
-    renderCzesciDoZlecenia();
-  }
-  function renderCzesciDoZlecenia() {
-    partsToRemoveList.innerHTML =
-      czesciDoZlecenia.length > 0
-        ? czesciDoZlecenia
-            .map(
-              (c) =>
-                `<li class="part-list-item" data-id="${c.id}"><span>${c.nazwa} - <strong>${c.ilosc} szt.</strong></span><div class="actions"><button type="button" class="btn-edit edit-part-btn">Edytuj</button><button type="button" class="btn-remove remove-part-btn">Usuń</button></div></li>`
-            )
-            .join("")
-        : '<li style="color: #888; border: none; justify-content: center;">Brak części do zdjęcia.</li>';
-  }
-  async function obslugaListyCzesci(event) {
-    const li = event.target.closest("li");
-    if (!li) return;
-    const id = li.dataset.id;
-    if (event.target.classList.contains("remove-part-btn")) {
-      czesciDoZlecenia = czesciDoZlecenia.filter((c) => c.id !== id);
-      renderCzesciDoZlecenia();
-    }
-    if (event.target.classList.contains("edit-part-btn")) {
-      const czesc = czesciDoZlecenia.find((c) => c.id === id);
-      const produkt = wszystkieProdukty.find((p) => p.id === id);
-      const iloscText = prompt(
-        `Edytuj ilość dla "${czesc.nazwa}":`,
-        czesc.ilosc
-      );
-      if (iloscText === null) return;
-      const nowaIlosc = Number(iloscText);
-      if (isNaN(nowaIlosc) || nowaIlosc <= 0) {
-        alert("Wpisz poprawną, dodatnią liczbę.");
-        return;
-      }
-      if (!czesc.isOil && nowaIlosc % 1 !== 0) {
-        alert("Dla tego produktu można podawać tylko liczby całkowite.");
-        return;
-      }
-      if (nowaIlosc > produkt.ilosc) {
-        alert(`Błąd: Na stanie jest tylko ${produkt.ilosc} szt.`);
-        return;
-      }
-      czesc.ilosc = nowaIlosc;
-      renderCzesciDoZlecenia();
-    }
-  }
-  async function obslugaZakonczeniaZlecenia(event) {
-    event.preventDefault();
-    const docId = document.getElementById("complete-zlecenie-id").value;
-    const zlecenieDoc = await getDoc(doc(db, "zlecenia", docId));
-    const jestSzybkie = !zlecenieDoc.data().maszynaId;
-    const dane = {
-      status: "ukończone",
-      wyfakturowaneGodziny: Number(
-        document.getElementById("wyfakturowane-godziny").value
-      ),
-      typZlecenia: document.getElementById("typ-zlecenia").value,
-      dataUkonczenia: new Date().toISOString().split("T")[0],
-      uzyteCzesci: jestSzybkie ? [] : czesciDoZlecenia,
-    };
-    try {
-      if (jestSzybkie) {
-        await updateDoc(doc(db, "zlecenia", docId), dane);
-      } else {
-        await runTransaction(db, async (t) => {
-          const zlecenieRef = doc(db, "zlecenia", docId);
-          const partPromises = czesciDoZlecenia.map((czesc) =>
-            t.get(doc(db, "magazyn", czesc.id))
-          );
-          const partDocs = await Promise.all(partPromises);
-          t.update(zlecenieRef, dane);
-          for (let i = 0; i < czesciDoZlecenia.length; i++) {
-            const czesc = czesciDoZlecenia[i];
-            const produktDoc = partDocs[i];
-            if (!produktDoc.exists())
-              throw `Produkt ${czesc.nazwa} nie istnieje!`;
-            const nowaIlosc = produktDoc.data().ilosc - czesc.ilosc;
-            if (nowaIlosc < 0)
-              throw `Za mało produktu ${czesc.nazwa} na stanie!`;
-            t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
-          }
-        });
-      }
-      alert("Zlecenie zakończone!");
-      completeModal.style.display = "none";
-      completeModalForm.reset();
-    } catch (error) {
-      console.error("BŁĄD TRANSAKCJI: ", error);
-      alert(`Wystąpił błąd: ${error}`);
-    }
-  }
-
-  // --- MAGAZYN ---
-  async function dodajProduktDoMagazynu(event) {
-    event.preventDefault();
-    const dane = {
-      index: magazynForm["item-index"].value,
-      nazwa: magazynForm["item-name"].value,
-      ilosc: Number(magazynForm["item-ilosc"].value),
-      klient: magazynForm["item-klient"].value || "---",
-      createdAt: new Date(),
-    };
-    try {
-      await addDoc(collection(db, "magazyn"), dane);
-      magazynForm.reset();
-    } catch (e) {
-      console.error("Błąd dodawania do magazynu: ", e);
-    }
-  }
-  async function dodajMasowo(event) {
-    event.preventDefault();
-    const klient = bulkAddForm["bulk-klient"].value;
-    const itemsText = bulkAddForm["bulk-items"].value.trim();
-    if (!itemsText) return;
-    const lines = itemsText.split("\n");
-    let dodaneCount = 0;
-    try {
-      for (const line of lines) {
-        const parts = line.split(";");
-        if (parts.length === 3) {
-          const [index, nazwa, ilosc] = parts;
-          await addDoc(collection(db, "magazyn"), {
-            index: index.trim(),
-            nazwa: nazwa.trim(),
-            ilosc: Number(ilosc.trim()),
-            klient: klient,
-            createdAt: new Date(),
-          });
-          dodaneCount++;
-        }
-      }
-      alert(`Pomyślnie dodano ${dodaneCount} produktów.`);
-      bulkAddForm.reset();
-    } catch (error) {
-      console.error("Błąd masowego dodawania:", error);
-      alert("Wystąpił błąd.");
-    }
-  }
-  async function dodajOlej() {
-    const typ = oilTypeSelect.value;
-    const pojemnosc = Number(oilContainerSizeSelect.value);
-    const dane = {
-      index: `OLEJ-${typ}-${pojemnosc}L`,
-      nazwa: `Olej ${typ} ${pojemnosc}L`,
-      ilosc: 1,
-      klient: "---",
-      jestOlejem: true,
-      pojemnosc: pojemnosc,
-      createdAt: new Date(),
-    };
-    try {
-      await addDoc(collection(db, "magazyn"), dane);
-    } catch (e) {
-      console.error("Błąd dodawania oleju: ", e);
-    }
-  }
-  function przeliczOlej(event) {
-    const pojemnosc = Number(oilContainerSizeSelect.value);
-    const source = event.target;
-    if (source.id === "converter-litry") {
-      converterSztukiInput.value = "";
-      const litry = Number(source.value);
-      resultSztuki.textContent =
-        litry > 0 ? `${(litry / pojemnosc).toFixed(3)} szt.` : "0.00 szt.";
-      if (litry <= 0) resultLitry.textContent = "0.00 L";
-    } else if (source.id === "converter-sztuki") {
-      converterLitryInput.value = "";
-      const sztuki = Number(source.value);
-      resultLitry.textContent =
-        sztuki > 0 ? `${(sztuki * pojemnosc).toFixed(2)} L` : "0.00 L";
-      if (sztuki <= 0) resultSztuki.textContent = "0.00 szt.";
-    }
-  }
-  async function obslugaTabeliMagazynu(event) {
-    const tr = event.target.closest("tr");
-    if (!tr) return;
-    const docId = tr.dataset.id;
-    if (event.target.classList.contains("delete-btn")) {
-      if (confirm("Na pewno usunąć?")) {
-        await deleteDoc(doc(db, "magazyn", docId));
-      }
-    } else if (
-      event.target.classList.contains("add-stock-btn") ||
-      event.target.classList.contains("remove-stock-btn")
-    ) {
-      stockChangeOperation = event.target.classList.contains("add-stock-btn")
-        ? "add"
-        : "remove";
-      document.getElementById("stock-modal-title").textContent =
-        stockChangeOperation === "add" ? "Dodaj do stanu" : "Zdejmij ze stanu";
-      document.getElementById("stock-modal-name").textContent = tr.dataset.name;
-      document.getElementById("stock-modal-current-qty").textContent =
-        tr.dataset.qty + " szt.";
-      document.getElementById("stock-change-id").value = docId;
-      const qtyInput = document.getElementById("stock-change-qty");
-      qtyInput.step = tr.dataset.isOil === "true" ? "0.01" : "1";
-      qtyInput.placeholder =
-        tr.dataset.isOil === "true" ? "np. 0.5" : "Tylko liczby całkowite";
-      stockModal.style.display = "block";
-    }
-  }
-  async function obslugaZmianyStanu(event) {
-    event.preventDefault();
-    const docId = document.getElementById("stock-change-id").value;
-    const changeQty = Number(document.getElementById("stock-change-qty").value);
-    if (changeQty <= 0) {
-      alert("Ilość musi być dodatnia.");
-      return;
-    }
-    const docRef = doc(db, "magazyn", docId);
-    try {
-      await runTransaction(db, async (t) => {
-        const sfDoc = await t.get(docRef);
-        if (!sfDoc.exists()) {
-          throw "Dokument nie istnieje!";
-        }
-        const currentQty = sfDoc.data().ilosc;
-        let newQty =
-          stockChangeOperation === "add"
-            ? currentQty + changeQty
-            : currentQty - changeQty;
-        if (newQty < 0) {
-          throw "Nie można zdjąć więcej niż jest na stanie!";
-        }
-        t.update(docRef, { ilosc: newQty });
-      });
-      stockModal.style.display = "none";
-      stockModalForm.reset();
-    } catch (e) {
-      console.error("Błąd transakcji: ", e);
-      alert(`Wystąpił błąd: ${e}`);
-    }
-  }
-  function wyswietlMagazyn() {
-    onSnapshot(
-      query(collection(db, "magazyn"), orderBy("createdAt", "desc")),
-      (snapshot) => {
-        let html = "";
-        wszystkieProdukty = [];
-        if (snapshot.empty) {
-          magazynLista.innerHTML =
-            '<tr><td colspan="6">Magazyn pusty.</td></tr>';
-          return;
-        }
-        snapshot.forEach((doc) => {
-          const produkt = doc.data();
-          produkt.id = doc.id;
-          wszystkieProdukty.push(produkt);
-          const iloscWLitrach = produkt.jestOlejem
-            ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + " L"
-            : "---";
-          html += `<tr data-id="${produkt.id}" data-name="${
-            produkt.nazwa
-          }" data-qty="${produkt.ilosc}" data-is-oil="${
-            produkt.jestOlejem || false
-          }"><td>${produkt.index}</td><td>${
-            produkt.nazwa
-          }</td><td>${produkt.ilosc.toFixed(
-            2
-          )} szt.</td><td>${iloscWLitrach}</td><td>${
-            produkt.klient
-          }</td><td><button class="add-stock-btn">Dodaj</button><button class="remove-stock-btn">Zdejmij</button><button class="delete-btn">Usuń</button></td></tr>`;
-        });
-        magazynLista.innerHTML = html;
-      }
-    );
-  }
-
-  // --- PODPIĘCIE EVENTÓW ---
-  klientForm.addEventListener("submit", dodajKlienta);
-  listaKlientowUl.addEventListener("click", obslugaListyKlientow);
-  maszynaForm.addEventListener("submit", dodajMaszyne);
-  listaMaszynUl.addEventListener("click", obslugaListyMaszyn);
-  przejazdForm.addEventListener("submit", dodajLubEdytujPrzejazd);
-  listaPrzejazdowDiv.addEventListener("click", obslugaListyPrzejazdow);
-  miesiacPrzejazdyInput.addEventListener("change", filtrujIwyswietlPrzejazdy);
-  document
-    .getElementById("export-przejazdy-btn")
-    .addEventListener("click", () => {
-      const miesiac = miesiacPrzejazdyInput.value;
-      const dane = wszystkiePrzejazdy
-        .filter((p) => p.data.startsWith(miesiac))
-        .map(({ id, createdAt, ...reszta }) => reszta);
-      eksportujDoCSV(dane, `przejazdy_${miesiac}.csv`);
-    });
-  zlecenieForm.addEventListener("submit", dodajZlecenie);
-  aktywneZleceniaLista.addEventListener("click", obslugaListyZlecen);
-  ukonczoneZleceniaLista.addEventListener("click", obslugaListyZlecen);
-  completeModalForm.addEventListener("submit", obslugaZakonczeniaZlecenia);
-  closeModalButton.onclick = () => {
-    completeModal.style.display = "none";
-  };
-  miesiacSummaryInput.addEventListener("change", () => {
-    obliczIPokazPodsumowanieFinansowe();
-    aktualizujPulpit();
-  });
-  document
-    .getElementById("export-zlecenia-btn")
-    .addEventListener("click", () => {
-      const miesiac = miesiacSummaryInput.value;
-      const dane = wszystkieZlecenia
-        .filter(
-          (z) =>
-            z.status === "ukończone" &&
-            z.dataUkonczenia &&
-            z.dataUkonczenia.startsWith(miesiac)
-        )
-        .map(({ id, createdAt, status, uzyteCzesci, ...reszta }) => ({
-          ...reszta,
-          uzyte_czesci: uzyteCzesci
-            ? uzyteCzesci.map((c) => c.nazwa).join(", ")
-            : "",
-        }));
-      eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
-    });
-  magazynForm.addEventListener("submit", dodajProduktDoMagazynu);
-  bulkAddForm.addEventListener("submit", dodajMasowo);
-  magazynLista.addEventListener("click", obslugaTabeliMagazynu);
-  stockModalForm.addEventListener("submit", obslugaZmianyStanu);
-  stockModalCloseButton.onclick = () => {
-    stockModal.style.display = "none";
-  };
-  addOilBtn.addEventListener("click", dodajOlej);
-  converterLitryInput.addEventListener("input", przeliczOlej);
-  converterSztukiInput.addEventListener("input", przeliczOlej);
-  oilContainerSizeSelect.addEventListener("change", () => {
-    converterLitryInput.value = "";
-    converterSztukiInput.value = "";
-    przeliczOlej({ target: { id: "" } });
-  });
-  window.onclick = (event) => {
-    if (
-      event.target == completeModal ||
-      event.target == stockModal ||
-      event.target == kalendarzModal ||
-      event.target == assignModal
-    ) {
-      event.target.style.display = "none";
-    }
-  };
-  modalMagazynLista.addEventListener("click", dodajCzescDoZlecenia);
-  partsToRemoveList.addEventListener("click", obslugaListyCzesci);
-  zlecenieKlientSelect.addEventListener("change", (event) => {
-    const wybranyKlientId = event.target.value;
-    if (wybranyKlientId === "szybkie-zlecenie" || !wybranyKlientId) {
-      zlecenieMaszynaSelect.disabled = true;
-      zlecenieMaszynaSelect.innerHTML = `<option value="">${
-        wybranyKlientId ? "-- N/A --" : "-- Najpierw wybierz klienta --"
-      }</option>`;
-    } else {
-      const maszynyKlienta = wszystkieMaszyny.filter(
-        (m) => m.klientId === wybranyKlientId
-      );
-      let maszynySelectHtml = '<option value="">-- Wybierz maszynę --</option>';
-      if (maszynyKlienta.length > 0) {
-        maszynySelectHtml += maszynyKlienta
-          .map(
-            (m) => `<option value="${m.id}">${m.typMaszyny} ${m.model}</option>`
-          )
-          .join("");
-        zlecenieMaszynaSelect.disabled = false;
-      } else {
-        maszynySelectHtml =
-          '<option value="">-- Ten klient nie ma maszyn --</option>';
-        zlecenieMaszynaSelect.disabled = true;
-      }
-      zlecenieMaszynaSelect.innerHTML = maszynySelectHtml;
-    }
-  });
-  assignForm.addEventListener("submit", zapiszPrzypisanie);
-  assignModal.querySelector(".close-button").onclick = () => {
-    assignModal.style.display = "none";
-  };
-  document
-    .getElementById("assign-klient-select")
-    .addEventListener("change", (event) => {
-      const klientId = event.target.value;
-      const maszynyKlienta = wszystkieMaszyny.filter(
-        (m) => m.klientId === klientId
-      );
-      const maszynySelect = document.getElementById("assign-maszyna-select");
-      let html = '<option value="">-- Wybierz istniejącą --</option>';
-      if (klientId) {
-        html += maszynyKlienta
-          .map(
-            (m) => `<option value="${m.id}">${m.typMaszyny} ${m.model}</option>`
-          )
-          .join("");
-        document.getElementById("assign-machine-section").style.display =
-          "block";
-      } else {
-        document.getElementById("assign-machine-section").style.display =
-          "none";
-      }
-      maszynySelect.innerHTML = html;
-    });
-  kalendarzForm.addEventListener("submit", obslugaZapisuGodzin);
-  kalendarzContainer.addEventListener("click", obslugaKalendarza);
-  kalendarzModal.querySelector(".close-button").onclick = () => {
-    kalendarzModal.style.display = "none";
-  };
-
-  // --- INICJALIZACJA ---
-  inicjalizujKalendarz();
-  wyswietlKlientow();
-  wyswietlMaszyny();
-  wyswietlPrzejazdy();
-  wyswietlZlecenia();
-  wyswietlMagazyn();
 }
+
+/** Funkcja formatująca datę YYYY-MM-DD */
+function formatDate(date) {
+    const d = new Date(date);
+    let month = '' + (d.getMonth() + 1);
+    let day = '' + d.getDate();
+    const year = d.getFullYear();
+
+    if (month.length < 2) month = '0' + month;
+    if (day.length < 2) day = '0' + day;
+
+    return [year, month, day].join('-');
+}
+
+/** Wypełnianie listy select elementami z bazy (Klient/Maszyna) */
+function populateSelect(selectElementId, collectionName, displayKey) {
+    const select = document.getElementById(selectElementId);
+    if (!select) return;
+
+    db.collection(collectionName).onSnapshot(snapshot => {
+        let dataMap = {}; // Lokalna mapa dla aktualnego snapshotu
+        select.innerHTML = '<option value="">-- Wybierz --</option>';
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            dataMap[doc.id] = data; // Zapisujemy do mapy
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = data[displayKey];
+            select.appendChild(option);
+        });
+
+        // Aktualizacja globalnych map
+        if (collectionName === 'klienci') clientsData = dataMap;
+        if (collectionName === 'maszyny') machinesData = dataMap;
+
+        // Liczniki na Dashboard
+        if (collectionName === 'klienci') document.getElementById('clients-count').textContent = snapshot.size;
+        if (collectionName === 'maszyny') document.getElementById('machines-count').textContent = snapshot.size;
+
+        // Przeładowanie list po aktualizacji danych Klientów/Maszyn
+        renderClients();
+        renderMachines();
+    });
+}
+
+/** Renderowanie Listy Zleceń */
+function renderOrders(listId, orders) {
+    const list = document.getElementById(listId);
+    if (!list) return;
+    list.innerHTML = '';
+
+    orders.forEach(doc => {
+        const order = doc.data();
+        const client = clientsData[order.klientId] ? clientsData[order.klientId].nazwa : 'Brak Klienta';
+        const machine = machinesData[order.maszynaId] ? machinesData[order.maszynaId].nazwa : 'Brak Maszyny';
+
+        const listItem = document.createElement('li');
+        listItem.className = 'list-item';
+        listItem.innerHTML = `
+            <div>
+                <strong>${client}</strong> - ${machine}
+                <br>
+                <small>${order.opis.substring(0, 50)}...</small>
+            </div>
+            <div class="action-buttons">
+                <span class="${order.status === 'Aktywne' ? 'status-active' : 'status-finished'}">${order.status}</span>
+                <button class="details-btn" data-id="${doc.id}"><i class="fas fa-info-circle"></i> Szczegóły</button>
+            </div>
+        `;
+        list.appendChild(listItem);
+    });
+}
+
+// --- LOGIKA FIREBASE I LISTENERY ---
+
+function setupFirebaseListeners() {
+    // Klienci
+    populateSelect('client-select', 'klienci', 'nazwa');
+    
+    // Maszyny
+    populateSelect('machine-select', 'maszyny', 'nazwa');
+    
+    // Zlecenia
+    db.collection('zlecenia').onSnapshot(snapshot => {
+        const activeOrders = [];
+        const finishedOrders = [];
+        ordersData = {}; // Czyścimy globalną mapę zleceń
+
+        snapshot.forEach(doc => {
+            const order = doc.data();
+            ordersData[doc.id] = {...order, id: doc.id}; // Zapisujemy
+            if (order.status === 'Aktywne') {
+                activeOrders.push(doc);
+            } else {
+                finishedOrders.push(doc);
+            }
+        });
+
+        document.getElementById('active-orders-count').textContent = activeOrders.length;
+        document.getElementById('finished-orders-count').textContent = finishedOrders.length;
+
+        // RENDEROWANIE ZLECEŃ
+        renderOrders('active-orders-list', activeOrders);
+        renderOrders('finished-orders-list', finishedOrders);
+
+        // Ostatnie aktywne zlecenia na Dashboard (wersja bez filtrowania)
+        renderOrders('last-active-orders-list', activeOrders.slice(0, 5));
+        
+        // Renderowanie kalendarza, jeśli jest aktywny
+        if (!document.getElementById('kalendarz').classList.contains('hidden')) {
+             renderCalendar(currentMonth);
+        }
+    });
+
+    // Przypisania Kalendarza
+    db.collection('calendarAssignments').onSnapshot(snapshot => {
+        calendarAssignments = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            calendarAssignments[data.date] = data;
+        });
+        // Przeładuj kalendarz po wczytaniu danych
+        if (!document.getElementById('kalendarz').classList.contains('hidden')) {
+             renderCalendar(currentMonth);
+        }
+    });
+}
+
+// --- LOGIKA ZLECENIA (Krok 2) ---
+
+/** Wyszukiwanie zleceń */
+function filterOrders(searchTerm) {
+    const term = searchTerm.toLowerCase();
+    
+    // Pobierz wszystkie elementy list
+    const activeList = document.getElementById('active-orders-list');
+    const finishedList = document.getElementById('finished-orders-list');
+
+    // Funkcja do filtrowania listy
+    const filterList = (list) => {
+        Array.from(list.children).forEach(listItem => {
+            const textContent = listItem.textContent.toLowerCase();
+            if (textContent.includes(term)) {
+                listItem.style.display = 'flex'; // Pokaż element
+            } else {
+                listItem.style.display = 'none'; // Ukryj element
+            }
+        });
+    };
+
+    filterList(activeList);
+    filterList(finishedList);
+}
+
+/** Renderowanie szczegółów (Modal) */
+function openOrderDetailsModal(orderId) {
+    const order = ordersData[orderId];
+    if (!order) return;
+
+    const client = clientsData[order.klientId] ? clientsData[order.klientId].nazwa : 'Nieznany';
+    const machine = machinesData[order.maszynaId] ? machinesData[order.maszynaId].nazwa : 'Nieznana';
+
+    const detailsContent = document.getElementById('modal-order-details-content');
+    detailsContent.innerHTML = `
+        <p><strong>Klient:</strong> ${client}</p>
+        <p><strong>Maszyna:</strong> ${machine}</p>
+        <p><strong>Status:</strong> <span class="${order.status === 'Aktywne' ? 'status-active' : 'status-finished'}">${order.status}</span></p>
+        <p><strong>Data Rozpoczęcia:</strong> ${order.data}</p>
+        <p><strong>Opis:</strong> ${order.opis}</p>
+        
+        <h4>Historia (Symulowana)</h4>
+        <p><small>Brak faktycznej historii zmian w bazie, ale tu mogłaby się pojawić:</small></p>
+        <ul>
+            <li><small>Dodano: ${order.data}</small></li>
+            <li><small>Status zmieniony na ${order.status} (Symulacja)</small></li>
+        </ul>
+    `;
+    document.getElementById('order-details-modal').style.display = 'block';
+}
+
+/** Zwijanie listy zakończonych zleceń */
+function setupCollapsible() {
+    const toggle = document.getElementById('finished-orders-toggle');
+    const content = document.getElementById('finished-orders-list');
+    
+    toggle.addEventListener('click', () => {
+        const isHidden = content.style.display === 'none';
+        content.style.display = isHidden ? 'block' : 'none';
+        toggle.classList.toggle('active', !isHidden);
+    });
+}
+
+
+// --- LOGIKA KLIENTÓW I MASZYN (Krok 3) ---
+
+/** Renderowanie Listy Klientów z przyciskiem edycji */
+function renderClients() {
+    const list = document.getElementById('clients-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    Object.keys(clientsData).forEach(id => {
+        const client = clientsData[id];
+        const listItem = document.createElement('li');
+        listItem.className = 'list-item';
+        listItem.innerHTML = `
+            <div>
+                <strong>${client.nazwa}</strong><br>
+                <small>${client.email || 'Brak emaila'} | ${client.telefon || 'Brak telefonu'}</small>
+            </div>
+            <div class="action-buttons">
+                <button class="edit-client-btn" data-id="${id}"><i class="fas fa-edit"></i> Edytuj</button>
+            </div>
+        `;
+        list.appendChild(listItem);
+    });
+}
+
+/** Renderowanie Listy Maszyn z przyciskiem edycji */
+function renderMachines() {
+    const list = document.getElementById('machines-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    Object.keys(machinesData).forEach(id => {
+        const machine = machinesData[id];
+        const listItem = document.createElement('li');
+        listItem.className = 'list-item';
+        listItem.innerHTML = `
+            <div>
+                <strong>${machine.nazwa}</strong><br>
+                <small>VIN: ${machine.vin || 'Brak VIN'} | Uwagi: ${machine.notes.substring(0, 30) || 'Brak'}</small>
+            </div>
+            <div class="action-buttons">
+                <button class="edit-machine-btn" data-id="${id}"><i class="fas fa-edit"></i> Edytuj</button>
+            </div>
+        `;
+        list.appendChild(listItem);
+    });
+}
+
+/** Otwieranie modala edycji Klienta */
+function openClientEditModal(id) {
+    const client = clientsData[id];
+    if (!client) return;
+
+    document.getElementById('edit-client-id').value = id;
+    document.getElementById('edit-client-name').value = client.nazwa || '';
+    document.getElementById('edit-client-phone').value = client.telefon || '';
+    document.getElementById('edit-client-email').value = client.email || '';
+
+    document.getElementById('client-edit-modal').style.display = 'block';
+}
+
+/** Otwieranie modala edycji Maszyny */
+function openMachineEditModal(id) {
+    const machine = machinesData[id];
+    if (!machine) return;
+
+    document.getElementById('edit-machine-id').value = id;
+    document.getElementById('edit-machine-name').value = machine.nazwa || '';
+    document.getElementById('edit-machine-vin').value = machine.vin || '';
+    document.getElementById('edit-machine-notes').value = machine.notes || '';
+
+    document.getElementById('machine-edit-modal').style.display = 'block';
+}
+
+/** Zapis edycji Klienta */
+function saveClientEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-client-id').value;
+    
+    db.collection('klienci').doc(id).update({
+        nazwa: document.getElementById('edit-client-name').value,
+        telefon: document.getElementById('edit-client-phone').value,
+        email: document.getElementById('edit-client-email').value,
+    })
+    .then(() => {
+        alert('Klient zaktualizowany pomyślnie!');
+        document.getElementById('client-edit-modal').style.display = 'none';
+    })
+    .catch(error => {
+        console.error('Błąd aktualizacji klienta:', error);
+        alert('Błąd podczas aktualizacji klienta.');
+    });
+}
+
+/** Zapis edycji Maszyny */
+function saveMachineEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-machine-id').value;
+    
+    db.collection('maszyny').doc(id).update({
+        nazwa: document.getElementById('edit-machine-name').value,
+        vin: document.getElementById('edit-machine-vin').value,
+        notes: document.getElementById('edit-machine-notes').value,
+    })
+    .then(() => {
+        alert('Maszyna zaktualizowana pomyślnie!');
+        document.getElementById('machine-edit-modal').style.display = 'none';
+    })
+    .catch(error => {
+        console.error('Błąd aktualizacji maszyny:', error);
+        alert('Błąd podczas aktualizacji maszyny.');
+    });
+}
+
+// --- LOGIKA KALENDARZA (Krok 4) ---
+
+/** Renderowanie Kalendarza */
+function renderCalendar(date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const today = new Date();
+
+    const monthNames = ["Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec", "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"];
+    document.getElementById('current-month-year').textContent = `${monthNames[month]} ${year}`;
+
+    const calendarGrid = document.getElementById('calendar-grid');
+    calendarGrid.innerHTML = '';
+
+    // Ustawienie na pierwszy dzień miesiąca
+    const firstDayOfMonth = new Date(year, month, 1);
+    // 0 = Niedziela, 1 = Poniedziałek. Przekształcamy 0 (Niedz) na 7
+    let startingDay = firstDayOfMonth.getDay();
+    if (startingDay === 0) startingDay = 7;
+    // Indeks: 1 (Pon) -> 0. 7 (Niedz) -> 6.
+    startingDay = startingDay - 1; 
+
+    // Ostatni dzień poprzedniego miesiąca
+    const lastDayOfPrevMonth = new Date(year, month, 0).getDate();
+
+    // Ostatni dzień aktualnego miesiąca
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    let dayCounter = 1;
+    let nextMonthDayCounter = 1;
+
+    // Rysowanie dni
+    for (let i = 0; i < 42; i++) { // 6 tygodni
+        const dayElement = document.createElement('div');
+        dayElement.className = 'calendar-day';
+
+        let dateString, displayDay;
+        let isCurrentMonth = true;
+
+        if (i < startingDay) {
+            // Dni poprzedniego miesiąca
+            displayDay = lastDayOfPrevMonth - startingDay + i + 1;
+            dayElement.classList.add('inactive');
+            isCurrentMonth = false;
+        } else if (dayCounter <= daysInMonth) {
+            // Dni aktualnego miesiąca
+            displayDay = dayCounter;
+            dateString = formatDate(new Date(year, month, dayCounter));
+            dayElement.dataset.date = dateString;
+
+            // Zaznaczanie dzisiejszej daty
+            if (year === today.getFullYear() && month === today.getMonth() && dayCounter === today.getDate()) {
+                dayElement.classList.add('today');
+            }
+
+            dayCounter++;
+        } else {
+            // Dni następnego miesiąca
+            displayDay = nextMonthDayCounter;
+            dayElement.classList.add('inactive');
+            isCurrentMonth = false;
+            nextMonthDayCounter++;
+        }
+
+        dayElement.innerHTML = `<span class="day-number">${displayDay}</span>`;
+
+        // Dodawanie przypisanych zleceń
+        if (isCurrentMonth && calendarAssignments[dateString]) {
+            const assignment = calendarAssignments[dateString];
+            const order = ordersData[assignment.orderId];
+            
+            if (order) {
+                const clientName = clientsData[order.klientId] ? clientsData[order.klientId].nazwa : 'Brak Klienta';
+                
+                dayElement.innerHTML += `
+                    <div class="assignment-item" data-date="${dateString}" data-order-id="${assignment.orderId}">
+                        ${clientName}
+                        ${assignment.drivingTime ? `<span class="driving-time">(${assignment.drivingTime})</span>` : ''}
+                    </div>
+                `;
+            }
+        }
+        
+        // Ustawienie listenera tylko dla dni aktualnego miesiąca
+        if (isCurrentMonth) {
+            dayElement.addEventListener('click', (e) => {
+                const clickedDate = dayElement.dataset.date;
+                // Jeśli kliknięto na element przypisania, otwórz modal w trybie edycji/usuwania
+                if (e.target.classList.contains('assignment-item')) {
+                    openCalendarAssignModal(clickedDate, e.target.dataset.orderId);
+                } else {
+                    // Jeśli kliknięto na pole dnia, otwórz modal dla tego dnia
+                    openCalendarAssignModal(clickedDate);
+                }
+            });
+        }
+        
+        calendarGrid.appendChild(dayElement);
+
+        if (dayCounter > daysInMonth && nextMonthDayCounter > 7) break; // Zoptymalizowane wyjście
+    }
+}
+
+/** Otwieranie modala przypisywania zlecenia do kalendarza */
+function openCalendarAssignModal(dateString, orderIdToEdit = null) {
+    const modal = document.getElementById('calendar-assign-modal');
+    const select = document.getElementById('assign-order-select');
+    const removeBtn = document.getElementById('remove-assignment-btn');
+
+    document.getElementById('assign-date-display').textContent = dateString;
+    document.getElementById('assign-date-input').value = dateString;
+    
+    // Wypełnianie listy zleceń (zarówno aktywnych, jak i zakończonych)
+    select.innerHTML = '<option value="">-- Wybierz zlecenie --</option>';
+    Object.values(ordersData).forEach(order => {
+        const option = document.createElement('option');
+        option.value = order.id;
+        const clientName = clientsData[order.klientId] ? clientsData[order.klientId].nazwa : 'Brak Klienta';
+        option.textContent = `[${order.status.substring(0, 1)}] ${clientName} - ${order.data}`;
+        select.appendChild(option);
+    });
+    
+    // Edycja istniejącego przypisania
+    if (orderIdToEdit) {
+        const assignment = calendarAssignments[dateString];
+        select.value = orderIdToEdit;
+        document.getElementById('driving-time').value = assignment.drivingTime || '';
+        removeBtn.style.display = 'block';
+        removeBtn.onclick = () => removeCalendarAssignment(dateString);
+    } else if (calendarAssignments[dateString]) {
+        // Jeśli dzień jest już przypisany (przez kliknięcie na pole)
+        const assignment = calendarAssignments[dateString];
+        select.value = assignment.orderId;
+        document.getElementById('driving-time').value = assignment.drivingTime || '';
+        removeBtn.style.display = 'block';
+        removeBtn.onclick = () => removeCalendarAssignment(dateString);
+    } else {
+        // Nowe przypisanie
+        select.value = '';
+        document.getElementById('driving-time').value = '';
+        removeBtn.style.display = 'none';
+        removeBtn.onclick = null;
+    }
+
+    modal.style.display = 'block';
+}
+
+/** Nawigacja Miesiącami */
+function setupCalendarNavigation() {
+    document.getElementById('prev-month').addEventListener('click', () => {
+        currentMonth.setMonth(currentMonth.getMonth() - 1);
+        renderCalendar(currentMonth);
+    });
+
+    document.getElementById('next-month').addEventListener('click', () => {
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+        renderCalendar(currentMonth);
+    });
+}
+
+/** Zapisywanie Przypisania do Kalendarza */
+function saveCalendarAssignment(e) {
+    e.preventDefault();
+    const date = document.getElementById('assign-date-input').value;
+    const orderId = document.getElementById('assign-order-select').value;
+    const drivingTime = document.getElementById('driving-time').value;
+
+    if (!orderId) {
+        alert("Proszę wybrać zlecenie.");
+        return;
+    }
+
+    // Używamy daty jako ID dokumentu, co zapewnia unikalność przypisania w danym dniu
+    db.collection('calendarAssignments').doc(date).set({
+        date: date,
+        orderId: orderId,
+        drivingTime: drivingTime,
+    })
+    .then(() => {
+        document.getElementById('calendar-assign-modal').style.display = 'none';
+        alert('Zlecenie przypisane do kalendarza.');
+        // Renderowanie Kalendarza jest automatycznie odświeżane przez listener (onSnapshot)
+    })
+    .catch(error => {
+        console.error('Błąd zapisu przypisania:', error);
+        alert('Błąd podczas zapisywania przypisania.');
+    });
+}
+
+/** Usuwanie Przypisania z Kalendarza */
+function removeCalendarAssignment(date) {
+     if (!confirm(`Czy na pewno chcesz usunąć przypisanie dla dnia ${date}?`)) {
+        return;
+    }
+    
+    db.collection('calendarAssignments').doc(date).delete()
+    .then(() => {
+        document.getElementById('calendar-assign-modal').style.display = 'none';
+        alert('Przypisanie usunięte.');
+    })
+    .catch(error => {
+        console.error('Błąd usuwania przypisania:', error);
+        alert('Błąd podczas usuwania przypisania.');
+    });
+}
+
+// --- LOGIKA PRZEŁĄCZNIKA MOTYWU ---
+
+function setupThemeToggle() {
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    function setTheme(theme) {
+        if (theme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            if (themeToggle) themeToggle.checked = true;
+        } else {
+            document.body.removeAttribute('data-theme');
+            if (themeToggle) themeToggle.checked = false;
+        }
+        localStorage.setItem('theme', theme);
+    }
+
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(savedTheme);
+
+    if (themeToggle) {
+        themeToggle.addEventListener('change', () => {
+            if (themeToggle.checked) {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+        });
+    }
+}
+
+// --- GŁÓWNA FUNKCJA INICJALIZUJĄCA ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Uruchomienie Firebase (z firebase-config.js)
+    try {
+        // Konfiguracja jest wczytywana z zewnętrznego pliku firebase-config.js
+        firebase.initializeApp(firebaseConfig); 
+    } catch (e) {
+        console.error("Błąd inicjalizacji Firebase (sprawdź firebase-config.js):", e);
+    }
+    
+    // Inicjalizacja baz danych i elementów
+    setupFirebaseListeners();
+    setupThemeToggle();
+    setupCollapsible();
+    setupCalendarNavigation();
+
+    // Domyślne wyświetlanie sekcji
+    showSection('dashboard');
+
+    // --- Listenery Formularzy ---
+    
+    // Listener wyszukiwania zleceń (Krok 2)
+    const orderSearchInput = document.getElementById('order-search');
+    if (orderSearchInput) {
+        orderSearchInput.addEventListener('input', (e) => {
+            filterOrders(e.target.value);
+        });
+    }
+
+    // Delegowanie kliknięć dla przycisków akcji (Szczegóły, Edycja)
+    document.addEventListener('click', (e) => {
+        // Przycisk Szczegóły Zlecenia (Krok 2)
+        if (e.target.classList.contains('details-btn')) {
+            openOrderDetailsModal(e.target.dataset.id);
+        }
+        // Przycisk Edycja Klienta (Krok 3)
+        if (e.target.classList.contains('edit-client-btn')) {
+            openClientEditModal(e.target.dataset.id);
+        }
+        // Przycisk Edycja Maszyny (Krok 3)
+        if (e.target.classList.contains('edit-machine-btn')) {
+            openMachineEditModal(e.target.dataset.id);
+        }
+    });
+
+    // Zapis Edycji Klienta (Krok 3)
+    const clientEditForm = document.getElementById('client-edit-form');
+    if (clientEditForm) {
+        clientEditForm.addEventListener('submit', saveClientEdit);
+    }
+    
+    // Zapis Edycji Maszyny (Krok 3)
+    const machineEditForm = document.getElementById('machine-edit-form');
+    if (machineEditForm) {
+        machineEditForm.addEventListener('submit', saveMachineEdit);
+    }
+
+    // Zapis Przypisania Kalendarza (Krok 4)
+    const calendarAssignForm = document.getElementById('calendar-assign-form');
+    if (calendarAssignForm) {
+        calendarAssignForm.addEventListener('submit', saveCalendarAssignment);
+    }
+
+    // Przełączanie widoczności formularzy
+    document.querySelectorAll('.toggle-form-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const form = button.closest('.widget').querySelector('form');
+            if (form) {
+                form.classList.toggle('hidden-form');
+                button.querySelector('i').classList.toggle('fa-plus');
+                button.querySelector('i').classList.toggle('fa-minus');
+            }
+        });
+    });
+
+    // Zamknięcie modali
+    document.querySelectorAll('.modal .close-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').style.display = 'none';
+        });
+    });
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            e.target.style.display = 'none';
+        }
+    });
+
+    // --- OBSŁUGA POZOSTAŁYCH FORMULARZY (Zgodnie z Twoim oryginalnym kodem) ---
+
+    // Formularz dodawania Zlecenia
+    const orderForm = document.getElementById('order-form');
+    if (orderForm) {
+        orderForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                klientId: document.getElementById('client-select').value,
+                maszynaId: document.getElementById('machine-select').value,
+                data: document.getElementById('order-date').value,
+                opis: document.getElementById('order-description').value,
+                status: document.getElementById('order-status').value
+            };
+            db.collection('zlecenia').add(data)
+                .then(() => {
+                    alert('Zlecenie dodane pomyślnie!');
+                    document.getElementById('order-form').reset();
+                })
+                .catch(error => console.error("Błąd dodawania zlecenia: ", error));
+        });
+    }
+
+
+    // Formularz dodawania Klienta
+    const clientForm = document.getElementById('client-form');
+    if (clientForm) {
+        clientForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                nazwa: document.getElementById('client-name').value,
+                telefon: document.getElementById('client-phone').value,
+                email: document.getElementById('client-email').value,
+            };
+            db.collection('klienci').add(data)
+                .then(() => {
+                    alert('Klient dodany pomyślnie!');
+                    document.getElementById('client-form').reset();
+                })
+                .catch(error => console.error("Błąd dodawania klienta: ", error));
+        });
+    }
+
+    // Formularz dodawania Maszyny
+    const machineForm = document.getElementById('machine-form');
+    if (machineForm) {
+        machineForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                nazwa: document.getElementById('machine-name').value,
+                vin: document.getElementById('machine-vin').value,
+                notes: document.getElementById('machine-notes').value,
+            };
+            db.collection('maszyny').add(data)
+                .then(() => {
+                    alert('Maszyna dodana pomyślnie!');
+                    document.getElementById('machine-form').reset();
+                })
+                .catch(error => console.error("Błąd dodawania maszyny: ", error));
+        });
+    }
+    
+});
