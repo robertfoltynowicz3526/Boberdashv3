@@ -85,7 +85,7 @@ function initializeApp() {
     if(miesiacPrzejazdyInput) miesiacPrzejazdyInput.value = currentMonth;
     document.querySelector('.tab-button').click();
     inicjujCiemnyMotyw(); // <--- DODAJ TĘ LINIĘ
-    inicjujZwijanie();bash
+    inicjujZwijanie();
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
@@ -1113,6 +1113,7 @@ function obslugaListyZlecenWModaluHistorii(event) {
     wyswietlPrzejazdy();
     wyswietlMagazyn();
 
-} // KONIEC initializeApp()
+} 
+// KONIEC initializeApp()
 // Ta ostatnia linijka (klamra zamykająca funkcję initializeApp) jest bardzo ważna!
 // Upewnij się, że ją wkleiłeś na samym końcu pliku.
