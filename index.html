@@ -3,273 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Zarządzania Zleceniami</title>
+    <title>Dashboard Serwisowy</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 </head>
 <body>
 
-    <nav class="sidebar">
-        <div class="logo">Dashboard v2</div>
-        <ul>
-            <li><a href="#" onclick="showSection('dashboard')"><i class="fas fa-home"></i> Dashboard</a></li>
-            <li><a href="#" onclick="showSection('zlecenia')"><i class="fas fa-list-alt"></i> Zlecenia</a></li>
-            <li><a href="#" onclick="showSection('klienci')"><i class="fas fa-users"></i> Klienci</a></li>
-            <li><a href="#" onclick="showSection('maszyny')"><i class="fas fa-truck"></i> Maszyny</a></li>
-            <li><a href="#" onclick="showSection('kalendarz')"><i class="fas fa-calendar-alt"></i> Kalendarz</a></li>
-            <li><a href="#" onclick="showSection('ustawienia')"><i class="fas fa-cog"></i> Ustawienia</a></li>
-            
-            <li class="theme-switcher">
-                <i class="fas fa-moon"></i>
-                <span>Motyw</span>
-                <label class="switch">
-                    <input type="checkbox" id="theme-toggle">
-                    <span class="slider"></span>
-                </label>
-            </li>
-            </ul>
-    </nav>
+    <header class="header">
+        <h1>Dashboard Serwisowy</h1>
+        <div class="theme-switcher">
+            <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox">
+            <label for="theme-toggle" class="theme-toggle-label"></label>
+        </div>
+    </header>
 
-    <main class="content">
-        <header>
-            <h1><span id="current-section-title">Dashboard</span></h1>
-        </header>
-
-        <section id="dashboard">
-            <div class="widget-grid">
-                <div class="widget">
-                    <h3>Aktywne Zlecenia</h3>
-                    <p id="active-orders-count">0</p>
+    <div class="container">
+        <div class="main-content">
+            <section class="card zlecenia">
+                <h2>Nowe zlecenia</h2>
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Wyszukaj po ID, kliencie, maszynie...">
                 </div>
-                <div class="widget">
-                    <h3>Klientów w Bazie</h3>
-                    <p id="clients-count">0</p>
-                </div>
-                <div class="widget">
-                    <h3>Dostępne Maszyny</h3>
-                    <p id="machines-count">0</p>
-                </div>
-                <div class="widget">
-                    <h3>Zakończone zlecenia</h3>
-                    <p id="finished-orders-count">0</p>
-                </div>
-            </div>
-            
-            <div class="widget">
-                <div class="widget-header">
-                    <h3>Ostatnie Aktywne Zlecenia</h3>
-                </div>
-                <ul id="last-active-orders-list" class="list">
+                <ul id="nowe-zlecenia-lista" class="zlecenia-lista">
                     </ul>
-            </div>
-        </section>
+            </section>
 
-        <section id="zlecenia" class="hidden">
-            <h2>Zlecenia</h2>
-            <div class="widget">
-                <div class="widget-header">
-                    <h3>Dodaj Nowe Zlecenie</h3>
-                    <button class="toggle-form-btn"><i class="fas fa-plus"></i></button>
+            <section class="card zlecenia">
+                <h2 id="zakonczone-header" class="collapsible-header">
+                    Zakończone zlecenia
+                    <span class="toggle-arrow">▼</span>
+                </h2>
+                <div id="zakonczone-content" class="collapsible-content">
+                    <ul id="zakonczone-zlecenia-lista" class="zlecenia-lista">
+                        </ul>
                 </div>
-                <form id="order-form" class="hidden-form">
-                    <label for="client-select">Klient:</label>
-                    <select id="client-select" required></select>
+            </section>
+        </div>
 
-                    <label for="machine-select">Maszyna:</label>
-                    <select id="machine-select" required></select>
-
-                    <label for="order-date">Data rozpoczęcia:</label>
-                    <input type="date" id="order-date" required>
-
-                    <label for="order-description">Opis:</label>
-                    <textarea id="order-description" required></textarea>
-
-                    <label for="order-status">Status:</label>
-                    <select id="order-status">
-                        <option value="Aktywne">Aktywne</option>
-                        <option value="Zakończone">Zakończone</option>
-                    </select>
-
-                    <button type="submit">Dodaj Zlecenie</button>
-                </form>
-            </div>
-            
-            <div class="widget">
-                <h3>Wyszukaj Zlecenie</h3>
-                <input type="text" id="order-search" placeholder="Wyszukaj po kliencie, maszynie lub opisie...">
-            </div>
-
-            <div class="widget">
-                <h3>Aktywne Zlecenia</h3>
-                <ul id="active-orders-list" class="list">
-                    </ul>
-            </div>
-
-            <div class="widget">
-                <h3 id="finished-orders-toggle" class="collapsible-header">
-                    Zakończone Zlecenia <i class="fas fa-chevron-down"></i>
-                </h3>
-                <ul id="finished-orders-list" class="list collapsible-content" style="display: none;">
-                    </ul>
-            </div>
-        </section>
-
-        <section id="klienci" class="hidden">
-            <h2>Klienci</h2>
-            <div class="widget">
-                <div class="widget-header">
-                    <h3>Dodaj Nowego Klienta</h3>
-                    <button class="toggle-form-btn"><i class="fas fa-plus"></i></button>
+        <aside class="sidebar">
+            <section class="card kalendarz">
+                <h2>Kalendarz</h2>
+                <div class="calendar-header">
+                    <button id="prev-month" class="calendar-nav">&lt;</button>
+                    <h3 id="month-year"></h3>
+                    <button id="next-month" class="calendar-nav">&gt;</button>
                 </div>
-                <form id="client-form" class="hidden-form">
-                    <label for="client-name">Imię i Nazwisko/Firma:</label>
-                    <input type="text" id="client-name" required>
-
-                    <label for="client-phone">Telefon:</label>
-                    <input type="text" id="client-phone">
-
-                    <label for="client-email">Email:</label>
-                    <input type="email" id="client-email">
-
-                    <button type="submit">Dodaj Klienta</button>
-                </form>
-            </div>
-
-            <div class="widget">
-                <h3>Lista Klientów</h3>
-                <ul id="clients-list" class="list">
-                    </ul>
-            </div>
-        </section>
-
-        <section id="maszyny" class="hidden">
-            <h2>Maszyny</h2>
-            <div class="widget">
-                <div class="widget-header">
-                    <h3>Dodaj Nową Maszynę</h3>
-                    <button class="toggle-form-btn"><i class="fas fa-plus"></i></button>
-                </div>
-                <form id="machine-form" class="hidden-form">
-                    <label for="machine-name">Nazwa / Model:</label>
-                    <input type="text" id="machine-name" required>
-
-                    <label for="machine-vin">Numer VIN:</label>
-                    <input type="text" id="machine-vin">
-
-                    <label for="machine-notes">Uwagi:</label>
-                    <textarea id="machine-notes"></textarea>
-
-                    <button type="submit">Dodaj Maszynę</button>
-                </form>
-            </div>
-
-            <div class="widget">
-                <h3>Lista Maszyn</h3>
-                <ul id="machines-list" class="list">
-                    </ul>
-            </div>
-        </section>
-
-        <section id="kalendarz" class="hidden">
-            <h2>Kalendarz</h2>
-            <div class="widget">
-                <div id="calendar-view">
-                    <div class="calendar-header">
-                        <button id="prev-month"><i class="fas fa-chevron-left"></i></button>
-                        <h3 id="current-month-year"></h3>
-                        <button id="next-month"><i class="fas fa-chevron-right"></i></button>
+                <div id="calendar-grid" class="calendar-grid">
                     </div>
-                    <div class="calendar-days-of-week">
-                        <span>PN</span><span>WT</span><span>ŚR</span><span>CZW</span><span>PT</span><span>SB</span><span>ND</span>
-                    </div>
-                    <div id="calendar-grid">
-                        </div>
-                </div>
+            </section>
+
+            <section class="card">
+                <h2>Klienci</h2>
+                <ul id="klienci-lista">
+                    </ul>
+            </section>
+
+            <section class="card">
+                <h2>Maszyny</h2>
+                <ul id="maszyny-lista">
+                    </ul>
+            </section>
+        </aside>
+    </div>
+
+    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
+
+    <div id="app-modal" class="modal hidden">
+        <button id="modal-close-btn" class="modal-close-btn">&times;</button>
+        <h2 id="modal-title"></h2>
+        <div id="modal-content">
             </div>
-        </section>
-
-        <section id="ustawienia" class="hidden">
-            <h2>Ustawienia</h2>
-            <div class="widget">
-                <p>Ustawienia projektu.</p>
-            </div>
-        </section>
-
-    </main>
-
-    <div id="order-details-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3>Szczegóły Zlecenia</h3>
-            <div id="modal-order-details-content">
-                </div>
-        </div>
     </div>
 
-    <div id="client-edit-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3>Edytuj Klienta</h3>
-            <form id="client-edit-form">
-                <input type="hidden" id="edit-client-id">
-                <label for="edit-client-name">Imię i Nazwisko/Firma:</label>
-                <input type="text" id="edit-client-name" required>
-
-                <label for="edit-client-phone">Telefon:</label>
-                <input type="text" id="edit-client-phone">
-
-                <label for="edit-client-email">Email:</label>
-                <input type="email" id="edit-client-email">
-
-                <button type="submit">Zapisz Zmiany</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="machine-edit-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3>Edytuj Maszynę</h3>
-            <form id="machine-edit-form">
-                <input type="hidden" id="edit-machine-id">
-                <label for="edit-machine-name">Nazwa / Model:</label>
-                <input type="text" id="edit-machine-name" required>
-
-                <label for="edit-machine-vin">Numer VIN:</label>
-                <input type="text" id="edit-machine-vin">
-
-                <label for="edit-machine-notes">Uwagi:</label>
-                <textarea id="edit-machine-notes"></textarea>
-
-                <button type="submit">Zapisz Zmiany</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="calendar-assign-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3>Przypisz Zlecenie do: <span id="assign-date-display"></span></h3>
-            <form id="calendar-assign-form">
-                <input type="hidden" id="assign-date-input">
-
-                <label for="assign-order-select">Wybierz Zlecenie (Aktywne/Zakończone):</label>
-                <select id="assign-order-select" required>
-                    <option value="">-- Wybierz zlecenie --</option>
-                    </select>
-
-                <label for="driving-time">Czas Jazdy (h:mm):</label>
-                <input type="text" id="driving-time" pattern="\d{1,2}:\d{2}" placeholder="np. 01:30 (godziny:minuty)">
-
-                <button type="submit">Przypisz</button>
-                <button type="button" id="remove-assignment-btn" class="delete-btn" style="display:none;">Usuń Przypisanie</button>
-            </form>
-        </div>
-    </div>
-
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-firestore.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="script.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
