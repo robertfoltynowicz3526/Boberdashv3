@@ -1,80 +1,211 @@
 <!DOCTYPE html>
 <html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Serwisowy</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-</head>
-<body>
-
-    <header class="header">
-        <h1>Dashboard Serwisowy</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Serwisowy</title>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="/main.js" defer></script>
+  </head>
+  <body>
+    <header>
+        <h1>System Serwisowy</h1>
+        <nav>
+            <button class="tab-button" onclick="openTab(event, 'pulpit')">Pulpit</button>
+            <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
+            <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
+            <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
+            <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
+            <button class="tab-button" onclick="openTab(event, 'przejazdy')">Przejazdy</button>
+        </nav>
         <div class="theme-switcher">
             <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox">
             <label for="theme-toggle" class="theme-toggle-label"></label>
         </div>
-    </header>
-
-    <div class="container">
-        <div class="main-content">
-            <section class="card zlecenia">
-                <h2>Nowe zlecenia</h2>
-                <div class="search-bar">
-                    <input type="text" id="search-input" placeholder="Wyszukaj po ID, kliencie, maszynie...">
-                </div>
-                <ul id="nowe-zlecenia-lista" class="zlecenia-lista">
-                    </ul>
-            </section>
-
-            <section class="card zlecenia">
-                <h2 id="zakonczone-header" class="collapsible-header">
-                    Zakończone zlecenia
-                    <span class="toggle-arrow">▼</span>
-                </h2>
-                <div id="zakonczone-content" class="collapsible-content">
-                    <ul id="zakonczone-zlecenia-lista" class="zlecenia-lista">
-                        </ul>
-                </div>
-            </section>
-        </div>
-
-        <aside class="sidebar">
-            <section class="card kalendarz">
-                <h2>Kalendarz</h2>
-                <div class="calendar-header">
-                    <button id="prev-month" class="calendar-nav">&lt;</button>
-                    <h3 id="month-year"></h3>
-                    <button id="next-month" class="calendar-nav">&gt;</button>
-                </div>
-                <div id="calendar-grid" class="calendar-grid">
+    </header>
+    <main>
+        <div id="pulpit" class="tab-content">
+            <h2>Pulpit i Ewidencja Czasu Pracy</h2>
+            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
+            <div id="kalendarz" class="calendar-container"></div>
+        </div>
+        <div id="klienci" class="tab-content">
+            <h2>Baza Klientów</h2>
+            <div class="form-section">
+                <h3>Dodaj nowego klienta</h3>
+                <form id="klient-form">
+                    <div class="form-group"><label for="klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="klient-nazwa" required></div>
+                    <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
+                    <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
+                    <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon"></div>
+                    <button type="submit">Dodaj Klienta</button>
+                </form>
+            </div>
+            <div class="table-section"><h3>Lista Klientów</h3><ul id="lista-klientow"></ul></div>
+        </div>
+        <div id="maszyny" class="tab-content">
+            <h2>Baza Maszyn</h2>
+            <div class="form-section">
+                <h3>Dodaj nową maszynę</h3>
+                <form id="maszyna-form">
+                    <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
+                    <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
+                    <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
+                    <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
+                    <div class="form-group"><label for="maszyna-rok">Rok produkcji:</label><input type="number" id="maszyna-rok"></div>
+                    <div class="form-group"><label for="maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="maszyna-mth"></div>
+                    <button type="submit">Dodaj Maszynę</button>
+                </form>
+            </div>
+            <div class="table-section"><h3>Lista Maszyn</h3><div id="lista-maszyn"></div></div>
+        </div>
+        <div id="zlecenia" class="tab-content">
+            <h2>Zlecenia</h2>
+            <div class="form-section">
+                <h3>Dodaj nowe zlecenie</h3>
+                <form id="zlecenie-form">
+                    <div class="form-grid-2">
+                        <div class="form-group"><label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label><select id="zlecenie-klient-select"><option value="">-- Wybierz --</option></select></div>
+                        <div class="form-group"><label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
                     </div>
-            </section>
-
-            <section class="card">
-                <h2>Klienci</h2>
-                <ul id="klienci-lista">
-                    </ul>
-            </section>
-
-            <section class="card">
-                <h2>Maszyny</h2>
-                <ul id="maszyny-lista">
-                    </ul>
-            </section>
-        </aside>
-    </div>
-
-    <div id="modal-backdrop" class="modal-backdrop hidden"></div>
-
-    <div id="app-modal" class="modal hidden">
-        <button id="modal-close-btn" class="modal-close-btn">&times;</button>
-        <h2 id="modal-title"></h2>
-        <div id="modal-content">
+                    <div class="form-grid-2">
+                        <div class="form-group"><label for="nr-zlecenia">Nr zlecenia / Nazwa dla szybkiego zlecenia:</label><input type="text" id="nr-zlecenia" required></div>
+                        <div class="form-group"><label for="zlecenie-data">Data zlecenia (dla kalendarza):</label><input type="date" id="zlecenie-data" required></div>
+                    </div>
+                    <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
+                    <div class="form-group"><label for="motogodziny">Motogodziny (opcjonalnie):</label><input type="number" id="motogodziny" step="0.1"></div>
+                    <button type="submit">Dodaj Zlecenie</button>
+                </form>
+            </div>
+            <div class="search-section">
+                <div class="form-group">
+                    <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
+                    <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
+                </div>
             </div>
+            <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div><hr>
+            <div class="table-section">
+                                <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
+                    Zakończone zlecenia <span class="arrow">▼</span>
+                </h3>
+                <div id="zakonczone-zlecenia-content" class="collapsible-content">
+                    <div class="summary-controls"><label for="miesiac-summary">Podsumowanie dla miesiąca:</label><input type="month" id="miesiac-summary"><button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button></div>
+                    <div id="summary-container"></div><div id="ukonczone-zlecenia-lista"></div>
+                </div>
+            </div>
+        </div>
+        <div id="magazyn" class="tab-content">
+            <h2>Magazyn</h2>
+            <div class="magazyn-forms">
+                <div class="form-section"><h3>Dodaj produkt</h3><form id="magazyn-form"><div class="form-group"><label for="item-index">Index:</label><input type="text" id="item-index" required></div><div class="form-group"><label for="item-name">Nazwa:</label><input type="text" id="item-name" required></div><div class="form-group"><label for="item-ilosc">Ilość:</label><input type="number" step="1" id="item-ilosc" required></div><div class="form-group"><label for="item-klient">Klient:</label><input type="text" id="item-klient"></div><button type="submit">Dodaj</button></form></div>
+                <div class="form-section"><h3>Masowe dodawanie</h3><form id="bulk-add-form"><div class="form-group"><label for="bulk-klient">Klient:</label><input type="text" id="bulk-klient" required></div><div class="form-group"><label for="bulk-items">Produkty:</label><textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea></div><button type="submit">Dodaj</button></form></div>
+                <div class="form-section"><h3>Zarządzanie Olejami</h3><div class="form-group"><label for="oil-type">Typ Oleju:</label><select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select></div><div class="form-group"><label for="oil-container-size">Pojemnik (L):</label><select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select></div><button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button><hr style="margin-top:1rem; margin-bottom: 1rem;"><h4>Przelicznik</h4><div class="form-group"><label for="converter-litry">Litry:</label><input type="number" step="0.01" id="converter-litry"></div><p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p><hr style="margin-top:1rem; margin-bottom: 1rem;"><div class="form-group"><label for="converter-sztuki">Sztuki:</label><input type="number" step="0.01" id="converter-sztuki"></div><p>Wynik: <strong id="result-litry">0.00 L</strong></p></div>
+            </div>
+            <div class="table-section"><h3>Stan Magazynowy</h3><table id="magazyn-table"><thead><tr><th>Index</th><th>Nazwa</th><th>Ilość (szt.)</th><th>Ilość (Litry)</th><th>Klient</th><th>Akcje</th></tr></thead><tbody id="magazyn-lista"></tbody></table></div>
+        </div>
+        <div id="przejazdy" class="tab-content">
+            <h2>Ewidencja Przejazdów</h2>
+            <div class="form-section">
+                <h3>Dodaj lub edytuj przejazd</h3>
+                <form id="przejazd-form"><div class="form-group"><label for="data">Data:</label><input type="date" id="data" required></div><div class="form-group"><label for="skad">Skąd:</label><input type="text" id="skad" placeholder="Np. Baza" required></div><div class="form-group"><label for="dokad">Dokąd:</label><input type="text" id="dokad" placeholder="Np. Klient A" required></div><div class="form-group"><label for="dystans">Dystans (km):</label><input type="number" id="dystans" placeholder="Np. 50" required></div><button type="submit">Zapisz Przejazd</button></form>
+            </div>
+            <div class="summary-controls">
+                <h3>Zapisane Przejazdy</h3><label for="miesiac-przejazdy">Miesiąc:</label><input type="month" id="miesiac-przejazdy"><button id="export-przejazdy-btn" class="btn-edit">Eksportuj</button>
+            </div>
+            <div id="lista-przejazdow"><p>Ładowanie...</p></div>
+        </div>
+    </main>
+
+        <div id="kalendarz-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span><h2 id="kalendarz-modal-title">Ewidencja Czasu</h2>
+            <form id="kalendarz-form">
+                <input type="hidden" id="kalendarz-data">
+                <div class="form-group"><label for="godziny-pracy">Godziny Pracy:</label><input type="number" step="0.5" id="godziny-pracy" value="0"></div>
+                <div class="form-group"><label for="godziny-fakturowane">Godziny Wyfakturowane:</label><input type="number" step="0.5" id="godziny-fakturowane" value="0"></div>
+                <div class="form-group"><label for="nadgodziny">Nadgodziny:</label><input type="number" step="0.5" id="nadgodziny" value="0"></div>
+                <div class="form-group"><label for="czas-jazdy">Czas Jazdy (h):</label><input type="number" step="0.25" id="czas-jazdy" value="0"></div>
+                <div class="form-group"><label for="kalendarz-notatka">Notatka:</label><textarea id="kalendarz-notatka" rows="2"></textarea></div>
+                <button type="submit">Zapisz</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="complete-zlecenie-modal" class="modal">
+        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p><div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny:</label><input type="number" step="0.1" id="wyfakturowane-godziny" required></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia:</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div><hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></form></div>
+    </div>
+
+    <div id="stock-change-modal" class="modal">
+        <div class="modal-content"><span class="close-button">&times;</span><h2 id="stock-modal-title">Zmień stan</h2><form id="stock-change-form"><input type="hidden" id="stock-change-id"><p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p><p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p><div class="form-group"><label for="stock-change-qty">Ilość:</label><input type="number" step="1" id="stock-change-qty" required></div><button type="submit">Zatwierdź Zmianę</button></form></div>
+    </div>
+
+    <div id="assign-zlecenie-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span><h2>Przypisz zlecenie</h2>
+            <form id="assign-zlecenie-form">
+                <input type="hidden" id="assign-zlecenie-id">
+                <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
+                <div class="form-group"><label for="assign-klient-select">1. Wybierz istniejącego klienta:</label><select id="assign-klient-select"></select></div>
+                <p>...lub dodaj nowego:</p>
+                <div class="form-group"><label for="assign-nowy-klient">Nazwa nowego klienta:</label><input type="text" id="assign-nowy-klient"></div><hr>
+                <div id="assign-machine-section" style="display: none;">
+                    <div class="form-group"><label for="assign-maszyna-select">2. Wybierz maszynę klienta:</label><select id="assign-maszyna-select"></select></div>
+                    <p>...lub dodaj nową:</p>
+                    <div class="form-group"><label for="assign-nowa-maszyna-typ">Typ:</label><select id="assign-nowa-maszyna-typ"><option value="">Wybierz</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Inna">Inna</option></select></div>
+                    <div class="form-group"><label for="assign-nowa-maszyna-model">Model:</label><input type="text" id="assign-nowa-maszyna-model"></div>
+                </div>
+                <button type="submit">Przypisz i Zapisz</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-klient-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Edytuj Klienta</h2>
+            <form id="edit-klient-form">
+                <input type="hidden" id="edit-klient-id">
+                <div class="form-group"><label for="edit-klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="edit-klient-nazwa" required></div>
+                <div class="form-group"><label for="edit-klient-nip">NIP:</label><input type="text" id="edit-klient-nip"></div>
+                <div class="form-group"><label for="edit-klient-adres">Adres:</label><input type="text" id="edit-klient-adres"></div>
+                <div class="form-group"><label for="edit-klient-telefon">Telefon:</label><input type="text" id="edit-klient-telefon"></div>
+                <button type="submit" class="btn-add">Zapisz Zmiany</button>
+            </form>
+        </div>
     </div>
 
-    <script src="main.js"></script>
-</body>
+    <div id="edit-maszyna-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2>Edytuj Maszynę</h2>
+            <form id="edit-maszyna-form">
+                <input type="hidden" id="edit-maszyna-id">
+                <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
+                <div class="form-group"><label for="edit-maszyna-typ">Typ Maszyny:</label><select id="edit-maszyna-typ" required><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
+                <div class="form-group"><label for="edit-maszyna-model">Model:</label><input type="text" id="edit-maszyna-model" required></div>
+                <div class="form-group"><label for="edit-maszyna-serial">Numer seryjny:</label><input type="text" id="edit-maszyna-serial"></div>
+                <div class="form-group"><label for="edit-maszyna-rok">Rok produkcji:</label><input type="number" id="edit-maszyna-rok"></div>
+                <div class="form-group"><label for="edit-maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="edit-maszyna-mth"></div>
+                <button type="submit" class="btn-add">Zapisz Zmiany</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="details-zlecenie-modal" class="modal">
+        <div class="modal-content modal-content-large">
+            <span class="close-button">&times;</span>
+            <h2 id="details-zlecenie-title">Szczegóły Zlecenia</h2>
+            <div class="zlecenie-details-container">
+                <h3>Podstawowe Informacje</h3>
+                <div id="details-zlecenie-info"></div>
+                <hr>
+                <h3>Historia Zlecenia</h3>
+                <div id="details-zlecenie-historia"></div>
+            </div>
+        </div>
+    </div>
+
+  </body>
 </html>
