@@ -52,7 +52,8 @@
             <div class="table-section">
                 <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
                 <div id="lista-klientow-content" class="collapsible-content">
-                    <div id="lista-klientow"></div> </div>
+                    <div id="lista-klientow"></div>
+                </div>
             </div>
         </div>
         <div id="maszyny" class="tab-content">
@@ -76,9 +77,10 @@
                 </div>
             </div>
             <div class="table-section">
-                 <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
+                <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
                 <div id="lista-maszyn-content" class="collapsible-content">
-                    <div id="lista-maszyn"></div> </div>
+                    <div id="lista-maszyn"></div>
+                </div>
             </div>
         </div>
         <div id="zlecenia" class="tab-content">
@@ -222,7 +224,7 @@
                 <h3>Podstawowe Informacje</h3>
                 <div id="details-zlecenie-info"></div>
                 <hr>
-                <h3>Historia Zlecenia</h3>
+                <h3>Historia Zlecenia (Zmiany Statusu itp.)</h3>
                 <div id="details-zlecenie-historia"></div>
                 <hr>
                 <h3>Powiązane Wpisy z Kalendarza (Ewidencja Czasu)</h3>
@@ -254,6 +256,13 @@
                 </div>
                 <button type="submit" class="btn-add">Zapisz Zmiany</button>
             </form>
+        </div>
+    </div>
+    <div id="machine-history-modal" class="modal">
+        <div class="modal-content modal-content-large">
+             <span class="close-button">&times;</span>
+             <h2 id="machine-history-title">Historia Serwisowa Maszyny</h2>
+             <div id="machine-history-list"></div>
         </div>
     </div>
   </body>
