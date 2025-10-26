@@ -1,7 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
 
     // --- BAZA DANYCH (Twoje dane) ---
-    // Dodane pola: czasJazdy i historia[] do zleceń
+    // Zachowałem Twoje oryginalne dane i dodałem nowe pola:
+    // czasJazdy, opis i historia[] do zleceń
 
     let clients = [
         { id: 1, name: "Klient A", address: "Adres A" },
@@ -55,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevMonthBtn = document.getElementById('prev-month');
     const nextMonthBtn = document.getElementById('next-month');
 
-    // --- FUNKCJE RENDERUJĄCE ---
+    // --- FUNKCJE RENDERUJĄCE (nowe wersje Twoich 'display' funkcji) ---
 
     /**
      * Renderuje listy zleceń na podstawie filtra
@@ -73,9 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
             z.machine.toLowerCase().includes(lowerCaseSearchTerm)
         );
 
-        if (filteredZlecenia.length === 0 && searchTerm) {
-            zleceniaNoweLista.innerHTML = `<li>Brak wyników dla "${searchTerm}"</li>`;
-        }
+        let renderedNowe = 0;
+        let renderedZakonczone = 0;
 
         filteredZlecenia.forEach(z => {
             const li = document.createElement('li');
@@ -92,10 +92,21 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (z.status === 'nowe') {
                 zleceniaNoweLista.appendChild(li);
+                renderedNowe++;
             } else {
                 zleceniaZakonczoneLista.appendChild(li);
+                renderedZakonczone++;
             }
         });
+
+        // Obsługa pustych list
+        if (renderedNowe === 0) {
+            zleceniaNoweLista.innerHTML = `<li>Brak ${searchTerm ? 'wyników wyszukiwania' : 'nowych zleceń'}.</li>`;
+        }
+        if (renderedZakonczone === 0) {
+            zleceniaZakonczoneLista.innerHTML = `<li>Brak ${searchTerm ? 'wyników wyszukiwania' : 'zakończonych zleceń'}.</li>`;
+        }
+
 
         // Dodanie listenerów do przycisków "Szczegóły"
         document.querySelectorAll('.btn-details').forEach(btn => {
@@ -267,14 +278,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const newName = document.getElementById('client-name').value;
         const newAddress = document.getElementById('client-address').value;
 
-        // Aktualizacja w "bazie danych"
+        // Znajdź starą nazwę *przed* aktualizacją
+        const oldName = clients.find(c => c.id === clientId)?.name;
+
+        // Aktualizacja w "bazie danych" klientów
         clients = clients.map(c => 
             c.id === clientId ? { ...c, name: newName, address: newAddress } : c
         );
 
         // Aktualizacja zleceń, jeśli nazwa klienta się zmieniła (dla spójności)
-        const oldName = clients.find(c => c.id === clientId)?.name;
-        if (oldName !== newName) {
+        if (oldName && oldName !== newName) {
             zlecenia = zlecenia.map(z => 
                 z.client === oldName ? { ...z, client: newName } : z
             );
@@ -291,14 +304,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const newName = document.getElementById('machine-name').value;
         const newLocation = document.getElementById('machine-location').value;
 
-        // Aktualizacja w "bazie danych"
+        // Znajdź starą nazwę *przed* aktualizacją
+        const oldName = machines.find(m => m.id === machineId)?.name;
+
+        // Aktualizacja w "bazie danych" maszyn
         machines = machines.map(m => 
             m.id === machineId ? { ...m, name: newName, location: newLocation } : m
         );
         
-        // Aktualizacja zleceń
-        const oldName = machines.find(m => m.id === machineId)?.name;
-         if (oldName !== newName) {
+        // Aktualizacja zleceń, jeśli nazwa maszyny się zmieniła
+         if (oldName && oldName !== newName) {
             zlecenia = zlecenia.map(z => 
                 z.machine === oldName ? { ...z, machine: newName } : z
             );
@@ -327,7 +342,12 @@ document.addEventListener('DOMContentLoaded', () => {
             calendarGrid.innerHTML += `<div class="calendar-day-header">${day}</div>`;
         });
 
-        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        // Obliczenie pierwszego dnia miesiąca (0 = Niedziela, 1 = Poniedziałek, itd.)
+        // Dostosowanie do polskiego standardu (Poniedziałek jako pierwszy)
+        let firstDayOfMonth = new Date(year, month, 1).getDay();
+        if (firstDayOfMonth === 0) firstDayOfMonth = 6; // Niedziela staje się '6'
+        else firstDayOfMonth = firstDayOfMonth - 1; // Reszta przesuwa się o -1
+
         const daysInMonth = new Date(year, month + 1, 0).getDate();
 
         // Puste komórki przed 1. dniem miesiąca
@@ -416,9 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Przyciski Edycji (delegacja zdarzeń)
     document.body.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-edit')) {
-            const type = e.target.dataset.type;
-            const id = parseInt(e.target.dataset.id);
+        // Wyszukiwanie przycisku, nawet jeśli kliknięto ikonę wewnątrz
+        const editButton = e.target.closest('.btn-edit'); 
+        if (editButton) {
+            const type = editButton.dataset.type;
+            const id = parseInt(editButton.dataset.id);
             if (type === 'client') {
                 showEditClientModal(id);
             } else if (type === 'machine') {
@@ -451,6 +473,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMachines();
         renderCalendar();
     }
+
+    init(); // Uruchomienie aplikacji
+});
 
     init(); // Uruchomienie aplikacji
 });
