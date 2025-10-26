@@ -75,8 +75,8 @@ function initializeApp() {
     const machineHistoryModal = document.getElementById('machine-history-modal');
     const machineHistoryList = document.getElementById('machine-history-list');
     
-    // --- INICJALIZACJA ---
-    window.openTab = (evt, tabName) => { document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none'); document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active')); document.getElementById(tabName).style.display = 'block'; evt.currentTarget.classList.add('active'); };
+// --- INICJALIZACJA ---
+    window.openTab = (evt, tabName) => { /* ... */ };
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
@@ -84,8 +84,8 @@ function initializeApp() {
     if(miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
     if(miesiacPrzejazdyInput) miesiacPrzejazdyInput.value = currentMonth;
     document.querySelector('.tab-button').click();
-    inicjujCiemnyMotyw();
-    inicjujZwijanie();
+    inicjujCiemnyMotyw(); // <--- DODAJ TĘ LINIĘ
+    inicjujZwijanie();bash
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
@@ -312,21 +312,26 @@ function initializeApp() {
 
         przefiltrowaniKlienci.forEach(klient => {
             wszystkieKlienci.push(klient); 
-            const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klient.id); 
-            const maszynyListaHtml = maszynyKlienta.length > 0
-                ? `<ul class="client-machine-list">
-                    ${maszynyKlienta.map(m => `<li>${m.typMaszyny} ${m.model} (S/N: ${m.nrSeryjny}) <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${m.typMaszyny} ${m.model}">Pokaż historię</a></li>`).join('')}
-                    </ul>`
-                : '<p style="font-size: 0.8rem; margin-left: 15px; color: var(--text-color-light);">Brak maszyn</p>';
+// Pobierz maszyny tego klienta (użyj cache!)
+const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klient.id); 
+const maszynyListaId = `client-${klient.id}-machines`; // Unikalne ID dla kontenera
+const maszynyKontenerHtml = maszynyKlienta.length > 0
+    ? `<div id="${maszynyListaId}" class="client-machine-list-container"> <ul class="client-machine-list">
+               ${maszynyKlienta.map(m => `<li>${m.typMaszyny} ${m.model} (S/N: ${m.nrSeryjny}) <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${m.typMaszyny} ${m.model}">Pokaż historię</a></li>`).join('')}
+           </ul>
+       </div>`
+    : `<div id="${maszynyListaId}" class="client-machine-list-container collapsed"> <p style="font-size: 0.8rem; margin-left: 0; padding: 5px 0; color: var(--text-color-light);">Brak maszyn</p>
+       </div>`;
 
-            klienciHtml += `
-                <div class="client-group" data-id="${klient.id}"> 
-                    <div class="client-header-item"> 
-                        <span><strong>${klient.nazwa}</strong> (NIP: ${klient.nip})<br><small>${klient.adres} | ${klient.telefon}</small></span>
-                        <div><button class="btn-edit edit-klient-btn">Edytuj</button><button class="delete-btn">Usuń</button></div>
-                    </div>
-                    ${maszynyListaHtml}
-                </div>`;
+// Dodaj strzałkę do nagłówka tylko jeśli są maszyny do pokazania/ukrycia
+const strzalkaHtml = maszynyKlienta.length > 0 ? `<span class="toggle-machines-arrow" data-target="${maszynyListaId}">▼</span>` : '';
+
+klienciHtml += `
+    <div class="client-group" data-id="${klient.id}">
+        <div class="client-header-item">
+            <span><strong>${klient.nazwa}</strong> (NIP: ${klient.nip})<br><small>${klient.adres} | ${klient.telefon}</small> ${strzalkaHtml}</span> <div><button class="btn-edit edit-klient-btn">Edytuj</button><button class="delete-btn">Usuń</button></div>
+        </div>
+        ${maszynyKontenerHtml} </div>`;
             selectHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
             selectZleceniaHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
         });
@@ -346,6 +351,17 @@ function initializeApp() {
     }
 
     async function obslugaListyKlientow(event) {
+    // NOWY BLOK: Obsługa kliknięcia strzałki zwijania/rozwijania maszyn
+if (event.target.classList.contains('toggle-machines-arrow')) {
+    const strzalka = event.target;
+    const targetId = strzalka.dataset.target;
+    const kontenerMaszyn = document.getElementById(targetId);
+    if (kontenerMaszyn) {
+        strzalka.classList.toggle('collapsed');
+        kontenerMaszyn.classList.toggle('collapsed');
+    }
+    return; // Zakończ, aby nie obsłużyć innych kliknięć w nagłówku
+}
         const clientGroup = event.target.closest('.client-group'); if (!clientGroup) return;
         const klientId = clientGroup.dataset.id;
 
@@ -368,32 +384,74 @@ function initializeApp() {
         }
     }
 
-    async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
-        document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
-        machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
-        machineHistoryModal.style.display = 'block';
+// --- ZMODYFIKOWANA FUNKCJA --- (pokazHistorieSerwisowaMaszyny) - Poprawiona logika i obsługa listenerów
+async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
+    document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
+    machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>'; // Pokaż status ładowania
+    machineHistoryModal.style.display = 'block'; // Pokaż modal od razu
 
-        const q = query(collection(db, "zlecenia"), where("maszynaId", "==", maszynaId), where("status", "==", "ukończone"), orderBy("dataUkonczenia", "desc"));
+    try {
+        // Zapytanie do Firebase
+        const q = query(
+            collection(db, "zlecenia"),
+            where("maszynaId", "==", maszynaId),
+            where("status", "==", "ukończone"),
+            orderBy("dataUkonczenia", "desc")
+        );
         const querySnapshot = await getDocs(q);
-        let historiaHtml = '';
-        querySnapshot.forEach((doc) => {
-            const zlecenie = doc.data();
-            const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-            historiaHtml += `
-                <li data-id="${doc.id}">
-                    <span>
-                        <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
-                        <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
-                        Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
-                        ${uzyteCzesciHtml}
-                    </span>
-                    <div>
-                        <button class="btn-details details-zlecenie-btn">Szczegóły</button>
-                        <button class="btn-edit edit-zlecenie-btn">Edytuj</button> 
-                    </div>
-                </li>`;
-        });
 
+        let historiaHtml = '';
+        if (querySnapshot.empty) {
+            historiaHtml = '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
+        } else {
+            querySnapshot.forEach((doc) => {
+                const zlecenie = doc.data();
+                const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0
+                    ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
+                    : '';
+                // Dodano przycisk edycji również tutaj
+                historiaHtml += `
+                    <li data-id="${doc.id}">
+                        <span>
+                            <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
+                            <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
+                            Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
+                            ${uzyteCzesciHtml}
+                        </span>
+                        <div>
+                            <button class="btn-details details-zlecenie-btn">Szczegóły</button>
+                            <button class="btn-edit edit-zlecenie-btn">Edytuj</button>
+                        </div>
+                    </li>`;
+            });
+            historiaHtml = `<ul>${historiaHtml}</ul>`; // Opakuj w UL, jeśli są wyniki
+        }
+
+        machineHistoryList.innerHTML = historiaHtml;
+
+        // Użyj delegacji zdarzeń DLA TEGO KONKRETNEGO MODALA, aby obsłużyć kliknięcia
+        // Usuń stary listener, jeśli istniał, aby uniknąć duplikatów
+        machineHistoryList.removeEventListener('click', obslugaListyZlecenWModaluHistorii);
+        machineHistoryList.addEventListener('click', obslugaListyZlecenWModaluHistorii);
+
+    } catch (error) {
+        console.error("Błąd podczas pobierania historii serwisowej:", error);
+        machineHistoryList.innerHTML = '<p style="color: red;">Wystąpił błąd podczas ładowania historii.</p>';
+    }
+}
+
+// NOWA, ODRĘBNA funkcja do obsługi kliknięć TYLKO w modalu historii maszyny
+function obslugaListyZlecenWModaluHistorii(event) {
+    const li = event.target.closest('li');
+    if (!li) return;
+    const docId = li.dataset.id;
+    if (event.target.classList.contains('details-zlecenie-btn')) {
+        otworzModalSzczegolowZlecenia(docId);
+    }
+    if (event.target.classList.contains('edit-zlecenie-btn')) {
+         otworzModalEdycjiZlecenia(docId);
+    }
+}
         machineHistoryList.innerHTML = historiaHtml ? `<ul>${historiaHtml}</ul>` : '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
         
         machineHistoryList.removeEventListener('click', obslugaListyZlecenWModalu); 
