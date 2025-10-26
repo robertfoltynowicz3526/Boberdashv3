@@ -65,12 +65,16 @@
             <h2>Zlecenia</h2>
             <div class="form-section">
                 <h3>Dodaj nowe zlecenie</h3>
-                                <form id="zlecenie-form">
+                <form id="zlecenie-form">
                     <div class="form-grid-2">
                         <div class="form-group"><label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label><select id="zlecenie-klient-select"><option value="">-- Wybierz --</option></select></div>
                         <div class="form-group"><label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
                     </div>
                     <div class="form-group"><label for="nr-zlecenia">Nr zlecenia / Nazwa dla szybkiego zlecenia:</label><input type="text" id="nr-zlecenia" required></div>
+                    <div class="form-grid-2">
+                        <div class="form-group"><label for="zlecenie-data-start">Data rozpoczęcia (opcjonalnie):</label><input type="date" id="zlecenie-data-start"></div>
+                        <div class="form-group"><label for="zlecenie-data-koniec">Data zakończenia (opcjonalnie):</label><input type="date" id="zlecenie-data-koniec"></div>
+                    </div>
                     <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
                     <div class="form-group"><label for="motogodziny">Motogodziny (opcjonalnie):</label><input type="number" id="motogodziny" step="0.1"></div>
                     <button type="submit">Dodaj Zlecenie</button>
@@ -84,7 +88,7 @@
             </div>
             <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div><hr>
             <div class="table-section">
-                                <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
+                <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
                     Zakończone zlecenia <span class="arrow">▼</span>
                 </h3>
                 <div id="zakonczone-zlecenia-content" class="collapsible-content">
@@ -128,22 +132,19 @@
                     <label for="kalendarz-zlecenie-select">Przypisz do zlecenia (opcjonalnie):</label>
                     <select id="kalendarz-zlecenie-select">
                         <option value="">-- Brak --</option>
-                        </select>
+                    </select>
                 </div>
                 <div class="form-group"><label for="kalendarz-notatka">Notatka:</label><textarea id="kalendarz-notatka" rows="2"></textarea></div>
                 <button type="submit">Zapisz</button>
             </form>
         </div>
     </div>
-
     <div id="complete-zlecenie-modal" class="modal">
         <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p><div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny:</label><input type="number" step="0.1" id="wyfakturowane-godziny" required></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia:</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div><hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></form></div>
     </div>
-
     <div id="stock-change-modal" class="modal">
         <div class="modal-content"><span class="close-button">&times;</span><h2 id="stock-modal-title">Zmień stan</h2><form id="stock-change-form"><input type="hidden" id="stock-change-id"><p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p><p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p><div class="form-group"><label for="stock-change-qty">Ilość:</label><input type="number" step="1" id="stock-change-qty" required></div><button type="submit">Zatwierdź Zmianę</button></form></div>
     </div>
-
     <div id="assign-zlecenie-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span><h2>Przypisz zlecenie</h2>
@@ -163,7 +164,6 @@
             </form>
         </div>
     </div>
-
     <div id="edit-klient-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -178,7 +178,6 @@
             </form>
         </div>
     </div>
-
     <div id="edit-maszyna-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
@@ -195,7 +194,6 @@
             </form>
         </div>
     </div>
-
     <div id="details-zlecenie-modal" class="modal">
         <div class="modal-content modal-content-large">
             <span class="close-button">&times;</span>
@@ -209,6 +207,5 @@
             </div>
         </div>
     </div>
-
   </body>
 </html>

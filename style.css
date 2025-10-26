@@ -82,7 +82,7 @@ header h1 { font-size: 1.5rem; color: var(--text-color-header); }
     border: 1px solid var(--border-color-light);
 }
 .form-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
-.form-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+/* Usunięto form-grid-3 */
 
 h2, h3 { margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--secondary-color); }
 .form-group { margin-bottom: 1rem; }
@@ -190,8 +190,11 @@ tbody tr { background-color: var(--bg-color-card); }
 .event-actions { position: absolute; right: 2px; top: 2px; display: none; z-index: 5; background: rgba(255,255,255,0.8); border-radius: 4px; padding: 2px; }
 .fc-daygrid-day-frame:hover .event-actions { display: flex; gap: 2px; }
 .event-actions button { padding: 1px 4px; font-size: 0.6rem; line-height: 1; }
-.fc-event-godziny { background-color: var(--primary-color); border-color: var(--primary-color); }
-.fc-event-zlecenie { background-color: var(--success-color); border-color: var(--success-color); font-weight: bold; }
+/* Zaktualizowane klasy dla eventów */
+.fc-event-godziny { background-color: var(--secondary-color); border-color: var(--secondary-color); } /* Godziny pracy */
+.fc-event-zlecenie { background-color: var(--success-color); border-color: var(--success-color); font-weight: bold; } /* Zlecenie */
+.fc-event-godziny-zlecenie { background-color: var(--primary-color); border-color: var(--primary-color); } /* Godziny przypisane do zlecenia */
+
 
 .client-group { background-color: var(--bg-color-card); border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-bottom: 1rem; box-shadow: var(--box-shadow); }
 .client-header { padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--primary-color); color: var(--text-color-inverted); border-radius: var(--border-radius); }
@@ -332,3 +335,4 @@ body[data-theme="dark"] {
 body[data-theme="dark"] .fc-daygrid-day.fc-day-today { background-color: rgba(95, 168, 227, 0.1) !important; }
 body[data-theme="dark"] thead { background-color: #2a2a2a; }
 body[data-theme="dark"] .close-button { color: #888; }
+body[data-theme="dark"] .event-actions { background: rgba(42, 42, 42, 0.8); }
