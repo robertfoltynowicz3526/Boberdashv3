@@ -72,12 +72,11 @@ function initializeApp() {
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     const currentMonth = `${year}-${month}`;
-    const currentDate = `${year}-${month}-${now.getDate().toString().padStart(2, '0')}`; // NOWA: Dzisiejsza data dla formularza zlecenia
     if(miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
     if(miesiacPrzejazdyInput) miesiacPrzejazdyInput.value = currentMonth;
-    if(zlecenieForm['zlecenie-data']) zlecenieForm['zlecenie-data'].value = currentDate; // NOWA: Ustawia domyślną datę zlecenia
     document.querySelector('.tab-button').click();
     inicjujCiemnyMotyw(); // NOWA: Inicjalizacja motywu
+    inicjujZwijanie(); // NOWA: Inicjalizacja zwijanej sekcji
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
@@ -87,30 +86,22 @@ function initializeApp() {
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
             // --- ZMODYFIKOWANA FUNKCJA --- (eventContent)
             eventContent: (arg) => {
-                // Ta logika pozostaje, ale tylko dla eventów typu 'godziny_pracy'
-                if (arg.event.extendedProps.type === 'godziny_pracy') {
-                    let eventEl = document.createElement('div');
-                    eventEl.innerHTML = `<div>${arg.event.title}</div>`;
-                    if (arg.event.extendedProps.notatka) { eventEl.innerHTML += ` <small title="${arg.event.extendedProps.notatka}">📝</small>`; }
-                    let actionsEl = document.createElement('div');
-                    actionsEl.classList.add('event-actions');
-                    actionsEl.innerHTML = `<button type="button" class="btn-edit event-edit-btn" data-date="${arg.event.startStr}">E</button><button type="button" class="btn-remove event-delete-btn" data-date="${arg.event.startStr}">X</button>`;
-                    eventEl.appendChild(actionsEl);
-                    return { domNodes: [eventEl] };
-                }
-                // Prostszy render dla zleceń
-                if (arg.event.extendedProps.type === 'zlecenie') {
-                    let eventEl = document.createElement('div');
-                    eventEl.innerHTML = `<div>${arg.event.title}</div>`;
-                    return { domNodes: [eventEl] };
-                }
-                return null;
+                let eventEl = document.createElement('div');
+                eventEl.innerHTML = `<div>${arg.event.title}</div>`;
+
+                // Logika dla wpisów godzinowych (z przyciskami)
+                if (arg.event.extendedProps.notatka) { eventEl.innerHTML += ` <small title="${arg.event.extendedProps.notatka}">📝</small>`; }
+                let actionsEl = document.createElement('div');
+                actionsEl.classList.add('event-actions');
+                actionsEl.innerHTML = `<button type="button" class="btn-edit event-edit-btn" data-date="${arg.event.startStr}">E</button><button type="button" class="btn-remove event-delete-btn" data-date="${arg.event.startStr}">X</button>`;
+                eventEl.appendChild(actionsEl);
+                return { domNodes: [eventEl] };
             },
             dateClick: (info) => otworzModalGodzin(info.dateStr),
             datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
         });
         calendar.render();
-        wyswietlWpisyKalendarza(); // Ta funkcja teraz załaduje też zlecenia
+        wyswietlWpisyKalendarza();
     }
 
     // --- ZMODYFIKOWANA FUNKCJA --- (otworzModalGodzin)
@@ -118,6 +109,20 @@ function initializeApp() {
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
         document.getElementById('kalendarz-data').value = data;
+
+        // NOWA: Wypełnij listę aktywnych zleceń
+        const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
+        zlecenieSelect.innerHTML = '<option value="">-- Brak --</option>'; // Resetuj
+        wszystkieZlecenia
+            .filter(z => z.status === 'aktywne' || z.status === 'nieprzypisane')
+            .forEach(z => {
+                const nazwa = z.klientNazwa ? `${z.klientNazwa} (${z.model})` : z.nrZlecenia;
+                const option = document.createElement('option');
+                option.value = z.id;
+                option.textContent = nazwa;
+                zlecenieSelect.appendChild(option);
+            });
+
         const docSnap = await getDoc(doc(db, "godziny_pracy", data));
         if (docSnap.exists()) {
             const dane = docSnap.data();
@@ -126,6 +131,7 @@ function initializeApp() {
             kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
             kalendarzForm['czas-jazdy'].value = dane.jazda || 0; // NOWA LINIA
             kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
+            kalendarzForm['kalendarz-zlecenie-select'].value = dane.zlecenieId || ''; // NOWA LINIA
         }
         kalendarzModal.style.display = 'block';
     }
@@ -134,19 +140,24 @@ function initializeApp() {
     async function obslugaZapisuGodzin(event) {
         event.preventDefault();
         const data = kalendarzForm['kalendarz-data'].value;
+        const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
+        const zlecenieId = zlecenieSelect.value;
+        const zlecenieNazwa = zlecenieId ? zlecenieSelect.options[zlecenieSelect.selectedIndex].text : null;
+
         const dane = { 
             praca: Number(kalendarzForm['godziny-pracy'].value) || 0, 
             fakturowane: Number(kalendarzForm['godziny-fakturowane'].value) || 0, 
             nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0, 
             jazda: Number(kalendarzForm['czas-jazdy'].value) || 0, // NOWA LINIA
-            notatka: kalendarzForm['kalendarz-notatka'].value || '' 
+            notatka: kalendarzForm['kalendarz-notatka'].value || '',
+            zlecenieId: zlecenieId || null, // NOWA LINIA
+            zlecenieNazwa: zlecenieNazwa // NOWA LINIA
         };
         try { await setDoc(doc(db, "godziny_pracy", data), dane); kalendarzModal.style.display = 'none'; } catch (e) { console.error("Błąd zapisu godzin: ", e); }
     }
 
-    // --- ZMODYFIKOWANA FUNKCJA --- (wyswietlWpisyKalendarza) - Teraz ładuje też zlecenia
+    // --- ZMODYFIKOWANA FUNKCJA --- (wyswietlWpisyKalendarza)
     function wyswietlWpisyKalendarza() {
-        // 1. Snapshot dla godzin pracy (Twoja istniejąca logika)
         onSnapshot(collection(db, "godziny_pracy"), (snapshot) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
@@ -157,26 +168,27 @@ function initializeApp() {
                 if (dane.praca > 0) title += `P: ${dane.praca}h<br>`;
                 if (dane.fakturowane > 0) title += `F: ${dane.fakturowane}h<br>`;
                 if (dane.nadgodziny > 0) title += `N: ${dane.nadgodziny}h<br>`;
-                if (dane.jazda > 0) title += `J: ${dane.jazda}h`; // NOWA LINIA
-                if (title) { events.push({ id: id, title: title.trim(), start: id, allDay: true, classNames: ['fc-event-custom'], extendedProps: { notatka: dane.notatka, type: 'godziny_pracy' } }); }
+                if (dane.jazda > 0) title += `J: ${dane.jazda}h`;
+                
+                // NOWA: Dodaj info o zleceniu do tytułu
+                let className = 'fc-event-godziny';
+                if (dane.zlecenieId) {
+                    title += `<hr style='margin: 2px 0; border-color: rgba(255,255,255,0.5)'><strong>${dane.zlecenieNazwa}</strong>`;
+                    className = 'fc-event-zlecenie';
+                }
+
+                if (title) { 
+                    events.push({ 
+                        id: id, 
+                        title: title.trim(), 
+                        start: id, 
+                        allDay: true, 
+                        classNames: [className], 
+                        extendedProps: { notatka: dane.notatka } 
+                    }); 
+                }
             });
             
-            // 2. Dodawanie zleceń do kalendarza
-            wszystkieZlecenia.forEach(zlecenie => {
-                const data = zlecenie.dataZlecenia || zlecenie.dataUkonczenia;
-                if (data) {
-                    events.push({
-                        id: zlecenie.id,
-                        title: `Zlecenie: ${zlecenie.klientNazwa || zlecenie.nrZlecenia}`,
-                        start: data,
-                        allDay: true,
-                        classNames: [zlecenie.status === 'aktywne' ? 'fc-event-zlecenie' : 'fc-event-zlecenie-ukonczone'],
-                        extendedProps: { type: 'zlecenie' }
-                    });
-                }
-            });
-
-            // 3. Renderowanie kalendarza
             if (calendar) {
                 calendar.removeAllEvents();
                 calendar.addEventSource(events);
@@ -261,6 +273,18 @@ function initializeApp() {
     // --- NOWA FUNKCJA --- (Ciemny Motyw)
     function applyTheme(theme) {
         document.body.dataset.theme = theme;
+    }
+
+    // --- NOWA FUNKCJA --- (Inicjalizacja Zwijania)
+    function inicjujZwijanie() {
+        // Domyślnie zwiń sekcję
+        zakonczoneZleceniaHeader.classList.add('collapsed');
+        zakonczoneZleceniaContent.classList.add('collapsed');
+
+        zakonczoneZleceniaHeader.addEventListener('click', () => {
+            zakonczoneZleceniaHeader.classList.toggle('collapsed');
+            zakonczoneZleceniaContent.classList.toggle('collapsed');
+        });
     }
     
     // --- KLIENCI ---
@@ -495,7 +519,6 @@ function initializeApp() {
             ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceň.</p>";
             obliczIPokazPodsumowanieFinansowe();
             // aktualizujPulpit(); // To jest już niepotrzebne
-            wyswietlWpisyKalendarza(); // NOWA: Odśwież kalendarz po załadowaniu zleceń
         });
     }
     
@@ -504,8 +527,6 @@ function initializeApp() {
         event.preventDefault();
         const wybranyKlientId = zlecenieKlientSelect.value;
         const wybranaMaszynaId = zlecenieMaszynaSelect.value;
-        const dataZlecenia = zlecenieForm['zlecenie-data'].value; // NOWA LINIA
-        if (!dataZlecenia) { alert("Musisz podać datę zlecenia!"); return; } // NOWA LINIA
 
         // NOWA: Historia
         const historia = [{
@@ -515,7 +536,7 @@ function initializeApp() {
 
         let dane;
         if (wybranyKlientId === "szybkie-zlecenie") {
-            dane = { status: 'nieprzypisane', nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value, dataZlecenia: dataZlecenia, historia: historia, createdAt: new Date() };
+            dane = { status: 'nieprzypisane', nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value, historia: historia, createdAt: new Date() };
         } else if (wybranyKlientId && wybranaMaszynaId) {
             const maszyna = wszystkieMaszyny.find(m => m.id === wybranaMaszynaId);
             dane = {
@@ -523,7 +544,6 @@ function initializeApp() {
                 typMaszyny: maszyna.typMaszyny, model: maszyna.model, status: 'aktywne',
                 nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value,
                 motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny, 
-                dataZlecenia: dataZlecenia, // NOWA LINIA
                 historia: historia, // NOWA LINIA
                 createdAt: new Date()
             };
@@ -534,7 +554,6 @@ function initializeApp() {
             await addDoc(collection(db, "zlecenia"), dane);
             if (dane.maszynaId && zlecenieForm.motogodziny.value) { await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny }); }
             zlecenieForm.reset();
-            zlecenieForm['zlecenie-data'].value = currentDate; // NOWA: Resetuj datę
             zlecenieKlientSelect.value = '';
             zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
             zlecenieMaszynaSelect.disabled = true;
@@ -592,7 +611,6 @@ function initializeApp() {
         infoDiv.innerHTML = `
             <div class="details-group"><strong>Klient:</strong> <p>${zlecenie.klientNazwa || '---'}</p></div>
             <div class="details-group"><strong>Maszyna:</strong> <p>${zlecenie.typMaszyny || ''} ${zlecenie.model || '---'}</p></div>
-            <div class="details-group"><strong>Data Zlecenia:</strong> <p>${zlecenie.dataZlecenia || 'Brak'}</p></div>
             <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
             <div class="details-group"><strong>Opis:</strong> <p>${zlecenie.opis || 'Brak opisu'}</p></div>
         `;
@@ -880,7 +898,7 @@ function initializeApp() {
     converterLitryInput.addEventListener('input', przeliczOlej);
     converterSztukiInput.addEventListener('input', przeliczOlej);
     oilContainerSizeSelect.addEventListener('change', () => { converterLitryInput.value = ''; converterSztukiInput.value = ''; przeliczOlej({target:{id:''}}); });
-    
+s
     modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
     partsToRemoveList.addEventListener('click', obslugaListyCzesci);
     zlecenieKlientSelect.addEventListener('change', (event) => {
@@ -921,11 +939,6 @@ function initializeApp() {
     kalendarzModal.querySelector('.close-button').onclick = () => { kalendarzModal.style.display = 'none'; };
 
     // --- NOWE LISTENERY ---
-    zakonczoneZleceniaHeader.addEventListener('click', () => {
-        zakonczoneZleceniaHeader.classList.toggle('collapsed');
-        zakonczoneZleceniaContent.classList.toggle('collapsed');
-    });
-
     zlecenieSearchInput.addEventListener('input', () => {
         wyswietlZlecenia(); // Przefiltruj zlecenia na żywo
     });
