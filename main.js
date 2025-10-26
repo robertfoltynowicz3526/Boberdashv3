@@ -166,8 +166,11 @@ function initializeApp() {
     }
 
     function wyswietlWpisyKalendarza() {
-        if (_wszystkieZleceniaCache.length === 0) {
+        if (_wszystkieZleceniaCache.length === 0 && _wszystkieKlienciCache.length > 0 && _wszystkieMaszynyCache.length > 0) { 
             console.log("Czekam na załadowanie danych zleceń dla kalendarza...");
+            if(calendar) {
+                 calendar.removeAllEvents(); 
+            }
             return; 
         }
 
@@ -201,7 +204,7 @@ function initializeApp() {
                     }); 
                 }
             });
-            
+// Dodaj zlecenia do listy wydarzeń
             _wszystkieZleceniaCache.forEach(zlecenie => {
                 const dataStart = zlecenie.dataRozpoczecia;
                 const dataKoniec = zlecenie.dataZakonczenia;
@@ -267,23 +270,18 @@ function initializeApp() {
     function inicjujCiemnyMotyw() { /* ... (bez zmian) ... */ }
     function applyTheme(theme) { /* ... (bez zmian) ... */ }
     function inicjujZwijanie() { 
-        // Zwijanie zakończonych zleceń
         zakonczoneZleceniaHeader.classList.add('collapsed');
         zakonczoneZleceniaContent.classList.add('collapsed');
         zakonczoneZleceniaHeader.addEventListener('click', () => {
             zakonczoneZleceniaHeader.classList.toggle('collapsed');
             zakonczoneZleceniaContent.classList.toggle('collapsed');
         });
-
-        // Zwijanie listy klientów
         listaKlientowHeader.classList.add('collapsed');
         listaKlientowContent.classList.add('collapsed');
         listaKlientowHeader.addEventListener('click', () => {
             listaKlientowHeader.classList.toggle('collapsed');
             listaKlientowContent.classList.toggle('collapsed');
         });
-
-        // Zwijanie listy maszyn (główny kontener)
         listaMaszynHeader.classList.add('collapsed');
         listaMaszynContent.classList.add('collapsed');
         listaMaszynHeader.addEventListener('click', () => {
@@ -291,20 +289,20 @@ function initializeApp() {
             listaMaszynContent.classList.toggle('collapsed');
         });
     }
-    // --- KLIENCI ---
+    
+    // --- KLIENCI ---
     async function dodajKlienta(event) { /* ... (bez zmian) ... */ }
 
     function wyswietlKlientow() {
+        if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0) { 
+             console.log("Czekam na maszyny przed renderowaniem klientów...");
+             listaKlientowDiv.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+             return; 
+        }
+
         const frazaWyszukiwania = klientSearchInput.value.toLowerCase(); 
         wszystkieKlienci = []; 
         let klienciHtml = '', selectHtml = '<option value="">-- Wybierz klienta --</option>', selectZleceniaHtml = '<option value="">-- Wybierz klienta --</option><option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
-
-        // Sprawdź czy cache maszyn jest załadowany
-        if (_wszystkieMaszynyCache.length === 0) {
-            console.log("Czekam na maszyny przed renderowaniem klientów...");
-            listaKlientowDiv.innerHTML = "<p>Ładowanie danych maszyn...</p>"; // Informacja dla użytkownika
-            return; // Poczekaj na załadowanie maszyn
-        }
 
         const przefiltrowaniKlienci = _wszystkieKlienciCache.filter(klient => { 
              if (!frazaWyszukiwania) return true;
@@ -352,14 +350,22 @@ function initializeApp() {
         const klientId = clientGroup.dataset.id;
 
         if (event.target.classList.contains('machine-history-link')) {
-            event.preventDefault();
+             event.preventDefault();
             const maszynaId = event.target.dataset.maszynaId;
             const maszynaNazwa = event.target.dataset.maszynaNazwa;
             pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
             return; 
         }
-        if (event.target.classList.contains('delete-btn')) { /* ... */ }
-        if (event.target.classList.contains('edit-klient-btn')) { /* ... */ }
+        if (event.target.classList.contains('delete-btn')) { 
+            if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) { 
+                // TODO: Dodać transakcję usuwającą maszyny i zlecenia powiązane z klientem
+                await deleteDoc(doc(db, "klienci", klientId)); 
+                 wyswietlMaszyny();
+            } 
+        }
+        if (event.target.classList.contains('edit-klient-btn')) {
+             otworzModalEdycjiKlienta(klientId);
+        }
     }
 
     async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
@@ -390,18 +396,33 @@ function initializeApp() {
 
         machineHistoryList.innerHTML = historiaHtml ? `<ul>${historiaHtml}</ul>` : '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
         
-        machineHistoryList.querySelectorAll('.details-zlecenie-btn').forEach(btn => btn.addEventListener('click', (e) => otworzModalSzczegolowZlecenia(e.target.closest('li').dataset.id)));
-        machineHistoryList.querySelectorAll('.edit-zlecenie-btn').forEach(btn => btn.addEventListener('click', (e) => otworzModalEdycjiZlecenia(e.target.closest('li').dataset.id)));
+        machineHistoryList.removeEventListener('click', obslugaListyZlecenWModalu); 
+        machineHistoryList.addEventListener('click', obslugaListyZlecenWModalu); 
     }
 
+    function obslugaListyZlecenWModalu(event) {
+        const li = event.target.closest('li'); if (!li) return;
+        const docId = li.dataset.id;
+        if (event.target.classList.contains('details-zlecenie-btn')) {
+            otworzModalSzczegolowZlecenia(docId);
+        }
+        if (event.target.classList.contains('edit-zlecenie-btn')) {
+             otworzModalEdycjiZlecenia(docId);
+        }
+    }
 
     function otworzModalEdycjiKlienta(klientId) { /* ... (bez zmian) ... */ }
     async function zapiszEdycjeKlienta(event) { /* ... (bez zmian) ... */ }
-
-    // --- MASZYNY ---
+    // --- MASZYNY ---
     async function dodajMaszyne(event) { /* ... (bez zmian) ... */ }
 
     function wyswietlMaszyny() {
+        if (_wszystkieKlienciCache.length === 0 && _wszystkieMaszynyCache.length > 0) { 
+            console.log("Czekam na klientów przed renderowaniem maszyn...");
+            listaMaszynDiv.innerHTML = "<p>Ładowanie danych klientów...</p>";
+            return;
+        }
+
         const frazaWyszukiwania = maszynaSearchInput.value.toLowerCase(); 
         wszystkieMaszyny = []; 
 
@@ -438,14 +459,19 @@ function initializeApp() {
                  wszystkieMaszyny.push(maszyna); 
             });
             wyswietlMaszyny();
-            wyswietlKlientow(); // Ważne po załadowaniu maszyn
+            wyswietlKlientow(); 
         });
     }
 
     async function obslugaListyMaszyn(event) {
         const element = event.target;
 
-        if (element.closest('.client-header')) { /* ... */ return; }
+        if (element.closest('.client-header')) { 
+            const header = element.closest('.client-header');
+            header.classList.toggle('open');
+            header.nextElementSibling.classList.toggle('open');
+            return; 
+        }
         if (element.classList.contains('machine-history-link')) { 
             event.preventDefault();
             const maszynaId = element.dataset.maszynaId;
@@ -455,54 +481,128 @@ function initializeApp() {
         }
         const li = element.closest('li'); if (!li) return;
         const maszynaId = li.dataset.id;
-        if (element.classList.contains('delete-btn')) { /* ... */ }
-        if (element.classList.contains('edit-maszyna-btn')) { /* ... */ }
+        if (element.classList.contains('delete-btn')) { 
+            if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) { 
+                // TODO: Transakcja usuwająca zlecenia powiązane z maszyną
+                await deleteDoc(doc(db, "maszyny", maszynaId)); 
+                 wyswietlKlientow();
+            } 
+        }
+        if (element.classList.contains('edit-maszyna-btn')) {
+             otworzModalEdycjiMaszyny(maszynaId);
+        }
     }
 
-    function otworzModalEdycjiMaszyny(maszynaId) { /* ... (bez zmian) ... */ }
-    async function zapiszEdycjeMaszyny(event) { /* ... (bez zmian) ... */ }
+    function otworzModalEdycjiMaszyny(maszynaId) { 
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId); // Użyj cache
+        if (!maszyna) return;
+        editMaszynaForm['edit-maszyna-id'].value = maszyna.id;
+        document.getElementById('edit-maszyna-klient-nazwa').textContent = maszyna.klientNazwa;
+        editMaszynaForm['edit-maszyna-typ'].value = maszyna.typMaszyny;
+        editMaszynaForm['edit-maszyna-model'].value = maszyna.model;
+        editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny;
+        editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji;
+        editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny;
+        editMaszynaModal.style.display = 'block';
+    }
+    async function zapiszEdycjeMaszyny(event) { 
+        event.preventDefault();
+        const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
+        const dane = {
+            typMaszyny: editMaszynaForm['edit-maszyna-typ'].value,
+            model: editMaszynaForm['edit-maszyna-model'].value,
+            nrSeryjny: editMaszynaForm['edit-maszyna-serial'].value,
+            rokProdukcji: Number(editMaszynaForm['edit-maszyna-rok'].value) || null,
+            motogodziny: Number(editMaszynaForm['edit-maszyna-mth'].value) || 0,
+        };
+        try {
+            await updateDoc(doc(db, "maszyny", maszynaId), dane);
+            // TODO: Dodać transakcję aktualizującą dane maszyny w zleceniach
+            editMaszynaModal.style.display = 'none';
+        } catch (e) { console.error("Błąd aktualizacji maszyny:", e); }
+    }
     
-    // --- PRZEJAZDY --- (bez zmian)
-    function wyswietlPrzejazdy() { /* ... */ }
-    function filtrujIwyswietlPrzejazdy() { /* ... */ }
-    async function dodajLubEdytujPrzejazd(event) { /* ... */ }
-    async function obslugaListyPrzejazdow(event) { /* ... */ }
-    
-    // --- ZLECENIA ---
+    // --- PRZEJAZDY --- 
+    function wyswietlPrzejazdy() { 
+        onSnapshot(query(collection(db, "przejazdy"), orderBy("data", "desc")), (snapshot) => {
+            wszystkiePrzejazdy = [];
+            snapshot.forEach(doc => wszystkiePrzejazdy.push({ id: doc.id, ...doc.data() }));
+            filtrujIwyswietlPrzejazdy();
+        });
+    }
+    function filtrujIwyswietlPrzejazdy() { 
+        const przefiltrowane = wszystkiePrzejazdy.filter(p => p.data && p.data.startsWith(miesiacPrzejazdyInput.value));
+        listaPrzejazdowDiv.innerHTML = przefiltrowane.length === 0 ? "<p>Brak przejazdów w tym miesiącu.</p>" : `<ul>${przefiltrowane.map(p => `<li data-id="${p.id}"><span><strong>${p.data}</strong>: ${p.skad} → ${p.dokad} (<strong>${p.dystans} km</strong>)</span><div><button class="btn-edit edit-przejazd-btn">Edytuj</button><button class="delete-btn">Usuń</button></div></li>`).join('')}</ul>`;
+    }
+    async function dodajLubEdytujPrzejazd(event) { 
+        event.preventDefault();
+        const dane = { data: przejazdForm.data.value, skad: przejazdForm.skad.value, dokad: przejazdForm.dokad.value, dystans: Number(przejazdForm.dystans.value) };
+        try {
+            if (edytowanyPrzejazdId) { await updateDoc(doc(db, "przejazdy", edytowanyPrzejazdId), dane); edytowanyPrzejazdId = null; } 
+            else { dane.createdAt = new Date(); await addDoc(collection(db, "przejazdy"), dane); }
+            przejazdForm.reset(); przejazdForm.querySelector('button').textContent = 'Zapisz Przejazd';
+        } catch (e) { console.error("Błąd zapisu przejazdu: ", e); }
+    }
+    async function obslugaListyPrzejazdow(event) { 
+        const li = event.target.closest('li'); if (!li) return;
+        const docId = li.dataset.id;
+        if (event.target.classList.contains('delete-btn')) { if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "przejazdy", docId)); } }
+        if (event.target.classList.contains('edit-przejazd-btn')) {
+            const przejazd = wszystkiePrzejazdy.find(p => p.id === docId);
+            if (przejazd) {
+                przejazdForm.data.value = przejazd.data; przejazdForm.skad.value = przejazd.skad;
+                przejazdForm.dokad.value = przejazd.dokad; przejazdForm.dystans.value = przejazd.dystans;
+                edytowanyPrzejazdId = docId;
+                przejazdForm.querySelector('button').textContent = 'Zaktualizuj Przejazd';
+                window.scrollTo(0, 0);
+            }
+        }
+    }
+    // --- ZLECENIA ---
     function wyswietlZlecenia() {
+         if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
+             console.log("Czekam na maszyny przed renderowaniem zleceń...");
+             aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+             ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+             return;
+         }
+
         const frazaWyszukiwania = zlecenieSearchInput.value.toLowerCase(); 
         wszystkieZlecenia = []; 
         let aktywneHtml = '', ukonczoneHtml = '';
 
         const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => { 
             if (!frazaWyszukiwania) return true;
-            const nazwa = zlecenie.klientNazwa ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}` : zlecenie.nrZlecenia;
-            const tekstDoWyszukania = `${nazwa} ${zlecenie.nrZlecenia} ${zlecenie.klientNazwa} ${zlecenie.model} ${zlecenie.typMaszyny}`.toLowerCase();
+            // Poprawiono: Użyj cache maszyn do znalezienia danych
+            const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+            const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+            const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : zlecenie.nrZlecenia;
+            const tekstDoWyszukania = `${nazwa} ${zlecenie.nrZlecenia} ${klient ? klient.nazwa : ''} ${maszyna ? maszyna.model : ''} ${maszyna ? maszyna.typMaszyny : ''}`.toLowerCase();
             return tekstDoWyszukania.includes(frazaWyszukiwania);
         });
 
         przefiltrowaneZlecenia.forEach(zlecenie => {
             wszystkieZlecenia.push(zlecenie); 
-            const nazwa = zlecenie.klientNazwa ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}` : zlecenie.nrZlecenia;
+            // Poprawiono: Użyj cache maszyn do znalezienia danych
+            const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+            const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+            const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : zlecenie.nrZlecenia;
             
             if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
                 const przycisk = zlecenie.status === 'nieprzypisane' ? `<button class="assign-btn btn-edit">Przypisz</button>` : `<button class="complete-btn">Zakończ</button>`;
                 aktywneHtml += `<li data-id="${zlecenie.id}"><span><strong>${nazwa}</strong><br><em>${zlecenie.opis || ''}</em></span><div><button class="btn-details details-zlecenie-btn">Szczegóły</button>${przycisk}<button class="delete-btn">Usuń</button></div></li>`;
             } else { // Zakończone
-                const nazwaMaszyny = zlecenie.klientNazwa ? `${zlecenie.klientNazwa} - ${zlecenie.typMaszyny} ${zlecenie.model}` : 'Zlecenie usuniętej maszyny';
+                const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
                 const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
                 ukonczoneHtml += `<li data-id="${zlecenie.id}"><span><strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br><em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>${uzyteCzesciHtml}</span><div><button class="btn-details details-zlecenie-btn">Szczegóły</button><button class="btn-edit edit-zlecenie-btn">Edytuj</button><button class="delete-btn">Usuń</button></div></li>`;
             }
         });
-        aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceň.</p>";
-        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceň.</p>";
+        aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceň lub pasujących do wyszukiwania.</p>";
+        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceň lub pasujących do wyszukiwania.</p>";
         obliczIPokazPodsumowanieFinansowe();
-        // Nie wywołuj wyswietlWpisyKalendarza stąd bezpośrednio, poczekaj na listener
     }
 
-    // Zmieniono nazwę zmiennej globalnej cache i funkcji nasłuchującej
-    let _wszystkieZleceniaCache = []; 
-    function nasluchujNaZlecenia() {
+    function nasluchujNaZlecenia() {
         onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
              _wszystkieZleceniaCache = [];
              wszystkieZlecenia = []; 
@@ -512,24 +612,227 @@ function initializeApp() {
                  wszystkieZlecenia.push(zlecenie); 
              });
              wyswietlZlecenia();
-             wyswietlWpisyKalendarza(); // Ważne po załadowaniu zleceń
+             wyswietlWpisyKalendarza(); 
         });
     }
 
-    async function dodajZlecenie(event) { /* ... (bez zmian) ... */ }
+    async function dodajZlecenie(event) {
+        event.preventDefault();
+        const wybranyKlientId = zlecenieKlientSelect.value;
+        const wybranaMaszynaId = zlecenieMaszynaSelect.value;
+        const dataRozpoczecia = zlecenieForm['zlecenie-data-start'].value || null; 
+        const dataZakonczenia = zlecenieForm['zlecenie-data-koniec'].value || null; 
+
+        if (dataZakonczenia && !dataRozpoczecia) { alert("Nie można podać daty zakończenia bez daty rozpoczęcia."); return; }
+        if (dataRozpoczecia && dataZakonczenia && dataZakonczenia < dataRozpoczecia) { alert("Data zakończenia nie może być wcześniejsza niż data rozpoczęcia."); return; }
+
+        const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
+
+        let dane;
+        if (wybranyKlientId === "szybkie-zlecenie") {
+            dane = { status: 'nieprzypisane', nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value, dataRozpoczecia: dataRozpoczecia, dataZakonczenia: dataZakonczenia, historia: historia, createdAt: new Date() };
+        } else if (wybranyKlientId && wybranaMaszynaId) {
+             // Użyj cache do pobrania danych klienta i maszyny
+            const maszyna = _wszystkieMaszynyCache.find(m => m.id === wybranaMaszynaId); 
+            const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
+            if (!maszyna || !klient) { alert("Błąd: Nie znaleziono danych klienta lub maszyny."); return;}
+
+            dane = {
+                maszynaId: wybranaMaszynaId, klientId: klient.id, klientNazwa: klient.nazwa,
+                typMaszyny: maszyna.typMaszyny, model: maszyna.model, status: 'aktywne',
+                nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value,
+                motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny, 
+                dataRozpoczecia: dataRozpoczecia, dataZakonczenia: dataZakonczenia, historia: historia, 
+                createdAt: new Date()
+            };
+        } else { alert("Wybierz klienta i maszynę LUB opcję 'Szybkie Zlecenie'."); return; }
+        try {
+            await addDoc(collection(db, "zlecenia"), dane);
+            if (dane.maszynaId && zlecenieForm.motogodziny.value) { await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny }); }
+            zlecenieForm.reset();
+            zlecenieKlientSelect.value = '';
+            zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
+            zlecenieMaszynaSelect.disabled = true;
+        } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
+     }
     function obliczIPokazPodsumowanieFinansowe() { /* ... (bez zmian) ... */ }
-    async function obslugaListyZlecen(event) { /* ... (bez zmian) ... */ }
-    function otworzModalEdycjiZlecenia(zlecenieId) { /* ... (bez zmian) ... */ }
+    async function obslugaListyZlecen(event) {
+        const li = event.target.closest('li'); if (!li) return;
+        const docId = li.dataset.id;
+        if (event.target.classList.contains('delete-btn')) { if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); } }
+        if (event.target.classList.contains('details-zlecenie-btn')) {
+            otworzModalSzczegolowZlecenia(docId);
+        }
+        if (event.target.classList.contains('assign-btn')) {
+            // Użyj cache zleceń
+            const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId); 
+            if (zlecenie) {
+                document.getElementById('assign-zlecenie-id').value = docId;
+                document.getElementById('assign-zlecenie-opis').textContent = zlecenie.nrZlecenia;
+                document.getElementById('assign-machine-section').style.display = 'none';
+                assignForm.reset();
+                assignModal.style.display = 'block';
+            }
+        }
+        if (event.target.classList.contains('complete-btn')) {
+            const docSnap = await getDoc(doc(db, "zlecenia", docId));
+            if (docSnap.exists()) {
+                 const zlecenie = docSnap.data();
+                 // Użyj cache maszyn do pobrania nazwy
+                 const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+                 const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+                 const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Nieprzypisane';
+                 document.getElementById('modal-klient').textContent = nazwaMaszyny;
+                 document.getElementById('modal-nr-zlecenia').textContent = zlecenie.nrZlecenia;
+                 document.getElementById('complete-zlecenie-id').value = docId;
+                 czesciDoZlecenia = [];
+                 renderCzesciDoZlecenia();
+                 renderMagazynWModalu();
+                 completeModal.style.display = 'block';
+            }
+        }
+        if (event.target.classList.contains('edit-zlecenie-btn')) {
+             // Użyj cache zleceń
+             const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId); 
+             if (zlecenie && zlecenie.status === 'ukończone') {
+                 otworzModalEdycjiZlecenia(docId);
+             } else if (zlecenie) {
+                 alert("Można edytować tylko zakończone zlecenia.");
+             }
+        }
+     }
+
+    function otworzModalEdycjiZlecenia(zlecenieId) {
+        // Użyj cache
+        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId); 
+        if (!zlecenie) return;
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+        const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Nieprzypisane';
+
+        editZlecenieForm['edit-zlecenie-id'].value = zlecenie.id;
+        document.getElementById('edit-zlecenie-klient').textContent = nazwaMaszyny;
+        document.getElementById('edit-zlecenie-nr').textContent = zlecenie.nrZlecenia;
+        editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
+        editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S'; 
+
+        editZlecenieModal.style.display = 'block';
+    }
+
     async function zapiszEdycjeZlecenia(event) { /* ... (bez zmian) ... */ }
-    async function otworzModalSzczegolowZlecenia(zlecenieId) { /* ... (bez zmian) ... */ }
-    async function zapiszPrzypisanie(event) { /* ... (bez zmian) ... */ }
+    async function otworzModalSzczegolowZlecenia(zlecenieId) {
+        // Użyj cache
+        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId); 
+        if (!zlecenie) { alert("Nie znaleziono zlecenia!"); return; }
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+        const nazwaMaszynyPelna = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Nieprzypisane';
+
+        document.getElementById('details-zlecenie-title').textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
+        
+        const infoDiv = document.getElementById('details-zlecenie-info');
+        infoDiv.innerHTML = `
+            <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
+            <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
+            <div class="details-group"><strong>Data Rozpoczęcia:</strong> <p>${zlecenie.dataRozpoczecia || 'Brak'}</p></div>
+            <div class="details-group"><strong>Data Zakończenia:</strong> <p>${zlecenie.dataZakonczenia || 'Brak'}</p></div>
+            <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
+            <div class="details-group"><strong>Opis:</strong> <p>${zlecenie.opis || 'Brak opisu'}</p></div>
+        `;
+        
+        if (zlecenie.status === 'ukończone') {
+            infoDiv.innerHTML += `
+                <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
+                <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
+                <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
+                <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
+            `;
+        }
+
+        const historiaDiv = document.getElementById('details-zlecenie-historia');
+        if (zlecenie.historia && zlecenie.historia.length > 0) { /* ... (bez zmian - używa danych zlecenia) ... */ } 
+        else { historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>'; }
+
+        const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
+        kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
+        const qKalendarz = query(collection(db, "godziny_pracy"), where("zlecenieId", "==", zlecenieId), orderBy("id", "desc")); 
+        const querySnapshotKalendarz = await getDocs(qKalendarz);
+        let kalendarzHtml = '';
+        querySnapshotKalendarz.forEach((doc) => {
+            const wpis = doc.data();
+            const dataWpisu = doc.id;
+            kalendarzHtml += `
+                <div class="calendar-entry-item">
+                    <span class="date">[${dataWpisu}]</span>
+                    Praca: ${wpis.praca || 0}h | Fakturowane: ${wpis.fakturowane || 0}h | Nadgodziny: ${wpis.nadgodziny || 0}h | Jazda: ${wpis.jazda || 0}h
+                    ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
+                </div>`;
+        });
+        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+
+        detailsZlecenieModal.style.display = 'block';
+    }
+    async function zapiszPrzypisanie(event) {
+        event.preventDefault();
+        const zlecenieId = assignForm['assign-zlecenie-id'].value;
+        let klientId = assignForm['assign-klient-select'].value;
+        let maszynaId = assignForm['assign-maszyna-select'].value;
+        const nowyKlientNazwa = assignForm['assign-nowy-klient'].value.trim();
+        const nowaMaszynaTyp = assignForm['assign-nowa-maszyna-typ'].value;
+        const nowaMaszynaModel = assignForm['assign-nowa-maszyna-model'].value.trim();
+        try {
+            if (!klientId && nowyKlientNazwa) {
+                const nowyKlientDoc = await addDoc(collection(db, "klienci"), { nazwa: nowyKlientNazwa, createdAt: new Date() });
+                klientId = nowyKlientDoc.id;
+            }
+            if (!klientId) { alert("Musisz wybrać lub dodać klienta."); return; }
+            if (!maszynaId && nowaMaszynaModel && nowaMaszynaTyp) {
+                await new Promise(resolve => setTimeout(resolve, 500)); // Daj czas na aktualizację cache
+                // Użyj cache klientów
+                const klient = _wszystkieKlienciCache.find(k => k.id === klientId); 
+                if (!klient) { alert("Błąd: Nie znaleziono danych nowo dodanego klienta. Spróbuj ponownie."); return;}
+                const nowaMaszynaDoc = await addDoc(collection(db, "maszyny"), {
+                    klientId: klientId, klientNazwa: klient.nazwa,
+                    typMaszyny: nowaMaszynaTyp, model: nowaMaszynaModel, createdAt: new Date()
+                });
+                maszynaId = nowaMaszynaDoc.id;
+            }
+            if (!maszynaId) { alert("Musisz wybrać lub dodać maszynę."); return; }
+            
+            // Daj Firebase chwilę na przetworzenie dodania maszyny, zanim pobierzesz jej dane
+            await new Promise(resolve => setTimeout(resolve, 700)); 
+            
+            // Użyj cache maszyn
+            const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId); 
+            if (!maszyna) { alert("Błąd: Nie znaleziono danych wybranej/dodanej maszyny. Spróbuj ponownie."); return; }
+
+            const zlecenieRef = doc(db, "zlecenia", zlecenieId);
+            const zlecenieSnap = await getDoc(zlecenieRef);
+            if (!zlecenieSnap.exists()) { alert("Błąd: Nie znaleziono zlecenia do przypisania."); return;}
+            const zlecenieData = zlecenieSnap.data();
+            const nowaHistoria = [...(zlecenieData.historia || []), {
+                timestamp: new Date().toISOString(),
+                akcja: `Przypisano do klienta: ${maszyna.klientNazwa} (Maszyna: ${maszyna.model})`
+            }];
+
+            const daneDoAktualizacji = {
+                maszynaId: maszynaId, klientId: maszyna.klientId,
+                klientNazwa: maszyna.klientNazwa, typMaszyny: maszyna.typMaszyny,
+                model: maszyna.model, status: 'aktywne',
+                historia: nowaHistoria 
+            };
+            await updateDoc(zlecenieRef, daneDoAktualizacji);
+            assignModal.style.display = 'none';
+        } catch (error) { console.error("Błąd podczas przypisywania:", error); alert(`Wystąpił błąd: ${error.message}`);}
+     }
     
     function renderMagazynWModalu() { /* ... (bez zmian) ... */ }
     function dodajCzescDoZlecenia(event) { /* ... (bez zmian) ... */ }
     function renderCzesciDoZlecenia() { /* ... (bez zmian) ... */ }
     async function obslugaListyCzesci(event) { /* ... (bez zmian) ... */ }
     async function obslugaZakonczeniaZlecenia(event) { /* ... (bez zmian) ... */ }
-    // --- MAGAZYN ---
+    
+    // --- MAGAZYN ---
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
         const dane = { index: magazynForm['item-index'].value, nazwa: magazynForm['item-name'].value, ilosc: Number(magazynForm['item-ilosc'].value), klient: magazynForm['item-klient'].value || '---', createdAt: new Date() };
@@ -546,7 +849,9 @@ function initializeApp() {
                     const [index, nazwa, ilosc] = parts;
                     await addDoc(collection(db, "magazyn"), { index: index.trim(), nazwa: nazwa.trim(), ilosc: Number(ilosc.trim()), klient: klient, createdAt: new Date() });
                     dodaneCount++;
-                }
+                } else {
+                    console.warn("Pominięto linię (nieprawidłowy format):", line);
+                }
             }
             alert(`Pomyślnie dodano ${dodaneCount} produktów.`); bulkAddForm.reset();
         } catch (error) { console.error("Błąd masowego dodawania:", error); alert("Wystąpił błąd."); }
@@ -559,19 +864,24 @@ function initializeApp() {
      }
     function przeliczOlej(event) {
         const pojemnosc = Number(oilContainerSizeSelect.value);
-        if (isNaN(pojemnosc) || pojemnosc <= 0) return; // Zabezpieczenie
+        if (isNaN(pojemnosc) || pojemnosc <= 0) return; 
         const source = event.target;
         if (source.id === 'converter-litry') {
             converterSztukiInput.value = '';
             const litry = Number(source.value);
             resultSztuki.textContent = litry > 0 ? `${(litry / pojemnosc).toFixed(3)} szt.` : '0.00 szt.';
-            if(litry <= 0) resultLitry.textContent = '0.00 L';
+            resultLitry.textContent = litry > 0 ? source.value + ' L' : '0.00 L'; // Pokaż wpisaną wartość L
         } else if (source.id === 'converter-sztuki') {
             converterLitryInput.value = '';
             const sztuki = Number(source.value);
             resultLitry.textContent = sztuki > 0 ? `${(sztuki * pojemnosc).toFixed(2)} L` : '0.00 L';
-            if(sztuki <= 0) resultSztuki.textContent = '0.00 szt.';
-        }
+            resultSztuki.textContent = sztuki > 0 ? source.value + ' szt.' : '0.00 szt.'; // Pokaż wpisaną wartość szt.
+        } else { // Wywołane przy zmianie pojemnika
+             converterLitryInput.value = '';
+             converterSztukiInput.value = '';
+             resultLitry.textContent = '0.00 L';
+             resultSztuki.textContent = '0.00 szt.';
+        }
      }
     async function obslugaTabeliMagazynu(event) {
         const tr = event.target.closest('tr'); if (!tr) return;
@@ -582,11 +892,12 @@ function initializeApp() {
             stockChangeOperation = event.target.classList.contains('add-stock-btn') ? 'add' : 'remove';
             document.getElementById('stock-modal-title').textContent = stockChangeOperation === 'add' ? 'Dodaj do stanu' : 'Zdejmij ze stanu';
             document.getElementById('stock-modal-name').textContent = tr.dataset.name;
-            document.getElementById('stock-modal-current-qty').textContent = tr.dataset.qty + ' szt.';
+            document.getElementById('stock-modal-current-qty').textContent = Number(tr.dataset.qty).toFixed(2) + ' szt.'; // Formatuj do 2 miejsc po przecinku
             document.getElementById('stock-change-id').value = docId;
             const qtyInput = document.getElementById('stock-change-qty');
             qtyInput.step = tr.dataset.isOil === 'true' ? "0.01" : "1";
             qtyInput.placeholder = tr.dataset.isOil === 'true' ? "np. 0.5" : "Tylko liczby całkowite";
+            qtyInput.value = ''; // Wyczyść pole przed pokazaniem
             stockModal.style.display = 'block';
         }
      }
@@ -600,7 +911,13 @@ function initializeApp() {
             await runTransaction(db, async (t) => {
                 const sfDoc = await t.get(docRef);
                 if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
-                const currentQty = sfDoc.data().ilosc;
+                const produktData = sfDoc.data();
+                const currentQty = produktData.ilosc;
+                 // Sprawdź czy liczba całkowita dla zwykłych produktów
+                 if (!produktData.jestOlejem && changeQty % 1 !== 0) {
+                     throw "Dla tego produktu można podawać tylko liczby całkowite.";
+                 }
+
                 let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQty - changeQty;
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
                 t.update(docRef, { ilosc: newQty });
@@ -609,7 +926,7 @@ function initializeApp() {
             stockModalForm.reset();
         } catch (e) { console.error("Błąd transakcji: ", e); alert(`Wystąpił błąd: ${e}`); }
      }
-    function wyswietlMagazyn() {
+     function wyswietlMagazyn() {
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
             let html = '';
             wszystkieProdukty = [];
@@ -619,7 +936,9 @@ function initializeApp() {
                 produkt.id = doc.id;
                 wszystkieProdukty.push(produkt);
                 const iloscWLitrach = produkt.jestOlejem ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L' : '---';
-                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${produkt.jestOlejem || false}"><td>${produkt.index}</td><td>${produkt.nazwa}</td><td>${produkt.ilosc.toFixed(2)} szt.</td><td>${iloscWLitrach}</td><td>${produkt.klient}</td><td><button class="add-stock-btn">Dodaj</button><button class="remove-stock-btn">Zdejmij</button><button class="delete-btn">Usuń</button></td></tr>`;
+                // Formatowanie ilości do 2 miejsc po przecinku
+                const iloscFormatowana = produkt.ilosc.toFixed(2);
+                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${produkt.jestOlejem || false}"><td>${produkt.index}</td><td>${produkt.nazwa}</td><td>${iloscFormatowana} szt.</td><td>${iloscWLitrach}</td><td>${produkt.klient}</td><td><button class="add-stock-btn">Dodaj</button><button class="remove-stock-btn">Zdejmij</button><button class="delete-btn">Usuń</button></td></tr>`;
             });
             magazynLista.innerHTML = html;
         });
@@ -633,14 +952,23 @@ function initializeApp() {
     przejazdForm.addEventListener('submit', dodajLubEdytujPrzejazd);
     listaPrzejazdowDiv.addEventListener('click', obslugaListyPrzejazdow);
     miesiacPrzejazdyInput.addEventListener('change', filtrujIwyswietlPrzejazdy);
-    document.getElementById('export-przejazdy-btn').addEventListener('click', () => { /* ... */ });
+    document.getElementById('export-przejazdy-btn').addEventListener('click', () => { 
+        const miesiac = miesiacPrzejazdyInput.value;
+        const dane = wszystkiePrzejazdy.filter(p => p.data.startsWith(miesiac)).map(({id, createdAt, ...reszta}) => reszta);
+        eksportujDoCSV(dane, `przejazdy_${miesiac}.csv`);
+    });
     zlecenieForm.addEventListener('submit', dodajZlecenie);
     aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
     ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen); 
     completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
     closeModalButton.onclick = () => { completeModal.style.display = "none"; };
     miesiacSummaryInput.addEventListener('change', () => { obliczIPokazPodsumowanieFinansowe(); });
-    document.getElementById('export-zlecenia-btn').addEventListener('click', () => { /* ... */ });
+    document.getElementById('export-zlecenia-btn').addEventListener('click', () => { 
+        const miesiac = miesiacSummaryInput.value;
+        const dane = _wszystkieZleceniaCache.filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac)) 
+            .map(({id, createdAt, status, uzyteCzesci, historia, ...reszta}) => ({...reszta, uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''}));
+        eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
+    });
     magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
     bulkAddForm.addEventListener('submit', dodajMasowo);
     magazynLista.addEventListener('click', obslugaTabeliMagazynu);
@@ -649,14 +977,43 @@ function initializeApp() {
     addOilBtn.addEventListener('click', dodajOlej);
     converterLitryInput.addEventListener('input', przeliczOlej);
     converterSztukiInput.addEventListener('input', przeliczOlej);
-    oilContainerSizeSelect.addEventListener('change', () => { converterLitryInput.value = ''; converterSztukiInput.value = ''; przeliczOlej({target:{id:''}}); }); 
+    oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({target:{id:''}}); }); // Wywołaj przeliczanie przy zmianie pojemnika
   
     modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
     partsToRemoveList.addEventListener('click', obslugaListyCzesci);
-    zlecenieKlientSelect.addEventListener('change', (event) => { /* ... */ });
+    zlecenieKlientSelect.addEventListener('change', (event) => { 
+        const wybranyKlientId = event.target.value;
+        if (wybranyKlientId === "szybkie-zlecenie" || !wybranyKlientId) {
+            zlecenieMaszynaSelect.disabled = true;
+            zlecenieMaszynaSelect.innerHTML = `<option value="">${wybranyKlientId ? '-- N/A --' : '-- Najpierw wybierz klienta --'}</option>`;
+        } else {
+            const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === wybranyKlientId); 
+            let maszynySelectHtml = '<option value="">-- Wybierz maszynę --</option>';
+            if (maszynyKlienta.length > 0) {
+                maszynySelectHtml += maszynyKlienta.map(m => `<option value="${m.id}">${m.typMaszyny} ${m.model}</option>`).join('');
+                zlecenieMaszynaSelect.disabled = false;
+            } else {
+                maszynySelectHtml = '<option value="">-- Ten klient nie ma maszyn --</option>';
+                zlecenieMaszynaSelect.disabled = true;
+            }
+            zlecenieMaszynaSelect.innerHTML = maszynySelectHtml;
+        }
+    });
     assignForm.addEventListener('submit', zapiszPrzypisanie);
     assignModal.querySelector('.close-button').onclick = () => { assignModal.style.display = 'none'; };
-    document.getElementById('assign-klient-select').addEventListener('change', (event) => { /* ... */ });
+    document.getElementById('assign-klient-select').addEventListener('change', (event) => { 
+        const klientId = event.target.value;
+        const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klientId); 
+        const maszynySelect = document.getElementById('assign-maszyna-select');
+        let html = '<option value="">-- Wybierz istniejącą --</option>';
+        if(klientId) {
+            html += maszynyKlienta.map(m => `<option value="${m.id}">${m.typMaszyny} ${m.model}</option>`).join('');
+            document.getElementById('assign-machine-section').style.display = 'block';
+        } else {
+            document.getElementById('assign-machine-section').style.display = 'none';
+        }
+        maszynySelect.innerHTML = html;
+    });
     kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
     kalendarzContainer.addEventListener('click', obslugaKalendarza);
     kalendarzModal.querySelector('.close-button').onclick = () => { kalendarzModal.style.display = 'none'; };
@@ -667,8 +1024,7 @@ function initializeApp() {
 
     editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
     editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
-    editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia); 
-    
+    editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
     editKlientModal.querySelector('.close-button').onclick = () => { editKlientModal.style.display = 'none'; };
     editMaszynaModal.querySelector('.close-button').onclick = () => { editMaszynaModal.style.display = 'none'; };
     detailsZlecenieModal.querySelector('.close-button').onclick = () => { detailsZlecenieModal.style.display = 'none'; };
@@ -692,9 +1048,13 @@ function initializeApp() {
 
     // --- INICJALIZACJA ---
     inicjalizujKalendarz();
-    nasluchujNaKlientow(); 
-    nasluchujNaMaszyny();   
-    nasluchujNaZlecenia();  
+    // Kolejność nasłuchiwania jest ważna!
+    nasluchujNaKlientow(); // Ładuje klientów i wywołuje wyswietlKlientow
+    nasluchujNaMaszyny();   // Ładuje maszyny i wywołuje wyswietlMaszyny -> wyswietlKlientow
+    nasluchujNaZlecenia();  // Ładuje zlecenia i wywołuje wyswietlZlecenia -> wyswietlWpisyKalendarza
     wyswietlPrzejazdy();
     wyswietlMagazyn();
-}
+
+} // KONIEC initializeApp()
+// Ta ostatnia linijka (klamra zamykająca funkcję initializeApp) jest bardzo ważna!
+// Upewnij się, że ją wkleiłeś na samym końcu pliku.
