@@ -409,4 +409,4 @@ body[data-theme="dark"] .close-button { color: #888; }
 body[data-theme="dark"] .event-actions { background: rgba(42, 42, 42, 0.8); }
 body[data-theme="dark"] .client-machine-list a { color: var(--secondary-color) !important; }
 body[data-theme="dark"] .machine-history-link { color: var(--secondary-color) !important; }
-body[data-theme="dark"] .fc-event hr { border-color: rgba(255, 255, 255, 0.3) !important; } /* Poprawka dla hr w ciemnym motywie */
+body[data-theme="dark"] .fc-event hr { border-color: rgba(255, 255, 255, 0.3) !important; }
