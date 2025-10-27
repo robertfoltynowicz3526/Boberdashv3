@@ -16,7 +16,7 @@ function initializeApp() {
 
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
-    // Usunięto selektory dla przejazdów (np. miesiacPrzejazdyInput)
+    // Usunięto selektory dla przejazdów
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
@@ -31,7 +31,6 @@ function initializeApp() {
     const maszynaKlientSelect = document.getElementById('maszyna-klient-select');
     const maszynaForm = document.getElementById('maszyna-form');
     const listaMaszynDiv = document.getElementById('lista-maszyn');
-    // Usunięto selektory dla przejazdów
     const zlecenieForm = document.getElementById('zlecenie-form');
     const aktywneZleceniaLista = document.getElementById('aktywne-zlecenia-lista');
     const ukonczoneZleceniaLista = document.getElementById('ukonczone-zlecenia-lista');
@@ -433,8 +432,7 @@ function initializeApp() {
              return; // Zakończ
         }
     }
-
-    // --- NOWA FUNKCJA --- (pokazHistorieSerwisowaMaszyny) - Otwiera dedykowany modal
+// --- NOWA FUNKCJA --- (pokazHistorieSerwisowaMaszyny) - Otwiera dedykowany modal
     async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
         document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
@@ -546,7 +544,6 @@ function initializeApp() {
                         transaction.update(maszynaDoc.ref, { klientNazwa: nowaNazwa });
                     });
                 });
-                console.log(`Przygotowano aktualizację dla ${maszynySnap.size} maszyn.`);
 
                 // Aktualizacja zleceń
                 const qZlecenia = query(collection(db, "zlecenia"), where("klientId", "==", klientId));
@@ -556,7 +553,6 @@ function initializeApp() {
                         transaction.update(zlecenieDoc.ref, { klientNazwa: nowaNazwa });
                     });
                 });
-                console.log(`Przygotowano aktualizację dla ${zleceniaSnap.size} zleceń.`);
 
                 // Aktualizacja wpisów w kalendarzu (godziny_pracy)
                 const powiazaneZleceniaIds = _wszystkieZleceniaCache
@@ -758,7 +754,7 @@ function initializeApp() {
     // --- ZLECENIA ---
     function wyswietlZlecenia() {
          // Sprawdź, czy dane są załadowane
-         if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0 && _wszystkieZleceniaCache.length > 0) { // Sprawdź czy inne dane są, a zleceń brak
+         if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
              console.log("Czekam na maszyny przed renderowaniem zleceń...");
              aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
              ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -867,7 +863,8 @@ function initializeApp() {
             zlecenieMaszynaSelect.disabled = true;
         } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
     }
-function obliczIPokazPodsumowanieFinansowe() {
+
+    function obliczIPokazPodsumowanieFinansowe() {
         const podsumowanie = obliczPodsumowanieFinansowe(miesiacSummaryInput.value, wszystkieZlecenia);
         summaryContainer.innerHTML = `<p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(2)} h</strong></p><p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(2)} zł</strong></p><p>Wartość Netto (po 30%): <strong>${podsumowanie.sumaNetto.toFixed(2)} zł</strong></p>`;
     }
@@ -1259,6 +1256,11 @@ function obliczIPokazPodsumowanieFinansowe() {
                 const sfDoc = await t.get(docRef);
                 if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
                 const produktData = sfDoc.data();
+        _ ```
+
+### Część 6 z 6 (Linie 901-1065)
+
+```javascript
                 const currentQty = produktData.ilosc;
                  // Sprawdź czy liczba całkowita dla zwykłych produktów
                  if (!produktData.jestOlejem && changeQty % 1 !== 0) {
@@ -1297,6 +1299,7 @@ function obliczIPokazPodsumowanieFinansowe() {
     listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
     // Usunięto listenery dla przejazdów
     zlecenieForm.addEventListener('submit', dodajZlecenie);
+    // Użyj delegacji zdarzeń dla list zleceń
     aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
     ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
     completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
@@ -1309,12 +1312,7 @@ function obliczIPokazPodsumowanieFinansowe() {
         eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
     });
     magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
-  _ ```
-
-### Część 6 z 6 (Linie 901-1065)
-
-```javascript
-  bulkAddForm.addEventListener('submit', dodajMasowo);
+    bulkAddForm.addEventListener('submit', dodajMasowo);
     magazynLista.addEventListener('click', obslugaTabeliMagazynu);
     stockModalForm.addEventListener('submit', obslugaZmianyStanu);
     stockModalCloseButton.onclick = () => { stockModal.style.display = "none"; };
