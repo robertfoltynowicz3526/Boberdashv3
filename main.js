@@ -1429,7 +1429,19 @@ let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQt
             event.target == editMaszynaModal ||
             event.target == detailsZlecenieModal ||
             event.target == editZlecenieModal ||
-  Gdy masz już wszystkie 10 części wklejone jedna pod drugą, sprawdź, czy Twój plik `main.js` kończy się **dokładnie** tak:
+event.target == machineHistoryModal
+        ) {
+            event.target.style.display = "none";
+        }
+    };
 
-```javascript
-// KONIEC initializeApp()
+    // --- INICJALIZACJA ---
+    inicjalizujKalendarz();
+    // Kolejność nasłuchiwania jest ważna!
+    nasluchujNaKlientow(); // Ładuje klientów i wywołuje wyswietlKlientow
+    nasluchujNaMaszyny();   // Ładuje maszyny i wywołuje wyswietlMaszyny -> wyswietlKlientow
+    nasluchujNaZlecenia();  // Ładuje zlecenia i wywołuje wyswietlZlecenia -> wyswietlWpisyKalendarza
+    wyswietlPrzejazdy();
+    wyswietlMagazyn();
+
+} // KONIEC initializeApp()
