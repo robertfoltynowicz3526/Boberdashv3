@@ -108,9 +108,9 @@ function initializeApp() {
                     eventEl.appendChild(actionsEl);
                 }
                 return { domNodes: [eventEl] };
-            },
+            }, // <-- TUTAJ JEST PRZECINEK, O KTÓRYM MÓWILIŚMY
             dateClick: (info) => otworzModalGodzin(info.dateStr),
-            datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
+datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
         });
         calendar.render();
     }
@@ -176,64 +176,9 @@ function initializeApp() {
         };
         try { await setDoc(doc(db, "godziny_pracy", data), dane); kalendarzModal.style.display = 'none'; } catch (e) { console.error("Błąd zapisu godzin: ", e); }
     }
-datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
-        });
-        calendar.render();
-    }
-
-    async function otworzModalGodzin(data) {
-        kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
-        kalendarzForm.reset();
-        document.getElementById('kalendarz-data').value = data;
-
-        const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
-        zlecenieSelect.innerHTML = '<option value="">-- Brak --</option>';
-        _wszystkieZleceniaCache
-            .filter(z => z.status === 'aktywne' || z.status === 'nieprzypisane')
-            .sort((a,b) => (a.klientNazwa || a.nrZlecenia).localeCompare(b.klientNazwa || b.nrZlecenia))
-            .forEach(z => {
-                const nazwa = z.klientNazwa ? `${z.klientNazwa} (${z.model || z.nrZlecenia})` : z.nrZlecenia;
-                const option = document.createElement('option');
-                option.value = z.id;
-                option.textContent = nazwa;
-                option.dataset.klientNazwa = z.klientNazwa || nazwa;
-                zlecenieSelect.appendChild(option);
-            });
-
-        const docSnap = await getDoc(doc(db, "godziny_pracy", data));
-        if (docSnap.exists()) {
-            const dane = docSnap.data();
-            kalendarzForm['godziny-pracy'].value = dane.praca || 0;
-            kalendarzForm['godziny-fakturowane'].value = dane.fakturowane || 0;
-            kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
-            kalendarzForm['czas-jazdy'].value = dane.jazda || 0;
-            kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
-            kalendarzForm['kalendarz-zlecenie-select'].value = dane.zlecenieId || '';
-        }
-        kalendarzModal.style.display = 'block';
-    }
-
-    async function obslugaZapisuGodzin(event) {
-        event.preventDefault();
-        const data = kalendarzForm['kalendarz-data'].value;
-        const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
-        const zlecenieId = zlecenieSelect.value;
-        const klientNazwa = zlecenieId ? zlecenieSelect.options[zlecenieSelect.selectedIndex].dataset.klientNazwa : null;
-
-        const dane = {
-            praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
-            fakturowane: Number(kalendarzForm['godziny-fakturowane'].value) || 0,
-            nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0,
-            jazda: Number(kalendarzForm['czas-jazdy'].value) || 0,
-            notatka: kalendarzForm['kalendarz-notatka'].value || '',
-            zlecenieId: zlecenieId || null,
-            klientNazwa: klientNazwa
-        };
-        try { await setDoc(doc(db, "godziny_pracy", data), dane); kalendarzModal.style.display = 'none'; } catch (e) { console.error("Błąd zapisu godzin: ", e); }
-    }
 
     function wyswietlWpisyKalendarza() {
-        if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) { 
+        if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
             console.log("Czekam na załadowanie danych zleceń dla kalendarza...");
             if(calendar) {
                  calendar.removeAllEvents();
@@ -459,9 +404,6 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
         onSnapshot(query(collection(db, "klienci"), orderBy("nazwa")), (snapshot) => {
              _wszystkieKlienciCache = [];
              snapshot.forEach(doc => { _wszystkieKlienciCache.push({ id: doc.id, ...doc.data() }); });
-             // Po załadowaniu klientów, spróbuj wyświetlić obie listy (maszyny i klienci)
-             // Jeśli maszyny są już załadowane, to się wyświetlą poprawnie
-             wyswietlMaszyny();
              wyswietlKlientow();
         });
     }
@@ -757,60 +699,19 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
         editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny || 0; // 0 jeśli brak
         editMaszynaModal.style.display = 'block';
     }
-    async function zapiszEdycjeMaszyny(event) {
-        event.preventDefault();
-        const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
-        const stareDane = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
-        if (!stareDane) {
-             console.error("Nie znaleziono starych danych maszyny w cache!");
-             alert("Wystąpił błąd podczas zapisu - nie znaleziono danych maszyny.");
-             return;
-        }
-        const nowyModel = editMaszynaForm['edit-maszyna-model'].value;
-        const nowyTyp = editMaszynaForm['edit-maszyna-typ'].value;
-
-        const dane = {
-            typMaszyny: nowyTyp,
-            model: nowyModel,
-            nrSeryjny: editMaszynaForm['edit-maszyna-serial'].value || '---', // Dodaj placeholder
-            rokProdukcji: Number(editMaszynaForm['edit-maszyna-rok'].value) || null, // null jeśli puste
-            motogodziny: Number(editMaszynaForm['edit-maszyna-mth'].value) || 0, // 0 jeśli puste
-        };
-        try {
-            await updateDoc(doc(db, "maszyny", maszynaId), dane);
-
-            // Jeśli model lub typ się zmienił, zaktualizuj zlecenia
-            if (stareDane.model !== nowyModel || stareDane.typMaszyny !== nowyTyp) {
-                console.log(`Zmieniono dane maszyny "${stareDane.model}". Aktualizacja zleceń...`);
-                 const qZlecenia = query(collection(db, "zlecenia"), where("maszynaId", "==", maszynaId));
-                 
-                 // Użyj transakcji do aktualizacji wszystkich pasujących zleceń
-                 await runTransaction(db, async (transaction) => {
-                    const zleceniaSnap = await getDocs(qZlecenia); // Pobierz wewnątrz transakcji
-                    zleceniaSnap.forEach(zlecenieDoc => {
-                        transaction.update(zlecenieDoc.ref, { model: nowyModel, typMaszyny: nowyTyp });
-                    });
-                    console.log(`Przygotowano aktualizację dla ${zleceniaSnap.size} zleceń.`);
-                });
-            }
-
-            editMaszynaModal.style.display = 'none';
-        } catch (e) {
-            console.error("Błąd aktualizacji maszyny lub powiązanych zleceń:", e);
-            alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
-        }
+    // --- PRZEJAZDY --- (Usunięte, bo zakładka jest wyłączona)
+    function wyswietlPrzejazdy() {
+        // Ta funkcja jest teraz pusta, ponieważ zakładka jest usunięta
+        // Ale zostawiamy ją, aby uniknąć błędów, jeśli jest gdzieś wywoływana
     }
-    
-    // --- PRZEJAZDY --- (Usunięte, bo zakładka jest wyłączona)
-    function wyswietlPrzejazdy() { /* ... */ } // Pusta funkcja, aby uniknąć błędów
-    function filtrujIwyswietlPrzejazdy() { /* ... */ } // Pusta funkcja
-    async function dodajLubEdytujPrzejazd(event) { /* ... */ } // Pusta funkcja
-    async function obslugaListyPrzejazdow(event) { /* ... */ } // Pusta funkcja
+    function filtrujIwyswietlPrzejazdy() { /* ... Pusta ... */ }
+    async function dodajLubEdytujPrzejazd(event) { event.preventDefault(); } // Zapobiegaj domyślnej akcji
+    async function obslugaListyPrzejazdow(event) { /* ... Pusta ... */ }
     
     // --- ZLECENIA ---
     function wyswietlZlecenia() {
          // Sprawdź, czy dane są załadowane
-         if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
+         if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0 && _wszystkieZleceniaCache.length > 0) { // Sprawdź czy inne dane są, a zleceń brak
              console.log("Czekam na maszyny przed renderowaniem zleceń...");
              aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
              ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -877,7 +778,8 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
         const wybranyKlientId = zlecenieKlientSelect.value;
         const wybranaMaszynaId = zlecenieMaszynaSelect.value;
         // Usunięto pobieranie dat - już nie są w formularzu
-        const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
+
+        const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
 
         let dane;
         if (wybranyKlientId === "szybkie-zlecenie") {
@@ -891,6 +793,7 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
                 createdAt: new Date()
             };
         } else if (wybranyKlientId && wybranaMaszynaId) {
+            // Użyj cache do pobrania danych klienta i maszyny
             const maszyna = _wszystkieMaszynyCache.find(m => m.id === wybranaMaszynaId);
             const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
             if (!maszyna || !klient) { alert("Błąd: Nie znaleziono danych klienta lub maszyny."); return;}
@@ -920,7 +823,7 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
         const podsumowanie = obliczPodsumowanieFinansowe(miesiacSummaryInput.value, wszystkieZlecenia);
         summaryContainer.innerHTML = `<p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(2)} h</strong></p><p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(2)} zł</strong></p><p>Wartość Netto (po 30%): <strong>${podsumowanie.sumaNetto.toFixed(2)} zł</strong></p>`;
     }
-
+    
     async function obslugaListyZlecen(event) {
         const li = event.target.closest('li'); if (!li) return;
         const docId = li.dataset.id;
@@ -1020,135 +923,19 @@ datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.v
                  return;
             }
             wpisHistorii += zmiany.join('; ');
-const nowaHistoria = [...staraHistoria, {
-                timestamp: new Date().toISOString(),
-                akcja: wpisHistorii
+akcja: `Przypisano do klienta: ${maszyna.klientNazwa} (Maszyna: ${maszyna.model})`
             }];
 
-            // Zaktualizuj dokument
-            await updateDoc(zlecenieRef, {
-                wyfakturowaneGodziny: noweGodziny,
-                typZlecenia: nowyTyp,
-                historia: nowaHistoria
-            });
-
-            editZlecenieModal.style.display = 'none';
-            alert("Zlecenie zaktualizowane.");
-        } catch (e) {
-            console.error("Błąd aktualizacji zlecenia:", e);
-            alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
-        }
-    }
-
-    async function otworzModalSzczegolowZlecenia(zlecenieId) {
-        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
-        if (!zlecenie) { alert("Nie znaleziono zlecenia!"); return; }
-        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-
-        document.getElementById('details-zlecenie-title').textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
-       
-        const infoDiv = document.getElementById('details-zlecenie-info');
-        infoDiv.innerHTML = `
-            <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
-            <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
-            <div class="details-group"><strong>Data Rozpoczęcia:</strong> <p>${zlecenie.dataRozpoczecia || 'Brak'}</p></div>
-            <div class="details-group"><strong>Data Zakończenia:</strong> <p>${zlecenie.dataZakonczenia || 'Brak'}</p></div>
-            <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
-            <div class="details-group"><strong>Opis:</strong> <p>${zlecenie.opis || 'Brak opisu'}</p></div>
-        `;
-       
-        if (zlecenie.status === 'ukończone') {
-            infoDiv.innerHTML += `
-                <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
-                <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
-                <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
-                <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
-            `;
-        }
-
-        const historiaDiv = document.getElementById('details-zlecenie-historia');
-        if (zlecenie.historia && zlecenie.historia.length > 0) {
-             historiaDiv.innerHTML = zlecenie.historia
-                 .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                 .map(wpis => `
-                    <div class="history-item">
-                        <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
-                        ${wpis.akcja}
-                    </div>
-                `).join('');
-        }
-        else { historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>'; }
-
-        const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
-        kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
-        const qKalendarz = query(collection(db, "godziny_pracy"), where("zlecenieId", "==", zlecenieId), orderBy("id", "desc"));
-        const querySnapshotKalendarz = await getDocs(qKalendarz);
-        let kalendarzHtml = '';
-        querySnapshotKalendarz.forEach((doc) => {
-            const wpis = doc.data();
-            const dataWpisu = doc.id;
-            kalendarzHtml += `
-                <div class="calendar-entry-item">
-                    <span class="date">[${dataWpisu}]</span>
-                    Praca: ${wpis.praca || 0}h | Fakturowane: ${wpis.fakturowane || 0}h | Nadgodziny: ${wpis.nadgodziny || 0}h | Jazda: ${wpis.jazda || 0}h
-                    ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
-                </div>`;
-        });
-        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
-
-        detailsZlecenieModal.style.display = 'block';
-    }
-
-    async function zapiszPrzypisanie(event) {
-        event.preventDefault();
-        const zlecenieId = assignForm['assign-zlecenie-id'].value;
-        let klientId = assignForm['assign-klient-select'].value;
-        let maszynaId = assignForm['assign-maszyna-select'].value;
-        const nowyKlientNazwa = assignForm['assign-nowy-klient'].value.trim();
-        const nowaMaszynaTyp = assignForm['assign-nowa-maszyna-typ'].value;
-        const nowaMaszynaModel = assignForm['assign-nowa-maszyna-model'].value.trim();
-        try {
-            if (!klientId && nowyKlientNazwa) {
-                const nowyKlientDoc = await addDoc(collection(db, "klienci"), { nazwa: nowyKlientNazwa, createdAt: new Date() });
-                klientId = nowyKlientDoc.id;
-            }
-            if (!klientId) { alert("Musisz wybrać lub dodać klienta."); return; }
-            if (!maszynaId && nowaMaszynaModel && nowaMaszynaTyp) {
-                await new Promise(resolve => setTimeout(resolve, 500)); // Daj czas na aktualizację cache
-                const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
-                if (!klient) { alert("Błąd: Nie znaleziono danych nowo dodanego klienta. Spróbuj ponownie."); return;}
-                const nowaMaszynaDoc = await addDoc(collection(db, "maszyny"), {
-                    klientId: klientId, klientNazwa: klient.nazwa,
-                    typMaszyny: nowaMaszynaTyp, model: nowaMaszynaModel, createdAt: new Date()
-                });
-                maszynaId = nowaMaszynaDoc.id;
-            }
-            if (!maszynaId) { alert("Musisz wybrać lub dodać maszynę."); return; }
-
-            await new Promise(resolve => setTimeout(resolve, 700));
-
-            const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
-            if (!maszyna) { alert("Błąd: Nie znaleziono danych wybranej/dodanej maszyny. Spróbuj ponownie."); return; }
-
-            const zlecenieRef = doc(db, "zlecenia", zlecenieId);
-            const zlecenieSnap = await getDoc(zlecenieRef);
-            if (!zlecenieSnap.exists()) { alert("Błąd: Nie znaleziono zlecenia do przypisania."); return;}
-            const zlecenieData = zlecenieSnap.data();
-            const nowaHistoria = [...(zlecenieData.historia || []), {
-                timestamp: new Date().toISOString(),
-                akcja: `Przypisano do klienta: ${maszyna.klientNazwa} (Maszyna: ${maszyna.model})`
-            }];
-const daneDoAktualizacji = {
+            const daneDoAktualizacji = {
                 maszynaId: maszynaId, klientId: maszyna.klientId,
                 klientNazwa: maszyna.klientNazwa, typMaszyny: maszyna.typMaszyny,
                 model: maszyna.model, status: 'aktywne',
-                historia: nowaHistoria 
+                historia: nowaHistoria
             };
             await updateDoc(zlecenieRef, daneDoAktualizacji);
             assignModal.style.display = 'none';
         } catch (error) { console.error("Błąd podczas przypisywania:", error); alert(`Wystąpił błąd: ${error.message}`);}
-     }
+    }
     
     function renderMagazynWModalu() {
         modalMagazynLista.innerHTML = wszystkieProdukty.filter(p => p.ilosc > 0).map(p => `<div class="modal-stock-item" data-id="${p.id}" data-name="${p.nazwa}" data-qty="${p.ilosc}" data-is-oil="${p.jestOlejem || false}"><span>${p.nazwa}</span><span class="item-qty">Na stanie: ${p.ilosc}</span></div>`).join('');
@@ -1204,7 +991,7 @@ const daneDoAktualizacji = {
                     timestamp: new Date().toISOString(),
                     akcja: `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}.`
                 }];
-                dane.historia = nowaHistoria; 
+                dane.historia = nowaHistoria;
 
                 const partPromises = czesciDoZlecenia.map(czesc => t.get(doc(db, "magazyn", czesc.id)));
                 const partDocs = await Promise.all(partPromises);
@@ -1217,16 +1004,13 @@ const daneDoAktualizacji = {
                     if (nowaIlosc < 0) throw `Za mało produktu ${czesc.nazwa} na stanie!`;
                     t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
                 }
-t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
-                }
             });
             alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
             completeModal.style.display = 'none';
             completeModalForm.reset();
         } catch (error) { console.error("BŁĄD TRANSAKCJI: ", error); alert(`Wystąpił błąd: ${error.message}`); }
     }
-    
-    // --- MAGAZYN ---
+// --- MAGAZYN ---
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
         const dane = { index: magazynForm['item-index'].value, nazwa: magazynForm['item-name'].value, ilosc: Number(magazynForm['item-ilosc'].value), klient: magazynForm['item-klient'].value || '---', createdAt: new Date() };
@@ -1313,8 +1097,6 @@ t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
                  }
 
                 let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQty - changeQty;
-                if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
-let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQty - changeQty;
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
                 t.update(docRef, { ilosc: newQty });
             });
@@ -1429,7 +1211,7 @@ let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQt
             event.target == editMaszynaModal ||
             event.target == detailsZlecenieModal ||
             event.target == editZlecenieModal ||
-event.target == machineHistoryModal
+            event.target == machineHistoryModal
         ) {
             event.target.style.display = "none";
         }
@@ -1441,7 +1223,7 @@ event.target == machineHistoryModal
     nasluchujNaKlientow(); // Ładuje klientów i wywołuje wyswietlKlientow
     nasluchujNaMaszyny();   // Ładuje maszyny i wywołuje wyswietlMaszyny -> wyswietlKlientow
     nasluchujNaZlecenia();  // Ładuje zlecenia i wywołuje wyswietlZlecenia -> wyswietlWpisyKalendarza
-    wyswietlPrzejazdy();
+    wyswietlPrzejazdy(); // Ta funkcja jest teraz pusta
     wyswietlMagazyn();
 
 } // KONIEC initializeApp()
