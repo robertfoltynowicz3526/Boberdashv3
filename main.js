@@ -1256,11 +1256,6 @@ function initializeApp() {
                 const sfDoc = await t.get(docRef);
                 if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
                 const produktData = sfDoc.data();
-        _ ```
-
-### Część 6 z 6 (Linie 901-1065)
-
-```javascript
                 const currentQty = produktData.ilosc;
                  // Sprawdź czy liczba całkowita dla zwykłych produktów
                  if (!produktData.jestOlejem && changeQty % 1 !== 0) {
