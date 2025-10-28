@@ -1,0 +1,26 @@
+# Pliki konfiguracyjne Firebase - BARDZO WAŻNE!
+# Upewnij się, że Twój plik z kluczami API tak się nazywa.
+firebase-config.js
+
+# Zależności
+# Ten folder może ważyć setki megabajtów i jest niepotrzebny.
+node_modules/
+
+# Pliki środowiskowe
+# Jeśli kiedykolwiek dodasz pliki .env, będą bezpieczne.
+.env
+.env.*
+!.env.example
+
+# Logi
+npm-debug.log*
+yarn-debug.log*
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db
+
+# Pliki generowane przez Vite i Vercel
+dist/
+.vite/
+.vercel/
