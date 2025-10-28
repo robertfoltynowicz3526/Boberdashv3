@@ -462,7 +462,8 @@ function initializeApp() {
                         <li data-id="${doc.id}">
                             <span>
                                 <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
-                                <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
+                                <em>Opis usterki: ${zlecenie.opis || 'Brak'}</em><br>
+                                <em>Wykonano: ${zlecenie.wykonaneCzynnosci || 'Nie podano'}</em><br>
                                 Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
                                 ${uzyteCzesciHtml}
                             </span>
@@ -1009,7 +1010,8 @@ function initializeApp() {
         if (zlecenie.status === 'ukończone') {
             infoDiv.innerHTML += `
                 <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
-                <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
+                <div class="details-group"><strong>Wykonane czynności:</strong> <p>${zlecenie.wykonaneCzynnosci || 'Nie podano'}</p></div>
+                <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
                 <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
                 <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
             `;
@@ -1146,7 +1148,8 @@ function initializeApp() {
         event.preventDefault();
         const docId = document.getElementById('complete-zlecenie-id').value;
         const dane = { status: 'ukończone', wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value), typZlecenia: document.getElementById('typ-zlecenia').value, dataUkonczenia: new Date().toISOString().split('T')[0], uzyteCzesci: czesciDoZlecenia };
-        try {
+            wykonaneCzynnosci: wykonaneCzynnosci
+            try {
             await runTransaction(db, async (t) => {
                 const zlecenieRef = doc(db, "zlecenia", docId);
                 const zlecenieSnap = await t.get(zlecenieRef);
