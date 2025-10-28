@@ -794,7 +794,7 @@ function initializeApp() {
             } else { // Zakończone
                 const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
                 const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-                ukonczoneHtml += `<li data-id="${zlecenie.id}"><span><strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br><em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>${uzyteCzesciHtml}</span><div><button class="btn-details details-zlecenie-btn">Szczegóły</button><button class="btn-edit edit-zlecenie-btn">Edytuj</button><button class="delete-btn">Usuń</button></div></li>`;
+                ukonczoneHtml += `<li data-id="${zlecenie.id}"><span><strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br><em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>${uzyteCzesciHtml}</span><div><button class="btn-details details-zlecenie-btn">Szczegóły</button><button class="btn-reopen reopen-zlecenie-btn">Otwórz Ponownie</button><button class="btn-edit edit-zlecenie-btn">Edytuj</button><button class="delete-btn">Usuń</button></div></li>`;
             }
         });
         aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceň lub pasujących do wyszukiwania.</p>";
@@ -892,6 +892,13 @@ function initializeApp() {
                 assignModal.style.display = 'block';
             }
             return; // Zakończ funkcję
+            if (event.target.classList.contains('reopen-zlecenie-btn')) {
+    const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
+    if (zlecenie) {
+        otworzPonownieZlecenie(docId, zlecenie.nrZlecenia);
+    }
+    return; // Zakończ funkcj
+}
         }
         if (event.target.classList.contains('complete-btn')) {
             const docSnap = await getDoc(doc(db, "zlecenia", docId));
@@ -933,12 +940,13 @@ function initializeApp() {
         document.getElementById('edit-zlecenie-nr').textContent = zlecenie.nrZlecenia;
         editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
         editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
-
+        editZlecenieForm['edit-wykonane-czynnosci'].value = zlecenie.wykonaneCzynnosci || ''; // Wczytaj istniejącą notatkę
         editZlecenieModal.style.display = 'block';
     }
 
     async function zapiszEdycjeZlecenia(event) {
         event.preventDefault();
+        const noweCzynnosci = editZlecenieForm['edit-wykonane-czynnosci'].value || 'Nie podano';
         const zlecenieId = editZlecenieForm['edit-zlecenie-id'].value;
         const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
         const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
@@ -955,14 +963,17 @@ function initializeApp() {
             const staraHistoria = zlecenieData.historia || [];
             const staryTyp = zlecenieData.typZlecenia;
             const stareGodziny = zlecenieData.wyfakturowaneGodziny;
-
+            const stareCzynnosci = zlecenieData.wykonaneCzynnosci;
             let wpisHistorii = `Edytowano zakończone zlecenie: `;
             const zmiany = [];
             if (stareGodziny !== noweGodziny) {
                 zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
             }
             if (staryTyp !== nowyTyp) {
-                zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
+                 if (stareCzynnosci !== noweCzynnosci) {
+    zmiany.push(`Notatkę zmieniono z "${stareCzynnosci}" na "${noweCzynnosci}"`);
+}
+                zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
             }
             if (zmiany.length === 0) {
                  editZlecenieModal.style.display = 'none';
@@ -978,6 +989,7 @@ function initializeApp() {
             await updateDoc(zlecenieRef, {
                 wyfakturowaneGodziny: noweGodziny,
                 typZlecenia: nowyTyp,
+                
                 historia: nowaHistoria
             });
 
@@ -1385,6 +1397,42 @@ function initializeApp() {
         ) {
             event.target.style.display = "none";
         }
+// --- NOWA FUNKCJA --- (Ponowne otwieranie zlecenia)
+async function otworzPonownieZlecenie(zlecenieId, nrZlecenia) {
+    if (!confirm(`Czy na pewno chcesz ponownie otworzyć zlecenie #${nrZlecenia}? \n\nCzęści pobrane z magazynu NIE zostaną automatycznie zwrócone.`)) {
+        return;
+    }
+
+    const zlecenieRef = doc(db, "zlecenia", zlecenieId);
+    try {
+        // Pobierz aktualną historię
+        const zlecenieSnap = await getDoc(zlecenieRef);
+        const zlecenieData = zlecenieSnap.data();
+        const staraHistoria = zlecenieData.historia || [];
+
+        // Dodaj wpis do historii
+        const nowaHistoria = [...staraHistoria, {
+            timestamp: new Date().toISOString(),
+            akcja: "Zlecenie zostało ponownie otwarte."
+        }];
+
+        // Zaktualizuj dokument, zmieniając status na 'aktywne' i dodając historię
+        await updateDoc(zlecenieRef, {
+            status: 'aktywne',
+            historia: nowaHistoria,
+            // Możemy też wyzerować dane ukończenia, jeśli chcemy
+            dataUkonczenia: null, 
+            wyfakturowaneGodziny: 0 
+        });
+
+        alert(`Zlecenie #${nrZlecenia} zostało ponownie otwarte.`);
+        // Aplikacja automatycznie odświeży listy dzięki 'nasluchujNaZlecenia()'
+
+    } catch (e) {
+        console.error("Błąd podczas ponownego otwierania zlecenia:", e);
+        alert("Wystąpił błąd. Spróbuj ponownie.");
+    }
+}
     };
 
     // --- INICJALIZACJA ---

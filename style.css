@@ -379,7 +379,13 @@ tbody tr { background-color: var(--bg-color-card); }
     transform: translateX(24px);
     background-color: var(--bg-color-header);
 }
-
+.btn-reopen {
+    background-color: #0275d8; /* Niebieski kolor */
+    color: white;
+}
+.btn-reopen:hover {
+    background-color: #025aa5;
+}
 /* --- NOWE STYLE: MOTYW CIEMNY --- */
 body[data-theme="dark"] {
     --primary-color: #4a6a8a;
@@ -402,6 +408,7 @@ body[data-theme="dark"] {
     --border-color-input: #444;
     --header-shadow: 0 4px 15px rgba(0,0,0,0.4);
     --box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    
 }
 body[data-theme="dark"] .fc-daygrid-day.fc-day-today { background-color: rgba(95, 168, 227, 0.1) !important; }
 body[data-theme="dark"] thead { background-color: #2a2a2a; }
