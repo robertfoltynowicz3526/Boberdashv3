@@ -870,18 +870,18 @@ function initializeApp() {
         summaryContainer.innerHTML = `<p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(2)} h</strong></p><p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(2)} zł</strong></p><p>Wartość Netto (po 30%): <strong>${podsumowanie.sumaNetto.toFixed(2)} zł</strong></p>`;
     }
     
-    async function obslugaListyZlecen(event) {
+async function obslugaListyZlecen(event) {
         const li = event.target.closest('li'); if (!li) return;
         const docId = li.dataset.id;
-        
+        
         if (event.target.classList.contains('delete-btn')) {
-            if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); }
-            return; // Zakończ funkcję
-        }
+            if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); }
+            return; // Zakończ funkcję
+        }
         if (event.target.classList.contains('details-zlecenie-btn')) {
-            otworzModalSzczegolowZlecenia(docId);
-            return; // Zakończ funkcję
-        }
+            otworzModalSzczegolowZlecenia(docId);
+            return; // Zakończ funkcję
+        }
         if (event.target.classList.contains('assign-btn')) {
             const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
             if (zlecenie) {
@@ -891,15 +891,47 @@ function initializeApp() {
                 assignForm.reset();
                 assignModal.style.display = 'block';
             }
-            return; // Zakończ funkcję
-            if (event.target.classList.contains('reopen-zlecenie-btn')) {
-    const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
-    if (zlecenie) {
-        otworzPonownieZlecenie(docId, zlecenie.nrZlecenia);
-    }
-    return; // Zakończ funkcj
-}
+            return; // Zakończ funkcję
+        } // <-- POPRAWIONA KLAMRA JEST TUTAJ
+        
+        if (event.target.classList.contains('complete-btn')) {
+            const docSnap = await getDoc(doc(db, "zlecenia", docId));
+            if (docSnap.exists()) {
+                const zlecenie = docSnap.data();
+                const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+                const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+                const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Nieprzypisane');
+                document.getElementById('modal-klient').textContent = nazwaMaszyny;
+                document.getElementById('modal-nr-zlecenia').textContent = zlecenie.nrZlecenia;
+                document.getElementById('complete-zlecenie-id').value = docId;
+                // Wyczyść pole tekstowe przy otwieraniu
+                document.getElementById('wykonane-czynnosci').value = ''; 
+                czesciDoZlecenia = [];
+                renderCzesciDoZlecenia();
+                renderMagazynWModalu();
+                completeModal.style.display = 'block';
+            }
+            return; // Zakończ funkcję
         }
+        if (event.target.classList.contains('edit-zlecenie-btn')) {
+            const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
+            if (zlecenie && zlecenie.status === 'ukończone') {
+                otworzModalEdycjiZlecenia(docId);
+            } else if (zlecenie) {
+                alert("Można edytować tylko zakończone zlecenia.");
+            }
+            return; // Zakończ funkcję
+        }
+        // --- TEN BLOK JEST TERAZ WE WŁAŚCIWYM MIEJSCU ---
+        if (event.target.classList.contains('reopen-zlecenie-btn')) {
+            const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
+            if (zlecenie) {
+                otworzPonownieZlecenie(docId, zlecenie.nrZlecenia);
+            }
+            return; // Zakończ funkcję
+        }
+    }
+        
         if (event.target.classList.contains('complete-btn')) {
             const docSnap = await getDoc(doc(db, "zlecenia", docId));
             if (docSnap.exists()) {
