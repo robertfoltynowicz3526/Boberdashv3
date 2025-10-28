@@ -926,6 +926,15 @@ function initializeApp() {
             }
             return; // Zakończ funkcję
         }
+// --- NOWY BLOK DLA "OTWÓRZ PONOWNIE" ---
+    if (event.target.classList.contains('reopen-zlecenie-btn')) {
+        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
+        if (zlecenie) {
+            otworzPonownieZlecenie(docId, zlecenie.nrZlecenia);
+        }
+        return; // Zakończ funkcję
+    }
+    // --- KONIEC NOWEGO BLOKU ---
     }
 
     function otworzModalEdycjiZlecenia(zlecenieId) {
