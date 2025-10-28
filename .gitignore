@@ -1,6 +1,6 @@
 # Pliki konfiguracyjne Firebase - BARDZO WAŻNE!
 # Upewnij się, że Twój plik z kluczami API tak się nazywa.
-firebase-config.js
+
 
 # Zależności
 # Ten folder może ważyć setki megabajtów i jest niepotrzebny.
