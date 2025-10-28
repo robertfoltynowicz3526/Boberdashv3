@@ -930,8 +930,7 @@ async function obslugaListyZlecen(event) {
             }
             return; // Zakończ funkcję
         }
-    }
-        
+    }  
         if (event.target.classList.contains('complete-btn')) {
             const docSnap = await getDoc(doc(db, "zlecenia", docId));
             if (docSnap.exists()) {
