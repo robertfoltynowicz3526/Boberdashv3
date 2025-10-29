@@ -387,90 +387,114 @@ function initializeApp() {
     }
 
 function wyswietlKlientow() {
-  // Poczekaj na maszyny – bez nich nie zbudujemy list pod klientami
-  if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0) {
-    console.log("Czekam na maszyny przed renderowaniem klientów...");
-    listaKlientowDiv.innerHTML = "<p>Ładowanie danych maszyn...</p>";
-    return;
-  }
+  try {
+    // Poczekaj na maszyny – bez nich nie budujemy list pod klientami
+    if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0) {
+      console.log("Czekam na maszyny przed renderowaniem klientów...");
+      if (listaKlientowDiv) listaKlientowDiv.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+      return;
+    }
 
-  const frazaWyszukiwania = (klientSearchInput?.value || "").toLowerCase();
-  wszystkieKlienci = []; // odśwież
+    const frazaWyszukiwania = ((klientSearchInput && klientSearchInput.value) ? klientSearchInput.value : "").toLowerCase();
+    wszystkieKlienci = [];
 
-  let klienciHtml = "";
-  let selectHtml = '<option value="">-- Wybierz klienta --</option>';
-  let selectZleceniaHtml = '<option value="">-- Wybierz klienta --</option><option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
+    let klienciHtml = "";
+    let selectHtml = '<option value="">-- Wybierz klienta --</option>';
+    let selectZleceniaHtml = '<option value="">-- Wybierz klienta --</option><option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
 
-  // Filtrowanie po frazie
-  const przefiltrowaniKlienci = _wszystkieKlienciCache.filter(klient => {
-    if (!frazaWyszukiwania) return true;
-    const tekst = `${klient.nazwa} ${klient.nip || ""} ${klient.adres || ""} ${klient.telefon || ""}`.toLowerCase();
-    return tekst.includes(frazaWyszukiwania);
-  });
+    // Filtrowanie
+    const przefiltrowaniKlienci = (_wszystkieKlienciCache || []).filter(klient => {
+      if (!frazaWyszukiwania) return true;
+      const tekst = [
+        klient.nazwa || "",
+        klient.nip || "",
+        klient.adres || "",
+        klient.telefon || ""
+      ].join(" ").toLowerCase();
+      return tekst.includes(frazaWyszukiwania);
+    });
 
-  przefiltrowaniKlienci.forEach(klient => {
-    wszystkieKlienci.push(klient);
+    przefiltrowaniKlienci.forEach(klient => {
+      wszystkieKlienci.push(klient);
 
-    // LISTA MASZYN TEGO KLIENTA
-    const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klient.id);
+      // Maszyny tego klienta
+      const maszynyKlienta = (_wszystkieMaszynyCache || []).filter(m => m.klientId === klient.id);
 
-    // UNIKALNE ID KONTENERA NA MASZYNY (ważne!)
-    const maszynyListaId = `client-${klient.id}-machines`;
+      // ID kontenera maszyn
+      const maszynyListaId = "client-" + klient.id + "-machines";
 
-    // KONTENER LISTY MASZYN – DOMYŚLNIE ZWINIĘTY (klasa 'collapsed')
-    const maszynyKontenerHtml = (maszynyKlienta.length > 0)
-      ? `
-        <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
-          <ul class="client-machine-list">
-            ${maszynyKlienta.map(m => `
-              <li data-id="${m.id}">
-                <span>${m.typMaszyny} ${m.model} (S/N: ${m.nrSeryjny || '---'})</span>
-                <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${m.typMaszyny} ${m.model}">Pokaż historię</a>
-              </li>
-            `).join("")}
-          </ul>
-        </div>
-      `
-      : `
-        <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
-          <p style="font-size: 0.8rem; margin-left: 0; padding: 5px 0; color: var(--text-color-light);">Brak maszyn</p>
+      // Kontener listy maszyn – domyślnie zwinięty
+      let maszynyKontenerHtml = '';
+      if (maszynyKlienta.length > 0) {
+        const liMaszyny = maszynyKlienta.map(m => {
+          const sn = (m.nrSeryjny && m.nrSeryjny !== '---') ? m.nrSeryjny : '---';
+          const naz = (m.typMaszyny || '') + ' ' + (m.model || '');
+          return `
+            <li data-id="${m.id}">
+              <span>${naz} (S/N: ${sn})</span>
+              <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${naz}">Pokaż historię</a>
+            </li>
+          `;
+        }).join("");
+
+        maszynyKontenerHtml = `
+          <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
+            <ul class="client-machine-list">
+              ${liMaszyny}
+            </ul>
+          </div>
+        `;
+      } else {
+        maszynyKontenerHtml = `
+          <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
+            <p style="font-size: 0.8rem; margin-left: 0; padding: 5px 0; color: var(--text-color-light);">Brak maszyn</p>
+          </div>
+        `;
+      }
+
+      // Strzałka toggle + nagłówek klienta
+      const strzalkaHtml = `<span class="toggle-machines-arrow collapsed" data-target="${maszynyListaId}">▼</span>`;
+      const nipTxt = klient.nip ? ` (NIP: ${klient.nip})` : "";
+
+      klienciHtml += `
+        <div class="client-group" data-id="${klient.id}">
+          <div class="client-header-item">
+            <span>
+              <strong>${klient.nazwa || '---'}</strong>${nipTxt}<br>
+              <small>${klient.adres || '---'} | ${klient.telefon || '---'}</small>
+              ${strzalkaHtml}
+            </span>
+            <div>
+              <button class="btn-edit edit-klient-btn">Edytuj</button>
+              <button class="delete-btn">Usuń</button>
+            </div>
+          </div>
+          ${maszynyKontenerHtml}
         </div>
       `;
 
-    // STRZAŁKA, KTÓRA ROZWIJA/ZWIJA #client-<id>-machines (ważne: data-target!)
-    const strzalkaHtml = `<span class="toggle-machines-arrow collapsed" data-target="${maszynyListaId}">▼</span>`;
+      // selecty
+      selectHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
+      selectZleceniaHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
+    });
 
-    // NAGŁÓWEK KLIENTA + PRZYCISKI
-    klienciHtml += `
-      <div class="client-group" data-id="${klient.id}">
-        <div class="client-header-item">
-          <span>
-            <strong>${klient.nazwa}</strong> ${klient.nip ? `(NIP: ${klient.nip})` : ""}
-            <br><small>${klient.adres || '---'} | ${klient.telefon || '---'}</small>
-            ${strzalkaHtml}
-          </span>
-          <div>
-            <button class="btn-edit edit-klient-btn">Edytuj</button>
-            <button class="delete-btn">Usuń</button>
-          </div>
-        </div>
-        ${maszynyKontenerHtml}
-      </div>
-    `;
+    if (listaKlientowDiv) {
+      listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
+    }
+    if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
+    if (zlecenieKlientSelect) zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
 
-    // SELECTY
-    selectHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
-    selectZleceniaHtml += `<option value="${klient.id}">${klient.nazwa}</option>`;
-  });
+    const assignKlientSelect = document.getElementById('assign-klient-select');
+    if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
 
-  listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
-  if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
-  if (zlecenieKlientSelect) zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
-
-  // (Jeśli masz formularz przypisywania zlecenia)
-  const assignKlientSelect = document.getElementById('assign-klient-select');
-  if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
+  } catch (err) {
+    console.error("wyswietlKlientow() — błąd:", err);
+    if (listaKlientowDiv) {
+      listaKlientowDiv.innerHTML = `<p style="color:#e74c3c">Błąd renderowania listy klientów: ${String(err)}</p>`;
+    }
+  }
 }
+
 
     async function obslugaListyKlientow(event) {
   // Klik w strzałkę obok klienta → rozwijaj/zwiń listę maszyn tego klienta
