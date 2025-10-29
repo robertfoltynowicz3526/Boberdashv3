@@ -98,3 +98,8 @@ body[data-theme="dark"] #noteModal .modal-content {
   border-color: var(--border-color);
   color: var(--text-color);
 }
+.btn-reopen {
+  background-color: #6c5ce7;
+  color: #fff;
+}
+.btn-reopen:hover { filter: brightness(1.05); }
