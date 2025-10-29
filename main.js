@@ -319,30 +319,37 @@ function initializeApp() {
     function applyTheme(theme) { if (theme === 'dark') { document.body.dataset.theme = 'dark'; } else { delete document.body.dataset.theme; } }
 
     function inicjujZwijanie() {
-        // Zwijanie zakończonych zleceń
-        zakonczoneZleceniaHeader.classList.add('collapsed');
-        zakonczoneZleceniaContent.classList.add('collapsed');
-        zakonczoneZleceniaHeader.addEventListener('click', () => {
-            zakonczoneZleceniaHeader.classList.toggle('collapsed');
-            zakonczoneZleceniaContent.classList.toggle('collapsed');
-        });
+  // Zakończone zlecenia
+  if (zakonczoneZleceniaHeader && zakonczoneZleceniaContent) {
+    zakonczoneZleceniaHeader.classList.add('collapsed');
+    zakonczoneZleceniaContent.classList.add('collapsed');
+    zakonczoneZleceniaHeader.addEventListener('click', () => {
+      zakonczoneZleceniaHeader.classList.toggle('collapsed');
+      zakonczoneZleceniaContent.classList.toggle('collapsed');
+    }, { passive: true });
+  }
 
-        // Zwijanie listy klientów
-        listaKlientowHeader.classList.add('collapsed');
-        listaKlientowContent.classList.add('collapsed');
-        listaKlientowHeader.addEventListener('click', () => {
-            listaKlientowHeader.classList.toggle('collapsed');
-            listaKlientowContent.classList.toggle('collapsed');
-        });
+  // Klienci (zwijana cała sekcja „Lista Klientów”)
+  if (listaKlientowHeader && listaKlientowContent) {
+    listaKlientowHeader.classList.add('collapsed');
+    listaKlientowContent.classList.add('collapsed');
+    listaKlientowHeader.addEventListener('click', () => {
+      listaKlientowHeader.classList.toggle('collapsed');
+      listaKlientowContent.classList.toggle('collapsed');
+    }, { passive: true });
+  }
 
-        // Zwijanie listy maszyn
-        listaMaszynHeader.classList.add('collapsed');
-        listaMaszynContent.classList.add('collapsed');
-        listaMaszynHeader.addEventListener('click', () => {
-            listaMaszynHeader.classList.toggle('collapsed');
-            listaMaszynContent.classList.toggle('collapsed');
-        });
-    }
+  // Maszyny (zwijana cała sekcja „Lista Maszyn”)
+  if (listaMaszynHeader && listaMaszynContent) {
+    listaMaszynHeader.classList.add('collapsed');
+    listaMaszynContent.classList.add('collapsed');
+    listaMaszynHeader.addEventListener('click', () => {
+      listaMaszynHeader.classList.toggle('collapsed');
+      listaMaszynContent.classList.toggle('collapsed');
+    }, { passive: true });
+  }
+}
+
 
     // WSTRZYKNIĘCIE POLA NOTATKI DO MODALA ZAKOŃCZENIA (bez modyfikacji index.html)
     function ensureZakonczenieNotatkaField() {
@@ -446,38 +453,59 @@ function initializeApp() {
     }
 
     async function obslugaListyKlientow(event) {
-        if (event.target.classList.contains('toggle-machines-arrow')) {
-            const strzalka = event.target;
-            const targetId = strzalka.dataset.target;
-            const kontenerMaszyn = document.getElementById(targetId);
-            if (kontenerMaszyn) {
-                strzalka.classList.toggle('collapsed');
-                kontenerMaszyn.classList.toggle('collapsed');
-            }
-            return;
-        }
-        const clientGroup = event.target.closest('.client-group'); if (!clientGroup) return;
-        const klientId = clientGroup.dataset.id;
-
-        if (event.target.classList.contains('machine-history-link')) {
-            event.preventDefault();
-            const maszynaId = event.target.dataset.maszynaId;
-            const maszynaNazwa = event.target.dataset.maszynaNazwa;
-            pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-            return;
-        }
-        if (event.target.classList.contains('delete-btn')) {
-            if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
-                await deleteDoc(doc(db, "klienci", klientId));
-                wyswietlMaszyny();
-            }
-            return;
-        }
-        if (event.target.classList.contains('edit-klient-btn')) {
-            otworzModalEdycjiKlienta(klientId);
-            return;
-        }
+  // Klik w strzałkę obok klienta → rozwijaj/zwiń listę maszyn tego klienta
+  if (event.target.classList && event.target.classList.contains('toggle-machines-arrow')) {
+    const arrow = event.target;
+    const targetId = arrow.dataset.target; // np. client-<id>-machines
+    const kontener = document.getElementById(targetId);
+    if (kontener) {
+      arrow.classList.toggle('collapsed');
+      kontener.classList.toggle('collapsed');
     }
+    return;
+  }
+
+  const clientGroup = event.target.closest('.client-group');
+  if (!clientGroup) return;
+  const klientId = clientGroup.dataset.id;
+
+  // Klik w cały nagłówek klienta też rozwija/zamyka (poza klikami w przyciski)
+  const headerItem = event.target.closest('.client-header-item');
+  if (headerItem && !event.target.classList.contains('edit-klient-btn') && !event.target.classList.contains('delete-btn')) {
+    const arrow = headerItem.querySelector('.toggle-machines-arrow');
+    if (arrow) {
+      const targetId = arrow.dataset.target;
+      const kontener = document.getElementById(targetId);
+      if (kontener) {
+        arrow.classList.toggle('collapsed');
+        kontener.classList.toggle('collapsed');
+      }
+    }
+    // nie return — żeby przyciski niżej nadal działały
+  }
+
+  if (event.target.classList.contains('machine-history-link')) {
+    event.preventDefault();
+    const maszynaId = event.target.dataset.maszynaId;
+    const maszynaNazwa = event.target.dataset.maszynaNazwa;
+    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+    return;
+  }
+
+  if (event.target.classList.contains('delete-btn')) {
+    if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
+      await deleteDoc(doc(db, "klienci", klientId));
+      wyswietlMaszyny();
+    }
+    return;
+  }
+
+  if (event.target.classList.contains('edit-klient-btn')) {
+    otworzModalEdycjiKlienta(klientId);
+    return;
+  }
+}
+
 
     async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
         document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
@@ -689,35 +717,45 @@ function initializeApp() {
     }
 
     async function obslugaListyMaszyn(event) {
-        const element = event.target;
+  const el = event.target;
 
-        if (element.closest('.client-header')) {
-            const header = element.closest('.client-header');
-            header.classList.toggle('open');
-            header.nextElementSibling.classList.toggle('open');
-            return;
-        }
-        if (element.classList.contains('machine-history-link')) {
-            event.preventDefault();
-            const maszynaId = element.dataset.maszynaId;
-            const maszynaNazwa = element.dataset.maszynaNazwa;
-            pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-            return;
-        }
-        const li = element.closest('li'); if (!li) return;
-        const maszynaId = li.dataset.id;
-        if (element.classList.contains('delete-btn')) {
-            if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-                await deleteDoc(doc(db, "maszyny", maszynaId));
-                wyswietlKlientow();
-            }
-            return;
-        }
-        if (element.classList.contains('edit-maszyna-btn')) {
-            otworzModalEdycjiMaszyny(maszynaId);
-            return;
-        }
+  // Klik w pasek .client-header (grupa maszyn danego klienta)
+  const header = el.closest('.client-header');
+  if (header) {
+    header.classList.toggle('open');
+    const list = header.nextElementSibling; // powinno być ul.machine-list
+    if (list && list.classList.contains('machine-list')) {
+      list.classList.toggle('open');
     }
+    return;
+  }
+
+  if (el.classList.contains('machine-history-link')) {
+    event.preventDefault();
+    const maszynaId = el.dataset.maszynaId;
+    const maszynaNazwa = el.dataset.maszynaNazwa;
+    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+    return;
+  }
+
+  const li = el.closest('li');
+  if (!li) return;
+  const maszynaId = li.dataset.id;
+
+  if (el.classList.contains('delete-btn')) {
+    if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
+      await deleteDoc(doc(db, "maszyny", maszynaId));
+      wyswietlKlientow();
+    }
+    return;
+  }
+
+  if (el.classList.contains('edit-maszyna-btn')) {
+    otworzModalEdycjiMaszyny(maszynaId);
+    return;
+  }
+}
+
 function otworzModalEdycjiMaszyny(maszynaId) {
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
     if (!maszyna) return;
