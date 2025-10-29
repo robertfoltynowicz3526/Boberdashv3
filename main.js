@@ -8,7 +8,8 @@ import Papa from 'papaparse';
  * - Ponowne otwieranie: przycisk „Otwórz ponownie” w liście zakończonych + log do historii
  */
 
-initializeApp();
+window.addEventListener('DOMContentLoaded', initializeApp);
+
 
 function initializeApp() {
     // --- STAŁE I ZMIENNE GLOBALNE ---
@@ -1621,13 +1622,14 @@ async function obslugaZakonczeniaZlecenia(event) {
         }
     };
 
-    // --- START APLIKACJI ---
-    inicjalizujKalendarz();     // kalendarz czasu pracy
-    nasluchujNaKlientow();      // klienci -> odświeża listę klientów i selecty
-    nasluchujNaMaszyny();       // maszyny -> odświeża listę maszyn i zależności
-    nasluchujNaZlecenia();      // zlecenia -> listy + kalendarz (wpisy powiązane)
-    wyswietlPrzejazdy();        // placeholder – nic nie robi
-    wyswietlMagazyn();          // magazyn w tabeli
+// --- INICJALIZACJA (wewnątrz initializeApp) ---
+inicjalizujKalendarz();
+nasluchujNaKlientow();
+nasluchujNaMaszyny();
+nasluchujNaZlecenia();
+wyswietlPrzejazdy(); // może być puste
+wyswietlMagazyn();
+
 
 } // koniec initializeApp()
 
