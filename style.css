@@ -200,7 +200,6 @@ main {
   font-size: clamp(1.3rem, 2vw + 0.1rem, 1.6rem);
   color: var(--text-color);
 }
-
 .summary-container-subtle,
 .form-section,
 .search-section,
@@ -599,7 +598,6 @@ ul {
 .event-actions .btn-remove {
   background: var(--danger-color);
 }
-
 .fc-event:hover {
   filter: brightness(1.05);
 }
@@ -797,9 +795,7 @@ footer {
   position: relative;
   animation: fadeIn 0.4s ease;
   color: var(--text-color);
-}
-
-#noteModal .modal-content h3 {
+}#noteModal .modal-content h3 {
   margin-top: 0;
   margin-bottom: 1rem;
   border-bottom: 2px solid var(--secondary-color);
