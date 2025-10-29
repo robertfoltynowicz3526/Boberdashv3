@@ -597,7 +597,7 @@ async function obslugaListyKlientow(event) {
     otworzModalEdycjiKlienta(klientId);
     return;
   }
-}
+
 
 
     async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
