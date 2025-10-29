@@ -496,7 +496,20 @@ function wyswietlKlientow() {
   }
 }
 
-
+function nasluchujNaKlientow() {
+  onSnapshot(
+    query(collection(db, "klienci"), orderBy("nazwa")),
+    (snapshot) => {
+      _wszystkieKlienciCache = [];  // odśwież cache
+      snapshot.forEach((docSnap) => {
+        _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // Po załadowaniu klientów przerysuj listy, które ich potrzebują:
+      wyswietlMaszyny();   // żeby przypiąć maszyny pod klientów
+      wyswietlKlientow();  // żeby wyrenderować listę klientów + selecty
+    }
+  );
+}
     async function obslugaListyKlientow(event) {
   // Klik w strzałkę obok klienta → rozwijaj/zwiń listę maszyn tego klienta
   if (event.target.classList && event.target.classList.contains('toggle-machines-arrow')) {
