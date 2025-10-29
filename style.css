@@ -1,419 +1,100 @@
-/* --- GŁÓWNE ZMIENNE (MOTYW JASNY) --- */
-:root {
-    --primary-color: #2c3e50;
-    --secondary-color: #3498db;
-    --light-color: #ecf0f1;
-    --success-color: #2ecc71;
-    --error-color: #e74c3c;
-    --warning-color: #f39c12;
-
-    --bg-color: #f4f7f9;
-    --bg-color-header: #ffffff;
-    --bg-color-card: #ffffff;
-    --bg-color-input: #ffffff;
-    --text-color: #2c3e50;
-    --text-color-light: #555;
-    --text-color-header: #2c3e50;
-    --text-color-inverted: #ffffff;
-    --border-color: #ddd;
-    --border-color-light: #eee;
-    --border-color-input: #ccc;
-    --header-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    --box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-
-    --border-radius: 8px;
+/* === MODAL: NOTATKA PRZY ZAKOŃCZENIU ZLECENIA === */
+#noteModal {
+  display: none;
+  position: fixed;
+  z-index: 1200;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: sans-serif;
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    line-height: 1.6;
-    transition: background-color 0.3s, color 0.3s;
-}
-main { padding: 0 2rem 2rem 2rem; }
-hr { border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0; }
-
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    background: var(--bg-color-header);
-    box-shadow: var(--header-shadow);
-    margin-bottom: 2rem;
-    border-bottom: 1px solid var(--border-color);
-}
-header h1 { font-size: 1.5rem; color: var(--text-color-header); }
-
-nav {
-    display: flex;
-    flex-wrap: wrap; /* Pozwala zawijać przyciski */
-    gap: 5px; /* Odstęp między przyciskami */
+#noteModal .modal-content {
+  background-color: var(--bg-color-card);
+  margin: 8% auto;
+  padding: 20px 25px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  max-width: 500px;
+  width: 90%;
+  box-shadow: var(--box-shadow);
+  position: relative;
+  animation: fadeIn 0.4s ease;
+  color: var(--text-color);
 }
 
-.tab-button {
-    background: none;
-    border: 2px solid var(--border-color);
-    color: var(--secondary-color);
-    padding: 8px 15px; /* Mniejszy padding */
-    margin: 0; /* Usunięto margines */
-    cursor: pointer; font-size: 0.9rem; /* Mniejszy font */
-    font-weight: 700;
-    border-radius: var(--border-radius);
-    transition: all 0.3s ease;
-}
-.tab-button:hover { background: var(--secondary-color); color: var(--text-color-inverted); border-color: var(--secondary-color); }
-.tab-button.active { background: var(--primary-color); color: var(--text-color-inverted); border-color: var(--primary-color); }
-.tab-content { display: none; }
-.tab-content.active { display: block; animation: fadeIn 0.5s; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-.form-section {
-    background: var(--bg-color-card);
-    padding: 2rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--border-color-light);
+#noteModal .modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--secondary-color);
+  padding-bottom: 0.5rem;
+  font-size: 1.2rem;
 }
 
-.search-section {
-    background: var(--bg-color-card);
-    padding: 1rem 2rem;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    margin-bottom: 2rem;
-    border: 1px solid var(--border-color-light);
-}
-.form-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
-
-h2, h3 { margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--secondary-color); }
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 700; }
-
-input[type="text"], input[type="number"], input[type="date"], input[type="month"], input[type="search"], select, textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--border-color-input);
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    background-color: var(--bg-color-input);
-    color: var(--text-color);
-}
-textarea { resize: vertical; }
-
-button { padding: 10px 20px; font-size: 0.9rem; border: none; border-radius: var(--border-radius); cursor: pointer; font-weight: 700; transition: background-color 0.3s; }
-.btn-add, form button[type="submit"] { background-color: var(--success-color); color: white; }
-.btn-edit { background-color: var(--warning-color); color: #212529; }
-.btn-remove, .delete-btn { background-color: var(--error-color); color: white; }
-.btn-details { background-color: #5bc0de; color: white; }
-.complete-btn, .assign-btn { background-color: var(--secondary-color); color: white; }
-
-/* Zmniejszone przyciski w listach */
-li button, .client-header-item button { /* Dodano .client-header-item button */
-    padding: 3px 6px;
-    font-size: 0.7rem;
-    margin: 0 2px;
-    line-height: 1.2;
+#noteModal .close-button {
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  position: absolute;
+  right: 15px;
+  top: 10px;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 
-ul { list-style: none; padding: 0; }
-li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.8rem;
-    background-color: var(--bg-color-card);
-    border: 1px solid var(--border-color);
-    margin-bottom: 0.5rem;
-    border-radius: 4px;
-}
-/* Style dla elementów w liście klientów (DIV zamiast LI) */
-.client-group {
-    background-color: var(--bg-color-card);
-    border: 1px solid var(--border-color);
-    margin-bottom: 0.5rem;
-    border-radius: 4px;
-}
-.client-header-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.8rem;
-}
-.client-group span, .client-header-item span { flex-grow: 1; word-break: break-word; }
-.client-group div, .client-header-item div { display: flex; flex-shrink: 0; margin-left: 1rem; flex-wrap: wrap; gap: 5px; }
-
-/* Style dla listy maszyn pod klientem */
-.client-machine-list {
-    list-style: disc;
-    padding: 0 0 10px 40px; /* Zmieniony padding */
-    margin: 0; /* Usunięto margines górny/dolny */
-}
-.client-machine-list li {
-    padding: 3px 0; /* Mniejszy padding */
-    border: none;
-    background: none;
-    display: list-item;
-    font-size: 0.85rem; /* Nieco mniejszy font */
-    color: var(--text-color-light);
-    align-items: flex-start; /* Lepsze wyrównanie */
-}
-.client-machine-list a {
-    color: var(--secondary-color);
-    text-decoration: none;
-    font-weight: bold;
-    margin-left: 10px;
-    font-size: 0.8rem; /* Mniejszy link */
-}
-.client-machine-list a:hover { text-decoration: underline; }
-
-table { width: 100%; border-collapse: collapse; }
-th, td { border: 1px solid var(--border-color); padding: 8px; text-align: left; }
-thead { background-color: var(--light-color); }
-tbody tr { background-color: var(--bg-color-card); }
-
-.summary-controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.summary-controls h3 { border: none; margin: 0; }
-#summary-container {
-    background: var(--light-color);
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-    border-left: 5px solid var(--secondary-color);
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-}
-#summary-container p { margin: 0; }
-#summary-container strong { font-size: 1.2rem; display: block; }
-
-.magazyn-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
-.add-stock-btn { background-color: var(--success-color); }
-.remove-stock-btn { background-color: var(--warning-color); color: #212529; }
-
-.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); overflow-y: auto;}
-.modal-content {
-    background-color: var(--bg-color-card);
-    margin: 10% auto;
-    padding: 20px;
-    border: 1px solid var(--border-color);
-    width: 90%; /* Zwiększona szerokość dla mniejszych ekranów */
-    max-width: 500px;
-    border-radius: 8px;
-    position: relative;
-    color: var(--text-color);
-}
-.modal-content-large { max-width: 800px; }
-.close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-
-#parts-to-remove-list { list-style: none; padding: 0; margin-top: 1rem; max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; }
-#parts-to-remove-list li { padding: 0.5rem; border-bottom: 1px solid var(--border-color-light); justify-content: flex-start; }
-.modal-stock-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 1rem; }
-.modal-stock-item { display: flex; justify-content: space-between; padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border-color-light); }
-.modal-stock-item:hover { background-color: var(--bg-color); }
-.modal-stock-item span { pointer-events: none; }
-.modal-stock-item .item-qty { font-weight: bold; color: var(--primary-color); }
-.part-list-item { display: flex; justify-content: space-between; align-items: center; }
-.part-list-item .actions button { padding: 2px 6px; font-size: 0.7rem; margin-left: 5px; }
-
-.summary-container-subtle {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 2rem;
-    padding: 0.75rem;
-    margin-bottom: 1.5rem;
-    background-color: var(--bg-color-card);
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-}
-.summary-container-subtle p { margin: 0; font-size: 0.9rem; }
-.summary-container-subtle strong { font-size: 1rem; color: var(--primary-color); margin-left: 0.5rem; }
-
-/* ZMIANY DLA KALENDARZA */
-.calendar-container { background-color: var(--bg-color-card); padding: 0.75rem; border-radius: var(--border-radius); box-shadow: var(--box-shadow); }
-.fc-daygrid-day.fc-day-today { background-color: rgba(52, 152, 219, 0.1) !important; }
-.fc-event { white-space: normal !important; cursor: pointer; padding: 1px 3px; font-size: 0.7rem; }
-.fc-event-main-frame { position: relative; }
-.event-actions { position: absolute; right: 2px; top: 2px; display: none; z-index: 5; background: rgba(255,255,255,0.8); border-radius: 4px; padding: 2px; }
-.fc-daygrid-day-frame:hover .event-actions { display: flex; gap: 2px; }
-.event-actions button { padding: 1px 4px; font-size: 0.6rem; line-height: 1; }
-/* Zaktualizowane klasy dla eventów */
-.fc-event-godziny { background-color: var(--secondary-color); border-color: var(--secondary-color); } /* Godziny pracy */
-.fc-event-zlecenie { background-color: var(--success-color); border-color: var(--success-color); font-weight: bold; } /* Zlecenie */
-.fc-event-godziny-zlecenie { background-color: var(--primary-color); border-color: var(--primary-color); } /* Godziny przypisane do zlecenia */
-
-
-.client-group { background-color: var(--bg-color-card); border: 1px solid var(--border-color); border-radius: var(--border-radius); margin-bottom: 1rem; box-shadow: var(--box-shadow); }
-.client-header { padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background-color: var(--primary-color); color: var(--text-color-inverted); border-radius: var(--border-radius); }
-.client-header h4 { margin: 0; }
-.client-header .arrow { transition: transform 0.3s ease; }
-.client-header.open .arrow { transform: rotate(90deg); }
-.machine-list { list-style: none; padding: 0; margin: 0; max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
-.machine-list.open { max-height: 1000px; }
-.machine-list li { border-top: 1px solid var(--border-color-light); margin: 0; border-radius: 0; }
-
-/* Style dla historii serwisowej w liście maszyn */
-.machine-history-link {
-    font-size: 0.8rem;
-    margin-left: 15px;
-    color: var(--secondary-color);
-    text-decoration: none;
-}
-.machine-history-link:hover { text-decoration: underline; }
-
-/* STYLE: SEKCJA ZWIJANA (Ogólne) */
-.collapsible-header {
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.collapsible-header .arrow {
-    font-size: 1.2rem;
-    transition: transform 0.3s;
-}
-.collapsible-content {
-    transition: max-height 0.3s ease-in-out, padding 0.3s, border 0.3s, margin 0.3s;
-    max-height: 2000px;
-    overflow: hidden;
-}
-.collapsible-content.collapsed {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-top: 0;
-    margin-bottom: 0;
-    overflow: hidden;
-    border-width: 0;
-}
-.collapsible-header.collapsed .arrow { transform: rotate(-90deg); }
-
-/* Style dla zwijanej listy maszyn pod klientem */
-.client-machine-list-container {
-    transition: max-height 0.3s ease-in-out, padding 0.3s, border 0.3s, margin 0.3s;
-    max-height: 500px;
-    overflow: hidden;
-    padding-top: 10px;
-    margin-left: 15px;
-    border-left: 2px solid var(--border-color-light);
-}
-.client-machine-list-container.collapsed {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-top: 0;
-    margin-bottom: 0;
-    border-width: 0;
-}
-.client-header-item .toggle-machines-arrow {
-    cursor: pointer;
-    font-size: 1rem;
-    margin-left: 10px;
-    transition: transform 0.3s ease;
-    display: inline-block;
-}
- .client-header-item .toggle-machines-arrow.collapsed { transform: rotate(-90deg); }
-
-/* STYLE: SZCZEGÓŁY ZLECENIA (MODAL) */
-.zlecenie-details-container h3 {
-    border-bottom: 1px solid var(--secondary-color);
-    font-size: 1.2rem;
-    margin-top: 1rem;
-}
-.zlecenie-details-container h3:first-child { margin-top: 0; }
-.details-group { margin-bottom: 10px; }
-.details-group strong {
-    display: block;
-    color: var(--text-color-light);
-    font-size: 0.9rem;
-}
-.details-group p { font-size: 1.1rem; margin: 0; padding-left: 10px; }
-.history-item, .calendar-entry-item {
-    padding: 8px;
-    background-color: var(--bg-color);
-    border-radius: 4px;
-    margin-bottom: 5px;
-    font-size: 0.9rem;
-    border-left: 3px solid var(--secondary-color);
-}
-.history-item .date, .calendar-entry-item .date {
-    font-weight: bold;
-    color: var(--text-color-light);
+#noteModal .close-button:hover {
+  color: var(--secondary-color);
 }
 
-/* STYLE: PRZEŁĄCZNIK MOTYWU */
-.theme-switcher { position: relative; margin-left: 1rem; }
-.theme-toggle-checkbox { display: none; }
-.theme-toggle-label {
-    display: block;
-    width: 50px;
-    height: 26px;
-    background-color: var(--border-color);
-    border-radius: 50px;
-    cursor: pointer;
-    position: relative;
-    transition: background-color 0.3s;
+#noteModal form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
-.theme-toggle-label::after {
-    content: '☀️';
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    background-color: #fff;
-    border-radius: 50%;
-    top: 3px;
-    left: 4px;
-    transition: transform 0.3s, content 0.3s;
-}
-.theme-toggle-checkbox:checked + .theme-toggle-label { background-color: var(--secondary-color); }
-.theme-toggle-checkbox:checked + .theme-toggle-label::after {
-    content: '🌙';
-    transform: translateX(24px);
-    background-color: var(--bg-color-header);
-}
-.btn-reopen {
-    background-color: #0275d8; /* Niebieski kolor */
-    color: white;
-}
-.btn-reopen:hover {
-    background-color: #025aa5;
-}
-/* --- NOWE STYLE: MOTYW CIEMNY --- */
-body[data-theme="dark"] {
-    --primary-color: #4a6a8a;
-    --secondary-color: #5fa8e3;
-    --light-color: #2a2a2a;
-    --success-color: #2aaa71;
-    --error-color: #e74c3c;
-    --warning-color: #f39c12;
 
-    --bg-color: #121212;
-    --bg-color-header: #1e1e1e;
-    --bg-color-card: #1e1e1e;
-    --bg-color-input: #2a2a2a;
-    --text-color: #e0e0e0;
-    --text-color-light: #aaa;
-    --text-color-header: #e0e0e0;
-    --text-color-inverted: #ffffff;
-    --border-color: #333;
-    --border-color-light: #2a2a2a;
-    --border-color-input: #444;
-    --header-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    --box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-    
+#noteModal textarea {
+  resize: vertical;
+  font-family: inherit;
+  font-size: 0.95rem;
+  border: 1px solid var(--border-color-input);
+  border-radius: var(--border-radius);
+  padding: 10px;
+  background-color: var(--bg-color-input);
+  color: var(--text-color);
 }
-body[data-theme="dark"] .fc-daygrid-day.fc-day-today { background-color: rgba(95, 168, 227, 0.1) !important; }
-body[data-theme="dark"] thead { background-color: #2a2a2a; }
-body[data-theme="dark"] .close-button { color: #888; }
-body[data-theme="dark"] .event-actions { background: rgba(42, 42, 42, 0.8); }
-body[data-theme="dark"] .client-machine-list a { color: var(--secondary-color) !important; }
-body[data-theme="dark"] .machine-history-link { color: var(--secondary-color) !important; }
-body[data-theme="dark"] .fc-event hr { border-color: rgba(255, 255, 255, 0.3) !important; }
+
+#noteModal input[type="number"],
+#noteModal select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color-input);
+  border-radius: var(--border-radius);
+  font-size: 0.95rem;
+  background-color: var(--bg-color-input);
+  color: var(--text-color);
+}
+
+#noteModal button[type="submit"] {
+  align-self: flex-end;
+  background-color: var(--success-color);
+  color: var(--text-color-inverted);
+  font-weight: 700;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#noteModal button[type="submit"]:hover {
+  background-color: #27ae60;
+}
+
+/* DARK THEME SUPPORT */
+body[data-theme="dark"] #noteModal .modal-content {
+  background-color: var(--bg-color-card);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
