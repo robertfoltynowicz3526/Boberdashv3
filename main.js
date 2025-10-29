@@ -510,35 +510,70 @@ function nasluchujNaKlientow() {
     }
   );
 }
-    async function obslugaListyKlientow(event) {
-  // Klik w strzałkę obok klienta → rozwijaj/zwiń listę maszyn tego klienta
-  if (event.target.classList && event.target.classList.contains('toggle-machines-arrow')) {
-    const arrow = event.target;
-    const targetId = arrow.dataset.target; // np. client-<id>-machines
+async function obslugaListyKlientow(event) {
+  // 1) próbujemy znaleźć klikniętą strzałkę albo jej rodzica z data-target
+  const arrow = event.target.closest('.toggle-machines-arrow');
+  if (arrow) {
+    const targetId = arrow.getAttribute('data-target');
     const kontener = document.getElementById(targetId);
-    if (kontener) {
-      arrow.classList.toggle('collapsed');
-      kontener.classList.toggle('collapsed');
+    if (!kontener) {
+      console.warn('[KLienci] Nie znaleziono kontenera maszyn dla', targetId);
+      return;
+    }
+    arrow.classList.toggle('collapsed');
+    kontener.classList.toggle('collapsed');
+    // log pomocniczy:
+    console.log('[Klienci] toggle', { targetId, collapsed: kontener.classList.contains('collapsed') });
+    return;
+  }
+
+  // 2) klik w cały nagłówek wiersza klienta (poza przyciskami)
+  const headerItem = event.target.closest('.client-header-item');
+  if (headerItem &&
+      !event.target.classList.contains('edit-klient-btn') &&
+      !event.target.classList.contains('delete-btn')) {
+    const arrow2 = headerItem.querySelector('.toggle-machines-arrow');
+    if (arrow2) {
+      const targetId2 = arrow2.getAttribute('data-target');
+      const kontener2 = document.getElementById(targetId2);
+      if (!kontener2) {
+        console.warn('[Klienci] (header) brak kontenera', targetId2);
+        return;
+      }
+      arrow2.classList.toggle('collapsed');
+      kontener2.classList.toggle('collapsed');
+      console.log('[Klienci] (header) toggle', { targetId: targetId2, collapsed: kontener2.classList.contains('collapsed') });
     }
     return;
   }
 
+  // 3) przyciski akcji
   const clientGroup = event.target.closest('.client-group');
   if (!clientGroup) return;
   const klientId = clientGroup.dataset.id;
 
-  // Klik w cały nagłówek klienta też rozwija/zamyka (poza klikami w przyciski)
-  const headerItem = event.target.closest('.client-header-item');
-  if (headerItem && !event.target.classList.contains('edit-klient-btn') && !event.target.classList.contains('delete-btn')) {
-    const arrow = headerItem.querySelector('.toggle-machines-arrow');
-    if (arrow) {
-      const targetId = arrow.dataset.target;
-      const kontener = document.getElementById(targetId);
-      if (kontener) {
-        arrow.classList.toggle('collapsed');
-        kontener.classList.toggle('collapsed');
-      }
+  if (event.target.classList.contains('machine-history-link')) {
+    event.preventDefault();
+    const maszynaId = event.target.dataset.maszynaId;
+    const maszynaNazwa = event.target.dataset.maszynaNazwa;
+    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+    return;
+  }
+
+  if (event.target.classList.contains('delete-btn')) {
+    if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
+      await deleteDoc(doc(db, "klienci", klientId));
+      wyswietlMaszyny();
     }
+    return;
+  }
+
+  if (event.target.classList.contains('edit-klient-btn')) {
+    otworzModalEdycjiKlienta(klientId);
+    return;
+  }
+}
+
     // nie return — żeby przyciski niżej nadal działały
   }
 
