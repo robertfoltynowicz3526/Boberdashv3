@@ -1565,113 +1565,89 @@ async function obslugaZakonczeniaZlecenia(event) {
         });
     }
 
-    // --- PODPIĘCIE EVENTÓW (wszystko w jednym miejscu) ---
-    // Klienci
-    klientForm.addEventListener('submit', dodajKlienta);
-    listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
-    editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
-    editKlientModal.querySelector('.close-button').onclick = () => { editKlientModal.style.display = 'none'; };
+   // --- PODPIĘCIE EVENTÓW ---
+klientForm.addEventListener('submit', dodajKlienta);
+listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
 
-    // Maszyny
-    maszynaForm.addEventListener('submit', dodajMaszyne);
-    listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
-    editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
-    editMaszynaModal.querySelector('.close-button').onclick = () => { editMaszynaModal.style.display = 'none'; };
+maszynaForm.addEventListener('submit', dodajMaszyne);
+listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
 
-    // Zlecenia
-    zlecenieForm.addEventListener('submit', dodajZlecenie);
-    aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
-    ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
-    completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
-    closeModalButton.onclick = () => { completeModal.style.display = "none"; };
+// ZLECENIA
+zlecenieForm.addEventListener('submit', dodajZlecenie);
+aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
+ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
 
-    editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
-    editZlecenieModal.querySelector('.close-button').onclick = () => { editZlecenieModal.style.display = 'none'; };
+completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
+closeModalButton.onclick = () => { completeModal.style.display = "none"; };
 
-    // Modal „Przypisz”
-    assignForm.addEventListener('submit', zapiszPrzypisanie);
-    assignModal.querySelector('.close-button').onclick = () => { assignModal.style.display = 'none'; };
-    document.getElementById('assign-klient-select').addEventListener('change', (event) => {
-        const klientId = event.target.value;
-        const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klientId);
-        const maszynySelect = document.getElementById('assign-maszyna-select');
-        let html = '<option value="">-- Wybierz istniejącą --</option>';
-        if (klientId) {
-            html += maszynyKlienta.map(m => `<option value="${m.id}">${m.typMaszyny} ${m.model}</option>`).join('');
-            document.getElementById('assign-machine-section').style.display = 'block';
-        } else {
-            document.getElementById('assign-machine-section').style.display = 'none';
-        }
-        maszynySelect.innerHTML = html;
-    });
+miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
+document.getElementById('export-zlecenia-btn').addEventListener('click', () => {
+  const miesiac = miesiacSummaryInput.value;
+  const dane = _wszystkieZleceniaCache
+    .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
+    .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
+      ...rest,
+      uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
+    }));
+  eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
+});
 
-    // Kalendarz (Ewidencja)
-    kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
-    kalendarzContainer.addEventListener('click', obslugaKalendarza);
-    kalendarzModal.querySelector('.close-button').onclick = () => { kalendarzModal.style.display = 'none'; };
+// MAGAZYN
+magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
+bulkAddForm.addEventListener('submit', dodajMasowo);
+magazynLista.addEventListener('click', obslugaTabeliMagazynu);
 
-    // Wyszukiwarki
-    klientSearchInput.addEventListener('input', wyswietlKlientow);
-    maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
-    zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
+stockModalForm.addEventListener('submit', obslugaZmianyStanu);
+stockModalCloseButton.onclick = () => { stockModal.style.display = "none"; };
 
-    // Eksport + podsumowanie
-    miesiacSummaryInput.addEventListener('change', () => { obliczIPokazPodsumowanieFinansowe(); });
-    document.getElementById('export-zlecenia-btn').addEventListener('click', () => {
-        const miesiac = miesiacSummaryInput.value;
-        const dane = _wszystkieZleceniaCache
-            .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
-            .map(({id, createdAt, status, uzyteCzesci, historia, ...reszta}) => ({
-                ...reszta,
-                uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
-            }));
-        eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
-    });
+addOilBtn.addEventListener('click', dodajOlej);
+converterLitryInput.addEventListener('input', przeliczOlej);
+converterSztukiInput.addEventListener('input', przeliczOlej);
+oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
 
-    // Magazyn
-    magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
-    bulkAddForm.addEventListener('submit', dodajMasowo);
-    magazynLista.addEventListener('click', obslugaTabeliMagazynu);
-    stockModalForm.addEventListener('submit', obslugaZmianyStanu);
-    stockModalCloseButton.onclick = () => { stockModal.style.display = "none"; };
-    addOilBtn.addEventListener('click', dodajOlej);
-    converterLitryInput.addEventListener('input', przeliczOlej);
-    converterSztukiInput.addEventListener('input', przeliczOlej);
-    oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({target:{id:''}}); });
+// KALENDARZ (modal + klik w kalendarzu)
+kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+kalendarzContainer.addEventListener('click', obslugaKalendarza);
+kalendarzModal.querySelector('.close-button').onclick = () => { kalendarzModal.style.display = 'none'; };
 
-    // Modal: wybór części
-    modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
-    partsToRemoveList.addEventListener('click', obslugaListyCzesci);
+// WYSZUKIWANIA
+klientSearchInput.addEventListener('input', wyswietlKlientow);
+maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
+zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
 
-    // Detale zlecenia
-    detailsZlecenieModal.querySelector('.close-button').onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+// EDYCJE (modale)
+editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
+editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
+editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
-    // Historia maszyny
-    machineHistoryModal.querySelector('.close-button').onclick = () => { machineHistoryModal.style.display = 'none'; };
+editKlientModal.querySelector('.close-button').onclick = () => { editKlientModal.style.display = 'none'; };
+editMaszynaModal.querySelector('.close-button').onclick = () => { editMaszynaModal.style.display = 'none'; };
+detailsZlecenieModal.querySelector('.close-button').onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+editZlecenieModal.querySelector('.close-button').onclick = () => { editZlecenieModal.style.display = 'none'; };
+machineHistoryModal.querySelector('.close-button').onclick = () => { machineHistoryModal.style.display = 'none'; };
 
-    // Zamknięcie modalów po kliknięciu w tło
-    window.onclick = (event) => {
-        if (event.target == completeModal ||
-            event.target == stockModal ||
-            event.target == kalendarzModal ||
-            event.target == assignModal ||
-            event.target == editKlientModal ||
-            event.target == editMaszynaModal ||
-            event.target == detailsZlecenieModal ||
-            event.target == editZlecenieModal ||
-            event.target == machineHistoryModal
-        ) {
-            event.target.style.display = "none";
-        }
-    };
+// Klik poza modal zamyka go
+window.onclick = (event) => {
+  if (
+    event.target == completeModal ||
+    event.target == stockModal ||
+    event.target == kalendarzModal ||
+    event.target == assignModal ||
+    event.target == editKlientModal ||
+    event.target == editMaszynaModal ||
+    event.target == detailsZlecenieModal ||
+    event.target == editZlecenieModal ||
+    event.target == machineHistoryModal
+  ) {
+    event.target.style.display = "none";
+  }
+};
 
-// --- INICJALIZACJA (wewnątrz initializeApp) ---
+// --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
 inicjalizujKalendarz();
 nasluchujNaKlientow();
 nasluchujNaMaszyny();
 nasluchujNaZlecenia();
-wyswietlPrzejazdy(); // może być puste
+wyswietlPrzejazdy(); // puste – OK
 wyswietlMagazyn();
-
-
 } // koniec initializeApp()
