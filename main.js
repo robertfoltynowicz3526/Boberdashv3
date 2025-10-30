@@ -2,12 +2,7 @@ import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs } from "firebase/firestore";
 import Papa from 'papaparse';
 
-/**
- * WAŻNE:
- * - Notatka przy zakończeniu: pole jest wstrzykiwane do modala #complete-zlecenie-modal (id: zakonczenie-notatka)
- * - Ponowne otwieranie: przycisk „Otwórz ponownie” w liście zakończonych + log do historii
- */
-
+// Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
 
 
@@ -1680,5 +1675,3 @@ wyswietlMagazyn();
 
 
 } // koniec initializeApp()
-
-initializeApp();
