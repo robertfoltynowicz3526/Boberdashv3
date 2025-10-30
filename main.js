@@ -547,29 +547,7 @@ async function obslugaListyKlientow(event) {
   if (!clientGroup) return;
   const klientId = clientGroup.dataset.id;
 
-  if (event.target.classList.contains('machine-history-link')) {
-    event.preventDefault();
-    const maszynaId = event.target.dataset.maszynaId;
-    const maszynaNazwa = event.target.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-    return;
-  }
-
-  if (event.target.classList.contains('delete-btn')) {
-    if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "klienci", klientId));
-      wyswietlMaszyny();
-    }
-    return;
-  }
-
-  if (event.target.classList.contains('edit-klient-btn')) {
-    otworzModalEdycjiKlienta(klientId);
-    return;
-  }
-}
-
-        async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
+       async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
         document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
         machineHistoryModal.style.display = 'block';
@@ -745,20 +723,36 @@ async function obslugaListyKlientow(event) {
             return acc;
         }, {});
         let maszynyHtml = '';
+        let grupaIndeks = 0;
         for (const klientNazwa in pogrupowaneMaszyny) {
-            maszynyHtml += `<div class="client-group">
-                <div class="client-header open"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
-                <ul class="machine-list open">
-                    ${pogrupowaneMaszyny[klientNazwa].map(maszyna =>
-                        `<li data-id="${maszyna.id}">
-                            <span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span>
+            grupaIndeks += 1;
+            const listaId = `machine-list-${grupaIndeks}`;
+            const maszynyKlienta = pogrupowaneMaszyny[klientNazwa];
+            const elementyMaszyn = maszynyKlienta.map(maszyna => {
+                const typ = maszyna.typMaszyny || '';
+                const model = maszyna.model || '';
+                const sn = maszyna.nrSeryjny || '---';
+                return `
+                        <li data-id="${maszyna.id}">
+                            <span>${typ} ${model} (S/N: ${sn})</span>
                             <div>
-                                <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">Historia</a>
+                                <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${typ} ${model}">Historia</a>
                                 <button class="btn-edit edit-maszyna-btn">Edytuj</button>
                                 <button class="delete-btn">Usuń</button>
                             </div>
-                        </li>`).join('')}
-                </ul></div>`;
+                        </li>`;
+            }).join('');
+
+            maszynyHtml += `
+                <div class="client-group">
+                    <div class="client-header collapsed" role="button" aria-expanded="false" aria-controls="${listaId}" tabindex="0">
+                        <h4>${klientNazwa}</h4>
+                        <span class="arrow" aria-hidden="true">▼</span>
+                    </div>
+                    <ul id="${listaId}" class="machine-list collapsed" hidden>
+                        ${elementyMaszyn}
+                    </ul>
+                </div>`;
         }
         listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
@@ -784,11 +778,24 @@ async function obslugaListyKlientow(event) {
   // Klik w pasek .client-header (grupa maszyn danego klienta)
   const header = el.closest('.client-header');
   if (header) {
-    header.classList.toggle('open');
-    const list = header.nextElementSibling; // powinno być ul.machine-list
-    if (list && list.classList.contains('machine-list')) {
-      list.classList.toggle('open');
+    if (event.type === 'keydown') {
+      const key = event.key;
+      if (key !== 'Enter' && key !== ' ' && key !== 'Spacebar') {
+        return;
+      }
+      event.preventDefault();
     }
+    const list = header.nextElementSibling; // powinno być ul.machine-list
+        const jestZwiniete = header.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', (!jestZwiniete).toString());
+    if (list && list.classList.contains('machine-list')) {
+      list.classList.toggle('collapsed', jestZwiniete);
+      list.toggleAttribute('hidden', jestZwiniete);
+    }
+    return;
+  }
+
+    if (event.type === 'keydown') {
     return;
   }
 
@@ -917,21 +924,37 @@ function wyswietlZlecenia() {
                 </div>
             </li>`;
         } else {
-            const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
-            const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-            const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
-            ukonczoneHtml += `<li data-id="${zlecenie.id}">
-                <span>
-                    <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
-                    <em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>
-                    Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>
-                    ${uzyteCzesciHtml}${notatkaHtml}
-                </span>
-                <div>
-                    <button class="btn-details details-zlecenie-btn">Szczegóły</button>
-                    <button class="btn-edit edit-zlecenie-btn">Edytuj</button>
-                    <button class="btn-edit reopen-btn">Otwórz ponownie</button>
-                    <button class="delete-btn">Usuń</button>
+            const nazwaKlienta = klient ? klient.nazwa : 'Klient usunięty';
+            const nazwaMaszyny = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() || 'Maszyna bez nazwy' : 'Brak przypisanej maszyny';
+            const listaCzesci = zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : '';
+            const notatka = zlecenie.zakonczenieNotatka ? zlecenie.zakonczenieNotatka.trim() : '';
+            const dataUkonczenia = zlecenie.dataUkonczenia || 'b.d.';
+            const wyfakturowaneGodziny = typeof zlecenie.wyfakturowaneGodziny === 'number' ? zlecenie.wyfakturowaneGodziny : (zlecenie.wyfakturowaneGodziny || 0);
+            const typZlecenia = zlecenie.typZlecenia || '?';
+
+            ukonczoneHtml += `<li data-id="${zlecenie.id}" class="completed-item">
+                <div class="completed-summary collapsed" role="button" aria-expanded="false" tabindex="0">
+                    <span class="completed-arrow" aria-hidden="true">▼</span>
+                    <div class="completed-summary-text">
+                        <strong>${nazwaKlienta}</strong>
+                        <span class="completed-machine">${nazwaMaszyny}</span>
+                    </div>
+                </div>
+                <div class="completed-details collapsed" aria-hidden="true" hidden>
+                    <div class="completed-details-info">
+                        <p><span class="label">Nr zlecenia:</span> <strong>${zlecenie.nrZlecenia || '---'}</strong></p>
+                        <p><span class="label">Ukończono:</span> <strong>${dataUkonczenia}</strong></p>
+                        <p><span class="label">Fakturowano:</span> <strong>${wyfakturowaneGodziny} h</strong></p>
+                        <p><span class="label">Typ:</span> <strong>${typZlecenia}</strong></p>
+                        ${listaCzesci ? `<p class="completed-used-parts">Użyto: ${listaCzesci}</p>` : ''}
+                        ${notatka ? `<p class="completed-note">📝 ${notatka}</p>` : ''}
+                    </div>
+                    <div class="completed-details-actions">
+                        <button class="btn-details details-zlecenie-btn">Szczegóły</button>
+                        <button class="btn-edit edit-zlecenie-btn">Edytuj</button>
+                        <button class="btn-edit reopen-btn">Otwórz ponownie</button>
+                        <button class="delete-btn">Usuń</button>
+                    </div>
                 </div>
             </li>`;
         }
@@ -1013,6 +1036,30 @@ function obliczIPokazPodsumowanieFinansowe() {
 
 async function obslugaListyZlecen(event) {
     const li = event.target.closest('li'); if (!li) return;
+        const summary = event.target.closest('.completed-summary');
+    if (summary) {
+        if (event.type === 'keydown') {
+            const key = event.key;
+            if (key !== 'Enter' && key !== ' ' && key !== 'Spacebar') {
+                return;
+            }
+            event.preventDefault();
+        }
+        const details = summary.nextElementSibling;
+        const jestZwiniete = summary.classList.toggle('collapsed');
+        summary.setAttribute('aria-expanded', (!jestZwiniete).toString());
+        if (details && details.classList.contains('completed-details')) {
+            details.classList.toggle('collapsed', jestZwiniete);
+            details.setAttribute('aria-hidden', jestZwiniete ? 'true' : 'false');
+            details.toggleAttribute('hidden', jestZwiniete);
+        }
+        return;
+    }
+
+    if (event.type === 'keydown') {
+        return;
+    }
+
     const docId = li.dataset.id;
 
     if (event.target.classList.contains('delete-btn')) {
@@ -1545,11 +1592,13 @@ listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
 
 maszynaForm.addEventListener('submit', dodajMaszyne);
 listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
+listaMaszynDiv.addEventListener('keydown', obslugaListyMaszyn);
 
 // ZLECENIA
 zlecenieForm.addEventListener('submit', dodajZlecenie);
 aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
 ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
+ukonczoneZleceniaLista.addEventListener('keydown', obslugaListyZlecen);
 
 completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
 closeModalButton.onclick = () => { completeModal.style.display = "none"; };
