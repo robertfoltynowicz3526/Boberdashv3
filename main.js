@@ -569,33 +569,7 @@ async function obslugaListyKlientow(event) {
   }
 }
 
-    // nie return — żeby przyciski niżej nadal działały
-  }
-
-  if (event.target.classList.contains('machine-history-link')) {
-    event.preventDefault();
-    const maszynaId = event.target.dataset.maszynaId;
-    const maszynaNazwa = event.target.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-    return;
-  }
-
-  if (event.target.classList.contains('delete-btn')) {
-    if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "klienci", klientId));
-      wyswietlMaszyny();
-    }
-    return;
-  }
-
-  if (event.target.classList.contains('edit-klient-btn')) {
-    otworzModalEdycjiKlienta(klientId);
-    return;
-  }
-
-
-
-    async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
+        async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
         document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
         machineHistoryModal.style.display = 'block';
