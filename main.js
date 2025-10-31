@@ -1210,6 +1210,7 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
+    
     editZlecenieModal.style.display = 'block';
 }
 
@@ -1242,11 +1243,24 @@ async function zapiszEdycjeZlecenia(event) {
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
-        if (zmiany.length === 0) { editZlecenieModal.style.display = 'none'; return; }
+         if (staryNumerWz !== nowyNumerWz) {
+            const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
+            const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
+            zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
+        }
+        if (zmiany.length === 0) {
+            editZlecenieModal.style.display = 'none';
+            return;
+        }
         wpisHistorii += zmiany.join('; ');
         const nowaHistoria = [...staraHistoria, { timestamp: new Date().toISOString(), akcja: wpisHistorii }];
 
-        await updateDoc(zlecenieRef, { wyfakturowaneGodziny: noweGodziny, typZlecenia: nowyTyp, zakonczenieNumerWZ: nowyNumerWz || null, historia: nowaHistoria });
+        await updateDoc(zlecenieRef, {
+            wyfakturowaneGodziny: noweGodziny,
+            typZlecenia: nowyTyp,
+            zakonczenieNumerWZ: nowyNumerWz || null,
+            historia: nowaHistoria
+        });
         editZlecenieModal.style.display = 'none';
         alert("Zlecenie zaktualizowane.");
     } catch (e) {
@@ -1282,6 +1296,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
             <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
             ${wzHtml}${notatkaHtml}
+            ${wzHtml}${notatkaHtml}           
         `;
     }
 
@@ -1762,4 +1777,5 @@ nasluchujNaMaszyny();
 nasluchujNaZlecenia();
 wyswietlPrzejazdy(); // puste – OK
 wyswietlMagazyn();
+
 } // koniec initializeApp()
