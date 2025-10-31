@@ -755,8 +755,8 @@ async function obslugaListyKlientow(event) {
         let maszynyHtml = '';
         for (const klientNazwa in pogrupowaneMaszyny) {
             maszynyHtml += `<div class="client-group">
-                <div class="client-header open"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
-                <ul class="machine-list open">
+                <div class="client-header"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
+                <ul class="machine-list">
                     ${pogrupowaneMaszyny[klientNazwa].map(maszyna =>
                         `<li data-id="${maszyna.id}">
                             <span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span>

@@ -519,6 +519,73 @@ ul {
   transform: rotate(0deg);
 }
 
+#lista-maszyn .client-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--surface-stroke);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#lista-maszyn .client-header:hover {
+  background-color: var(--bg-elevated-hover);
+  border-color: var(--border-color);
+}
+
+#lista-maszyn .client-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#lista-maszyn .client-header .arrow {
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+#lista-maszyn .client-header.open .arrow {
+  transform: rotate(90deg);
+}
+
+#lista-maszyn .machine-list {
+  list-style: none;
+  margin: 0.5rem 0 1.25rem 0;
+  padding: 0 0 0 0.5rem;
+  display: none;
+}
+
+#lista-maszyn .machine-list.open {
+  display: block;
+}
+
+#lista-maszyn .machine-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background-color: rgba(148, 163, 184, 0.12);
+}
+
+#lista-maszyn .machine-list li + li {
+  margin-top: 0.35rem;
+}
+
+#lista-maszyn .machine-list a {
+  font-size: 0.85rem;
+  color: var(--accent-color);
+}
+
+#lista-maszyn .machine-list a:hover {
+  text-decoration: underline;
+}
+
 .client-machine-list-container {
   margin: 0.35rem 0 0.75rem 0;
   padding-left: 1.25rem;
