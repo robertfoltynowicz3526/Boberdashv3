@@ -1293,10 +1293,9 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
         infoDiv.innerHTML += `
             <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
-            <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
-            <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
+            <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
+            <div class="details-group"><strong>Użyte Części:</strong> <p>${uzyteCzesciOpis}</p></div>
             ${wzHtml}${notatkaHtml}
-            ${wzHtml}${notatkaHtml}           
         `;
     }
 
@@ -1442,7 +1441,10 @@ async function obslugaZakonczeniaZlecenia(event) {
     event.preventDefault();
     const docId = document.getElementById('complete-zlecenie-id').value;
     const numerWz = (document.getElementById('zakonczenie-wz')?.value || '').trim();
-    const notatka = (document.getElementById('zakonczenie-notatka')?.value || '').trim();
+    const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
+    const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
+    const numerWz = zakonczenieWzInput && 'value' in zakonczenieWzInput ? zakonczenieWzInput.value.trim() : '';
+    const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
     const dane = {
         status: 'ukończone',
         wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
