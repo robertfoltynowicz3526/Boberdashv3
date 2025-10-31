@@ -26,6 +26,7 @@ function initializeApp() {
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
+    const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
     const kalendarzModal = document.getElementById('kalendarz-modal');
@@ -97,6 +98,12 @@ function initializeApp() {
     inicjujCiemnyMotyw();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
+        if (zlecenieKlientFilterInput) {
+        zlecenieKlientFilterInput.addEventListener('input', () => {
+            odswiezSelectKlientaDoZlecenia();
+        });
+    }
+    odswiezSelectKlientaDoZlecenia();
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
@@ -382,6 +389,48 @@ function initializeApp() {
         catch (e) { console.error("Błąd dodawania klienta: ", e); }
     }
 
+    function odswiezSelectKlientaDoZlecenia() {
+        if (!zlecenieKlientSelect) return;
+
+        const poprzedniWybor = zlecenieKlientSelect.value;
+        const fraza = (zlecenieKlientFilterInput?.value || '').trim().toLowerCase();
+
+        const klienciDlaSelecta = (_wszystkieKlienciCache || [])
+            .filter(klient => {
+                if (!fraza) return true;
+                const tekst = [
+                    klient.nazwa || '',
+                    klient.nip || '',
+                    klient.adres || '',
+                    klient.telefon || ''
+                ].join(' ').toLowerCase();
+                return tekst.includes(fraza);
+            })
+            .sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
+
+        const maWyniki = klienciDlaSelecta.length > 0;
+        const placeholder = (_wszystkieKlienciCache?.length || 0) === 0
+            ? '-- Brak klientów w bazie --'
+            : (maWyniki ? '-- Wybierz klienta --' : '-- Brak klientów pasujących do filtra --');
+        let optionsHtml = `<option value="">${placeholder}</option>`;
+        optionsHtml += '<option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
+
+        if (maWyniki) {
+            klienciDlaSelecta.forEach(klient => {
+                optionsHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
+            });
+        }
+
+        zlecenieKlientSelect.innerHTML = optionsHtml;
+
+        const moznaPrzywrocic = poprzedniWybor === ''
+            || poprzedniWybor === 'szybkie-zlecenie'
+            || klienciDlaSelecta.some(klient => klient.id === poprzedniWybor);
+
+        zlecenieKlientSelect.value = moznaPrzywrocic ? poprzedniWybor : '';
+        zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    }
+
 function wyswietlKlientow() {
   try {
     // Poczekaj na maszyny – bez nich nie budujemy list pod klientami
@@ -396,7 +445,7 @@ function wyswietlKlientow() {
 
     let klienciHtml = "";
     let selectHtml = '<option value="">-- Wybierz klienta --</option>';
-    let selectZleceniaHtml = '<option value="">-- Wybierz klienta --</option><option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
+   
 
     // Filtrowanie
     const przefiltrowaniKlienci = (_wszystkieKlienciCache || []).filter(klient => {
@@ -471,13 +520,13 @@ function wyswietlKlientow() {
 
       // selecty
       selectHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
-      selectZleceniaHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
     });
 
     if (listaKlientowDiv) {
       listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
     }
     if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
+    odswiezSelectKlientaDoZlecenia();
     if (zlecenieKlientSelect) {
       const poprzedniWybor = zlecenieKlientSelect.value;
       zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
