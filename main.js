@@ -15,8 +15,22 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+       const utworzPustyRekordMiesieczny = () => ({
+        praca: 0,
+        nadgodziny: 0,
+        jazda: 0,
+        wyfakturowaneGodziny: 0,
+        brutto: 0,
+        netto: 0
+    }); 
     let wszystkieZlecenia = [], wszystkieProdukty = [], wszystkiePrzejazdy = [],
         czesciDoZlecenia = [], wszystkieMaszyny = [], wszystkieKlienci = [], wszystkieWpisyKalendarza = [];
+    let ostatnieZestawienieMiesieczne = {
+        miesiace: [],
+        sumyRoczne: utworzPustyRekordMiesieczny(),
+        sumyRocznePerRok: [],
+        lata: []
+    };
     let ostatnieZestawienieMiesieczne = { miesiace: [], sumyRoczne: { praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 } };
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;

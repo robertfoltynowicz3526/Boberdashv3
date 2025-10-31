@@ -207,6 +207,7 @@ main {
 .card,
 #summary-container,
 #annual-summary {
+#annual-summary {
   background: var(--bg-elevated);
   border-radius: 16px;
   padding: 1.4rem 1.6rem;
