@@ -455,12 +455,12 @@ function wyswietlKlientow() {
       klienciHtml += `
         <div class="client-group" data-id="${klient.id}">
           <div class="client-header-item">
-            <span>
+            <div class="client-header-text">
               <strong>${klient.nazwa || '---'}</strong>${nipTxt}<br>
               <small>${klient.adres || '---'} | ${klient.telefon || '---'}</small>
-              ${strzalkaHtml}
-            </span>
-            <div>
+            </div>
+            ${strzalkaHtml}
+            <div class="client-header-actions">             
               <button class="btn-edit edit-klient-btn">Edytuj</button>
               <button class="delete-btn">Usuń</button>
             </div>
@@ -478,7 +478,15 @@ function wyswietlKlientow() {
       listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
     }
     if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
-    if (zlecenieKlientSelect) zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
+    if (zlecenieKlientSelect) {
+      const poprzedniWybor = zlecenieKlientSelect.value;
+      zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
+      const istniejePoprzedniaOpcja = Array.from(zlecenieKlientSelect.options).some(option => option.value === poprzedniWybor);
+      if (istniejePoprzedniaOpcja) {
+        zlecenieKlientSelect.value = poprzedniWybor;
+      }
+      zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    }
 
     const assignKlientSelect = document.getElementById('assign-klient-select');
     if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
@@ -764,6 +772,49 @@ async function obslugaListyKlientow(event) {
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
     }
 
+    function aktualizujMaszynyDlaZlecenia() {
+        if (!zlecenieMaszynaSelect) return;
+
+        const wybranyKlientId = zlecenieKlientSelect.value;
+
+        if (!wybranyKlientId) {
+            zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
+            zlecenieMaszynaSelect.disabled = true;
+            return;
+        }
+
+        if (wybranyKlientId === 'szybkie-zlecenie') {
+            zlecenieMaszynaSelect.innerHTML = '<option value="">-- Szybkie zlecenie (bez maszyny) --</option>';
+            zlecenieMaszynaSelect.disabled = true;
+            return;
+        }
+
+        const maszynyKlienta = _wszystkieMaszynyCache
+            .filter(maszyna => maszyna.klientId === wybranyKlientId)
+            .sort((a, b) => {
+                const typPorownanie = (a.typMaszyny || '').localeCompare(b.typMaszyny || '');
+                if (typPorownanie !== 0) return typPorownanie;
+                return (a.model || '').localeCompare(b.model || '');
+            });
+
+        if (maszynyKlienta.length === 0) {
+            zlecenieMaszynaSelect.innerHTML = '<option value="">-- Brak maszyn dla klienta --</option>';
+            zlecenieMaszynaSelect.disabled = true;
+            return;
+        }
+
+        const opcjeMaszyn = maszynyKlienta
+            .map(maszyna => {
+                const sn = maszyna.nrSeryjny && maszyna.nrSeryjny !== '---' ? ` (S/N: ${maszyna.nrSeryjny})` : '';
+                return `<option value="${maszyna.id}">${maszyna.typMaszyny || ''} ${maszyna.model || ''}${sn}</option>`;
+            })
+            .join('');
+
+        zlecenieMaszynaSelect.innerHTML = `<option value="">-- Wybierz maszynę --</option>${opcjeMaszyn}`;
+        zlecenieMaszynaSelect.disabled = false;
+    }
+
+
     function nasluchujNaMaszyny() {
         onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
             _wszystkieMaszynyCache = [];
@@ -1000,6 +1051,7 @@ async function dodajZlecenie(event) {
         zlecenieKlientSelect.value = '';
         zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
         zlecenieMaszynaSelect.disabled = true;
+        zlecenieKlientSelect.dispatchEvent(new Event('change'));
     } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
 }
 
@@ -1548,8 +1600,11 @@ listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
 
 // ZLECENIA
 zlecenieForm.addEventListener('submit', dodajZlecenie);
+zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
 aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
 ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
+
+zlecenieKlientSelect.dispatchEvent(new Event('change'));
 
 completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
 closeModalButton.onclick = () => { completeModal.style.display = "none"; };
