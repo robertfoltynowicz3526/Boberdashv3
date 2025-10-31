@@ -32,6 +32,7 @@ function initializeApp() {
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
+    const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
@@ -45,7 +46,7 @@ function initializeApp() {
     const ukonczoneZleceniaLista = document.getElementById('ukonczone-zlecenia-lista');
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
-    const closeModalButton = completeModal.querySelector('.close-button');
+    const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const summaryContainer = document.getElementById('summary-container');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
@@ -54,7 +55,7 @@ function initializeApp() {
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const stockModalForm = document.getElementById('stock-change-form');
-    const stockModalCloseButton = stockModal.querySelector('.close-button');
+    const stockModalCloseButton = stockModal ? stockModal.querySelector('.close-button') : null
     const addOilBtn = document.getElementById('add-oil-btn');
     const oilTypeSelect = document.getElementById('oil-type');
     const oilContainerSizeSelect = document.getElementById('oil-container-size');
@@ -71,6 +72,9 @@ function initializeApp() {
     const editMaszynaModal = document.getElementById('edit-maszyna-modal');
     const editMaszynaForm = document.getElementById('edit-maszyna-form');
     const detailsZlecenieModal = document.getElementById('details-zlecenie-modal');
+    const editKlientCloseButton = editKlientModal ? editKlientModal.querySelector('.close-button') : null;
+    const editMaszynaCloseButton = editMaszynaModal ? editMaszynaModal.querySelector('.close-button') : null;
+    const detailsZlecenieCloseButton = detailsZlecenieModal ? detailsZlecenieModal.querySelector('.close-button') : null;
     const klientSearchInput = document.getElementById('klient-search-input');
     const maszynaSearchInput = document.getElementById('maszyna-search-input');
     const listaKlientowHeader = document.getElementById('lista-klientow-header');
@@ -81,6 +85,8 @@ function initializeApp() {
     const editZlecenieForm = document.getElementById('edit-zlecenie-form');
     const machineHistoryModal = document.getElementById('machine-history-modal');
     const machineHistoryList = document.getElementById('machine-history-list');
+    const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
+    const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     window.openTab = (evt, tabName) => {
@@ -94,11 +100,14 @@ function initializeApp() {
     const year = now.getFullYear();
     const currentMonth = `${year}-${month}`;
     if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-    document.querySelector('.tab-button').click(); // Otwórz pierwszą zakładkę
+    const firstTabButton = document.querySelector('.tab-button');
+    if (firstTabButton) {
+        firstTabButton.click(); // Otwórz pierwszą zakładkę
+    }
     inicjujCiemnyMotyw();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
-        if (zlecenieKlientFilterInput) {
+    if (zlecenieKlientFilterInput) {
         zlecenieKlientFilterInput.addEventListener('input', () => {
             odswiezSelectKlientaDoZlecenia();
         });
@@ -138,9 +147,11 @@ function initializeApp() {
     }
 
     async function otworzModalGodzin(data) {
+        if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
-        document.getElementById('kalendarz-data').value = data;
+        const kalendarzDataInput = document.getElementById('kalendarz-data');
+        if (kalendarzDataInput) kalendarzDataInput.value = data;
 
         const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
         zlecenieSelect.innerHTML = '<option value="">-- Brak --</option>';
@@ -177,6 +188,7 @@ function initializeApp() {
     }
 
     async function obslugaZapisuGodzin(event) {
+        if (!kalendarzForm || !kalendarzModal) return;
         event.preventDefault();
         const data = kalendarzForm['kalendarz-data'].value;
         const zlecenieSelect = kalendarzForm['kalendarz-zlecenie-select'];
@@ -259,6 +271,7 @@ function initializeApp() {
             return acc;
         }, { praca: 0, fakturowane: 0, nadgodziny: 0, jazda: 0 });
 
+        if (!kalendarzPodsumowanieDiv) return;
         kalendarzPodsumowanieDiv.innerHTML = `
             <p>Praca w miesiącu: <strong>${sumy.praca.toFixed(1)} h</strong></p>
             <p>Fakturowane: <strong>${sumy.fakturowane.toFixed(1)} h</strong></p>
@@ -527,15 +540,6 @@ function wyswietlKlientow() {
     }
     if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
     odswiezSelectKlientaDoZlecenia();
-    if (zlecenieKlientSelect) {
-      const poprzedniWybor = zlecenieKlientSelect.value;
-      zlecenieKlientSelect.innerHTML = selectZleceniaHtml;
-      const istniejePoprzedniaOpcja = Array.from(zlecenieKlientSelect.options).some(option => option.value === poprzedniWybor);
-      if (istniejePoprzedniaOpcja) {
-        zlecenieKlientSelect.value = poprzedniWybor;
-      }
-      zlecenieKlientSelect.dispatchEvent(new Event('change'));
-    }
 
     const assignKlientSelect = document.getElementById('assign-klient-select');
     if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
@@ -627,7 +631,9 @@ async function obslugaListyKlientow(event) {
 }
 
         async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
-        document.getElementById('machine-history-title').textContent = `Historia Serwisowa: ${maszynaNazwa}`;
+        if (!machineHistoryModal || !machineHistoryList) return;
+        const historyTitle = document.getElementById('machine-history-title');
+        if (historyTitle) historyTitle.textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
         machineHistoryModal.style.display = 'block';
 
@@ -691,6 +697,7 @@ async function obslugaListyKlientow(event) {
     }
 
     function otworzModalEdycjiKlienta(klientId) {
+        if (!editKlientForm) return;
         const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
         if (!klient) return;
         editKlientForm['edit-klient-id'].value = klient.id;
@@ -789,7 +796,7 @@ async function obslugaListyKlientow(event) {
             listaMaszynDiv.innerHTML = "<p>Ładowanie danych klientów...</p>";
             return;
         }
-        const frazaWyszukiwania = maszynaSearchInput.value.toLowerCase();
+        const frazaWyszukiwania = (maszynaSearchInput?.value || '').toLowerCase();
         wszystkieMaszyny = [];
 
         const przefiltrowaneMaszyny = _wszystkieMaszynyCache.filter(maszyna => {
@@ -818,8 +825,12 @@ async function obslugaListyKlientow(event) {
                         </li>`).join('')}
                 </ul></div>`;
         }
-        listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
-        zlecenieKlientSelect.dispatchEvent(new Event('change'));
+       if (listaMaszynDiv) {
+            listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
+        }
+        if (zlecenieKlientSelect) {
+            zlecenieKlientSelect.dispatchEvent(new Event('change'));
+        }
     }
 
     function aktualizujMaszynyDlaZlecenia() {
@@ -920,6 +931,7 @@ async function obslugaListyKlientow(event) {
 }
 
 function otworzModalEdycjiMaszyny(maszynaId) {
+    if (!editMaszynaForm || !editMaszynaModal) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
     if (!maszyna) return;
     editMaszynaForm['edit-maszyna-id'].value = maszyna.id;
@@ -933,6 +945,7 @@ function otworzModalEdycjiMaszyny(maszynaId) {
 }
 
 async function zapiszEdycjeMaszyny(event) {
+    if (!editMaszynaForm) return;
     event.preventDefault();
     const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
     const stareDane = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
@@ -980,12 +993,12 @@ async function obslugaListyPrzejazdow(event) {}
 // --- ZLECENIA ---
 function wyswietlZlecenia() {
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
-        aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
-        ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
         return;
     }
 
-    const frazaWyszukiwania = zlecenieSearchInput.value.toLowerCase();
+    const frazaWyszukiwania = (zlecenieSearchInput?.value || '').toLowerCase();
     wszystkieZlecenia = [];
     let aktywneHtml = '', ukonczoneHtml = '';
 
@@ -1020,7 +1033,7 @@ function wyswietlZlecenia() {
         } else {
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
             const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-                        const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
+            const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
             ukonczoneHtml += `<li data-id="${zlecenie.id}">
                 <span>
@@ -1039,8 +1052,12 @@ function wyswietlZlecenia() {
         }
     });
 
-    aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceń lub pasujących do wyszukiwania.</p>";
-    ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
+    if (aktywneZleceniaLista) {
+        aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceń lub pasujących do wyszukiwania.</p>";
+    }
+    if (ukonczoneZleceniaLista) {
+        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
+    }
     obliczIPokazPodsumowanieFinansowe();
 }
 
@@ -1111,7 +1128,9 @@ async function dodajZlecenie(event) {
 }
 
 function obliczIPokazPodsumowanieFinansowe() {
-    const podsumowanie = obliczPodsumowanieFinansowe(miesiacSummaryInput.value, wszystkieZlecenia);
+    if (!summaryContainer) return;
+    const wybranyMiesiac = miesiacSummaryInput ? miesiacSummaryInput.value : '';
+    const podsumowanie = obliczPodsumowanieFinansowe(wybranyMiesiac, wszystkieZlecenia);
     summaryContainer.innerHTML = `
         <p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(2)} h</strong></p>
         <p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(2)} zł</strong></p>
@@ -1132,26 +1151,33 @@ async function obslugaListyZlecen(event) {
     }
     if (event.target.classList.contains('assign-btn')) {
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
-        if (zlecenie) {
-            document.getElementById('assign-zlecenie-id').value = docId;
-            document.getElementById('assign-zlecenie-opis').textContent = zlecenie.nrZlecenia;
-            document.getElementById('assign-machine-section').style.display = 'none';
+        if (zlecenie && assignForm && assignModal) {
+            const assignIdInput = assignForm.querySelector('#assign-zlecenie-id');
+            const assignOpis = document.getElementById('assign-zlecenie-opis');
+            const assignMachineSection = document.getElementById('assign-machine-section');
+            if (assignIdInput) assignIdInput.value = docId;
+            if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
+            if (assignMachineSection) assignMachineSection.style.display = 'none';
             assignForm.reset();
             assignModal.style.display = 'block';
         }
         return;
     }
     if (event.target.classList.contains('complete-btn')) {
+        if (!completeModal || !completeModalForm) return;
         const docSnap = await getDoc(doc(db, "zlecenia", docId));
         if (docSnap.exists()) {
             const zlecenie = docSnap.data();
             const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
             const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Nieprzypisane');
-            document.getElementById('modal-klient').textContent = nazwaMaszyny;
-            document.getElementById('modal-nr-zlecenia').textContent = zlecenie.nrZlecenia;
-            completeModalForm.reset();         
-            document.getElementById('complete-zlecenie-id').value = docId;
+            const modalKlient = document.getElementById('modal-klient');
+            const modalNrZlecenia = document.getElementById('modal-nr-zlecenia');
+            if (modalKlient) modalKlient.textContent = nazwaMaszyny;
+            if (modalNrZlecenia) modalNrZlecenia.textContent = zlecenie.nrZlecenia;
+            completeModalForm.reset();
+            const completeIdInput = document.getElementById('complete-zlecenie-id');
+            if (completeIdInput) completeIdInput.value = docId;
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
@@ -1198,6 +1224,7 @@ async function obslugaListyZlecen(event) {
 }
 
 function otworzModalEdycjiZlecenia(zlecenieId) {
+    if (!editZlecenieForm || !editZlecenieModal) return;
     const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
     if (!zlecenie) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
@@ -1215,6 +1242,7 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
 }
 
 async function zapiszEdycjeZlecenia(event) {
+    if (!editZlecenieForm) return;
     event.preventDefault();
     const zlecenieId = editZlecenieForm['edit-zlecenie-id'].value;
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
@@ -1239,11 +1267,7 @@ async function zapiszEdycjeZlecenia(event) {
         const zmiany = [];
         if (stareGodziny !== noweGodziny) zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
         if (staryTyp !== nowyTyp) zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
-                const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
-            const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
-            zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
-        }
-         if (staryNumerWz !== nowyNumerWz) {
+        if (staryNumerWz !== nowyNumerWz) {
             const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
@@ -1272,12 +1296,15 @@ async function zapiszEdycjeZlecenia(event) {
 async function otworzModalSzczegolowZlecenia(zlecenieId) {
     const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
     if (!zlecenie) { alert("Nie znaleziono zlecenia!"); return; }
+    const titleEl = document.getElementById('details-zlecenie-title');
+    const infoDiv = document.getElementById('details-zlecenie-info');
+    const historiaDiv = document.getElementById('details-zlecenie-historia');
+    const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
+    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
     const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
 
-    document.getElementById('details-zlecenie-title').textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
-
-    const infoDiv = document.getElementById('details-zlecenie-info');
+    titleEl.textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
     infoDiv.innerHTML = `
         <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
         <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
@@ -1299,20 +1326,24 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
         `;
     }
 
-    const historiaDiv = document.getElementById('details-zlecenie-historia');
-    if (zlecenie.historia && zlecenie.historia.length > 0) {
-        historiaDiv.innerHTML = zlecenie.historia
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-            .map(wpis => `
-                <div class="history-item">
-                    <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
-                    ${wpis.akcja}
-                </div>
-            `).join('');
-    } else { historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>'; }
+    if (historiaDiv) {
+        if (zlecenie.historia && zlecenie.historia.length > 0) {
+            historiaDiv.innerHTML = zlecenie.historia
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .map(wpis => `
+                    <div class="history-item">
+                        <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
+                        ${wpis.akcja}
+                    </div>
+                `).join('');
+        } else {
+            historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>';
+        }
+    }
 
-    const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
-    kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
+    if (kalendarzDiv) {
+        kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
+    }
     const qKalendarz = query(collection(db, "godziny_pracy"), where("zlecenieId", "==", zlecenieId), orderBy("id", "desc"));
     const querySnapshotKalendarz = await getDocs(qKalendarz);
     let kalendarzHtml = '';
@@ -1326,12 +1357,15 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
                 ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
             </div>`;
     });
-    kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+    if (kalendarzDiv) {
+        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+    }
 
     detailsZlecenieModal.style.display = 'block';
 }
 
 async function zapiszPrzypisanie(event) {
+    if (!assignForm || !assignModal) return;
     event.preventDefault();
     const zlecenieId = assignForm['assign-zlecenie-id'].value;
     let klientId = assignForm['assign-klient-select'].value;
@@ -1386,6 +1420,7 @@ async function zapiszPrzypisanie(event) {
 }
 
 function renderMagazynWModalu() {
+    if (!modalMagazynLista) return;
     modalMagazynLista.innerHTML = wszystkieProdukty
         .filter(p => p.ilosc > 0)
         .map(p => `<div class="modal-stock-item" data-id="${p.id}" data-name="${p.nazwa}" data-qty="${p.ilosc}" data-is-oil="${p.jestOlejem || false}">
@@ -1407,6 +1442,7 @@ function dodajCzescDoZlecenia(event) {
 }
 
 function renderCzesciDoZlecenia() {
+    if (!partsToRemoveList) return;
     partsToRemoveList.innerHTML = czesciDoZlecenia.length > 0
         ? czesciDoZlecenia.map(c => `<li class="part-list-item" data-id="${c.id}">
             <span>${c.nazwa} - <strong>${c.ilosc} szt.</strong></span>
@@ -1438,6 +1474,7 @@ async function obslugaListyCzesci(event) {
 }
 
 async function obslugaZakonczeniaZlecenia(event) {
+    if (!completeModalForm || !completeModal) return;
     event.preventDefault();
     const docId = document.getElementById('complete-zlecenie-id').value;
     const numerWz = (document.getElementById('zakonczenie-wz')?.value || '').trim();
@@ -1466,6 +1503,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             const nowaHistoria = [...(zlecenieData.historia || []), {
                 timestamp: new Date().toISOString(),
                 akcja: wpisHistorii
+               }];
             dane.historia = nowaHistoria;
 
             const partPromises = czesciDoZlecenia.map(czesc => t.get(doc(db, "magazyn", czesc.id)));
@@ -1488,42 +1526,6 @@ async function obslugaZakonczeniaZlecenia(event) {
         alert(`Wystąpił błąd: ${error.message || error}`);
     }
 }
-
-/* ... (Część 3/3 – funkcje magazynu + eventy i inicjalizacja) ... */
-    // --- POMOCNICZE: pola dodatkowe w modalu zakończenia ---
-    function ensureZakonczenieNotatkaField() {
-        if (!completeModalForm) return;
-        let anchorRow = completeModalForm.querySelector('#typ-zlecenia')?.closest('.form-group');
-
-        const insertAfter = (element) => {
-            if (anchorRow && anchorRow.parentNode) {
-                anchorRow.parentNode.insertBefore(element, anchorRow.nextSibling);
-            } else {
-                completeModalForm.appendChild(element);
-            }
-            anchorRow = element;
-        };
-
-        if (!document.getElementById('zakonczenie-wz')) {
-            const blockWz = document.createElement('div');
-            blockWz.className = 'form-group';
-            blockWz.innerHTML = `
-                <label for="zakonczenie-wz">Numer WZ (opcjonalnie):</label>
-                <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024">
-            `;
-            insertAfter(blockWz);
-        }
-
-        if (!document.getElementById('zakonczenie-notatka')) {
-            const block = document.createElement('div');
-            block.className = 'form-group';
-            block.innerHTML = `
-                <label for="zakonczenie-notatka">Notatka (opcjonalnie):</label>
-                <textarea id="zakonczenie-notatka" rows="3" placeholder="Krótki opis wykonanych prac, czynności, uwagi..."></textarea>
-            `;
-            insertAfter(block);
-        }
-    }
 
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
     async function dodajProduktDoMagazynu(event) {
@@ -1576,6 +1578,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     async function dodajOlej() {
+        if (!oilTypeSelect || !oilContainerSizeSelect) return;
         const typ = oilTypeSelect.value;
         const pojemnosc = Number(oilContainerSizeSelect.value);
         const dane = {
@@ -1595,22 +1598,23 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     function przeliczOlej(event) {
+        if (!oilContainerSizeSelect || !resultLitry || !resultSztuki) return;
         const pojemnosc = Number(oilContainerSizeSelect.value);
         if (isNaN(pojemnosc) || pojemnosc <= 0) return;
         const source = event.target;
         if (source.id === 'converter-litry') {
-            converterSztukiInput.value = '';
+            if (converterSztukiInput) converterSztukiInput.value = '';
             const litry = Number(source.value);
             resultSztuki.textContent = litry > 0 ? `${(litry / pojemnosc).toFixed(3)} szt.` : '0.00 szt.';
             resultLitry.textContent = litry > 0 ? source.value + ' L' : '0.00 L';
         } else if (source.id === 'converter-sztuki') {
-            converterLitryInput.value = '';
+            if (converterLitryInput) converterLitryInput.value = '';
             const sztuki = Number(source.value);
             resultLitry.textContent = sztuki > 0 ? `${(sztuki * pojemnosc).toFixed(2)} L` : '0.00 L';
             resultSztuki.textContent = sztuki > 0 ? source.value + ' szt.' : '0.00 szt.';
         } else {
-            converterLitryInput.value = '';
-            converterSztukiInput.value = '';
+            if (converterLitryInput) converterLitryInput.value = '';
+            if (converterSztukiInput) converterSztukiInput.value = '';
             resultLitry.textContent = '0.00 L';
             resultSztuki.textContent = '0.00 szt.';
         }
@@ -1636,6 +1640,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     async function obslugaZmianyStanu(event) {
+        if (!stockModalForm) return;
         event.preventDefault();
         const docId = document.getElementById('stock-change-id').value;
         const changeQty = Number(document.getElementById('stock-change-qty').value);
@@ -1663,6 +1668,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     function wyswietlMagazyn() {
+        if (!magazynLista) return;
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
             let html = '';
             wszystkieProdukty = [];
@@ -1691,69 +1697,90 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
    // --- PODPIĘCIE EVENTÓW ---
-klientForm.addEventListener('submit', dodajKlienta);
-listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
+    if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
+    if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
 
-maszynaForm.addEventListener('submit', dodajMaszyne);
-listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
+    if (maszynaForm) maszynaForm.addEventListener('submit', dodajMaszyne);
+    if (listaMaszynDiv) listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
 
-// ZLECENIA
-zlecenieForm.addEventListener('submit', dodajZlecenie);
-zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
-zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
-aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
-ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
+    // ZLECENIA
+    if (zlecenieForm) zlecenieForm.addEventListener('submit', dodajZlecenie);
+    if (zlecenieKlientSelect) {
+        zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
+        zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    }
+    if (aktywneZleceniaLista) aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
+    if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
 
-zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    if (completeModalForm) completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
+    if (closeModalButton && completeModal) {
+        closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
+    }
 
-completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
-closeModalButton.onclick = () => { completeModal.style.display = "none"; };
+    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
+    const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
+    if (exportZleceniaBtn && miesiacSummaryInput) {
+        exportZleceniaBtn.addEventListener('click', () => {
+            const miesiac = miesiacSummaryInput.value;
+            const dane = _wszystkieZleceniaCache
+                .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
+                .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
+                    ...rest,
+                    uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
+                }));
+            eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
+        });
+    }
 
-miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
-document.getElementById('export-zlecenia-btn').addEventListener('click', () => {
-  const miesiac = miesiacSummaryInput.value;
-  const dane = _wszystkieZleceniaCache
-    .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
-    .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
-      ...rest,
-      uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
-    }));
-  eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
-});
+    // MAGAZYN
+    if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
+    if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
+    if (magazynLista) magazynLista.addEventListener('click', obslugaTabeliMagazynu);
 
-// MAGAZYN
-magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
-bulkAddForm.addEventListener('submit', dodajMasowo);
-magazynLista.addEventListener('click', obslugaTabeliMagazynu);
+    if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
+    if (stockModalCloseButton && stockModal) {
+        stockModalCloseButton.onclick = () => { stockModal.style.display = 'none'; };
+    }
 
-stockModalForm.addEventListener('submit', obslugaZmianyStanu);
-stockModalCloseButton.onclick = () => { stockModal.style.display = "none"; };
+    if (addOilBtn) addOilBtn.addEventListener('click', dodajOlej);
+    if (converterLitryInput) converterLitryInput.addEventListener('input', przeliczOlej);
+    if (converterSztukiInput) converterSztukiInput.addEventListener('input', przeliczOlej);
+    if (oilContainerSizeSelect) {
+        oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
+    }
 
-addOilBtn.addEventListener('click', dodajOlej);
-converterLitryInput.addEventListener('input', przeliczOlej);
-converterSztukiInput.addEventListener('input', przeliczOlej);
-oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
+    // KALENDARZ (modal + klik w kalendarzu)
+    if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+    if (kalendarzContainer) kalendarzContainer.addEventListener('click', obslugaKalendarza);
+    if (kalendarzModalCloseButton && kalendarzModal) {
+        kalendarzModalCloseButton.onclick = () => { kalendarzModal.style.display = 'none'; };
+    }
 
-// KALENDARZ (modal + klik w kalendarzu)
-kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
-kalendarzContainer.addEventListener('click', obslugaKalendarza);
-kalendarzModal.querySelector('.close-button').onclick = () => { kalendarzModal.style.display = 'none'; };
+    // WYSZUKIWANIA
+    if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientow);
+    if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
+    if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
 
-// WYSZUKIWANIA
-klientSearchInput.addEventListener('input', wyswietlKlientow);
-maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
-zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
+    // EDYCJE (modale)
+    if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
+    if (editMaszynaForm) editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
+    if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
-// EDYCJE (modale)
-editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
-editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
-editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
-
-editKlientModal.querySelector('.close-button').onclick = () => { editKlientModal.style.display = 'none'; };
-editMaszynaModal.querySelector('.close-button').onclick = () => { editMaszynaModal.style.display = 'none'; };
-detailsZlecenieModal.querySelector('.close-button').onclick = () => { detailsZlecenieModal.style.display = 'none'; };
-editZlecenieModal.querySelector('.close-button').onclick = () => { editZlecenieModal.style.display = 'none'; };
-machineHistoryModal.querySelector('.close-button').onclick = () => { machineHistoryModal.style.display = 'none'; };
+    if (editKlientCloseButton && editKlientModal) {
+        editKlientCloseButton.onclick = () => { editKlientModal.style.display = 'none'; };
+    }
+    if (editMaszynaCloseButton && editMaszynaModal) {
+        editMaszynaCloseButton.onclick = () => { editMaszynaModal.style.display = 'none'; };
+    }
+    if (detailsZlecenieCloseButton && detailsZlecenieModal) {
+        detailsZlecenieCloseButton.onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+    }
+    if (editZlecenieCloseButton && editZlecenieModal) {
+        editZlecenieCloseButton.onclick = () => { editZlecenieModal.style.display = 'none'; };
+    }
+    if (machineHistoryCloseButton && machineHistoryModal) {
+        machineHistoryCloseButton.onclick = () => { machineHistoryModal.style.display = 'none'; };
+    }
 
 // Klik poza modal zamyka go
 window.onclick = (event) => {
