@@ -1477,7 +1477,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (!completeModalForm || !completeModal) return;
     event.preventDefault();
     const docId = document.getElementById('complete-zlecenie-id').value;
-    const numerWz = (document.getElementById('zakonczenie-wz')?.value || '').trim();
+    const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
     const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
     const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
     const numerWz = zakonczenieWzInput && 'value' in zakonczenieWzInput ? zakonczenieWzInput.value.trim() : '';
@@ -1489,7 +1489,7 @@ async function obslugaZakonczeniaZlecenia(event) {
         dataUkonczenia: new Date().toISOString().split('T')[0],
         uzyteCzesci: czesciDoZlecenia,
         zakonczenieNotatka: notatka || null,
-        zakonczenieNumerWZ: numerWz || null
+        zakonczenieNumerWZ: numerWzValue || null
     };
     try {
         await runTransaction(db, async (t) => {
