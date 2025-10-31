@@ -20,6 +20,7 @@
             <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
             <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
             <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
+            <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Podsumowanie</button>
             </nav>
         <div class="theme-switcher">
             <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox">
@@ -131,6 +132,11 @@
                 <div class="form-section"><h3>Zarządzanie Olejami</h3><div class="form-group"><label for="oil-type">Typ Oleju:</label><select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select></div><div class="form-group"><label for="oil-container-size">Pojemnik (L):</label><select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select></div><button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button><hr style="margin-top:1rem; margin-bottom: 1rem;"><h4>Przelicznik</h4><div class="form-group"><label for="converter-litry">Litry:</label><input type="number" step="0.01" id="converter-litry"></div><p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p><hr style="margin-top:1rem; margin-bottom: 1rem;"><div class="form-group"><label for="converter-sztuki">Sztuki:</label><input type="number" step="0.01" id="converter-sztuki"></div><p>Wynik: <strong id="result-litry">0.00 L</strong></p></div>
             </div>
             <div class="table-section"><h3>Stan Magazynowy</h3><table id="magazyn-table"><thead><tr><th>Index</th><th>Nazwa</th><th>Ilość (szt.)</th><th>Ilość (Litry)</th><th>Klient</th><th>Akcje</th></tr></thead><tbody id="magazyn-lista"></tbody></table></div>
+        </div>
+        <div id="podsumowanie" class="tab-content">
+            <h2>Podsumowanie Roczne</h2>
+            <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
+            <div id="annual-summary"></div>
         </div>
         </main>
 

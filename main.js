@@ -17,6 +17,7 @@ function initializeApp() {
     };
     let wszystkieZlecenia = [], wszystkieProdukty = [], wszystkiePrzejazdy = [],
         czesciDoZlecenia = [], wszystkieMaszyny = [], wszystkieKlienci = [], wszystkieWpisyKalendarza = [];
+    let ostatnieZestawienieMiesieczne = { miesiace: [], sumyRoczne: { praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 } };
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
@@ -48,6 +49,7 @@ function initializeApp() {
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const summaryContainer = document.getElementById('summary-container');
+    const annualSummaryContainer = document.getElementById('annual-summary');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
@@ -255,6 +257,7 @@ function initializeApp() {
                 calendar.addEventSource(events);
                 obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
             }
+            odswiezPodsumowania();
         });
     }
 
@@ -292,19 +295,151 @@ function initializeApp() {
     }
 
     // --- FUNKCJE OGÓLNE ---
-    function obliczPodsumowanieFinansowe(wybranyMiesiac, zlecenia) {
-        let sumaGodzin = 0, sumaBrutto = 0;
-        if (!wybranyMiesiac || zlecenia.length === 0) return { sumaGodzin, sumaBrutto, sumaNetto: 0 };
-        const zleceniaZMiesiaca = zlecenia.filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(wybranyMiesiac));
-        zleceniaZMiesiaca.forEach(zlecenie => {
-            sumaGodzin += zlecenie.wyfakturowaneGodziny || 0;
-            if (STAWKI[zlecenie.typZlecenia] && zlecenie.wyfakturowaneGodziny) {
-                sumaBrutto += zlecenie.wyfakturowaneGodziny * STAWKI[zlecenie.typZlecenia].stawka;
+    function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
+        const mapa = {};
+        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 });
+        const pobierzRekord = (miesiac) => {
+            if (!mapa[miesiac]) {
+                mapa[miesiac] = pustyRekord();
             }
+            return mapa[miesiac];
+        };
+
+        wpisy.forEach(wpis => {
+            if (!wpis?.id) return;
+            const miesiac = wpis.id.slice(0, 7);
+            if (!miesiac) return;
+            const rekord = pobierzRekord(miesiac);
+            rekord.praca += Number(wpis.praca) || 0;
+            rekord.nadgodziny += Number(wpis.nadgodziny) || 0;
+            rekord.jazda += Number(wpis.jazda) || 0;            
         });
-        const sumaNetto = sumaBrutto * 0.70;
-        return { sumaGodzin, sumaBrutto, sumaNetto };
+
+
+        zlecenia.forEach(zlecenie => {
+            if (!zlecenie || zlecenie.status !== 'ukończone' || !zlecenie.dataUkonczenia) return;
+            const miesiac = zlecenie.dataUkonczenia.slice(0, 7);
+            if (!miesiac) return;
+            const rekord = pobierzRekord(miesiac);
+            const godziny = Number(zlecenie.wyfakturowaneGodziny) || 0;
+            const stawka = STAWKI[zlecenie.typZlecenia]?.stawka || 0;
+            const brutto = godziny * stawka;
+            rekord.wyfakturowaneGodziny += godziny;
+            rekord.brutto += brutto;
+            rekord.netto += brutto * 0.70;
+        });
+
+        const miesiace = Object.keys(mapa)
+            .sort()
+            .map(miesiac => ({ miesiac, ...mapa[miesiac] }));
+
+        const sumyRoczne = miesiace.reduce((acc, rekord) => {
+            acc.praca += rekord.praca;
+            acc.nadgodziny += rekord.nadgodziny;
+            acc.jazda += rekord.jazda;
+            acc.wyfakturowaneGodziny += rekord.wyfakturowaneGodziny;
+            acc.brutto += rekord.brutto;
+            acc.netto += rekord.netto;
+            return acc;
+        }, pustyRekord());
+
+        return { miesiace, sumyRoczne };
     }
+
+    function formatujMiesiac(miesiac) {
+        if (!miesiac) return '';
+        try {
+            const data = new Date(`${miesiac}-01T00:00:00`);
+            return data.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+        } catch (e) {
+            return miesiac;
+        }
+    }
+
+    function formatujLiczbe(wartosc) {
+        return (Number(wartosc) || 0).toFixed(2);
+    }
+
+    function renderMiesiecznePodsumowanie() {
+        if (!summaryContainer) return;
+        const wybranyMiesiac = miesiacSummaryInput ? miesiacSummaryInput.value : '';
+        if (!wybranyMiesiac) {
+            summaryContainer.innerHTML = '<p>Wybierz miesiąc, aby zobaczyć szczegóły podsumowania.</p>';
+            return;
+        }
+
+        const rekord = ostatnieZestawienieMiesieczne.miesiace.find(m => m.miesiac === wybranyMiesiac);
+        if (!rekord) {
+            summaryContainer.innerHTML = '<p>Brak danych dla wybranego miesiąca.</p>';
+            return;
+        }
+
+        summaryContainer.innerHTML = `
+            <p><strong>${formatujMiesiac(wybranyMiesiac)}</strong></p>
+            <p>Godziny pracy: <strong>${formatujLiczbe(rekord.praca)} h</strong></p>
+            <p>Nadgodziny: <strong>${formatujLiczbe(rekord.nadgodziny)} h</strong></p>
+            <p>Czas jazdy: <strong>${formatujLiczbe(rekord.jazda)} h</strong></p>
+            <p>Godziny wyfakturowane: <strong>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</strong></p>
+            <p>Wartość brutto: <strong>${formatujLiczbe(rekord.brutto)} zł</strong></p>
+            <p>Wartość netto: <strong>${formatujLiczbe(rekord.netto)} zł</strong></p>
+        `;
+    }
+
+    function renderRocznePodsumowanie() {
+        if (!annualSummaryContainer) return;
+        const { miesiace, sumyRoczne } = ostatnieZestawienieMiesieczne;
+        if (!miesiace.length) {
+            annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
+            return;
+        }
+
+        const wiersze = miesiace.map(rekord => `
+            <tr>
+                <td>${formatujMiesiac(rekord.miesiac)}</td>
+                <td>${formatujLiczbe(rekord.praca)} h</td>
+                <td>${formatujLiczbe(rekord.nadgodziny)} h</td>
+                <td>${formatujLiczbe(rekord.jazda)} h</td>
+                <td>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
+                <td>${formatujLiczbe(rekord.brutto)} zł</td>
+                <td>${formatujLiczbe(rekord.netto)} zł</td>
+            </tr>
+        `).join('');
+
+        const suma = `
+            <tr>
+                <td>Razem</td>
+                <td>${formatujLiczbe(sumyRoczne.praca)} h</td>
+                <td>${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
+                <td>${formatujLiczbe(sumyRoczne.jazda)} h</td>
+                <td>${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
+                <td>${formatujLiczbe(sumyRoczne.brutto)} zł</td>
+                <td>${formatujLiczbe(sumyRoczne.netto)} zł</td>
+            </tr>`;
+
+        annualSummaryContainer.innerHTML = `
+            <div class="table-responsive">
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Miesiąc</th>
+                            <th>Godziny pracy</th>
+                            <th>Nadgodziny</th>
+                            <th>Czas jazdy</th>
+                            <th>Godziny wyfakturowane</th>
+                            <th>Brutto</th>
+                            <th>Netto</th>
+                        </tr>
+                    </thead>
+                    <tbody>${wiersze}</tbody>
+                    <tfoot>${suma}</tfoot>
+                </table>
+            </div>`;
+    }
+
+    function odswiezPodsumowania() {
+        ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
+        renderRocznePodsumowanie();
+        renderMiesiecznePodsumowanie();
 
     function eksportujDoCSV(dane, nazwaPliku) {
         if (dane.length === 0) { alert("Brak danych do wyeksportowania."); return; }
@@ -1058,7 +1193,7 @@ function wyswietlZlecenia() {
     if (ukonczoneZleceniaLista) {
         ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
     }
-    obliczIPokazPodsumowanieFinansowe();
+    renderMiesiecznePodsumowanie();
 }
 
 function nasluchujNaZlecenia() {
@@ -1071,7 +1206,7 @@ function nasluchujNaZlecenia() {
             wszystkieZlecenia.push(zlecenie);
         });
         wyswietlZlecenia();
-        wyswietlWpisyKalendarza();
+        odswiezPodsumowania();
     });
 }
 
@@ -1125,16 +1260,6 @@ async function dodajZlecenie(event) {
         zlecenieMaszynaSelect.disabled = true;
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
     } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
-}
-
-function obliczIPokazPodsumowanieFinansowe() {
-    if (!summaryContainer) return;
-    const wybranyMiesiac = miesiacSummaryInput ? miesiacSummaryInput.value : '';
-    const podsumowanie = obliczPodsumowanieFinansowe(wybranyMiesiac, wszystkieZlecenia);
-    summaryContainer.innerHTML = `
-        <p>Suma godzin: <strong>${podsumowanie.sumaGodzin.toFixed(2)} h</strong></p>
-        <p>Wartość Brutto: <strong>${podsumowanie.sumaBrutto.toFixed(2)} zł</strong></p>
-        <p>Wartość Netto (po 30%): <strong>${podsumowanie.sumaNetto.toFixed(2)} zł</strong></p>`;
 }
 
 async function obslugaListyZlecen(event) {
@@ -1717,7 +1842,7 @@ async function obslugaZakonczeniaZlecenia(event) {
         closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
     }
 
-    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
+    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', renderMiesiecznePodsumowanie);
     const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
     if (exportZleceniaBtn && miesiacSummaryInput) {
         exportZleceniaBtn.addEventListener('click', () => {
