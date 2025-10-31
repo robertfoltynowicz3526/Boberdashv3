@@ -649,6 +649,7 @@ async function obslugaListyKlientow(event) {
                     const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0
                         ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
                         : '';
+                    const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';                        
                     const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
                     historiaHtml += `
                         <li data-id="${d.id}">
@@ -656,7 +657,7 @@ async function obslugaListyKlientow(event) {
                                 <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
                                 <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
                                 Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
-                                ${uzyteCzesciHtml}${notatkaHtml}
+                                ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
                             </span>
                             <div>
                                 <button class="btn-details details-zlecenie-btn">Szczegóły</button>
@@ -1019,13 +1020,14 @@ function wyswietlZlecenia() {
         } else {
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
             const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
+                        const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
             ukonczoneHtml += `<li data-id="${zlecenie.id}">
                 <span>
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
                     <em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>
-                    ${uzyteCzesciHtml}${notatkaHtml}
+                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
                 </span>
                 <div>
                     <button class="btn-details details-zlecenie-btn">Szczegóły</button>
@@ -1073,7 +1075,9 @@ async function dodajZlecenie(event) {
             opis: zlecenieForm['opis-usterki'].value,
             dataRozpoczecia, dataZakonczenia,
             historia,
-            createdAt: new Date()
+            createdAt: new Date(),
+            zakonczenieNotatka: null,
+            zakonczenieNumerWZ: null
         };
     } else if (wybranyKlientId && wybranaMaszynaId) {
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === wybranaMaszynaId);
@@ -1087,7 +1091,9 @@ async function dodajZlecenie(event) {
             motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
             dataRozpoczecia, dataZakonczenia,
             historia,
-            createdAt: new Date()
+            createdAt: new Date(),
+            zakonczenieNotatka: null,
+            zakonczenieNumerWZ: null
         };
     } else { alert("Wybierz klienta i maszynę LUB opcję 'Szybkie Zlecenie'."); return; }
 
@@ -1144,6 +1150,7 @@ async function obslugaListyZlecen(event) {
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Nieprzypisane');
             document.getElementById('modal-klient').textContent = nazwaMaszyny;
             document.getElementById('modal-nr-zlecenia').textContent = zlecenie.nrZlecenia;
+            completeModalForm.reset();         
             document.getElementById('complete-zlecenie-id').value = docId;
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
@@ -1179,6 +1186,7 @@ async function obslugaListyZlecen(event) {
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
+                zakonczenieNumerWZ: null,               
                 historia: nowaHistoria
             });
         } catch (e) {
@@ -1201,7 +1209,7 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     document.getElementById('edit-zlecenie-nr').textContent = zlecenie.nrZlecenia;
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
-
+    editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
     editZlecenieModal.style.display = 'block';
 }
 
@@ -1210,6 +1218,7 @@ async function zapiszEdycjeZlecenia(event) {
     const zlecenieId = editZlecenieForm['edit-zlecenie-id'].value;
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
+    const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
@@ -1223,16 +1232,21 @@ async function zapiszEdycjeZlecenia(event) {
         const staraHistoria = zlecenieData.historia || [];
         const staryTyp = zlecenieData.typZlecenia;
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
+        const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
 
         let wpisHistorii = `Edytowano zakończone zlecenie: `;
         const zmiany = [];
         if (stareGodziny !== noweGodziny) zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
         if (staryTyp !== nowyTyp) zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
+                const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
+            const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
+            zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
+        }
         if (zmiany.length === 0) { editZlecenieModal.style.display = 'none'; return; }
         wpisHistorii += zmiany.join('; ');
         const nowaHistoria = [...staraHistoria, { timestamp: new Date().toISOString(), akcja: wpisHistorii }];
 
-        await updateDoc(zlecenieRef, { wyfakturowaneGodziny: noweGodziny, typZlecenia: nowyTyp, historia: nowaHistoria });
+        await updateDoc(zlecenieRef, { wyfakturowaneGodziny: noweGodziny, typZlecenia: nowyTyp, zakonczenieNumerWZ: nowyNumerWz || null, historia: nowaHistoria });
         editZlecenieModal.style.display = 'none';
         alert("Zlecenie zaktualizowane.");
     } catch (e) {
@@ -1260,13 +1274,14 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     `;
 
     if (zlecenie.status === 'ukończone') {
+         const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         const notatkaHtml = zlecenie.zakonczenieNotatka ? `<div class="details-group"><strong>Notatka przy zakończeniu:</strong> <p>${zlecenie.zakonczenieNotatka}</p></div>` : '';
         infoDiv.innerHTML += `
             <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${STAWKI[zlecenie.typZlecenia]?.nazwa || 'Nieznany'})</p></div>
             <div class="details-group"><strong>Użyte Części:</strong> <p>${zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : 'Brak'}</p></div>
-            ${notatkaHtml}
+            ${wzHtml}${notatkaHtml}
         `;
     }
 
@@ -1411,6 +1426,7 @@ async function obslugaListyCzesci(event) {
 async function obslugaZakonczeniaZlecenia(event) {
     event.preventDefault();
     const docId = document.getElementById('complete-zlecenie-id').value;
+    const numerWz = (document.getElementById('zakonczenie-wz')?.value || '').trim();
     const notatka = (document.getElementById('zakonczenie-notatka')?.value || '').trim();
     const dane = {
         status: 'ukończone',
@@ -1418,7 +1434,8 @@ async function obslugaZakonczeniaZlecenia(event) {
         typZlecenia: document.getElementById('typ-zlecenia').value,
         dataUkonczenia: new Date().toISOString().split('T')[0],
         uzyteCzesci: czesciDoZlecenia,
-        zakonczenieNotatka: notatka || null
+        zakonczenieNotatka: notatka || null,
+        zakonczenieNumerWZ: numerWz || null
     };
     try {
         await runTransaction(db, async (t) => {
@@ -1426,10 +1443,12 @@ async function obslugaZakonczeniaZlecenia(event) {
             const zlecenieSnap = await t.get(zlecenieRef);
             if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
             const zlecenieData = zlecenieSnap.data();
+            let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}.`;
+            if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
+            if (notatka) wpisHistorii += ` Notatka: ${notatka}`;            
             const nowaHistoria = [...(zlecenieData.historia || []), {
                 timestamp: new Date().toISOString(),
-                akcja: `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}.${notatka ? ` Notatka: ${notatka}` : ''}`
-            }];
+                akcja: wpisHistorii
             dane.historia = nowaHistoria;
 
             const partPromises = czesciDoZlecenia.map(czesc => t.get(doc(db, "magazyn", czesc.id)));
@@ -1454,24 +1473,38 @@ async function obslugaZakonczeniaZlecenia(event) {
 }
 
 /* ... (Część 3/3 – funkcje magazynu + eventy i inicjalizacja) ... */
-    // --- POMOCNICZE: pole notatki w modalu zakończenia ---
+    // --- POMOCNICZE: pola dodatkowe w modalu zakończenia ---
     function ensureZakonczenieNotatkaField() {
-        // Jeżeli textarea już istnieje – nic nie rób
-        if (document.getElementById('zakonczenie-notatka')) return;
+        if (!completeModalForm) return;
+        let anchorRow = completeModalForm.querySelector('#typ-zlecenia')?.closest('.form-group');
 
-        // Wstaw textarea z notatką tuż pod selektem typu zlecenia
-        const typRow = completeModalForm.querySelector('#typ-zlecenia')?.closest('.form-group');
-        const block = document.createElement('div');
-        block.className = 'form-group';
-        block.innerHTML = `
-            <label for="zakonczenie-notatka">Notatka (opcjonalnie):</label>
-            <textarea id="zakonczenie-notatka" rows="3" placeholder="Krótki opis wykonanych prac, czynności, uwagi..."></textarea>
-        `;
-        if (typRow && typRow.parentNode) {
-            typRow.parentNode.insertBefore(block, typRow.nextSibling);
-        } else {
-            // awaryjnie dodaj na koniec formularza
-            completeModalForm.appendChild(block);
+        const insertAfter = (element) => {
+            if (anchorRow && anchorRow.parentNode) {
+                anchorRow.parentNode.insertBefore(element, anchorRow.nextSibling);
+            } else {
+                completeModalForm.appendChild(element);
+            }
+            anchorRow = element;
+        };
+
+        if (!document.getElementById('zakonczenie-wz')) {
+            const blockWz = document.createElement('div');
+            blockWz.className = 'form-group';
+            blockWz.innerHTML = `
+                <label for="zakonczenie-wz">Numer WZ (opcjonalnie):</label>
+                <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024">
+            `;
+            insertAfter(blockWz);
+        }
+
+        if (!document.getElementById('zakonczenie-notatka')) {
+            const block = document.createElement('div');
+            block.className = 'form-group';
+            block.innerHTML = `
+                <label for="zakonczenie-notatka">Notatka (opcjonalnie):</label>
+                <textarea id="zakonczenie-notatka" rows="3" placeholder="Krótki opis wykonanych prac, czynności, uwagi..."></textarea>
+            `;
+            insertAfter(block);
         }
     }
 
@@ -1649,6 +1682,7 @@ listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
 
 // ZLECENIA
 zlecenieForm.addEventListener('submit', dodajZlecenie);
+zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
 zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
 aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
 ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
