@@ -111,9 +111,15 @@
                 <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
                     Zakończone zlecenia <span class="arrow">▼</span>
                 </h3>
+                <div class="summary-controls">
+                    <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
+                    <input type="month" id="miesiac-summary">
+                    <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
+                </div>
+                <div id="summary-container"></div>
                 <div id="zakonczone-zlecenia-content" class="collapsible-content">
-                    <div class="summary-controls"><label for="miesiac-summary">Podsumowanie dla miesiąca:</label><input type="month" id="miesiac-summary"><button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button></div>
-                    <div id="summary-container"></div><div id="ukonczone-zlecenia-lista"></div>
+                <div id="zakonczone-zlecenia-content" class="collapsible-content">
+                <div id="ukonczone-zlecenia-lista"></div>
                 </div>
             </div>
         </div>

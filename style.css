@@ -214,6 +214,7 @@ main {
   transition: background 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;
 }
 
+
 .summary-container-subtle:hover,
 .form-section:hover,
 .search-section:hover,
