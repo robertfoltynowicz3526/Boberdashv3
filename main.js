@@ -15,7 +15,7 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
-       const utworzPustyRekordMiesieczny = () => ({
+    const utworzPustyRekordMiesieczny = () => ({
         praca: 0,
         nadgodziny: 0,
         jazda: 0,
@@ -70,7 +70,7 @@ function initializeApp() {
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const stockModalForm = document.getElementById('stock-change-form');
-    const stockModalCloseButton = stockModal ? stockModal.querySelector('.close-button') : null
+    const stockModalCloseButton = stockModal ? stockModal.querySelector('.close-button') : null;
     const addOilBtn = document.getElementById('add-oil-btn');
     const oilTypeSelect = document.getElementById('oil-type');
     const oilContainerSizeSelect = document.getElementById('oil-container-size');
@@ -349,30 +349,9 @@ function initializeApp() {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
-    function formatujIloscMagazynu(ilosc, jestOlejem) {
+    function formatujIloscMagazynu(ilosc) {
         const wartosc = wartoscLiczbowa(ilosc);
-        if (jestOlejem) {
-            return wartosc.toFixed(2);
-        }
-        return Number.isInteger(wartosc) ? wartosc.toString() : wartosc.toFixed(2);
-    }
-
-    function normalizujMiesiac(wartosc) {
-        if (!wartosc) return '';
-        const data = new Date(wartosc);
-        if (!Number.isNaN(data.getTime())) {
-            const miesiac = String(data.getMonth() + 1).padStart(2, '0');
-            return `${data.getFullYear()}-${miesiac}`;
-        }
-        if (typeof wartosc === 'string' && wartosc.length >= 7) {
-            const surowy = wartosc.slice(0, 7);
-            const [rok, miesiac] = surowy.split('-');
-            if (rok && miesiac) {
-                return `${rok}-${miesiac.padStart(2, '0')}`;
-            }
-            return surowy;
-        }
-        return '';
+       return wartosc.toFixed(2);
     }
 
     function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
@@ -440,7 +419,36 @@ function initializeApp() {
         return (Number(wartosc) || 0).toFixed(2);
     }
 
-    function renderMiesiecznePodsumowanie() {
+    function obliczPodsumowanieFinansowe(miesiac, wszystkieZlecenia) {
+        if (!miesiac) return null;
+        const wynik = {
+            miesiac,
+            liczbaZlecen: 0,
+            wyfakturowaneGodziny: 0,
+            brutto: 0,
+            netto: 0,
+            podzialTypow: {}
+        };
+
+        wszystkieZlecenia
+            .filter(z => z && z.status === 'ukończone' && z.dataUkonczenia)
+            .forEach(z => {
+                if (normalizujMiesiac(z.dataUkonczenia) !== miesiac) return;
+                wynik.liczbaZlecen += 1;
+                const godziny = Number(z.wyfakturowaneGodziny) || 0;
+                wynik.wyfakturowaneGodziny += godziny;
+                const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
+                const kwotaBrutto = godziny * stawka;
+                wynik.brutto += kwotaBrutto;
+                wynik.netto += kwotaBrutto * 0.7;
+                const typ = z.typZlecenia || 'Inne';
+                wynik.podzialTypow[typ] = (wynik.podzialTypow[typ] || 0) + 1;
+            });
+
+        return wynik;
+    }
+
+    function obliczIPokazPodsumowanieFinansowe() {
         if (!summaryContainer) return;
         const wybranyMiesiac = miesiacSummaryInput ? miesiacSummaryInput.value : '';
         if (!wybranyMiesiac) {
@@ -448,20 +456,34 @@ function initializeApp() {
             return;
         }
 
-        const rekord = ostatnieZestawienieMiesieczne.miesiace.find(m => m.miesiac === wybranyMiesiac);
-        if (!rekord) {
+        const rekordCzasowy =
+            ostatnieZestawienieMiesieczne.miesiace.find(m => m.miesiac === wybranyMiesiac) ||
+            utworzPustyRekordMiesieczny();
+        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
+        const maDaneZlecen = finansowe && finansowe.liczbaZlecen > 0;
+        const maDaneGodzin = Object.values(rekordCzasowy).some(wartosc => Number(wartosc) > 0);
+
+        if (!maDaneZlecen && !maDaneGodzin) {
             summaryContainer.innerHTML = '<p>Brak danych dla wybranego miesiąca.</p>';
             return;
         }
 
+        const podzialTypowText = finansowe
+            ? Object.entries(finansowe.podzialTypow)
+                .map(([typ, liczba]) => `${typ}: ${liczba}`)
+                .join(', ')
+            : '';
+
         summaryContainer.innerHTML = `
             <p><strong>${formatujMiesiac(wybranyMiesiac)}</strong></p>
-            <p>Godziny pracy: <strong>${formatujLiczbe(rekord.praca)} h</strong></p>
-            <p>Nadgodziny: <strong>${formatujLiczbe(rekord.nadgodziny)} h</strong></p>
-            <p>Czas jazdy: <strong>${formatujLiczbe(rekord.jazda)} h</strong></p>
-            <p>Godziny wyfakturowane: <strong>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</strong></p>
-            <p>Wartość brutto: <strong>${formatujLiczbe(rekord.brutto)} zł</strong></p>
-            <p>Wartość netto: <strong>${formatujLiczbe(rekord.netto)} zł</strong></p>
+            <p>Ukończone zlecenia: <strong>${finansowe?.liczbaZlecen || 0}</strong></p>
+            <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe?.wyfakturowaneGodziny || rekordCzasowy.wyfakturowaneGodziny)} h</strong></p>
+            <p>Wartość brutto: <strong>${formatujLiczbe(finansowe?.brutto || rekordCzasowy.brutto)} zł</strong></p>
+            <p>Wartość netto: <strong>${formatujLiczbe(finansowe?.netto || rekordCzasowy.netto)} zł</strong></p>
+            <p>Godziny pracy: <strong>${formatujLiczbe(rekordCzasowy.praca)} h</strong></p>
+            <p>Nadgodziny: <strong>${formatujLiczbe(rekordCzasowy.nadgodziny)} h</strong></p>
+            <p>Czas jazdy: <strong>${formatujLiczbe(rekordCzasowy.jazda)} h</strong></p>
+            ${podzialTypowText ? `<p>Struktura typów zleceń: <strong>${podzialTypowText}</strong></p>` : ''}
         `;
     }
 
@@ -526,7 +548,7 @@ function initializeApp() {
             }
         }
         renderRocznePodsumowanie();
-        renderMiesiecznePodsumowanie();
+        obliczIPokazPodsumowanieFinansowe();
     }   
 
     function eksportujDoCSV(dane, nazwaPliku) {
@@ -1281,7 +1303,7 @@ function wyswietlZlecenia() {
     if (ukonczoneZleceniaLista) {
         ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
     }
-    renderMiesiecznePodsumowanie();
+    obliczIPokazPodsumowanieFinansowe();
 }
 
 function nasluchujNaZlecenia() {
@@ -1657,7 +1679,7 @@ async function zapiszPrzypisanie(event) {
             .filter(p => p.ilosc > 0)
             .map(p => `<div class="modal-stock-item" data-id="${p.id}" data-name="${p.nazwa}" data-qty="${p.ilosc}" data-is-oil="${p.jestOlejem}">
                 <span>${p.nazwa}</span>
-                <span class="item-qty">Na stanie: ${formatujIloscMagazynu(p.ilosc, p.jestOlejem)} szt.</span>
+                <span class="item-qty">Na stanie: ${formatujIloscMagazynu(p.ilosc)} szt.</span>
             </div>`)
             .join('');
         modalMagazynLista.innerHTML = itemsHtml || '<p style="color:#94a3b8;">Brak części dostępnych na stanie.</p>';
@@ -1681,7 +1703,7 @@ function renderCzesciDoZlecenia() {
     if (!partsToRemoveList) return;
     partsToRemoveList.innerHTML = czesciDoZlecenia.length > 0
         ? czesciDoZlecenia.map(c => `<li class="part-list-item" data-id="${c.id}">
-            <span>${c.nazwa} - <strong>${formatujIloscMagazynu(c.ilosc, c.isOil)} szt.</strong></span>
+            <span>${c.nazwa} - <strong>${formatujIloscMagazynu(c.ilosc)} szt.</strong></span>
             <div class="actions"><button type="button" class="btn-edit edit-part-btn">Edytuj</button>
             <button type="button" class="btn-remove remove-part-btn">Usuń</button></div></li>`).join('')
         : '<li style="color: #888; border: none; justify-content: center;">Brak części do zdjęcia.</li>';
@@ -1749,7 +1771,13 @@ async function obslugaZakonczeniaZlecenia(event) {
                 const czesc = czesciDoZlecenia[i];
                 const produktDoc = partDocs[i];
                 if (!produktDoc.exists()) throw `Produkt ${czesc.nazwa} nie istnieje!`;
-                const nowaIlosc = produktDoc.data().ilosc - czesc.ilosc;
+                const produktMagazynData = produktDoc.data();
+                const aktualnaIlosc = Number(produktMagazynData.ilosc) || 0;
+                const isOilProdukt = Boolean(produktMagazynData.jestOlejem);
+                let nowaIlosc = aktualnaIlosc - czesc.ilosc;
+                if (isOilProdukt) {
+                    nowaIlosc = Number(nowaIlosc.toFixed(2));
+                }
                 if (nowaIlosc < 0) throw `Za mało produktu ${czesc.nazwa} na stanie!`;
                 t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
             }
@@ -1766,10 +1794,13 @@ async function obslugaZakonczeniaZlecenia(event) {
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
+        const ilosc = Number(magazynForm['item-ilosc'].value);
+        if (!Number.isFinite(ilosc) || ilosc <= 0) { alert("Podaj dodatnią ilość."); return; }
+        if (!Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
         const dane = {
             index: magazynForm['item-index'].value,
             nazwa: magazynForm['item-name'].value,
-            ilosc: Number(magazynForm['item-ilosc'].value),
+            ilosc,
             klient: magazynForm['item-klient'].value || '---',
             createdAt: new Date()
         };
@@ -1793,10 +1824,15 @@ async function obslugaZakonczeniaZlecenia(event) {
                 const parts = line.split(';');
                 if (parts.length === 3) {
                     const [index, nazwa, ilosc] = parts;
+                    const parsedIlosc = Number(ilosc.trim());
+                    if (!Number.isFinite(parsedIlosc) || parsedIlosc <= 0) {
+                        console.warn("Pominięto linię (nieprawidłowa ilość):", line);
+                        continue;
+                    }
                     await addDoc(collection(db, "magazyn"), {
                         index: index.trim(),
                         nazwa: nazwa.trim(),
-                        ilosc: Number(ilosc.trim()),
+                        ilosc: parsedIlosc,
                         klient,
                         createdAt: new Date()
                     });
@@ -1817,6 +1853,7 @@ async function obslugaZakonczeniaZlecenia(event) {
         if (!oilTypeSelect || !oilContainerSizeSelect) return;
         const typ = oilTypeSelect.value;
         const pojemnosc = Number(oilContainerSizeSelect.value);
+        if (!Number.isFinite(pojemnosc) || pojemnosc <= 0) { alert("Wybierz poprawną pojemność."); return; }
         const dane = {
             index: `OLEJ-${typ}-${pojemnosc}L`,
             nazwa: `Olej ${typ} ${pojemnosc}L`,
@@ -1862,12 +1899,19 @@ async function obslugaZakonczeniaZlecenia(event) {
         if (event.target.classList.contains('delete-btn')) {
             if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "magazyn", docId)); }
         } else if (event.target.classList.contains('add-stock-btn') || event.target.classList.contains('remove-stock-btn')) {
-            stockChangeOperation = event.target.classList.contains('add-stock-btn') ? 'add' : 'remove';
-            document.getElementById('stock-modal-title').textContent = stockChangeOperation === 'add' ? 'Dodaj do stanu' : 'Zdejmij ze stanu';
-            document.getElementById('stock-modal-name').textContent = tr.dataset.name;
-            document.getElementById('stock-modal-current-qty').textContent = Number(tr.dataset.qty).toFixed(2) + ' szt.';
-            document.getElementById('stock-change-id').value = docId;
+            if (!stockModal) return;
+            const titleEl = document.getElementById('stock-modal-title');
+            const nameEl = document.getElementById('stock-modal-name');
+            const currentQtyEl = document.getElementById('stock-modal-current-qty');
+            const idInput = document.getElementById('stock-change-id');
             const qtyInput = document.getElementById('stock-change-qty');
+            if (!titleEl || !nameEl || !currentQtyEl || !idInput || !qtyInput) return;
+
+            stockChangeOperation = event.target.classList.contains('add-stock-btn') ? 'add' : 'remove';
+            titleEl.textContent = stockChangeOperation === 'add' ? 'Dodaj do stanu' : 'Zdejmij ze stanu';
+            nameEl.textContent = tr.dataset.name;
+            currentQtyEl.textContent = Number(tr.dataset.qty).toFixed(2) + ' szt.';
+            idInput.value = docId;
             qtyInput.step = tr.dataset.isOil === 'true' ? "0.01" : "1";
             qtyInput.placeholder = tr.dataset.isOil === 'true' ? "np. 0.5" : "Tylko liczby całkowite";
             qtyInput.value = '';
@@ -1879,23 +1923,29 @@ async function obslugaZakonczeniaZlecenia(event) {
         if (!stockModalForm) return;
         event.preventDefault();
         const docId = document.getElementById('stock-change-id').value;
-        const changeQty = Number(document.getElementById('stock-change-qty').value);
-        if (changeQty <= 0) { alert("Ilość musi być dodatnia."); return; }
+        const changeInput = document.getElementById('stock-change-qty');
+        if (!changeInput) return;
+        const changeQty = Number(changeInput.value);
+        if (!Number.isFinite(changeQty) || changeQty <= 0) { alert("Ilość musi być dodatnia liczbą."); return; }
         const docRef = doc(db, "magazyn", docId);
         try {
             await runTransaction(db, async (t) => {
                 const sfDoc = await t.get(docRef);
                 if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
                 const produktData = sfDoc.data();
-                const currentQty = produktData.ilosc;
-                if (!produktData.jestOlejem && changeQty % 1 !== 0) {
+                const currentQty = Number(produktData.ilosc) || 0;
+                const isOil = Boolean(produktData.jestOlejem);
+                if (!isOil && !Number.isInteger(changeQty)) {
                     throw "Dla tego produktu można podawać tylko liczby całkowite.";
                 }
                 let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQty - changeQty;
+                if (isOil) {
+                    newQty = Number(newQty.toFixed(2));
+                }
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
                 t.update(docRef, { ilosc: newQty });
             });
-            stockModal.style.display = 'none';
+            if (stockModal) stockModal.style.display = 'none';
             stockModalForm.reset();
         } catch (e) {
             console.error("Błąd transakcji: ", e);
@@ -1915,7 +1965,8 @@ async function obslugaZakonczeniaZlecenia(event) {
                  produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
                 produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
                 const jestOlejem = Boolean(produkt.jestOlejem);
-                const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc, jestOlejem);
+                produkt.jestOlejem = jestOlejem;
+                const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
                 const iloscWLitrach = jestOlejem && produkt.pojemnosc
                     ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
                     : '---';
@@ -1960,7 +2011,7 @@ async function obslugaZakonczeniaZlecenia(event) {
         closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
     }
 
-    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', renderMiesiecznePodsumowanie);
+    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
     const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
     if (exportZleceniaBtn && miesiacSummaryInput) {
         exportZleceniaBtn.addEventListener('click', () => {
