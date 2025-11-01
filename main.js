@@ -310,6 +310,55 @@ function initializeApp() {
     // --- FUNKCJE OGÓLNE ---
     function normalizujMiesiac(wartosc) {
         if (!wartosc) return '';
+
+        let data = null;
+        if (typeof wartosc?.toDate === 'function') {
+            data = wartosc.toDate();
+        } else if (wartosc instanceof Date) {
+            data = wartosc;
+        } else if (typeof wartosc === 'number') {
+            data = new Date(wartosc);
+        } else if (typeof wartosc === 'string') {
+            const trimmed = wartosc.trim();
+            const normalized = trimmed.replace(/[./]/g, '-');
+            const candidate = normalized.length >= 10 ? normalized.slice(0, 10) : normalized;
+            data = new Date(candidate);
+            if (!Number.isNaN(data.getTime())) {
+                const miesiac = String(data.getMonth() + 1).padStart(2, '0');
+                return `${data.getFullYear()}-${miesiac}`;
+            }
+            const [rok, miesiac] = candidate.split('-');
+            if (rok && miesiac) {
+                return `${rok}-${miesiac.padStart(2, '0')}`;
+            }
+            return '';
+        } else {
+            data = new Date(wartosc);
+        }
+
+        if (data && !Number.isNaN(data.getTime())) {
+            const miesiac = String(data.getMonth() + 1).padStart(2, '0');
+            return `${data.getFullYear()}-${miesiac}`;
+        }
+        return '';
+    }
+
+    function wartoscLiczbowa(wartosc) {
+        if (typeof wartosc === 'number' && Number.isFinite(wartosc)) return wartosc;
+        const parsed = Number(wartosc);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function formatujIloscMagazynu(ilosc, jestOlejem) {
+        const wartosc = wartoscLiczbowa(ilosc);
+        if (jestOlejem) {
+            return wartosc.toFixed(2);
+        }
+        return Number.isInteger(wartosc) ? wartosc.toString() : wartosc.toFixed(2);
+    }
+
+    function normalizujMiesiac(wartosc) {
+        if (!wartosc) return '';
         const data = new Date(wartosc);
         if (!Number.isNaN(data.getTime())) {
             const miesiac = String(data.getMonth() + 1).padStart(2, '0');
@@ -469,6 +518,13 @@ function initializeApp() {
 
     function odswiezPodsumowania() {
         ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
+        if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
+            const miesiace = ostatnieZestawienieMiesieczne.miesiace;
+            const aktualny = miesiacSummaryInput.value;
+            if (!aktualny || !miesiace.some(m => m.miesiac === aktualny)) {
+                miesiacSummaryInput.value = miesiace[miesiace.length - 1].miesiac;
+            }
+        }
         renderRocznePodsumowanie();
         renderMiesiecznePodsumowanie();
     }   
@@ -1590,13 +1646,22 @@ async function zapiszPrzypisanie(event) {
     }
 }
 
-function renderMagazynWModalu() {
-    if (!modalMagazynLista) return;
-    modalMagazynLista.innerHTML = wszystkieProdukty
-        .filter(p => p.ilosc > 0)
-        .map(p => `<div class="modal-stock-item" data-id="${p.id}" data-name="${p.nazwa}" data-qty="${p.ilosc}" data-is-oil="${p.jestOlejem || false}">
-            <span>${p.nazwa}</span><span class="item-qty">Na stanie: ${p.ilosc}</span></div>`).join('');
-}
+    function renderMagazynWModalu() {
+        if (!modalMagazynLista) return;
+        const itemsHtml = wszystkieProdukty
+            .map(produkt => ({
+                ...produkt,
+                ilosc: wartoscLiczbowa(produkt.ilosc),
+                jestOlejem: Boolean(produkt.jestOlejem)
+            }))
+            .filter(p => p.ilosc > 0)
+            .map(p => `<div class="modal-stock-item" data-id="${p.id}" data-name="${p.nazwa}" data-qty="${p.ilosc}" data-is-oil="${p.jestOlejem}">
+                <span>${p.nazwa}</span>
+                <span class="item-qty">Na stanie: ${formatujIloscMagazynu(p.ilosc, p.jestOlejem)} szt.</span>
+            </div>`)
+            .join('');
+        modalMagazynLista.innerHTML = itemsHtml || '<p style="color:#94a3b8;">Brak części dostępnych na stanie.</p>';
+    }
 
 function dodajCzescDoZlecenia(event) {
     const itemDiv = event.target.closest('.modal-stock-item'); if (!itemDiv) return;
@@ -1616,7 +1681,7 @@ function renderCzesciDoZlecenia() {
     if (!partsToRemoveList) return;
     partsToRemoveList.innerHTML = czesciDoZlecenia.length > 0
         ? czesciDoZlecenia.map(c => `<li class="part-list-item" data-id="${c.id}">
-            <span>${c.nazwa} - <strong>${c.ilosc} szt.</strong></span>
+            <span>${c.nazwa} - <strong>${formatujIloscMagazynu(c.ilosc, c.isOil)} szt.</strong></span>
             <div class="actions"><button type="button" class="btn-edit edit-part-btn">Edytuj</button>
             <button type="button" class="btn-remove remove-part-btn">Usuń</button></div></li>`).join('')
         : '<li style="color: #888; border: none; justify-content: center;">Brak części do zdjęcia.</li>';
@@ -1847,10 +1912,16 @@ async function obslugaZakonczeniaZlecenia(event) {
             snapshot.forEach((docSnap) => {
                 const produkt = docSnap.data();
                 produkt.id = docSnap.id;
+                 produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
+                produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
+                const jestOlejem = Boolean(produkt.jestOlejem);
+                const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc, jestOlejem);
+                const iloscWLitrach = jestOlejem && produkt.pojemnosc
+                    ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
+                    : '---';
+                const datasetQty = produkt.ilosc;               
                 wszystkieProdukty.push(produkt);
-                const iloscWLitrach = produkt.jestOlejem ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L' : '---';
-                const iloscFormatowana = produkt.ilosc.toFixed(2);
-                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${produkt.jestOlejem || false}">
+                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
                     <td>${produkt.index}</td>
                     <td>${produkt.nazwa}</td>
                     <td>${iloscFormatowana} szt.</td>
@@ -1863,7 +1934,7 @@ async function obslugaZakonczeniaZlecenia(event) {
                     </td>
                 </tr>`;
             });
-            magazynLista.innerHTML = html;
+            magazynLista.innerHTML = html || '<tr><td colspan="6">Magazyn pusty.</td></tr>';
             renderMagazynWModalu();
         });
     }
