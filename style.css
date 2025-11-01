@@ -221,6 +221,7 @@ main {
 .table-section,
 .card,
 #summary-container,
+#completed-summary,
 #annual-summary {
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -939,15 +940,18 @@ body[data-theme="dark"] .client-group strong {
   color: var(--text-muted);
 }
 
-#summary-container > p {
+#summary-container > p,
+#completed-summary > p {
   margin: 0.35rem 0;
 }
 
-#summary-container strong {
+#summary-container strong,
+#completed-summary strong {
   color: var(--accent-color);
 }
 
-#summary-container em {
+#summary-container em,
+#completed-summary em {
   color: var(--text-muted);
 }
 

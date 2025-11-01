@@ -62,6 +62,7 @@ function initializeApp() {
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const summaryContainer = document.getElementById('summary-container');
+    const completedSummaryContainer = document.getElementById('completed-summary');
     const annualSummaryContainer = document.getElementById('annual-summary');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
@@ -418,6 +419,20 @@ function initializeApp() {
     function formatujLiczbe(wartosc) {
         return (Number(wartosc) || 0).toFixed(2);
     }
+    function getSelectedMonth() {
+        const now = new Date();
+        const fallback = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (!miesiacSummaryInput) {
+            return fallback;
+        }
+        const value = (miesiacSummaryInput.value || '').trim();
+        if (!value) {
+            miesiacSummaryInput.value = fallback;
+            return fallback;
+        }
+        return value;
+    }
+
 
     function obliczPodsumowanieFinansowe(miesiac, wszystkieZlecenia) {
         if (!miesiac) return null;
@@ -449,41 +464,40 @@ function initializeApp() {
     }
 
     function obliczIPokazPodsumowanieFinansowe() {
-        if (!summaryContainer) return;
-        const wybranyMiesiac = miesiacSummaryInput ? miesiacSummaryInput.value : '';
-        if (!wybranyMiesiac) {
-            summaryContainer.innerHTML = '<p>Wybierz miesiąc, aby zobaczyć szczegóły podsumowania.</p>';
-            return;
-        }
-
+        const wybranyMiesiac = getSelectedMonth();
+        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache) || {
+            liczbaZlecen: 0,
+            wyfakturowaneGodziny: 0,
+            brutto: 0,
+            netto: 0,
+            podzialTypow: {}
+        };
         const rekordCzasowy =
-            ostatnieZestawienieMiesieczne.miesiace.find(m => m.miesiac === wybranyMiesiac) ||
-            utworzPustyRekordMiesieczny();
-        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
-        const maDaneZlecen = finansowe && finansowe.liczbaZlecen > 0;
-        const maDaneGodzin = Object.values(rekordCzasowy).some(wartosc => Number(wartosc) > 0);
-
-        if (!maDaneZlecen && !maDaneGodzin) {
-            summaryContainer.innerHTML = '<p>Brak danych dla wybranego miesiąca.</p>';
-            return;
+        if (completedSummaryContainer) {
+            completedSummaryContainer.innerHTML = `
+                <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe.wyfakturowaneGodziny)} h</strong></p>
+                <p>Wartość brutto: <strong>${formatujLiczbe(finansowe.brutto)} zł</strong></p>
+                <p>Wartość netto: <strong>${formatujLiczbe(finansowe.netto)} zł</strong></p>
+            `;
         }
 
-        const podzialTypowText = finansowe
-            ? Object.entries(finansowe.podzialTypow)
-                .map(([typ, liczba]) => `${typ}: ${liczba}`)
-                .join(', ')
-            : '';
+        if (!summaryContainer) {
+        }
+
+        const struktura = { S: 0, G: 0, W: 0, Z: 0 };
+        Object.keys(struktura).forEach(typ => {
+            struktura[typ] = finansowe.podzialTypow?.[typ] || 0;
+        });
 
         summaryContainer.innerHTML = `
-            <p><strong>${formatujMiesiac(wybranyMiesiac)}</strong></p>
-            <p>Ukończone zlecenia: <strong>${finansowe?.liczbaZlecen || 0}</strong></p>
-            <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe?.wyfakturowaneGodziny || rekordCzasowy.wyfakturowaneGodziny)} h</strong></p>
-            <p>Wartość brutto: <strong>${formatujLiczbe(finansowe?.brutto || rekordCzasowy.brutto)} zł</strong></p>
-            <p>Wartość netto: <strong>${formatujLiczbe(finansowe?.netto || rekordCzasowy.netto)} zł</strong></p>
+            <p>Ukończone zlecenia: <strong>${Number(finansowe.liczbaZlecen || 0)}</strong></p>
+            <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe.wyfakturowaneGodziny)} h</strong></p>
+            <p>Wartość brutto: <strong>${formatujLiczbe(finansowe.brutto)} zł</strong></p>
+            <p>Wartość netto: <strong>${formatujLiczbe(finansowe.netto)} zł</strong></p>
             <p>Godziny pracy: <strong>${formatujLiczbe(rekordCzasowy.praca)} h</strong></p>
             <p>Nadgodziny: <strong>${formatujLiczbe(rekordCzasowy.nadgodziny)} h</strong></p>
             <p>Czas jazdy: <strong>${formatujLiczbe(rekordCzasowy.jazda)} h</strong></p>
-            ${podzialTypowText ? `<p>Struktura typów zleceń: <strong>${podzialTypowText}</strong></p>` : ''}
+            <p>Struktura typów zleceń: <strong>S: ${struktura.S}, G: ${struktura.G}, W: ${struktura.W}, Z: ${struktura.Z}</strong></p>
         `;
     }
 
@@ -1244,6 +1258,7 @@ function wyswietlZlecenia() {
     }
 
     const frazaWyszukiwania = (zlecenieSearchInput?.value || '').toLowerCase();
+    const selectedMonth = getSelectedMonth();
     wszystkieZlecenia = [];
     let aktywneHtml = '', ukonczoneHtml = '';
 
@@ -1275,7 +1290,11 @@ function wyswietlZlecenia() {
                     <button class="delete-btn">Usuń</button>
                 </div>
             </li>`;
-        } else {
+        } else if (zlecenie.status === 'ukończone') {
+            const dataUkonczenia = zlecenie.dataUkonczenia || '';
+            if (!dataUkonczenia.startsWith(selectedMonth)) {
+                return;
+            }
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
             const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
             const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
@@ -1803,6 +1822,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             ilosc,
             klient: magazynForm['item-klient'].value || '---',
             createdAt: new Date()
+            jestOlejem: false,
         };
         try {
             await addDoc(collection(db, "magazyn"), dane);
@@ -1829,11 +1849,16 @@ async function obslugaZakonczeniaZlecenia(event) {
                         console.warn("Pominięto linię (nieprawidłowa ilość):", line);
                         continue;
                     }
+                    if (!Number.isInteger(parsedIlosc)) {
+                        console.warn("Pominięto linię (ilość musi być całkowita):", line);
+                        continue;
+                    }
                     await addDoc(collection(db, "magazyn"), {
                         index: index.trim(),
                         nazwa: nazwa.trim(),
                         ilosc: parsedIlosc,
                         klient,
+                        jestOlejem: false,
                         createdAt: new Date()
                     });
                     dodaneCount++;
@@ -2011,11 +2036,17 @@ async function obslugaZakonczeniaZlecenia(event) {
         closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
     }
 
-    if (miesiacSummaryInput) miesiacSummaryInput.addEventListener('change', obliczIPokazPodsumowanieFinansowe);
+    if (miesiacSummaryInput) {
+        miesiacSummaryInput.addEventListener('change', () => {
+            getSelectedMonth();
+            wyswietlZlecenia();
+            obliczIPokazPodsumowanieFinansowe();
+        });
+    }
     const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
     if (exportZleceniaBtn && miesiacSummaryInput) {
         exportZleceniaBtn.addEventListener('click', () => {
-            const miesiac = miesiacSummaryInput.value;
+            const miesiac = getSelectedMonth();
             const dane = _wszystkieZleceniaCache
                 .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
                 .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({

@@ -117,15 +117,16 @@
                     <input type="month" id="miesiac-summary">
                     <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
                 </div>
-                <div id="summary-container"></div>
+                
                 <div id="zakonczone-zlecenia-content" class="collapsible-content">
-                <div id="zakonczone-zlecenia-content" class="collapsible-content">
+                <div id="completed-summary" class="summary-container-subtle"></div>
                 <div id="ukonczone-zlecenia-lista"></div>
                 </div>
             </div>
         </div>
         <div id="magazyn" class="tab-content">
             <h2>Magazyn</h2>
+            <div id="summary-container" class="summary-container-subtle"></div>
             <div class="magazyn-forms">
                 <div class="form-section"><h3>Dodaj produkt</h3><form id="magazyn-form"><div class="form-group"><label for="item-index">Index:</label><input type="text" id="item-index" required></div><div class="form-group"><label for="item-name">Nazwa:</label><input type="text" id="item-name" required></div><div class="form-group"><label for="item-ilosc">Ilość:</label><input type="number" step="1" id="item-ilosc" required></div><div class="form-group"><label for="item-klient">Klient:</label><input type="text" id="item-klient"></div><button type="submit">Dodaj</button></form></div>
                 <div class="form-section"><h3>Masowe dodawanie</h3><form id="bulk-add-form"><div class="form-group"><label for="bulk-klient">Klient:</label><input type="text" id="bulk-klient" required></div><div class="form-group"><label for="bulk-items">Produkty:</label><textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea></div><button type="submit">Dodaj</button></form></div>
