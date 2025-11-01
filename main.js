@@ -308,6 +308,24 @@ function initializeApp() {
     }
 
     // --- FUNKCJE OGÓLNE ---
+    function normalizujMiesiac(wartosc) {
+        if (!wartosc) return '';
+        const data = new Date(wartosc);
+        if (!Number.isNaN(data.getTime())) {
+            const miesiac = String(data.getMonth() + 1).padStart(2, '0');
+            return `${data.getFullYear()}-${miesiac}`;
+        }
+        if (typeof wartosc === 'string' && wartosc.length >= 7) {
+            const surowy = wartosc.slice(0, 7);
+            const [rok, miesiac] = surowy.split('-');
+            if (rok && miesiac) {
+                return `${rok}-${miesiac.padStart(2, '0')}`;
+            }
+            return surowy;
+        }
+        return '';
+    }
+
     function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
         const mapa = {};
         const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 });
@@ -320,18 +338,18 @@ function initializeApp() {
 
         wpisy.forEach(wpis => {
             if (!wpis?.id) return;
-            const miesiac = wpis.id.slice(0, 7);
+            const miesiac = normalizujMiesiac(wpis.id);
             if (!miesiac) return;
             const rekord = pobierzRekord(miesiac);
             rekord.praca += Number(wpis.praca) || 0;
             rekord.nadgodziny += Number(wpis.nadgodziny) || 0;
-            rekord.jazda += Number(wpis.jazda) || 0;            
+            rekord.jazda += Number(wpis.jazda) || 0;  
         });
 
 
         zlecenia.forEach(zlecenie => {
             if (!zlecenie || zlecenie.status !== 'ukończone' || !zlecenie.dataUkonczenia) return;
-            const miesiac = zlecenie.dataUkonczenia.slice(0, 7);
+            const miesiac = normalizujMiesiac(zlecenie.dataUkonczenia);
             if (!miesiac) return;
             const rekord = pobierzRekord(miesiac);
             const godziny = Number(zlecenie.wyfakturowaneGodziny) || 0;
@@ -1891,6 +1909,8 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
     if (magazynLista) magazynLista.addEventListener('click', obslugaTabeliMagazynu);
 
+    if (modalMagazynLista) modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
+    if (partsToRemoveList) partsToRemoveList.addEventListener('click', obslugaListyCzesci);
     if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
     if (stockModalCloseButton && stockModal) {
         stockModalCloseButton.onclick = () => { stockModal.style.display = 'none'; };
