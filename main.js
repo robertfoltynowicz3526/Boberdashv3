@@ -472,7 +472,7 @@ function initializeApp() {
             netto: 0,
             podzialTypow: {}
         };
-        const rekordCzasowy =
+        const rekordCzasowy = (ostatnieZestawienieMiesieczne.miesiace || []).find(m => m.miesiac === wybranyMiesiac) || utworzPustyRekordMiesieczny();
         if (completedSummaryContainer) {
             completedSummaryContainer.innerHTML = `
                 <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe.wyfakturowaneGodziny)} h</strong></p>
@@ -482,6 +482,7 @@ function initializeApp() {
         }
 
         if (!summaryContainer) {
+            return;
         }
 
         const struktura = { S: 0, G: 0, W: 0, Z: 0 };
@@ -1821,7 +1822,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             nazwa: magazynForm['item-name'].value,
             ilosc,
             klient: magazynForm['item-klient'].value || '---',
-            createdAt: new Date()
+            createdAt: new Date(),
             jestOlejem: false,
         };
         try {
