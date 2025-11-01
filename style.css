@@ -748,6 +748,16 @@ select {
   box-shadow: 0 20px 35px -25px rgba(15, 23, 42, 0.45);
 }
 
+body[data-theme="dark"] .client-group {
+  background: rgba(17, 28, 52, 0.85);
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: 0 20px 40px -30px rgba(8, 47, 73, 0.65);
+}
+
+body[data-theme="dark"] .client-group:hover {
+  box-shadow: 0 26px 48px -28px rgba(59, 130, 246, 0.45);
+}
+
 .client-header-item {
   display: flex;
   justify-content: space-between;
@@ -877,6 +887,19 @@ select {
   border: 1px solid rgba(59, 130, 246, 0.2);
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
+}
+
+body[data-theme="dark"] .client-header {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: var(--text-color);
+}
+
+body[data-theme="dark"] .client-header .arrow,
+body[data-theme="dark"] .client-group .client-header-text span,
+body[data-theme="dark"] .client-group p,
+body[data-theme="dark"] .client-group strong {
+  color: var(--text-color);
 }
 
 .client-header h4 {

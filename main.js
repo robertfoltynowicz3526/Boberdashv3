@@ -1442,6 +1442,16 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
     const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+    const typStawkiOpis = STAWKI[zlecenie.typZlecenia]?.nazwa || 'Brak danych';
+    const uzyteCzesci = Array.isArray(zlecenie.uzyteCzesci) ? zlecenie.uzyteCzesci : [];
+    const uzyteCzesciOpis = uzyteCzesci.length > 0
+        ? uzyteCzesci.map(czesc => {
+            const ilosc = Number(czesc.ilosc);
+            const wyswietlanaIlosc = Number.isFinite(ilosc) ? ilosc : 0;
+            const oznaczenieOleju = czesc.jestOlejem ? ' (olej)' : '';
+            return `${czesc.nazwa} (x${wyswietlanaIlosc})${oznaczenieOleju}`;
+        }).join(', ')
+        : 'Brak';
 
     titleEl.textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
     infoDiv.innerHTML = `
@@ -1483,7 +1493,11 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
     }
-    const qKalendarz = query(collection(db, "godziny_pracy"), where("zlecenieId", "==", zlecenieId), orderBy("id", "desc"));
+    const qKalendarz = query(
+        collection(db, "godziny_pracy"),
+        where("zlecenieId", "==", zlecenieId),
+        orderBy("__name__", "desc")
+    );
     const querySnapshotKalendarz = await getDocs(qKalendarz);
     let kalendarzHtml = '';
     querySnapshotKalendarz.forEach((docSnap) => {
@@ -1832,6 +1846,7 @@ async function obslugaZakonczeniaZlecenia(event) {
                 </tr>`;
             });
             magazynLista.innerHTML = html;
+            renderMagazynWModalu();
         });
     }
 
@@ -1921,29 +1936,30 @@ async function obslugaZakonczeniaZlecenia(event) {
         machineHistoryCloseButton.onclick = () => { machineHistoryModal.style.display = 'none'; };
     }
 
-// Klik poza modal zamyka go
-window.onclick = (event) => {
-  if (
-    event.target == completeModal ||
-    event.target == stockModal ||
-    event.target == kalendarzModal ||
-    event.target == assignModal ||
-    event.target == editKlientModal ||
-    event.target == editMaszynaModal ||
-    event.target == detailsZlecenieModal ||
-    event.target == editZlecenieModal ||
-    event.target == machineHistoryModal
-  ) {
-    event.target.style.display = "none";
-  }
-};
+    // Klik poza modal zamyka go
+    window.onclick = (event) => {
+        if (
+            event.target == completeModal ||
+            event.target == stockModal ||
+            event.target == kalendarzModal ||
+            event.target == assignModal ||
+            event.target == editKlientModal ||
+            event.target == editMaszynaModal ||
+            event.target == detailsZlecenieModal ||
+            event.target == editZlecenieModal ||
+            event.target == machineHistoryModal
+        ) {
+            event.target.style.display = "none";
+        }
+    };
 
-// --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
-inicjalizujKalendarz();
-nasluchujNaKlientow();
-nasluchujNaMaszyny();
-nasluchujNaZlecenia();
-wyswietlPrzejazdy(); // puste – OK
-wyswietlMagazyn();
+    // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
+    inicjalizujKalendarz();
+    wyswietlWpisyKalendarza();
+    nasluchujNaKlientow();
+    nasluchujNaMaszyny();
+    nasluchujNaZlecenia();
+    wyswietlPrzejazdy(); // puste – OK
+    wyswietlMagazyn();
 
 } // koniec initializeApp()
