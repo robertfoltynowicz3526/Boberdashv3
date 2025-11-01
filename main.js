@@ -31,7 +31,6 @@ function initializeApp() {
         sumyRocznePerRok: [],
         lata: []
     };
-    let ostatnieZestawienieMiesieczne = { miesiace: [], sumyRoczne: { praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 } };
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
@@ -454,6 +453,7 @@ function initializeApp() {
         ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
         renderRocznePodsumowanie();
         renderMiesiecznePodsumowanie();
+    }   
 
     function eksportujDoCSV(dane, nazwaPliku) {
         if (dane.length === 0) { alert("Brak danych do wyeksportowania."); return; }
