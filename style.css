@@ -221,7 +221,7 @@ main {
 .table-section,
 .card,
 #summary-container,
-#completed-summary,
+#magazyn-summary,
 #annual-summary {
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -238,6 +238,7 @@ main {
 .table-section:hover,
 .card:hover,
 #summary-container:hover,
+#magazyn-summary:hover,
 #annual-summary:hover {
   background: var(--bg-elevated-hover);
   box-shadow: var(--shadow-lg);
@@ -409,7 +410,8 @@ select {
   transition: transform 0.2s ease;
 }
 
-.collapsible-header.collapsed .arrow {
+.collapsible-header.collapsed .arrow,
+.collapsible-header[data-collapsed="true"] .arrow {
   transform: rotate(-90deg);
 }
 
@@ -521,8 +523,11 @@ select {
   color: var(--danger-color);
 }
 
-#aktywne-zlecenia-lista,
-#ukonczone-zlecenia-lista {
+#aktywne-zlecenia-lista ul,
+#ukonczone-zlecenia-lista ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -558,6 +563,29 @@ select {
   display: flex;
   gap: 0.4rem;
 }
+
+#ukonczone-zlecenia-lista {
+  overflow: hidden;
+  max-height: 2000px;
+  transition: max-height 0.4s ease;
+}
+
+#ukonczone-zlecenia-lista ul {
+  transition: opacity 0.2s ease;
+}
+
+#ukonczone-zlecenia-lista.collapsed {
+  max-height: 0;
+}
+
+#ukonczone-zlecenia-lista.collapsed ul {
+  opacity: 0;
+}
+
+#ukonczone-zlecenia-lista:not(.collapsed) ul {
+  opacity: 1;
+}
+
 
 .status-chip {
   display: inline-flex;
@@ -941,18 +969,74 @@ body[data-theme="dark"] .client-group strong {
 }
 
 #summary-container > p,
-#completed-summary > p {
+#magazyn-summary > p {
   margin: 0.35rem 0;
 }
 
 #summary-container strong,
-#completed-summary strong {
+#magazyn-summary strong {
   color: var(--accent-color);
 }
 
 #summary-container em,
-#completed-summary em {
+#magazyn-summary em {
   color: var(--text-muted);
+}
+
+#kalendarz-zlecenia-multi {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#kalendarz-zlecenia-multi .multi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+#kalendarz-zlecenia-multi .multi-row select,
+#kalendarz-zlecenia-multi .multi-row input {
+  flex: 1 1 200px;
+}
+
+#kalendarz-zlecenia-multi .multi-row .multi-add {
+  flex: 0 0 auto;
+}
+
+#kalendarz-zlecenia-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#kalendarz-zlecenia-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 0.6rem 0.9rem;
+  gap: 0.75rem;
+}
+
+#kalendarz-zlecenia-list li .actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+#kalendarz-zlecenia-list li.empty {
+  justify-content: center;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .modal-stock-item .item-qty {
