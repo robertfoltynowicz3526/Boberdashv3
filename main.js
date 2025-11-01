@@ -361,7 +361,7 @@ function initializeApp() {
 
         const dane = {
             praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
-            fakturowane: sumaFakturowane
+            fakturowane: sumaFakturowane,
             nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0,
             jazda: Number(kalendarzForm['czas-jazdy'].value) || 0,
             notatka: kalendarzForm['kalendarz-notatka'].value || '',
