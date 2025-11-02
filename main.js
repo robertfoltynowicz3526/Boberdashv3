@@ -654,67 +654,33 @@ function initializeApp() {
     }
 
 
-    function obliczPodsumowanieFinansowe(miesiac, wszystkieZlecenia, wpisyGodzin = []) {
-        if (!miesiac) return null;
-        const wynik = {
-            miesiac,
-            liczbaZlecen: 0,
-            wyfakturowaneGodziny: 0,
-            brutto: 0,
-            netto: 0,
-            podzialTypow: {},
-            praca: 0,
-            nadgodziny: 0,
-            jazda: 0
-        };
-
-        wpisyGodzin
-            .filter(wpis => normalizujMiesiac(wpis.id) === miesiac)
-            .forEach(wpis => {
-                wynik.praca += Number(wpis.praca) || 0;
-                wynik.nadgodziny += Number(wpis.nadgodziny) || 0;
-                wynik.jazda += Number(wpis.jazda) || 0;
-                wynik.wyfakturowaneGodziny += Number(wpis.fakturowane) || 0;
-            });
+    function obliczPodsumowanieFinansowe(miesiac, wszystkieZlecenia) {
+        const pustyWynik = { sumaGodzin: 0, sumaBrutto: 0, sumaNetto: 0 };
+        if (!miesiac) return pustyWynik;
 
 
-        wszystkieZlecenia
-            .filter(z => z && z.status === 'ukończone' && z.dataUkonczenia)
-            .forEach(z => {
-                if (normalizujMiesiac(z.dataUkonczenia) !== miesiac) return;
-                wynik.liczbaZlecen += 1;
+        return wszystkieZlecenia
+            .filter(z => z?.status === 'ukończone' && z.dataUkonczenia?.startsWith(miesiac))
+            .reduce((acc, z) => {
                 const godziny = Number(z.wyfakturowaneGodziny) || 0;
                 const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
                 const kwotaBrutto = godziny * stawka;
-                wynik.brutto += kwotaBrutto;
-                wynik.netto += kwotaBrutto * 0.7;
-                const typ = z.typZlecenia || 'Inne';
-                wynik.podzialTypow[typ] = (wynik.podzialTypow[typ] || 0) + 1;
-            });
-
-        return wynik;
+                acc.sumaGodzin += godziny;
+                acc.sumaBrutto += kwotaBrutto;
+                acc.sumaNetto += kwotaBrutto * 0.7;
+                return acc;
+            }, { ...pustyWynik });
     }
 
     function obliczIPokazPodsumowanieFinansowe() {
         const wybranyMiesiac = getSelectedMonth();
-        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache, wszystkieWpisyKalendarza) || {
-            liczbaZlecen: 0,
-            wyfakturowaneGodziny: 0,
-            brutto: 0,
-            netto: 0,
-            podzialTypow: {},
-            praca: 0,
-            nadgodziny: 0,
-            jazda: 0
-        };
+        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
         if (zakonczoneSummaryContainer) {
+            const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
             zakonczoneSummaryContainer.innerHTML = `
-                <p>Godziny pracy: <strong>${formatujLiczbe(finansowe.praca)} h</strong></p>
-                <p>Nadgodziny: <strong>${formatujLiczbe(finansowe.nadgodziny)} h</strong></p>
-                <p>Czas jazdy: <strong>${formatujLiczbe(finansowe.jazda)} h</strong></p>
-                <p>Godziny wyfakturowane: <strong>${formatujLiczbe(finansowe.wyfakturowaneGodziny)} h</strong></p>
-                <p>Wartość brutto: <strong>${formatujLiczbe(finansowe.brutto)} zł</strong></p>
-                <p>Wartość netto: <strong>${formatujLiczbe(finansowe.netto)} zł</strong></p>
+            <p>Godziny wyfakturowane: <strong>${sumaGodzin.toFixed(2)} h</strong></p>
+            <p>Wartość brutto: <strong>${sumaBrutto.toFixed(2)} zł</strong></p>
+            <p>Wartość netto: <strong>${sumaNetto.toFixed(2)} zł</strong></p>    
             `;
         }
 
