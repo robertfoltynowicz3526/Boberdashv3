@@ -64,7 +64,8 @@ function initializeApp() {
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
-    const zakonczoneSummaryContainer = document.getElementById('summary-container');
+    const zakonczoneTopSummary = document.getElementById('zakonczone-top-summary');
+    const zakonczoneMonthSummary = document.getElementById('zakonczone-month-summary');
     const annualSummaryContainer = document.getElementById('annual-summary');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
@@ -83,12 +84,24 @@ function initializeApp() {
     const resultLitry = document.getElementById('result-litry');
     const themeToggle = document.getElementById('theme-toggle');
     const zakonczoneZleceniaHeader = document.getElementById('zakonczone-zlecenia-header');
+    const zakonczoneZleceniaContent = document.getElementById('zakonczone-zlecenia-content');
     const zlecenieSearchInput = document.getElementById('zlecenie-search-input');
     const kalendarzMultiWrapper = document.getElementById('kalendarz-zlecenia-multi');
     const kalendarzMultiSelect = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-select') : null;
     const kalendarzMultiHoursInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-fh') : null;
     const kalendarzMultiAddButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-add') : null;
     const kalendarzMultiList = document.getElementById('kalendarz-zlecenia-list');
+    const dashboardNoweZlecenia = document.getElementById('kpi-nowe-zlecenia-value');
+    const dashboardOtwarteZlecenia = document.getElementById('kpi-otwarte-zlecenia-value');
+    const dashboardWyfakturowane = document.getElementById('kpi-hours-month-value');
+    const dashboardWyfakturowaneZmiana = document.getElementById('kpi-hours-change-value');
+    const dashboardAbsorpcja = document.getElementById('kpi-absorpcja-value');
+    const weekPracaValue = document.getElementById('week-praca-value');
+    const weekJazdaValue = document.getElementById('week-jazda-value');
+    const weekNadgodzinyValue = document.getElementById('week-nadgodziny-value');
+    const hoursChartContainer = document.getElementById('hours-chart');
+    const calendarAbsorpcjaTag = document.getElementById('calendar-absorpcja');
+    const podsumowanieMetryki = document.getElementById('podsumowanie-metryki');
     const editKlientModal = document.getElementById('edit-klient-modal');
     const editKlientForm = document.getElementById('edit-klient-form');
     const editMaszynaModal = document.getElementById('edit-maszyna-modal');
@@ -112,10 +125,15 @@ function initializeApp() {
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     window.openTab = (evt, tabName) => {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        document.getElementById(tabName).style.display = 'block';
-        evt.currentTarget.classList.add('active');
+        const tab = document.getElementById(tabName);
+        if (tab) {
+            tab.classList.add('active');
+        }
+        if (evt?.currentTarget) {
+            evt.currentTarget.classList.add('active');
+        }
     };
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -124,7 +142,7 @@ function initializeApp() {
     if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
     const firstTabButton = document.querySelector('.tab-button');
     if (firstTabButton) {
-        firstTabButton.click(); // Otwórz pierwszą zakładkę
+        firstTabButton.click();
     }
     inicjujCiemnyMotyw();
     inicjujZwijanie();
@@ -147,21 +165,57 @@ function initializeApp() {
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
             displayEventEnd: true,
             eventContent: (arg) => {
-                let eventEl = document.createElement('div');
-                eventEl.innerHTML = `<div>${arg.event.title || ''}</div>`;
+                const container = document.createElement('div');
+                const linie = Array.isArray(arg.event.extendedProps.linie) ? arg.event.extendedProps.linie : [];
+                const powiazane = Array.isArray(arg.event.extendedProps.powiazaneLinie) ? arg.event.extendedProps.powiazaneLinie : [];
+
+                if (linie.length > 0) {
+                    linie.forEach(tekst => {
+                        const linia = document.createElement('div');
+                        linia.textContent = tekst;
+                        container.appendChild(linia);
+                    });
+                } else {
+                    const fallback = document.createElement('div');
+                    fallback.textContent = arg.event.title || '';
+                    container.appendChild(fallback);
+                }
+
+                if (powiazane.length > 0) {
+                    const separator = document.createElement('hr');
+                    separator.style.margin = '4px 0';
+                    separator.style.borderColor = 'rgba(255,255,255,0.35)';
+                    container.appendChild(separator);
+                    powiazane.forEach(tekst => {
+                        const linia = document.createElement('div');
+                        linia.textContent = tekst;
+                        container.appendChild(linia);
+                    });
+                }
                 if (arg.event.extendedProps.type === 'godziny_pracy') {
                     if (arg.event.extendedProps.notatka) {
-                        eventEl.innerHTML += ` <small title="${arg.event.extendedProps.notatka}">📝</small>`;
+                     const note = document.createElement('div');
+                        note.textContent = `Notatka: ${arg.event.extendedProps.notatka}`;
+                        note.classList.add('event-note');
+                        container.appendChild(note);   
                     }
-                    let actionsEl = document.createElement('div');
+                    const actionsEl = document.createElement('div');
                     actionsEl.classList.add('event-actions');
-                    actionsEl.innerHTML = `
-                        <button type="button" class="btn-edit event-edit-btn" data-date="${arg.event.startStr}">E</button>
-                        <button type="button" class="btn-remove event-delete-btn" data-date="${arg.event.startStr}">X</button>
-                    `;
-                    eventEl.appendChild(actionsEl);
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'btn-edit event-edit-btn';
+                    editBtn.dataset.date = arg.event.startStr;
+                    editBtn.textContent = 'E';
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn-remove event-delete-btn';
+                    deleteBtn.dataset.date = arg.event.startStr;
+                    deleteBtn.textContent = 'X';
+                    actionsEl.appendChild(editBtn);
+                    actionsEl.appendChild(deleteBtn);
+                    container.appendChild(actionsEl);
                 }
-                return { domNodes: [eventEl] };
+                return { domNodes: [container] };
             },
             dateClick: (info) => otworzModalGodzin(info.dateStr),
             datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
@@ -231,7 +285,7 @@ function initializeApp() {
         multiEdytowanyIndex = null;
         if (kalendarzMultiSelect) kalendarzMultiSelect.value = '';
         if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = '';
-        if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj';
+        if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj kolejne zlecenie';
     }
 
     function aktualizujPoleFakturowane(wartosc, tylkoOdczyt = false) {
@@ -411,31 +465,28 @@ function initializeApp() {
                 wszystkieWpisyKalendarza.push(wpis);
 
                 const linie = [];
-                if (dane.praca > 0) linie.push(`P: ${formatujLiczbe(dane.praca)}h`);
-                if (suma > 0) linie.push(`F: ${formatujLiczbe(suma)}h`);
-                if (dane.nadgodziny > 0) linie.push(`N: ${formatujLiczbe(dane.nadgodziny)}h`);
-                if (dane.jazda > 0) linie.push(`J: ${formatujLiczbe(dane.jazda)}h`);
+                if (dane.praca > 0) linie.push(`Praca: ${formatujLiczbe(dane.praca)} h`);
+                if (suma > 0) linie.push(`Fakturowane: ${formatujLiczbe(suma)} h`);
+                if (dane.nadgodziny > 0) linie.push(`Nadgodziny: ${formatujLiczbe(dane.nadgodziny)} h`);
+                if (dane.jazda > 0) linie.push(`Jazda: ${formatujLiczbe(dane.jazda)} h`);
 
-                let className = 'fc-event-godziny';
-                let title = linie.join('<br>');
-                if (powiazane.length > 0) {
-                    const dodatkoweLinie = powiazane
-                        .map(p => `F: ${formatujLiczbe(p.fakturowane)}h — ${p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId)}`)
-                        .join('<br>');
-                    title += `${title ? "<hr style='margin: 2px 0; border-color: rgba(255,255,255,0.5)'>" : ''}${dodatkoweLinie}`;
-                    className = 'fc-event-godziny-zlecenie';
-                }
+                const powiazaneLinie = powiazane.map(p => `F: ${formatujLiczbe(p.fakturowane)} h — ${p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId)}`);
+                let className = powiazaneLinie.length > 0 ? 'fc-event-godziny-zlecenie' : 'fc-event-godziny';
 
-                if (title) {
-                    events.push({
-                        id: `godziny_${id}`,
-                        title: title.trim(),
-                        start: id,
-                        allDay: true,
-                        classNames: [className],
-                        extendedProps: { notatka: dane.notatka, type: 'godziny_pracy', zleceniaPowiazane: powiazane }
-                    });
-                }
+                events.push({
+                    id: `godziny_${id}`,
+                    title: linie.join(' | ') || 'Ewidencja czasu',
+                    start: id,
+                    allDay: true,
+                    classNames: [className],
+                    extendedProps: {
+                        notatka: dane.notatka,
+                        type: 'godziny_pracy',
+                        zleceniaPowiazane: powiazane,
+                        linie,
+                        powiazaneLinie
+                    }
+                });
             });
 
             if (calendar) {
@@ -467,6 +518,9 @@ function initializeApp() {
             <p>Nadgodziny: <strong>${sumy.nadgodziny.toFixed(1)} h</strong></p>
             <p>Czas Jazdy: <strong>${sumy.jazda.toFixed(1)} h</strong></p>
         `;
+         if (calendarAbsorpcjaTag) {
+            calendarAbsorpcjaTag.textContent = `Absorpcja: ${formatujProcent(obliczAbsorpcje(sumy.fakturowane))}%`;
+        }
     }
 
     async function obslugaKalendarza(event) {
@@ -522,6 +576,90 @@ function initializeApp() {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    function pobierzZakonczoneZleceniaWMiesiacu(zlecenia, miesiac) {
+        if (!miesiac) return [];
+        return (zlecenia || []).filter(z => {
+            if (!z || z.status !== 'ukończone') return false;
+            const data = typeof z.dataUkonczenia === 'string'
+                ? z.dataUkonczenia
+                : normalizujMiesiac(z.dataUkonczenia);
+            return typeof data === 'string' && data.startsWith(miesiac);
+        });
+    }
+
+    function obliczFinanseZlecen(zlecenia) {
+        return (zlecenia || []).reduce((acc, z) => {
+            const godziny = Number(z?.wyfakturowaneGodziny) || 0;
+            const stawka = STAWKI[z?.typZlecenia]?.stawka || 0;
+            const brutto = godziny * stawka;
+            acc.godziny += godziny;
+            acc.brutto += brutto;
+            acc.netto += brutto * 0.7;
+            acc.liczba += 1;
+            const typ = (z?.typZlecenia || 'inne').toUpperCase();
+            acc.typy[typ] = (acc.typy[typ] || 0) + 1;
+            return acc;
+        }, { godziny: 0, brutto: 0, netto: 0, liczba: 0, typy: {} });
+    }
+
+    function pobierzSumyKalendarza(miesiac) {
+        if (!miesiac) return { praca: 0, jazda: 0, nadgodziny: 0, fakturowane: 0 };
+        return wszystkieWpisyKalendarza
+            .filter(wpis => wpis?.id && wpis.id.startsWith(miesiac))
+            .reduce((acc, wpis) => {
+                acc.praca += Number(wpis.praca) || 0;
+                acc.jazda += Number(wpis.jazda) || 0;
+                acc.nadgodziny += Number(wpis.nadgodziny) || 0;
+                acc.fakturowane += Number(wpis.fakturowane) || 0;
+                return acc;
+            }, { praca: 0, jazda: 0, nadgodziny: 0, fakturowane: 0 });
+    }
+
+    function obliczAbsorpcje(godziny) {
+        const wynik = ((Number(godziny) || 0) / 168) * 100;
+        return Number.isFinite(wynik) ? Number(wynik.toFixed(1)) : 0;
+    }
+
+    function obliczPoprzedniMiesiac(miesiac) {
+        if (!miesiac) return '';
+        const [rok, mies] = miesiac.split('-').map(Number);
+        if (!rok || !mies) return '';
+        const data = new Date(rok, mies - 1, 1);
+        data.setMonth(data.getMonth() - 1);
+        const y = data.getFullYear();
+        const m = String(data.getMonth() + 1).padStart(2, '0');
+        return `${y}-${m}`;
+    }
+
+    function obliczPodsumowanieTygodnia() {
+        if (!wszystkieWpisyKalendarza.length) {
+            return { praca: 0, jazda: 0, nadgodziny: 0 };
+        }
+        const teraz = new Date();
+        const dzien = teraz.getDay();
+        const przesuniecie = dzien === 0 ? 6 : dzien - 1; // poniedziałek jako początek tygodnia
+        const poczatek = new Date(teraz);
+        poczatek.setHours(0, 0, 0, 0);
+        poczatek.setDate(teraz.getDate() - przesuniecie);
+        const koniec = new Date(poczatek);
+        koniec.setDate(poczatek.getDate() + 7);
+
+        return wszystkieWpisyKalendarza.reduce((acc, wpis) => {
+            if (!wpis?.id) return acc;
+            const data = new Date(wpis.id);
+            if (Number.isNaN(data.getTime())) return acc;
+            if (data >= poczatek && data < koniec) {
+                acc.praca += Number(wpis.praca) || 0;
+                acc.jazda += Number(wpis.jazda) || 0;
+                acc.nadgodziny += Number(wpis.nadgodziny) || 0;
+            }
+            return acc;
+        }, { praca: 0, jazda: 0, nadgodziny: 0 });
+    }
+
+    function formatujProcent(wartosc) {
+        return (Number(wartosc) || 0).toFixed(1);
+    }
     function pobierzNazweZlecenia(zlecenie) {
         if (!zlecenie) return '';
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
@@ -655,36 +793,17 @@ function initializeApp() {
 
 
     function obliczPodsumowanieFinansowe(miesiac, wszystkieZlecenia) {
-        const pustyWynik = { sumaGodzin: 0, sumaBrutto: 0, sumaNetto: 0 };
-        if (!miesiac) return pustyWynik;
-
-
-        return wszystkieZlecenia
-            .filter(z => z?.status === 'ukończone' && z.dataUkonczenia?.startsWith(miesiac))
-            .reduce((acc, z) => {
-                const godziny = Number(z.wyfakturowaneGodziny) || 0;
-                const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
-                const kwotaBrutto = godziny * stawka;
-                acc.sumaGodzin += godziny;
-                acc.sumaBrutto += kwotaBrutto;
-                acc.sumaNetto += kwotaBrutto * 0.7;
-                return acc;
-            }, { ...pustyWynik });
-    }
-
-    function obliczIPokazPodsumowanieFinansowe() {
-        const wybranyMiesiac = getSelectedMonth();
-        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
-        if (zakonczoneSummaryContainer) {
-            const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
-            zakonczoneSummaryContainer.innerHTML = `
-            <p>Godziny wyfakturowane: <strong>${sumaGodzin.toFixed(2)} h</strong></p>
-            <p>Wartość brutto: <strong>${sumaBrutto.toFixed(2)} zł</strong></p>
-            <p>Wartość netto: <strong>${sumaNetto.toFixed(2)} zł</strong></p>    
-            `;
+        if (!miesiac) {
+            return { sumaGodzin: 0, sumaBrutto: 0, sumaNetto: 0, liczba: 0, typy: {} };
         }
-
-
+        const dane = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(wszystkieZlecenia, miesiac));
+        return {
+            sumaGodzin: dane.godziny,
+            sumaBrutto: dane.brutto,
+            sumaNetto: dane.netto,
+            liczba: dane.liczba,
+            typy: dane.typy
+        };
     }
 
     function renderRocznePodsumowanie() {
@@ -738,6 +857,124 @@ function initializeApp() {
             </div>`;
     }
 
+    function renderZakonczoneSekcja() {
+        const wybranyMiesiac = getSelectedMonth();
+        const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
+        const kalendarz = pobierzSumyKalendarza(wybranyMiesiac);
+        const absorpcja = obliczAbsorpcje(kalendarz.fakturowane);
+
+        if (zakonczoneTopSummary) {
+            const cards = [
+                { label: 'Godziny wyfakturowane', value: `${formatujLiczbe(finansowe.sumaGodzin)} h` },
+                { label: 'Wartość brutto', value: `${formatujLiczbe(finansowe.sumaBrutto)} zł` },
+                { label: 'Wartość netto', value: `${formatujLiczbe(finansowe.sumaNetto)} zł` },
+                { label: 'Absorpcja', value: `${formatujProcent(absorpcja)}%` }
+            ].map(card => `
+                <div class="metric-card">
+                    <h4>${card.label}</h4>
+                    <strong>${card.value}</strong>
+                </div>
+            `).join('');
+            zakonczoneTopSummary.innerHTML = cards;
+        }
+
+        if (zakonczoneMonthSummary) {
+            zakonczoneMonthSummary.innerHTML = `
+                <p>Suma godzin: <strong>${formatujLiczbe(finansowe.sumaGodzin)} h</strong></p>
+                <p>Wartość brutto: <strong>${formatujLiczbe(finansowe.sumaBrutto)} zł</strong></p>
+                <p>Wartość netto: <strong>${formatujLiczbe(finansowe.sumaNetto)} zł</strong></p>
+            `;
+        }
+    }
+
+    function renderDashboard() {
+        if (!dashboardNoweZlecenia && !dashboardAbsorpcja && !hoursChartContainer) return;
+        const teraz = new Date();
+        const aktualnyMiesiac = `${teraz.getFullYear()}-${String(teraz.getMonth() + 1).padStart(2, '0')}`;
+        const poprzedniMiesiac = obliczPoprzedniMiesiac(aktualnyMiesiac);
+
+        const zakonczoneAktualny = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, aktualnyMiesiac));
+        const zakonczonePoprzedni = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, poprzedniMiesiac));
+        const sumaKalendarza = pobierzSumyKalendarza(aktualnyMiesiac);
+        const absorpcja = obliczAbsorpcje(sumaKalendarza.fakturowane);
+
+        const noweZlecenia = (_wszystkieZleceniaCache || []).filter(z => normalizujMiesiac(z?.createdAt) === aktualnyMiesiac).length;
+        const otwarteZlecenia = (_wszystkieZleceniaCache || []).filter(z => z?.status === 'aktywne' || z?.status === 'nieprzypisane').length;
+
+        const diff = zakonczoneAktualny.godziny - (zakonczonePoprzedni.godziny || 0);
+        const procentZmiany = (zakonczonePoprzedni.godziny || 0) === 0
+            ? (zakonczoneAktualny.godziny > 0 ? 100 : 0)
+            : (diff / zakonczonePoprzedni.godziny) * 100;
+
+        if (dashboardNoweZlecenia) dashboardNoweZlecenia.textContent = noweZlecenia.toString();
+        if (dashboardOtwarteZlecenia) dashboardOtwarteZlecenia.textContent = otwarteZlecenia.toString();
+        if (dashboardWyfakturowane) dashboardWyfakturowane.textContent = `${formatujLiczbe(zakonczoneAktualny.godziny)} h`;
+        if (dashboardWyfakturowaneZmiana) {
+            const znak = procentZmiany > 0 ? '+' : '';
+            dashboardWyfakturowaneZmiana.textContent = `${znak}${formatujProcent(procentZmiany)}% vs poprzedni`;
+        }
+        if (dashboardAbsorpcja) dashboardAbsorpcja.textContent = `${formatujProcent(absorpcja)}%`;
+
+        const tydzien = obliczPodsumowanieTygodnia();
+        if (weekPracaValue) weekPracaValue.textContent = `${formatujLiczbe(tydzien.praca)} h`;
+        if (weekJazdaValue) weekJazdaValue.textContent = `${formatujLiczbe(tydzien.jazda)} h`;
+        if (weekNadgodzinyValue) weekNadgodzinyValue.textContent = `${formatujLiczbe(tydzien.nadgodziny)} h`;
+
+        if (hoursChartContainer) {
+            const miesiaceDoWyswietlenia = [];
+            for (let i = 2; i >= 0; i--) {
+                const data = new Date(teraz.getFullYear(), teraz.getMonth() - i, 1);
+                const mies = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+                miesiaceDoWyswietlenia.push(mies);
+            }
+            const daneWykresu = miesiaceDoWyswietlenia.map(mies => {
+                const finanse = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, mies));
+                return { miesiac: mies, godziny: finanse.godziny };
+            });
+            const maxGodziny = Math.max(0, ...daneWykresu.map(d => d.godziny));
+            if (maxGodziny === 0) {
+                hoursChartContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
+            } else {
+                hoursChartContainer.innerHTML = daneWykresu.map(dane => {
+                    const wysokosc = maxGodziny === 0 ? 0 : Math.max(8, (dane.godziny / maxGodziny) * 100);
+                    return `
+                        <div class="bar">
+                            <div class="bar-fill" style="height:${wysokosc}%"></div>
+                            <strong>${formatujLiczbe(dane.godziny)}</strong>
+                            <span>${formatujMiesiac(dane.miesiac)}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    }
+
+    function renderPodsumowanieSekcja() {
+        if (!podsumowanieMetryki) return;
+        const miesiac = getSelectedMonth();
+        const zakonczone = pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, miesiac);
+        const finanse = obliczFinanseZlecen(zakonczone);
+        const kalendarz = pobierzSumyKalendarza(miesiac);
+        const absorpcja = obliczAbsorpcje(kalendarz.fakturowane);
+        const typy = finanse.typy || {};
+
+        const s = typy.S || 0;
+        const g = typy.G || 0;
+        const w = typy.W || 0;
+        const z = typy.Z || 0;
+
+        podsumowanieMetryki.innerHTML = `
+            <div class="metric-card"><h4>Ukończone zlecenia</h4><strong>${finanse.liczba}</strong></div>
+            <div class="metric-card"><h4>Godziny wyfakturowane</h4><strong>${formatujLiczbe(finanse.godziny)} h</strong></div>
+            <div class="metric-card"><h4>Wartość brutto</h4><strong>${formatujLiczbe(finanse.brutto)} zł</strong></div>
+            <div class="metric-card"><h4>Wartość netto</h4><strong>${formatujLiczbe(finanse.netto)} zł</strong></div>
+            <div class="metric-card"><h4>Godziny pracy</h4><strong>${formatujLiczbe(kalendarz.praca)} h</strong></div>
+            <div class="metric-card"><h4>Nadgodziny</h4><strong>${formatujLiczbe(kalendarz.nadgodziny)} h</strong></div>
+            <div class="metric-card"><h4>Czas jazdy</h4><strong>${formatujLiczbe(kalendarz.jazda)} h</strong></div>
+            <div class="metric-card"><h4>Struktura typów</h4><strong>S: ${s}, G: ${g}, W: ${w}, Z: ${z}</strong></div>
+            <div class="metric-card"><h4>Absorpcja</h4><strong>${formatujProcent(absorpcja)}%</strong></div>
+        `;
+    }
     function odswiezPodsumowania() {
         ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
         if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
@@ -748,7 +985,9 @@ function initializeApp() {
             }
         }
         renderRocznePodsumowanie();
-        obliczIPokazPodsumowanieFinansowe();
+        renderZakonczoneSekcja();
+        renderPodsumowanieSekcja();
+        renderDashboard();
     }   
 
     function eksportujDoCSV(dane, nazwaPliku) {
@@ -764,7 +1003,7 @@ function initializeApp() {
     }
 
     function inicjujCiemnyMotyw() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        const savedTheme = localStorage.getItem('theme') || 'dark';
         applyTheme(savedTheme);
         if (themeToggle) {
             themeToggle.checked = (savedTheme === 'dark');
@@ -780,36 +1019,31 @@ function initializeApp() {
     function applyTheme(theme) { if (theme === 'dark') { document.body.dataset.theme = 'dark'; } else { delete document.body.dataset.theme; } }
 
     function inicjujZwijanie() {
-  // Zakończone zlecenia
-  if (zakonczoneZleceniaHeader && ukonczoneZleceniaLista) {
-    zakonczoneZleceniaHeader.dataset.collapsed = 'true';
-    ukonczoneZleceniaLista.classList.add('collapsed');
-    zakonczoneZleceniaHeader.addEventListener('click', () => {
-     const isCollapsed = ukonczoneZleceniaLista.classList.toggle('collapsed');
-      zakonczoneZleceniaHeader.dataset.collapsed = isCollapsed ? 'true' : 'false'; 
-    }, { passive: true });
-  }
+  if (zakonczoneZleceniaHeader && zakonczoneZleceniaContent) {
+            zakonczoneZleceniaContent.classList.add('collapsed');
+            zakonczoneZleceniaHeader.addEventListener('click', () => {
+                zakonczoneZleceniaHeader.classList.toggle('collapsed');
+                zakonczoneZleceniaContent.classList.toggle('collapsed');
+            }, { passive: true });
+        }
+           if (listaKlientowHeader && listaKlientowContent) {
+            listaKlientowHeader.classList.add('collapsed');
+            listaKlientowContent.classList.add('collapsed');
+            listaKlientowHeader.addEventListener('click', () => {
+                listaKlientowHeader.classList.toggle('collapsed');
+                listaKlientowContent.classList.toggle('collapsed');
+            }, { passive: true });
+        }
 
-  // Klienci (zwijana cała sekcja „Lista Klientów”)
-  if (listaKlientowHeader && listaKlientowContent) {
-    listaKlientowHeader.classList.add('collapsed');
-    listaKlientowContent.classList.add('collapsed');
-    listaKlientowHeader.addEventListener('click', () => {
-      listaKlientowHeader.classList.toggle('collapsed');
-      listaKlientowContent.classList.toggle('collapsed');
-    }, { passive: true });
-  }
-
-  // Maszyny (zwijana cała sekcja „Lista Maszyn”)
-  if (listaMaszynHeader && listaMaszynContent) {
-    listaMaszynHeader.classList.add('collapsed');
-    listaMaszynContent.classList.add('collapsed');
-    listaMaszynHeader.addEventListener('click', () => {
-      listaMaszynHeader.classList.toggle('collapsed');
-      listaMaszynContent.classList.toggle('collapsed');
-    }, { passive: true });
-  }
-}
+           if (listaMaszynHeader && listaMaszynContent) {
+            listaMaszynHeader.classList.add('collapsed');
+            listaMaszynContent.classList.add('collapsed');
+            listaMaszynHeader.addEventListener('click', () => {
+                listaMaszynHeader.classList.toggle('collapsed');
+                listaMaszynContent.classList.toggle('collapsed');
+            }, { passive: true });
+        }
+    }
 
 
     // WSTRZYKNIĘCIE POLA NOTATKI DO MODALA ZAKOŃCZENIA (bez modyfikacji index.html)
@@ -1257,7 +1491,7 @@ async function obslugaListyKlientow(event) {
         for (const klientNazwa in pogrupowaneMaszyny) {
             maszynyHtml += `<div class="client-group">
                 <div class="client-header"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
-                <ul class="machine-list">
+                <ul class="machine-list collapsed">
                     ${pogrupowaneMaszyny[klientNazwa].map(maszyna =>
                         `<li data-id="${maszyna.id}">
                             <span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span>
@@ -1337,13 +1571,15 @@ async function obslugaListyKlientow(event) {
     async function obslugaListyMaszyn(event) {
   const el = event.target;
 
-  // Klik w pasek .client-header (grupa maszyn danego klienta)
   const header = el.closest('.client-header');
   if (header) {
-    header.classList.toggle('open');
-    const list = header.nextElementSibling; // powinno być ul.machine-list
+    const list = header.nextElementSibling;
     if (list && list.classList.contains('machine-list')) {
-      list.classList.toggle('open');
+      list.classList.toggle('collapsed');
+      const arrow = header.querySelector('.arrow');
+      if (arrow) {
+        arrow.style.transform = list.classList.contains('collapsed') ? '' : 'rotate(90deg)';
+      }
     }
     return;
   }
@@ -1507,7 +1743,7 @@ function wyswietlZlecenia() {
     if (ukonczoneZleceniaLista) {
         ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
     }
-    obliczIPokazPodsumowanieFinansowe();
+    renderZakonczoneSekcja();
 }
 
 function nasluchujNaZlecenia() {
@@ -2230,7 +2466,8 @@ async function obslugaZakonczeniaZlecenia(event) {
         miesiacSummaryInput.addEventListener('change', () => {
             getSelectedMonth();
             wyswietlZlecenia();
-            obliczIPokazPodsumowanieFinansowe();
+            renderZakonczoneSekcja();
+            renderPodsumowanieSekcja();
         });
     }
     const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
