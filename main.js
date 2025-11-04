@@ -936,6 +936,10 @@ function initializeApp() {
     }
 
     function renderZakonczoneSekcja() {
+        if (!zakonczoneTopSummary && !zakonczoneMonthSummary) {
+            return;
+        }
+
         const wybranyMiesiac = getSelectedMonth();
         const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
         const kalendarz = pobierzSumyKalendarza(wybranyMiesiac);
