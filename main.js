@@ -69,7 +69,7 @@ function initializeApp() {
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
     const magazynLista = document.getElementById('magazyn-lista');
-    const magazynSummaryContainer = document.getElementById('magazyn-summary');
+    const magazynHeaderContainer = document.getElementById('magazyn-header');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const stockModalForm = document.getElementById('stock-change-form');
@@ -101,6 +101,7 @@ function initializeApp() {
     const hoursChartContainer = document.getElementById('hours-chart');
     const calendarAbsorpcjaTag = document.getElementById('calendar-absorpcja');
     const podsumowaniaMetryki = document.getElementById('podsumowania-metryki');
+    const isPodsumowaniaViewMounted = () => Boolean(document.getElementById('podsumowania-view'))
     const editKlientModal = document.getElementById('edit-klient-modal');
     const editKlientForm = document.getElementById('edit-klient-form');
     const editMaszynaModal = document.getElementById('edit-maszyna-modal');
@@ -882,7 +883,7 @@ function initializeApp() {
     }
 
     function renderRocznePodsumowanie() {
-        if (!annualSummaryContainer) return;
+        if (!isPodsumowaniaViewMounted() || !annualSummaryContainer) return;
         const { miesiace, sumyRoczne } = ostatnieZestawienieMiesieczne;
         if (!miesiace.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
@@ -936,7 +937,7 @@ function initializeApp() {
     }
 
     function renderZakonczoneSekcja() {
-        if (!zakonczoneTopSummary && !zakonczoneMonthSummary) {
+        if (!isPodsumowaniaViewMounted() || (!zakonczoneTopSummary && !zakonczoneMonthSummary)) {
             return;
         }
 
@@ -1031,7 +1032,7 @@ function initializeApp() {
     }
 
     function renderPodsumowanieSekcja() {
-        if (!podsumowaniaMetryki) return;
+        if (!isPodsumowaniaViewMounted() || !podsumowaniaMetryki) return;
         const miesiac = getSelectedMonth();
         const zakonczone = pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, miesiac);
         const finanse = obliczFinanseZlecen(zakonczone);
@@ -1326,54 +1327,40 @@ function nasluchujNaKlientow() {
   );
 }
 async function obslugaListyKlientow(event) {
-  // 1) próbujemy znaleźć klikniętą strzałkę albo jej rodzica z data-target
   const arrow = event.target.closest('.toggle-machines-arrow');
   if (arrow) {
     const targetId = arrow.getAttribute('data-target');
-    const kontener = document.getElementById(targetId);
+    const kontener = targetId ? document.getElementById(targetId) : null;
     if (!kontener) {
-      console.warn('[KLienci] Nie znaleziono kontenera maszyn dla', targetId);
+      console.warn('[Klienci] Nie znaleziono kontenera maszyn dla', targetId);
       return;
     }
     arrow.classList.toggle('collapsed');
     kontener.classList.toggle('collapsed');
-    // log pomocniczy:
     return;
   }
 
-  // 2) klik w cały nagłówek wiersza klienta (poza przyciskami)
-  const headerItem = event.target.closest('.client-header-item');
-  if (headerItem &&
-      !event.target.classList.contains('edit-klient-btn') &&
-      !event.target.classList.contains('delete-btn')) {
-    const arrow2 = headerItem.querySelector('.toggle-machines-arrow');
-    if (arrow2) {
-      const targetId2 = arrow2.getAttribute('data-target');
-      const kontener2 = document.getElementById(targetId2);
-      if (!kontener2) {
-        console.warn('[Klienci] (header) brak kontenera', targetId2);
-        return;
-      }
-      arrow2.classList.toggle('collapsed');
-      kontener2.classList.toggle('collapsed');
+  const historyTrigger = event.target.closest('.machine-history-link, .history-btn');
+  if (historyTrigger) {
+    event.preventDefault();
+    const maszynaId = historyTrigger.dataset.maszynaId;
+    const maszynaNazwa = historyTrigger.dataset.maszynaNazwa;
+    if (maszynaId) {
+      pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa || '');
     }
     return;
   }
 
-  // 3) przyciski akcji
-  const clientGroup = event.target.closest('.client-group');
+  const actionButton = event.target.closest('button');
+  if (!actionButton) return;
+
+  const clientGroup = actionButton.closest('.client-group');
   if (!clientGroup) return;
+
   const klientId = clientGroup.dataset.id;
+  if (!klientId) return;
 
-  if (event.target.classList.contains('machine-history-link')) {
-    event.preventDefault();
-    const maszynaId = event.target.dataset.maszynaId;
-    const maszynaNazwa = event.target.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-    return;
-  }
-
-  if (event.target.classList.contains('delete-btn')) {
+  if (actionButton.classList.contains('delete-btn')) {
     if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
       await deleteDoc(doc(db, "klienci", klientId));
       wyswietlMaszyny();
@@ -1381,9 +1368,9 @@ async function obslugaListyKlientow(event) {
     return;
   }
 
-  if (event.target.classList.contains('edit-klient-btn')) {
+    if (actionButton.classList.contains('edit-klient-btn')) {
     otworzModalEdycjiKlienta(klientId);
-    return;
+
   }
 }
 
@@ -1683,49 +1670,52 @@ async function obslugaListyKlientow(event) {
     }
 
     async function obslugaListyMaszyn(event) {
-    const arrow = event.target.closest('.toggle-machines-arrow');
-    if (arrow) {
-        const targetId = arrow.dataset.target;
-        if (targetId) {
-            const container = document.getElementById(targetId);
-            if (container) {
-                container.classList.toggle('collapsed');
+         const arrow = event.target.closest('.toggle-machines-arrow');
+        if (arrow) {
+            const targetId = arrow.dataset.target;
+            const container = targetId ? document.getElementById(targetId) : null;
+            if (!container) {
+                console.warn('[Maszyny] Nie znaleziono kontenera', targetId);
+                return;
             }
+            arrow.classList.toggle('collapsed');
+            container.classList.toggle('collapsed');
+            return;
         }
-        arrow.classList.toggle('collapsed');
-        return;
-    }
 
-  const historyLink = event.target.closest('.machine-history-link');
-    if (historyLink) {
-        event.preventDefault();
-        const maszynaId = historyLink.dataset.maszynaId;
-        const maszynaNazwa = historyLink.dataset.maszynaNazwa;
-        pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-        return;
-    }
-
-    const actionButton = event.target.closest('button');
-    if (!actionButton) return;
-
-    const li = actionButton.closest('li');
-    if (!li) return;
-    const maszynaId = li.dataset.id;
-    if (!maszynaId) return;
-
-    if (actionButton.classList.contains('delete-btn')) {
-        if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-            await deleteDoc(doc(db, "maszyny", maszynaId));
-            wyswietlKlientow();
+        const historyTrigger = event.target.closest('.machine-history-link, .history-btn');
+        if (historyTrigger) {
+            event.preventDefault();
+            const maszynaId = historyTrigger.dataset.maszynaId || historyTrigger.dataset.id;
+            const maszynaNazwa = historyTrigger.dataset.maszynaNazwa || historyTrigger.dataset.nazwa || '';
+            if (maszynaId) {
+                pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+            }
+            return;
         }
-        return;
-    }
 
-    if (actionButton.classList.contains('edit-maszyna-btn')) {
-        otworzModalEdycjiMaszyny(maszynaId);
-        return;
+        const actionButton = event.target.closest('button');
+        if (!actionButton) return;
+
+        const li = actionButton.closest('li');
+        if (!li) return;
+        const maszynaId = li.dataset.id;
+        if (!maszynaId) return;
+
+
+        if (actionButton.classList.contains('delete-btn')) {
+            if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
+                await deleteDoc(doc(db, "maszyny", maszynaId));
+                wyswietlKlientow();
+            }
+            return;
+        }
+
+
+        if (actionButton.classList.contains('edit-maszyna-btn')) {
+            otworzModalEdycjiMaszyny(maszynaId);
+        }
     }
-}
 
 function otworzModalEdycjiMaszyny(maszynaId) {
     if (!editMaszynaForm || !editMaszynaModal) return;
@@ -1930,20 +1920,26 @@ async function dodajZlecenie(event) {
 }
 
 async function obslugaListyZlecen(event) {
-    const target = event.target;
-    const li = target.closest('li');
-    const docId = target?.dataset.id || li?.dataset.id;
-    if (!docId) return;
-
-    if (target.classList.contains('delete-btn')) {
+    const deleteBtn = event.target.closest('.delete-btn');
+    if (deleteBtn) {
+        const docId = deleteBtn.dataset.id || deleteBtn.closest('li')?.dataset.id;
+        if (!docId) return
         if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); }
         return;
     }
-    if (target.classList.contains('details-zlecenie-btn')) {
+
+    const detailsBtn = event.target.closest('.details-zlecenie-btn');
+    if (detailsBtn) {
+        const docId = detailsBtn.dataset.id || detailsBtn.closest('li')?.dataset.id;
+        if (!docId) return;
         otworzModalSzczegolowZlecenia(docId);
         return;
     }
-    if (target.classList.contains('assign-btn')) {
+
+    const assignBtn = event.target.closest('.assign-btn');
+    if (assignBtn) {
+        const docId = assignBtn.dataset.id || assignBtn.closest('li')?.dataset.id;
+        if (!docId) return;
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
         if (zlecenie && assignForm && assignModal) {
             const assignIdInput = assignForm.querySelector('#assign-zlecenie-id');
@@ -1957,7 +1953,11 @@ async function obslugaListyZlecen(event) {
         }
         return;
     }
-        if (target.classList.contains('complete-btn')) {
+
+    const completeBtn = event.target.closest('.complete-btn');
+    if (completeBtn) {
+        const docId = completeBtn.dataset.id || completeBtn.closest('li')?.dataset.id;
+        if (!docId) return;
         if (!completeModal || !completeModalForm) return;
         const docSnap = await getDoc(doc(db, "zlecenia", docId));
         if (docSnap.exists()) {
@@ -1980,7 +1980,11 @@ async function obslugaListyZlecen(event) {
         }
         return;
     }
-    if (target.classList.contains('edit-zlecenie-btn')) {
+
+    const editBtn = event.target.closest('.edit-zlecenie-btn');
+    if (editBtn) {
+        const docId = editBtn.dataset.id || editBtn.closest('li')?.dataset.id;
+        if (!docId) return;
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === docId);
         if (zlecenie && zlecenie.status === 'ukończone') {
             otworzModalEdycjiZlecenia(docId);
@@ -1989,34 +1993,33 @@ async function obslugaListyZlecen(event) {
         }
         return;
     }
-    if (target.classList.contains('reopen-btn')) {
+
+    const reopenBtn = event.target.closest('.reopen-btn');
+    if (reopenBtn) {
+        const docId = reopenBtn.dataset.id || reopenBtn.closest('li')?.dataset.id;
+        if (!docId) return;
         const reopenReason = prompt("Powód ponownego otwarcia (opcjonalnie):", "");
         try {
             const zlecenieRef = doc(db, "zlecenia", docId);
             const snap = await getDoc(zlecenieRef);
             if (!snap.exists()) return;
             const data = snap.data();
-            const nowaHistoria = [...(data.historia || []), {
-                timestamp: new Date().toISOString(),
-                akcja: `Ponownie otwarto zlecenie${reopenReason ? `: ${reopenReason}` : ''}`
-            }];
+            const nowaHistoria = [...(data.historia || []), { timestamp: new Date().toISOString(), akcja: `Ponownie otwarto zlecenie${reopenReason ? `: ${reopenReason}` : ''}` }];
             await updateDoc(zlecenieRef, {
                 status: 'aktywne',
                 dataUkonczenia: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
-                zakonczenieNumerWZ: null,               
+                zakonczenieNumerWZ: null,
                 historia: nowaHistoria
             });
         } catch (e) {
             console.error("Błąd przy ponownym otwieraniu:", e);
             alert("Nie udało się ponownie otworzyć zlecenia.");
         }
-        return;
     }
 }
-
 function otworzModalEdycjiZlecenia(zlecenieId) {
     if (!editZlecenieForm || !editZlecenieModal) return;
     const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
@@ -2581,11 +2584,10 @@ async function obslugaZakonczeniaZlecenia(event) {
             wszystkieProdukty = [];
             let sumaIlosci = 0;
             let liczbaNiskich = 0;
-            let ostatniaZmiana = null;
 
             if (snapshot.empty) {
                 magazynLista.innerHTML = '<tr><td colspan="6">Magazyn pusty.</td></tr>';
-                renderMagazynPodsumowanie(0, 0, null);
+                renderMagazynPodsumowanie(0, 0, 0);
                 return;
             }
             snapshot.forEach((docSnap) => {
@@ -2607,12 +2609,6 @@ async function obslugaZakonczeniaZlecenia(event) {
                 if (iloscLiczbowa <= NISKI_STAN_MAGAZYNOWY) {
                     liczbaNiskich += 1;
                 }
-                [konwertujNaDate(docSnap.updateTime), konwertujNaDate(produkt.updatedAt), konwertujNaDate(produkt.createdAt)]
-                    .forEach((data) => {
-                        if (data && (!ostatniaZmiana || data > ostatniaZmiana)) {
-                            ostatniaZmiana = data;
-                        }
-                    });
 
                 html += `<tr data-id=\"${produkt.id}\" data-name=\"${produkt.nazwa}\" data-qty=\"${datasetQty}\" data-is-oil=\"${jestOlejem}\"></span>
                     <td>${produkt.index}</td>
@@ -2629,29 +2625,28 @@ async function obslugaZakonczeniaZlecenia(event) {
             });
 
             magazynLista.innerHTML = html || '<tr><td colspan="6">Magazyn pusty.</td></tr>';
-            renderMagazynPodsumowanie(sumaIlosci, liczbaNiskich, ostatniaZmiana);
+            renderMagazynPodsumowanie(wszystkieProdukty.length, sumaIlosci, liczbaNiskich);
             renderMagazynWModalu();
         });
     }
 
-    function renderMagazynPodsumowanie(sumaIlosci, liczbaNiskich, ostatniaZmiana) {
-        if (!magazynSummaryContainer) {
-            console.warn('[UI] Element #magazyn-summary nie istnieje – pominięto podsumowanie magazynu.');
+    function renderMagazynPodsumowanie(liczbaPozycji, sumaIlosci, liczbaNiskich) {
+        if (!magazynHeaderContainer) {
+            console.warn('[UI] Element #magazyn-header nie istnieje – pominięto podsumowanie magazynu.');
             return;
         }
-        const formattedDate = formatujDateCzas(ostatniaZmiana);
-        magazynSummaryContainer.innerHTML = `
+        magazynHeaderContainer.innerHTML = `
             <div class=\"summary-item\">
-                <span class=\"summary-label\">Łącznie szt.</span>
+                <span class=\"summary-label\">Łączna liczba pozycji</span>
+                <span class=\"summary-value\">${liczbaPozycji}</span>
+            </div>
+            <div class=\"summary-item\">
+                <span class=\"summary-label\">Łączna ilość</span>
                 <span class=\"summary-value\">${formatujLiczbe(sumaIlosci)}</span>
             </div>
             <div class=\"summary-item\">
-                <span class=\"summary-label\">Niskie stany</span>
+                <span class=\"summary-label\">Poniżej progu (${NISKI_STAN_MAGAZYNOWY})</span>
                 <span class=\"summary-value\">${liczbaNiskich}</span>
-            </div>
-            <div class=\"summary-item\">
-                <span class=\"summary-label\">Ostatnia zmiana</span>
-                <span class=\"summary-value\">${formattedDate}</span>
             </div>
         `;
     }

@@ -270,12 +270,6 @@
           <div class="section-heading">
             <h2>Magazyn</h2>
           </div>
-          <div class="magazyn-summary-block">
-            <div class="section-header">
-              <h3>Stan magazynu</h3>
-            </div>
-            <div id="magazyn-summary" class="summary-container-subtle magazyn-summary"></div>
-          </div>
           <div class="magazyn-forms">
             <div class="form-section">
               <h3>Dodaj produkt</h3>
@@ -349,6 +343,7 @@
               <p>Wynik: <strong id="result-litry">0.00 L</strong></p>
             </div>
             </div>
+            <div id="magazyn-header" class="magazyn-header summary-container-subtle"></div>
           <div class="table-section">
             <h3>Stan Magazynowy</h3>
             <table id="magazyn-table">
@@ -367,19 +362,25 @@
           </div>
         </section>
 
-        <section id="podsumowania" class="tab-content"></section>
-          <div class="section-heading">
-            <h2>Podsumowania</h2>
+        <section id="podsumowania" class="tab-content">
+          <div id="podsumowania-view">
+            <div class="section-heading">
+              <h2>Podsumowania</h2>
+            </div>
+            <div id="summary-container">
+              <div class="summary-controls">
+                <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
+                <input type="month" id="miesiac-summary" />
+                <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
+              </div>
+              <div id="podsumowania-metryki" class="summary-cards"></div>
+              <div id="zakonczone-top-summary" class="summary-kpi-row"></div>
+              <div id="zakonczone-month-summary" class="summary-kpi-grid"></div>
+              <div class="podsumowanie-divider"></div>
+              <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
+              <div id="annual-summary"></div>
+            </div>
           </div>
-          <div class="summary-controls">
-            <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
-            <input type="month" id="miesiac-summary" />
-            <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
-          </div>
-          <div id="podsumowania-metryki" class="summary-cards"></div>
-          <div class="podsumowanie-divider"></div>
-          <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
-          <div id="annual-summary"></div>
         </section>
       </main>
     </div>
