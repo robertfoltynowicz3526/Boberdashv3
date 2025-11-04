@@ -1440,15 +1440,21 @@ async function obslugaListyKlientow(event) {
     }
 
     function obslugaListyZlecenWModaluHistorii(event) {
-        const target = event.target;
-        const li = target.closest('li');
-        const docId = target.dataset.id || li?.dataset.id;
-        if (!docId) return;
-        if (target.classList.contains('details-zlecenie-btn')) {
-            otworzModalSzczegolowZlecenia(docId);
+        const detailsBtn = event.target.closest('.details-zlecenie-btn');
+        if (detailsBtn) {
+            const docId = detailsBtn.dataset.id || detailsBtn.closest('li')?.dataset.id;
+            if (docId) {
+                otworzModalSzczegolowZlecenia(docId);
+            }
+            return;
         }
-        if (target.classList.contains('edit-zlecenie-btn')) {
-            otworzModalEdycjiZlecenia(docId);
+        
+        const editBtn = event.target.closest('.edit-zlecenie-btn');
+        if (editBtn) {
+            const docId = editBtn.dataset.id || editBtn.closest('li')?.dataset.id;
+            if (docId) {
+                otworzModalEdycjiZlecenia(docId);
+            }
         }
     }
 
@@ -1561,27 +1567,57 @@ async function obslugaListyKlientow(event) {
             return tekst.includes(frazaWyszukiwania);
         });
 
-        const pogrupowaneMaszyny = przefiltrowaneMaszyny.reduce((acc, maszyna) => {
-            (acc[maszyna.klientNazwa] = acc[maszyna.klientNazwa] || []).push(maszyna);
-            return acc;
-        }, {});
-        let maszynyHtml = '';
-        for (const klientNazwa in pogrupowaneMaszyny) {
-            maszynyHtml += `<div class="client-group">
-                <div class="client-header"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
-                <ul class="machine-list collapsed">
-                    ${pogrupowaneMaszyny[klientNazwa].map(maszyna =>
-                        `<li data-id="${maszyna.id}">
-                            <span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span>
-                            <div>
-                                <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">Historia</a>
-                                <button class="btn-edit edit-maszyna-btn">Edytuj</button>
-                                <button class="delete-btn">Usuń</button>
-                            </div>
-                        </li>`).join('')}
-                </ul></div>`;
-        }
-       if (listaMaszynDiv) {
+        const grupyMaszyn = przefiltrowaneMaszyny.reduce((mapa, maszyna, index) => {
+            const klientId = maszyna.klientId || '';
+            const klucz = klientId || `nieprzypisany-${maszyna.klientNazwa || index}`;
+            if (!mapa.has(klucz)) {
+                const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
+                const nazwa = klient?.nazwa || maszyna.klientNazwa || 'Nieprzypisany klient';
+                mapa.set(klucz, { klientId, nazwa, maszyny: [] });
+            }
+            mapa.get(klucz).maszyny.push(maszyna);
+            return mapa;
+        }, new Map());
+
+        const posortowaneGrupy = Array.from(grupyMaszyn.values())
+            .sort((a, b) => a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' }));
+
+        const maszynyHtml = posortowaneGrupy.map((grupa, idx) => {
+            const suffix = grupa.klientId ? grupa.klientId : `group-${idx}`;
+            const targetId = `client-${suffix}-machines`;
+            const listaMaszyn = grupa.maszyny
+                .sort((a, b) => (a.typMaszyny || '').localeCompare(b.typMaszyny || '') || (a.model || '').localeCompare(b.model || ''))
+                .map(maszyna => {
+                    const typ = maszyna.typMaszyny || '---';
+                    const model = maszyna.model || '';
+                    const numerSeryjny = maszyna.nrSeryjny && maszyna.nrSeryjny !== '---' ? maszyna.nrSeryjny : 'brak';
+                    const label = `${typ} ${model}`.trim();
+                    return `
+                    <li data-id="${maszyna.id}">
+                        <span>${label} (S/N: ${numerSeryjny})</span>
+                        <div>
+                            <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${label}">Historia</a>
+                            <button class="btn-edit edit-maszyna-btn">Edytuj</button>
+                            <button class="delete-btn">Usuń</button>
+                        </div>
+                    </li>`;
+                }).join('');
+
+            return `
+                <div class="client-group">
+                    <div class="client-header">
+                        <div class="client-header-text"><h4>${grupa.nazwa}</h4></div>
+                        <span class="toggle-machines-arrow collapsed" data-target="${targetId}">▼</span>
+                    </div>
+                    <div id="${targetId}" class="client-machine-list-container collapsed">
+                        <ul class="client-machine-list">
+                            ${listaMaszyn}
+                        </ul>
+                    </div>
+                </div>`;
+        }).join('');
+
+        if (listaMaszynDiv) {
             listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
         }
         if (zlecenieKlientSelect) {
@@ -1647,45 +1683,48 @@ async function obslugaListyKlientow(event) {
     }
 
     async function obslugaListyMaszyn(event) {
-  const el = event.target;
-
-  const header = el.closest('.client-header');
-  if (header) {
-    const list = header.nextElementSibling;
-    if (list && list.classList.contains('machine-list')) {
-      list.classList.toggle('collapsed');
-      const arrow = header.querySelector('.arrow');
-      if (arrow) {
-        arrow.style.transform = list.classList.contains('collapsed') ? '' : 'rotate(90deg)';
-      }
+    const arrow = event.target.closest('.toggle-machines-arrow');
+    if (arrow) {
+        const targetId = arrow.dataset.target;
+        if (targetId) {
+            const container = document.getElementById(targetId);
+            if (container) {
+                container.classList.toggle('collapsed');
+            }
+        }
+        arrow.classList.toggle('collapsed');
+        return;
     }
-    return;
-  }
 
-  if (el.classList.contains('machine-history-link')) {
-    event.preventDefault();
-    const maszynaId = el.dataset.maszynaId;
-    const maszynaNazwa = el.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-    return;
-  }
-
-  const li = el.closest('li');
-  if (!li) return;
-  const maszynaId = li.dataset.id;
-
-  if (el.classList.contains('delete-btn')) {
-    if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "maszyny", maszynaId));
-      wyswietlKlientow();
+  const historyLink = event.target.closest('.machine-history-link');
+    if (historyLink) {
+        event.preventDefault();
+        const maszynaId = historyLink.dataset.maszynaId;
+        const maszynaNazwa = historyLink.dataset.maszynaNazwa;
+        pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+        return;
     }
-    return;
-  }
 
-  if (el.classList.contains('edit-maszyna-btn')) {
-    otworzModalEdycjiMaszyny(maszynaId);
-    return;
-  }
+    const actionButton = event.target.closest('button');
+    if (!actionButton) return;
+
+    const li = actionButton.closest('li');
+    if (!li) return;
+    const maszynaId = li.dataset.id;
+    if (!maszynaId) return;
+
+    if (actionButton.classList.contains('delete-btn')) {
+        if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
+            await deleteDoc(doc(db, "maszyny", maszynaId));
+            wyswietlKlientow();
+        }
+        return;
+    }
+
+    if (actionButton.classList.contains('edit-maszyna-btn')) {
+        otworzModalEdycjiMaszyny(maszynaId);
+        return;
+    }
 }
 
 function otworzModalEdycjiMaszyny(maszynaId) {
@@ -2109,32 +2148,83 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
     }
-    const qKalendarz = query(
-        collection(db, "godziny_pracy"),
-        orderBy("__name__", "desc")
-    );
-    const querySnapshotKalendarz = await getDocs(qKalendarz);
-    let kalendarzHtml = '';
-    querySnapshotKalendarz.forEach((docSnap) => {
-        const wpis = docSnap.data();
-        const { powiazane } = normalizujPowiazaneZlecenia(wpis);
-        const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
-        if (!powiazanie) return;
-        const dataWpisu = docSnap.id;
-        kalendarzHtml += `
-            <div class="calendar-entry-item">
-                <span class="date">[${dataWpisu}]</span>
-                Praca: ${formatujLiczbe(wpis.praca || 0)}h | Fakturowane dla zlecenia: ${formatujLiczbe(powiazanie.fakturowane)}h | Nadgodziny: ${formatujLiczbe(wpis.nadgodziny || 0)}h | Jazda: ${formatujLiczbe(wpis.jazda || 0)}h
-                ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
-            </div>`;
-    });
-    if (kalendarzDiv) {
-        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+    try {
+        const qKalendarz = query(
+            collection(db, "godziny_pracy"),
+            where("zlecenieId", "==", zlecenieId)
+        );
+        const querySnapshotKalendarz = await getDocs(qKalendarz);
+        let wpisyKalendarza = querySnapshotKalendarza.docs
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+            .sort((a, b) => {
+                const dataA = new Date(a.id);
+                const dataB = new Date(b.id);
+                const czasA = Number.isNaN(dataA.getTime()) ? 0 : dataA.getTime();
+                const czasB = Number.isNaN(dataB.getTime()) ? 0 : dataB.getTime();
+                if (czasA === czasB) {
+                    return b.id.localeCompare(a.id);
+                }
+                return czasB - czasA;
+            });
+
+        if (!wpisyKalendarza.length) {
+            wpisyKalendarza = wszystkieWpisyKalendarza
+                .map(wpis => {
+                    const { powiazane } = normalizujPowiazaneZlecenia(wpis);
+                    const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
+                    if (!powiazanie) return null;
+                    return {
+                        id: wpis.id,
+                        praca: wpis.praca,
+                        fakturowane: powiazanie.fakturowane,
+                        nadgodziny: wpis.nadgodziny,
+                        jazda: wpis.jazda,
+                        notatka: wpis.notatka
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => {
+                    const dataA = new Date(a.id);
+                    const dataB = new Date(b.id);
+                    const czasA = Number.isNaN(dataA.getTime()) ? 0 : dataA.getTime();
+                    const czasB = Number.isNaN(dataB.getTime()) ? 0 : dataB.getTime();
+                    if (czasA === czasB) {
+                        return b.id.localeCompare(a.id);
+                    }
+                    return czasB - czasA;
+                });
+        }
+
+        const kalendarzHtml = wpisyKalendarza.map(wpis => {
+            const praca = formatujLiczbe(wpis.praca || 0);
+            const fakturowane = formatujLiczbe(wpis.fakturowane || 0);
+            const nadgodziny = formatujLiczbe(wpis.nadgodziny || 0);
+            const jazda = formatujLiczbe(wpis.jazda || 0);
+            const notatkaHtml = wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : '';
+            return `
+                <div class="calendar-entry-item">
+                    <span class="date">[${wpis.id}]</span>
+                    Praca: ${praca}h | Fakturowane: ${fakturowane}h | Nadgodziny: ${nadgodziny}h | Jazda: ${jazda}h
+                    ${notatkaHtml}
+                </div>`;
+        }).join('');
+
+        if (kalendarzDiv) {
+            kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+        }
+    } catch (error) {
+        console.error('Błąd wczytywania wpisów kalendarza:', error);
+        if (kalendarzDiv) {
+            kalendarzDiv.innerHTML = '<p style="color: #f87171;">Nie udało się wczytać wpisów kalendarza.</p>';
+        }
     }
 
     detailsZlecenieModal.style.display = 'block';
 }
 
+ window.otworzModalSzczegolowZlecenia = otworzModalSzczegolowZlecenia;
+
+ 
 async function zapiszPrzypisanie(event) {
     if (!assignForm || !assignModal) return;
     event.preventDefault();
