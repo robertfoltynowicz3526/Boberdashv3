@@ -2,9 +2,6 @@ import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs } from "firebase/firestore";
 import Papa from 'papaparse';
 
-// Uruchom dopiero po załadowaniu DOM:
-window.addEventListener('DOMContentLoaded', initializeApp);
-
 
 function initializeApp() {
     // --- STAŁE I ZMIENNE GLOBALNE ---
@@ -125,23 +122,11 @@ function initializeApp() {
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    function setActiveTab(tabName) {
-        if (!tabName) return;
-        const tabElement = document.getElementById(tabName);
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.toggle('active', tab === tabElement);
+    document.querySelectorAll('#sidebar .tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            setActiveTab(button.dataset.tab);
         });
-        document.querySelectorAll('#sidebar .tab-button').forEach(button => {
-            const shouldActivate = tabElement && button.dataset.tab === tabName;
-            button.classList.toggle('active', shouldActivate);
         });
-    }
-
-    window.openTab = (tabName) => {
-        if (typeof tabName === 'string') {
-            setActiveTab(tabName);
-        }
-    };
 
     function setActiveTab(tabName) {
         if (!tabName) return;
@@ -539,12 +524,27 @@ function initializeApp() {
 
         const absorpcja = obliczAbsorpcje(sumy.fakturowane);
         if (!kalendarzPodsumowanieDiv) return;
+        const pracaTxt = `${formatujLiczbe(sumy.praca)} h`;
+        const fakturowaneTxt = `${formatujLiczbe(sumy.fakturowane)} h`;
+        const jazdaTxt = `${formatujLiczbe(sumy.jazda)} h`;
+        const nadgodzinyTxt = `${formatujLiczbe(sumy.nadgodziny)} h`;
+        const statsText = `Praca ${pracaTxt} • Fakturowane ${fakturowaneTxt} • Jazda ${jazdaTxt} • Nadg. ${nadgodzinyTxt}`;
         kalendarzPodsumowanieDiv.innerHTML = `
-            <div class="summary-item"><span class="summary-label">Praca w miesiącu</span><span class="summary-value">${sumy.praca.toFixed(1)} h</span></div>
-            <div class="summary-item"><span class="summary-label">Fakturowane</span><span class="summary-value">${sumy.fakturowane.toFixed(1)} h</span></div>
-            <div class="summary-item"><span class="summary-label">Nadgodziny</span><span class="summary-value">${sumy.nadgodziny.toFixed(1)} h</span></div>
-            <div class="summary-item"><span class="summary-label">Czas jazdy</span><span class="summary-value">${sumy.jazda.toFixed(1)} h</span></div>
-            <div class="summary-item"><span class="summary-label">Absorpcja</span><span class="summary-value">${formatujProcent(absorpcja)}%</span></div>
+           <div class="calendar-summary-bar">
+                <p class="calendar-summary-stats">${statsText}</p>
+                <div class="calendar-absorpcja-card">
+                    <span class="label">Absorpcja</span>
+                    <span class="value">${formatujProcent(absorpcja)}%</span>
+                    <span class="hint">= Fakturowane / 168h</span>
+                </div>
+            </div>
+            <div class="calendar-summary-grid">
+                <div class="summary-item"><span class="summary-label">Praca</span><span class="summary-value">${pracaTxt}</span></div>
+                <div class="summary-item"><span class="summary-label">Fakturowane</span><span class="summary-value">${fakturowaneTxt}</span></div>
+                <div class="summary-item"><span class="summary-label">Jazda</span><span class="summary-value">${jazdaTxt}</span></div>
+                <div class="summary-item"><span class="summary-label">Nadgodziny</span><span class="summary-value">${nadgodzinyTxt}</span></div>
+                <div class="summary-item"><span class="summary-label">Absorpcja</span><span class="summary-value">${formatujProcent(absorpcja)}%</span></div>
+            </div> 
         `;
          if (calendarAbsorpcjaTag) {
             calendarAbsorpcjaTag.textContent = `Absorpcja: ${formatujProcent(absorpcja)}%`;
@@ -2604,3 +2604,9 @@ async function obslugaZakonczeniaZlecenia(event) {
     wyswietlMagazyn();
 
 } // koniec initializeApp()
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
+} else {
+    initializeApp();
+}

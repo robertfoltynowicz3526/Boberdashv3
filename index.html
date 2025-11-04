@@ -12,8 +12,8 @@
     <script type="module" src="/main.js" defer></script>
   </head>
   <body>
-    <div class="app-shell">
-      <aside id="sidebar" class="sidebar"></aside>
+     <div class="layout">
+      <aside id="sidebar" class="sidebar">
         <div class="brand">
           <div class="brand-logo">
             <span class="logo-circle">
@@ -31,15 +31,15 @@
           <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
           <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
           <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
-          <button type="button" class="tab-button" data-tab="podsumowanie">Kalendarz &amp; Roczne</button>
+          <button type="button" class="tab-button" data-tab="podsumowanie">Kalendarz</button>
         </nav>
         <div class="theme-switcher">
           <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox" />
           <label for="theme-toggle" class="theme-toggle-label"></label>
           <span class="theme-label">Tryb nocny</span>
         </div>
-    </aside>
-      <main>
+      </aside>
+      <main class="content">
         <header class="main-header">
           <h1>Panel Agro-Bober</h1>
           <p>Kontrola serwisu i ewidencji czasu pracy</p>
