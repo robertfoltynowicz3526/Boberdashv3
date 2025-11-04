@@ -21,8 +21,9 @@ function initializeApp() {
         jazda: 0,
         wyfakturowaneGodziny: 0,
         brutto: 0,
-        netto: 0
-    }); 
+        netto: 0,
+        absorpcja: 0
+    });
     let wszystkieZlecenia = [], wszystkieProdukty = [], wszystkiePrzejazdy = [],
         czesciDoZlecenia = [], wszystkieMaszyny = [], wszystkieKlienci = [], wszystkieWpisyKalendarza = [];
     let ostatnieZestawienieMiesieczne = {
@@ -124,25 +125,47 @@ function initializeApp() {
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    window.openTab = (evt, tabName) => {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        const tab = document.getElementById(tabName);
-        if (tab) {
-            tab.classList.add('active');
-        }
-        if (evt?.currentTarget) {
-            evt.currentTarget.classList.add('active');
+    function setActiveTab(tabName) {
+        if (!tabName) return;
+        const tabElement = document.getElementById(tabName);
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.toggle('active', tab === tabElement);
+        });
+        document.querySelectorAll('#sidebar .tab-button').forEach(button => {
+            const shouldActivate = tabElement && button.dataset.tab === tabName;
+            button.classList.toggle('active', shouldActivate);
+        });
+    }
+
+    window.openTab = (tabName) => {
+        if (typeof tabName === 'string') {
+            setActiveTab(tabName);
         }
     };
+
+    function setActiveTab(tabName) {
+        if (!tabName) return;
+        const tabElement = document.getElementById(tabName);
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.toggle('active', tab === tabElement);
+        });
+        document.querySelectorAll('#sidebar .tab-button').forEach(button => {
+            const shouldActivate = tabElement && button.dataset.tab === tabName;
+            button.classList.toggle('active', shouldActivate);
+        });
+    }
+
+    window.openTab = (tabName) => {
+        if (typeof tabName === 'string') {
+            setActiveTab(tabName);
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     const currentMonth = `${year}-${month}`;
     if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-    const firstTabButton = document.querySelector('.tab-button');
+    const firstTabButton = document.querySelector('#sidebar .tab-button');
     if (firstTabButton) {
-        firstTabButton.click();
+        setActiveTab(firstTabButton.dataset.tab);
     }
     inicjujCiemnyMotyw();
     inicjujZwijanie();
@@ -511,15 +534,17 @@ function initializeApp() {
             return acc;
         }, { praca: 0, fakturowane: 0, nadgodziny: 0, jazda: 0 });
 
+        const absorpcja = obliczAbsorpcje(sumy.fakturowane);
         if (!kalendarzPodsumowanieDiv) return;
         kalendarzPodsumowanieDiv.innerHTML = `
-            <p>Praca w miesiącu: <strong>${sumy.praca.toFixed(1)} h</strong></p>
-            <p>Fakturowane: <strong>${sumy.fakturowane.toFixed(1)} h</strong></p>
-            <p>Nadgodziny: <strong>${sumy.nadgodziny.toFixed(1)} h</strong></p>
-            <p>Czas Jazdy: <strong>${sumy.jazda.toFixed(1)} h</strong></p>
+            <div class="summary-item"><span class="summary-label">Praca w miesiącu</span><span class="summary-value">${sumy.praca.toFixed(1)} h</span></div>
+            <div class="summary-item"><span class="summary-label">Fakturowane</span><span class="summary-value">${sumy.fakturowane.toFixed(1)} h</span></div>
+            <div class="summary-item"><span class="summary-label">Nadgodziny</span><span class="summary-value">${sumy.nadgodziny.toFixed(1)} h</span></div>
+            <div class="summary-item"><span class="summary-label">Czas jazdy</span><span class="summary-value">${sumy.jazda.toFixed(1)} h</span></div>
+            <div class="summary-item"><span class="summary-label">Absorpcja</span><span class="summary-value">${formatujProcent(absorpcja)}%</span></div>
         `;
          if (calendarAbsorpcjaTag) {
-            calendarAbsorpcjaTag.textContent = `Absorpcja: ${formatujProcent(obliczAbsorpcje(sumy.fakturowane))}%`;
+            calendarAbsorpcjaTag.textContent = `Absorpcja: ${formatujProcent(absorpcja)}%`;
         }
     }
 
@@ -715,7 +740,7 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
         const mapa = {};
-        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 });
+        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0, absorpcja: 0 });
         const pobierzRekord = (miesiac) => {
             if (!mapa[miesiac]) {
                 mapa[miesiac] = pustyRekord();
@@ -749,7 +774,11 @@ function initializeApp() {
 
         const miesiace = Object.keys(mapa)
             .sort()
-            .map(miesiac => ({ miesiac, ...mapa[miesiac] }));
+            .map(miesiac => {
+                const rekord = mapa[miesiac];
+                const absorpcja = obliczAbsorpcje(rekord.wyfakturowaneGodziny);
+                return { miesiac, ...rekord, absorpcja };
+            });
 
         const sumyRoczne = miesiace.reduce((acc, rekord) => {
             acc.praca += rekord.praca;
@@ -760,6 +789,7 @@ function initializeApp() {
             acc.netto += rekord.netto;
             return acc;
         }, pustyRekord());
+        sumyRoczne.absorpcja = obliczAbsorpcje(sumyRoczne.wyfakturowaneGodziny);
 
         return { miesiace, sumyRoczne };
     }
@@ -821,6 +851,7 @@ function initializeApp() {
                 <td>${formatujLiczbe(rekord.nadgodziny)} h</td>
                 <td>${formatujLiczbe(rekord.jazda)} h</td>
                 <td>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
+                <td>${formatujProcent(rekord.absorpcja)}%</td>
                 <td>${formatujLiczbe(rekord.brutto)} zł</td>
                 <td>${formatujLiczbe(rekord.netto)} zł</td>
             </tr>
@@ -833,6 +864,7 @@ function initializeApp() {
                 <td>${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
                 <td>${formatujLiczbe(sumyRoczne.jazda)} h</td>
                 <td>${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
+                <td>${formatujProcent(sumyRoczne.absorpcja)}%</td>
                 <td>${formatujLiczbe(sumyRoczne.brutto)} zł</td>
                 <td>${formatujLiczbe(sumyRoczne.netto)} zł</td>
             </tr>`;
@@ -847,6 +879,7 @@ function initializeApp() {
                             <th>Nadgodziny</th>
                             <th>Czas jazdy</th>
                             <th>Godziny wyfakturowane</th>
+                            <th>Absorpcja</th>
                             <th>Brutto</th>
                             <th>Netto</th>
                         </tr>
@@ -867,8 +900,7 @@ function initializeApp() {
             const cards = [
                 { label: 'Godziny wyfakturowane', value: `${formatujLiczbe(finansowe.sumaGodzin)} h` },
                 { label: 'Wartość brutto', value: `${formatujLiczbe(finansowe.sumaBrutto)} zł` },
-                { label: 'Wartość netto', value: `${formatujLiczbe(finansowe.sumaNetto)} zł` },
-                { label: 'Absorpcja', value: `${formatujProcent(absorpcja)}%` }
+                { label: 'Wartość netto', value: `${formatujLiczbe(finansowe.sumaNetto)} zł` }
             ].map(card => `
                 <div class="metric-card">
                     <h4>${card.label}</h4>
@@ -880,9 +912,10 @@ function initializeApp() {
 
         if (zakonczoneMonthSummary) {
             zakonczoneMonthSummary.innerHTML = `
-                <p>Suma godzin: <strong>${formatujLiczbe(finansowe.sumaGodzin)} h</strong></p>
-                <p>Wartość brutto: <strong>${formatujLiczbe(finansowe.sumaBrutto)} zł</strong></p>
-                <p>Wartość netto: <strong>${formatujLiczbe(finansowe.sumaNetto)} zł</strong></p>
+                <div class="summary-item"><span class="summary-label">Suma godzin</span><span class="summary-value">${formatujLiczbe(finansowe.sumaGodzin)} h</span></div>
+                <div class="summary-item"><span class="summary-label">Wartość brutto</span><span class="summary-value">${formatujLiczbe(finansowe.sumaBrutto)} zł</span></div>
+                <div class="summary-item"><span class="summary-label">Wartość netto</span><span class="summary-value">${formatujLiczbe(finansowe.sumaNetto)} zł</span></div>
+                <div class="summary-item"><span class="summary-label">Absorpcja</span><span class="summary-value">${formatujProcent(absorpcja)}%</span></div>
             `;
         }
     }
@@ -893,22 +926,21 @@ function initializeApp() {
         const aktualnyMiesiac = `${teraz.getFullYear()}-${String(teraz.getMonth() + 1).padStart(2, '0')}`;
         const poprzedniMiesiac = obliczPoprzedniMiesiac(aktualnyMiesiac);
 
-        const zakonczoneAktualny = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, aktualnyMiesiac));
-        const zakonczonePoprzedni = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, poprzedniMiesiac));
-        const sumaKalendarza = pobierzSumyKalendarza(aktualnyMiesiac);
-        const absorpcja = obliczAbsorpcje(sumaKalendarza.fakturowane);
+        const sumaKalendarzaAktualny = pobierzSumyKalendarza(aktualnyMiesiac);
+        const sumaKalendarzaPoprzedni = pobierzSumyKalendarza(poprzedniMiesiac);
+        const absorpcja = obliczAbsorpcje(sumaKalendarzaAktualny.fakturowane);
 
         const noweZlecenia = (_wszystkieZleceniaCache || []).filter(z => normalizujMiesiac(z?.createdAt) === aktualnyMiesiac).length;
         const otwarteZlecenia = (_wszystkieZleceniaCache || []).filter(z => z?.status === 'aktywne' || z?.status === 'nieprzypisane').length;
 
-        const diff = zakonczoneAktualny.godziny - (zakonczonePoprzedni.godziny || 0);
-        const procentZmiany = (zakonczonePoprzedni.godziny || 0) === 0
-            ? (zakonczoneAktualny.godziny > 0 ? 100 : 0)
-            : (diff / zakonczonePoprzedni.godziny) * 100;
+        const diff = sumaKalendarzaAktualny.fakturowane - (sumaKalendarzaPoprzedni.fakturowane || 0);
+        const procentZmiany = (sumaKalendarzaPoprzedni.fakturowane || 0) === 0
+            ? (sumaKalendarzaAktualny.fakturowane > 0 ? 100 : 0)
+            : (diff / sumaKalendarzaPoprzedni.fakturowane) * 100;
 
         if (dashboardNoweZlecenia) dashboardNoweZlecenia.textContent = noweZlecenia.toString();
         if (dashboardOtwarteZlecenia) dashboardOtwarteZlecenia.textContent = otwarteZlecenia.toString();
-        if (dashboardWyfakturowane) dashboardWyfakturowane.textContent = `${formatujLiczbe(zakonczoneAktualny.godziny)} h`;
+        if (dashboardWyfakturowane) dashboardWyfakturowane.textContent = `${formatujLiczbe(sumaKalendarzaAktualny.fakturowane)} h`;
         if (dashboardWyfakturowaneZmiana) {
             const znak = procentZmiany > 0 ? '+' : '';
             dashboardWyfakturowaneZmiana.textContent = `${znak}${formatujProcent(procentZmiany)}% vs poprzedni`;
@@ -928,8 +960,8 @@ function initializeApp() {
                 miesiaceDoWyswietlenia.push(mies);
             }
             const daneWykresu = miesiaceDoWyswietlenia.map(mies => {
-                const finanse = obliczFinanseZlecen(pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, mies));
-                return { miesiac: mies, godziny: finanse.godziny };
+            const kalendarz = pobierzSumyKalendarza(mies);
+                return { miesiac: mies, godziny: kalendarz.fakturowane };    
             });
             const maxGodziny = Math.max(0, ...daneWykresu.map(d => d.godziny));
             if (maxGodziny === 0) {
@@ -1127,7 +1159,6 @@ function wyswietlKlientow() {
   try {
     // Poczekaj na maszyny – bez nich nie budujemy list pod klientami
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0) {
-      console.log("Czekam na maszyny przed renderowaniem klientów...");
       if (listaKlientowDiv) listaKlientowDiv.innerHTML = "<p>Ładowanie danych maszyn...</p>";
       return;
     }
@@ -1258,7 +1289,6 @@ async function obslugaListyKlientow(event) {
     arrow.classList.toggle('collapsed');
     kontener.classList.toggle('collapsed');
     // log pomocniczy:
-    console.log('[Klienci] toggle', { targetId, collapsed: kontener.classList.contains('collapsed') });
     return;
   }
 
@@ -1277,7 +1307,6 @@ async function obslugaListyKlientow(event) {
       }
       arrow2.classList.toggle('collapsed');
       kontener2.classList.toggle('collapsed');
-      console.log('[Klienci] (header) toggle', { targetId: targetId2, collapsed: kontener2.classList.contains('collapsed') });
     }
     return;
   }

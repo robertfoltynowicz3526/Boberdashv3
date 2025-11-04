@@ -13,7 +13,7 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar">
+      <aside id="sidebar" class="sidebar"></aside>
         <div class="brand">
           <div class="brand-logo">
             <span class="logo-circle">
@@ -25,13 +25,13 @@
             </div>
           </div>
         </div>
-        <nav class="sidebar-nav">
-          <button class="tab-button" onclick="openTab(event, 'pulpit')">Pulpit</button>
-          <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
-          <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
-          <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
-          <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
-          <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Kalendarz &amp; Roczne</button>
+        <nav class="side-nav">
+          <button type="button" class="tab-button" data-tab="pulpit">Pulpit</button>
+          <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
+          <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
+          <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
+          <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
+          <button type="button" class="tab-button" data-tab="podsumowanie">Kalendarz &amp; Roczne</button>
         </nav>
         <div class="theme-switcher">
           <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox" />
@@ -88,7 +88,7 @@
                 <span class="value" id="week-nadgodziny-value">0 h</span>
               </article>
             </div>
-          </section>
+            </section>
 
           <section class="chart-section">
             <div class="section-header">
