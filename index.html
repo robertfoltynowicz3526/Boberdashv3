@@ -31,7 +31,7 @@
           <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
           <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
           <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
-          <button type="button" class="tab-button" data-tab="podsumowanie">Kalendarz</button>
+          <button type="button" class="tab-button" data-tab="podsumowania">Podsumowania</button>
         </nav>
         <div class="theme-switcher">
           <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox" />
@@ -50,6 +50,14 @@
             <h2>Pulpit</h2>
             <p>Zarządzaj wydajnością serwisu w czasie rzeczywistym.</p>
           </div>
+           <section class="calendar-section">
+            <div class="section-header">
+              <h3>Kalendarz pracy</h3>
+              <div class="absorpcja-tag" id="calendar-absorpcja">Absorpcja: 0%</div>
+            </div>
+            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
+            <div id="kalendarz" class="calendar-container"></div>
+          </section>
           <div class="dashboard-kpi-grid">
             <article class="kpi-card">
               <h3>Nowe zlecenia (miesiąc)</h3>
@@ -96,15 +104,6 @@
             </div>
             <div id="hours-chart" class="bar-chart"></div>
           </section>
-
-          <section class="calendar-section">
-            <div class="section-header">
-              <h3>Kalendarz pracy</h3>
-              <div class="absorpcja-tag" id="calendar-absorpcja">Absorpcja: 0%</div>
-            </div>
-            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
-            <div id="kalendarz" class="calendar-container"></div>
-        </section>
         </section>
 
         <section id="klienci" class="tab-content">
@@ -279,7 +278,12 @@
           <div class="section-heading">
             <h2>Magazyn</h2>
           </div>
-          <div id="magazyn-summary" class="summary-container-subtle"></div>
+          <div class="magazyn-summary-block">
+            <div class="section-header">
+              <h3>Stan magazynu</h3>
+            </div>
+            <div id="magazyn-summary" class="summary-container-subtle magazyn-summary"></div>
+          </div>
           <div class="magazyn-forms">
             <div class="form-section">
               <h3>Dodaj produkt</h3>
@@ -371,11 +375,11 @@
           </div>
         </section>
 
-        <section id="podsumowanie" class="tab-content">
+        <section id="podsumowania" class="tab-content"></section>
           <div class="section-heading">
-            <h2>Podsumowanie i kalendarz</h2>
+            <h2>Podsumowania</h2>
           </div>
-          <div id="podsumowanie-metryki" class="summary-cards"></div>
+          <div id="podsumowania-metryki" class="summary-cards"></div>
           <div class="podsumowanie-divider"></div>
           <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
           <div id="annual-summary"></div>

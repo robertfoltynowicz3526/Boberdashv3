@@ -69,6 +69,7 @@ function initializeApp() {
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
     const magazynLista = document.getElementById('magazyn-lista');
+    const magazynSummaryContainer = document.getElementById('magazyn-summary');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const stockModalForm = document.getElementById('stock-change-form');
@@ -99,7 +100,7 @@ function initializeApp() {
     const weekNadgodzinyValue = document.getElementById('week-nadgodziny-value');
     const hoursChartContainer = document.getElementById('hours-chart');
     const calendarAbsorpcjaTag = document.getElementById('calendar-absorpcja');
-    const podsumowanieMetryki = document.getElementById('podsumowanie-metryki');
+    const podsumowaniaMetryki = document.getElementById('podsumowania-metryki');
     const editKlientModal = document.getElementById('edit-klient-modal');
     const editKlientForm = document.getElementById('edit-klient-form');
     const editMaszynaModal = document.getElementById('edit-maszyna-modal');
@@ -121,6 +122,21 @@ function initializeApp() {
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
+    const addListenerSafely = (element, eventName, handler, label) => {
+        if (element) {
+            element.addEventListener(eventName, handler);
+        } else {
+            console.warn(`[UI] Pominięto nasłuch (${label}) – element nie istnieje w DOM.`);
+        }
+    };
+
+    const warnIfMissing = (element, label) => {
+        if (!element) {
+            console.warn(`[UI] Element ${label} nie istnieje w DOM.`);
+        }
+        return element;
+    };
+
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     document.querySelectorAll('#sidebar .tab-button').forEach(button => {
         button.addEventListener('click', () => {
@@ -131,6 +147,9 @@ function initializeApp() {
     function setActiveTab(tabName) {
         if (!tabName) return;
         const tabElement = document.getElementById(tabName);
+        if (!tabElement) {
+            console.warn(`[UI] Zakładka ${tabName} nie istnieje w DOM.`);
+        }
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.toggle('active', tab === tabElement);
         });
@@ -175,6 +194,9 @@ function initializeApp() {
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
             displayEventEnd: true,
+            contentHeight: 'auto',
+            height: 'auto',
+            expandRows: true,
             eventContent: (arg) => {
                 const container = document.createElement('div');
                 const linie = Array.isArray(arg.event.extendedProps.linie) ? arg.event.extendedProps.linie : [];
@@ -604,6 +626,26 @@ function initializeApp() {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
+    function konwertujNaDate(wartosc) {
+        if (!wartosc) return null;
+        if (typeof wartosc.toDate === 'function') {
+            return wartosc.toDate();
+        }
+        if (wartosc instanceof Date) {
+            return wartosc;
+        }
+        const parsed = new Date(wartosc);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    function formatujDateCzas(data) {
+        if (!(data instanceof Date) || Number.isNaN(data.getTime())) {
+            return 'brak danych';
+        }
+        return data.toLocaleString('pl-PL', { dateStyle: 'medium', timeStyle: 'short' });
+    }
+
+
     function pobierzZakonczoneZleceniaWMiesiacu(zlecenia, miesiac) {
         if (!miesiac) return [];
         return (zlecenia || []).filter(z => {
@@ -985,7 +1027,7 @@ function initializeApp() {
     }
 
     function renderPodsumowanieSekcja() {
-        if (!podsumowanieMetryki) return;
+        if (!podsumowaniaMetryki) return;
         const miesiac = getSelectedMonth();
         const zakonczone = pobierzZakonczoneZleceniaWMiesiacu(_wszystkieZleceniaCache, miesiac);
         const finanse = obliczFinanseZlecen(zakonczone);
@@ -998,7 +1040,7 @@ function initializeApp() {
         const w = typy.W || 0;
         const z = typy.Z || 0;
 
-        podsumowanieMetryki.innerHTML = `
+        podsumowaniaMetryki.innerHTML = `
             <div class="metric-card"><h4>Ukończone zlecenia</h4><strong>${finanse.liczba}</strong></div>
             <div class="metric-card"><h4>Godziny wyfakturowane</h4><strong>${formatujLiczbe(finanse.godziny)} h</strong></div>
             <div class="metric-card"><h4>Wartość brutto</h4><strong>${formatujLiczbe(finanse.brutto)} zł</strong></div>
@@ -2436,15 +2478,26 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     function wyswietlMagazyn() {
-        if (!magazynLista) return;
+        if (!magazynLista) {
+            console.warn('[UI] Element #magazyn-lista nie istnieje – pominięto render magazynu.');
+            return;
+        }
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
             let html = '';
             wszystkieProdukty = [];
-            if (snapshot.empty) { magazynLista.innerHTML = '<tr><td colspan="6">Magazyn pusty.</td></tr>'; return; }
+            let sumaIlosci = 0;
+            let liczbaNiskich = 0;
+            let ostatniaZmiana = null;
+
+            if (snapshot.empty) {
+                magazynLista.innerHTML = '<tr><td colspan="6">Magazyn pusty.</td></tr>';
+                renderMagazynPodsumowanie(0, 0, null);
+                return;
+            }
             snapshot.forEach((docSnap) => {
                 const produkt = docSnap.data();
                 produkt.id = docSnap.id;
-                 produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
+                produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
                 produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
                 const jestOlejem = Boolean(produkt.jestOlejem);
                 produkt.jestOlejem = jestOlejem;
@@ -2452,44 +2505,81 @@ async function obslugaZakonczeniaZlecenia(event) {
                 const iloscWLitrach = jestOlejem && produkt.pojemnosc
                     ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
                     : '---';
-                const datasetQty = produkt.ilosc;               
+                const datasetQty = produkt.ilosc;            
                 wszystkieProdukty.push(produkt);
-                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
+
+                const iloscLiczbowa = Number(datasetQty) || 0;
+                sumaIlosci += iloscLiczbowa;
+                if (iloscLiczbowa <= NISKI_STAN_MAGAZYNOWY) {
+                    liczbaNiskich += 1;
+                }
+                [konwertujNaDate(docSnap.updateTime), konwertujNaDate(produkt.updatedAt), konwertujNaDate(produkt.createdAt)]
+                    .forEach((data) => {
+                        if (data && (!ostatniaZmiana || data > ostatniaZmiana)) {
+                            ostatniaZmiana = data;
+                        }
+                    });
+
+                html += `<tr data-id=\"${produkt.id}\" data-name=\"${produkt.nazwa}\" data-qty=\"${datasetQty}\" data-is-oil=\"${jestOlejem}\"></span>
                     <td>${produkt.index}</td>
                     <td>${produkt.nazwa}</td>
                     <td>${iloscFormatowana} szt.</td>
                     <td>${iloscWLitrach}</td>
                     <td>${produkt.klient}</td>
                     <td>
-                        <button class="add-stock-btn">Dodaj</button>
-                        <button class="remove-stock-btn">Zdejmij</button>
-                        <button class="delete-btn">Usuń</button>
+                        <button class=\"add-stock-btn\">Dodaj</button>
+                        <button class=\"remove-stock-btn\">Zdejmij</button>
+                        <button class=\"delete-btn\">Usuń</button>
                     </td>
                 </tr>`;
             });
+
             magazynLista.innerHTML = html || '<tr><td colspan="6">Magazyn pusty.</td></tr>';
+            renderMagazynPodsumowanie(sumaIlosci, liczbaNiskich, ostatniaZmiana);
             renderMagazynWModalu();
         });
     }
 
+    function renderMagazynPodsumowanie(sumaIlosci, liczbaNiskich, ostatniaZmiana) {
+        if (!magazynSummaryContainer) {
+            console.warn('[UI] Element #magazyn-summary nie istnieje – pominięto podsumowanie magazynu.');
+            return;
+        }
+        const formattedDate = formatujDateCzas(ostatniaZmiana);
+        magazynSummaryContainer.innerHTML = `
+            <div class=\"summary-item\">
+                <span class=\"summary-label\">Łącznie szt.</span>
+                <span class=\"summary-value\">${formatujLiczbe(sumaIlosci)}</span>
+            </div>
+            <div class=\"summary-item\">
+                <span class=\"summary-label\">Niskie stany</span>
+                <span class=\"summary-value\">${liczbaNiskich}</span>
+            </div>
+            <div class=\"summary-item\">
+                <span class=\"summary-label\">Ostatnia zmiana</span>
+                <span class=\"summary-value\">${formattedDate}</span>
+            </div>
+        `;
+    }
+  
    // --- PODPIĘCIE EVENTÓW ---
-    if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
-    if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
+    addListenerSafely(klientForm, 'submit', dodajKlienta, '#klient-form');
+    addListenerSafely(listaKlientowDiv, 'click', obslugaListyKlientow, '#lista-klientow');
 
-    if (maszynaForm) maszynaForm.addEventListener('submit', dodajMaszyne);
-    if (listaMaszynDiv) listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
+    addListenerSafely(maszynaForm, 'submit', dodajMaszyne, '#maszyna-form');
+    addListenerSafely(listaMaszynDiv, 'click', obslugaListyMaszyn, '#lista-maszyn');
 
     // ZLECENIA
-    if (zlecenieForm) zlecenieForm.addEventListener('submit', dodajZlecenie);
-    if (zlecenieKlientSelect) {
+    addListenerSafely(zlecenieForm, 'submit', dodajZlecenie, '#zlecenie-form');
+    if (warnIfMissing(zlecenieKlientSelect, '#zlecenie-klient-select')) {
         zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
     }
-    if (aktywneZleceniaLista) aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
-    if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
-    if (machineHistoryList) machineHistoryList.addEventListener('click', obslugaListyZlecenWModaluHistorii);
+    addListenerSafely(aktywneZleceniaLista, 'click', obslugaListyZlecen, '#aktywne-zlecenia-lista');
+    addListenerSafely(ukonczoneZleceniaLista, 'click', obslugaListyZlecen, '#ukonczone-zlecenia-lista');
+    addListenerSafely(machineHistoryList, 'click', obslugaListyZlecenWModaluHistorii, '#machine-history-list');
 
-    if (completeModalForm) completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
+    addListenerSafely(completeModalForm, 'submit', obslugaZakonczeniaZlecenia, '#complete-zlecenie-form');
     if (closeModalButton && completeModal) {
         closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
     }
@@ -2514,29 +2604,37 @@ async function obslugaZakonczeniaZlecenia(event) {
                 }));
             eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
         });
+    } else {
+        if (!exportZleceniaBtn) console.warn('[UI] Element #export-zlecenia-btn nie istnieje w DOM.');
+        if (!miesiacSummaryInput) console.warn('[UI] Element #miesiac-summary nie istnieje w DOM.');
     }
 
     // MAGAZYN
-    if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
-    if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
-    if (magazynLista) magazynLista.addEventListener('click', obslugaTabeliMagazynu);
+    addListenerSafely(magazynForm, 'submit', dodajProduktDoMagazynu, '#magazyn-form');
+    addListenerSafely(bulkAddForm, 'submit', dodajMasowo, '#bulk-add-form');
+    addListenerSafely(magazynLista, 'click', obslugaTabeliMagazynu, '#magazyn-lista');
 
-    if (modalMagazynLista) modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
-    if (partsToRemoveList) partsToRemoveList.addEventListener('click', obslugaListyCzesci);
-    if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
+    addListenerSafely(modalMagazynLista, 'click', dodajCzescDoZlecenia, '#modal-magazyn-lista');
+    addListenerSafely(partsToRemoveList, 'click', obslugaListyCzesci, '#parts-to-remove-list');
+    addListenerSafely(stockModalForm, 'submit', obslugaZmianyStanu, '#stock-change-form');
     if (stockModalCloseButton && stockModal) {
         stockModalCloseButton.onclick = () => { stockModal.style.display = 'none'; };
+    } else if (!stockModalCloseButton) {
+        console.warn('[UI] Przycisk zamykania w #stock-change-modal nie istnieje.');
     }
+    
 
-    if (addOilBtn) addOilBtn.addEventListener('click', dodajOlej);
-    if (converterLitryInput) converterLitryInput.addEventListener('input', przeliczOlej);
-    if (converterSztukiInput) converterSztukiInput.addEventListener('input', przeliczOlej);
+    addListenerSafely(addOilBtn, 'click', dodajOlej, '#add-oil-btn');
+    addListenerSafely(converterLitryInput, 'input', przeliczOlej, '#converter-litry');
+    addListenerSafely(converterSztukiInput, 'input', przeliczOlej, '#converter-sztuki');
     if (oilContainerSizeSelect) {
         oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
+       } else {
+        console.warn('[UI] Element #oil-container-size nie istnieje w DOM.'); 
     }
 
     // KALENDARZ (modal + klik w kalendarzu)
-    if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+    addListenerSafely(kalendarzForm, 'submit', obslugaZapisuGodzin, '#kalendarz-form');
     if (kalendarzForm && kalendarzForm['godziny-fakturowane']) {
         kalendarzForm['godziny-fakturowane'].addEventListener('input', () => {
             if (multiZlecenia.length === 0) {
@@ -2547,50 +2645,66 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (kalendarzContainer) kalendarzContainer.addEventListener('click', obslugaKalendarza);
     if (kalendarzModalCloseButton && kalendarzModal) {
         kalendarzModalCloseButton.onclick = () => { kalendarzModal.style.display = 'none'; };
+        } else if (!kalendarzModalCloseButton) {
+        console.warn('[UI] Przycisk zamknięcia modala kalendarza nie istnieje.');
     }
-    if (kalendarzMultiAddButton) kalendarzMultiAddButton.addEventListener('click', dodajLubZapiszMultiZlecenie);
-    if (kalendarzMultiList) kalendarzMultiList.addEventListener('click', obslugaListyMulti);
+    addListenerSafely(kalendarzMultiAddButton, 'click', dodajLubZapiszMultiZlecenie, '.multi-add');
+    addListenerSafely(kalendarzMultiList, 'click', obslugaListyMulti, '#kalendarz-zlecenia-list');
 
     // WYSZUKIWANIA
-    if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientow);
-    if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
-    if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
+    addListenerSafely(klientSearchInput, 'input', wyswietlKlientow, '#klient-search-input');
+    addListenerSafely(maszynaSearchInput, 'input', wyswietlMaszyny, '#maszyna-search-input');
+    addListenerSafely(zlecenieSearchInput, 'input', wyswietlZlecenia, '#zlecenie-search-input');
 
     // EDYCJE (modale)
-    if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
-    if (editMaszynaForm) editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
-    if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
+    addListenerSafely(editKlientForm, 'submit', zapiszEdycjeKlienta, '#edit-klient-form');
+    addListenerSafely(editMaszynaForm, 'submit', zapiszEdycjeMaszyny, '#edit-maszyna-form');
+    addListenerSafely(editZlecenieForm, 'submit', zapiszEdycjeZlecenia, '#edit-zlecenie-form');
 
     if (editKlientCloseButton && editKlientModal) {
         editKlientCloseButton.onclick = () => { editKlientModal.style.display = 'none'; };
+    } else if (!editKlientCloseButton) {
+        console.warn('[UI] Brak przycisku zamknięcia w modalu edycji klienta.');    
     }
     if (editMaszynaCloseButton && editMaszynaModal) {
         editMaszynaCloseButton.onclick = () => { editMaszynaModal.style.display = 'none'; };
+    } else if (!editMaszynaCloseButton) {
+        console.warn('[UI] Brak przycisku zamknięcia w modalu edycji maszyny.');
     }
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
         detailsZlecenieCloseButton.onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+     } else if (!detailsZlecenieCloseButton) {
+        console.warn('[UI] Brak przycisku zamknięcia w szczegółach zlecenia.');
     }
     if (editZlecenieCloseButton && editZlecenieModal) {
         editZlecenieCloseButton.onclick = () => { editZlecenieModal.style.display = 'none'; };
+    } else if (!editZlecenieCloseButton) {
+        console.warn('[UI] Brak przycisku zamknięcia w modalu edycji zlecenia.');
     }
     if (machineHistoryCloseButton && machineHistoryModal) {
         machineHistoryCloseButton.onclick = () => { machineHistoryModal.style.display = 'none'; };
+    } else if (!machineHistoryCloseButton) {
+        console.warn('[UI] Brak przycisku zamknięcia w modalu historii maszyn.');
     }
 
     // Klik poza modal zamyka go
     window.onclick = (event) => {
+        const target = event.target;
+        if (!target || !(target instanceof HTMLElement)) {
+            return;
+        }
         if (
-            event.target == completeModal ||
-            event.target == stockModal ||
-            event.target == kalendarzModal ||
-            event.target == assignModal ||
-            event.target == editKlientModal ||
-            event.target == editMaszynaModal ||
-            event.target == detailsZlecenieModal ||
-            event.target == editZlecenieModal ||
-            event.target == machineHistoryModal
+            target === completeModal ||
+            target === stockModal ||
+            target === kalendarzModal ||
+            target === assignModal ||
+            target === editKlientModal ||
+            target === editMaszynaModal ||
+            target === detailsZlecenieModal ||
+            target === editZlecenieModal ||
+            target === machineHistoryModal 
         ) {
-            event.target.style.display = "none";
+            target.style.display = 'none';
         }
     };
 
