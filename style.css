@@ -1100,13 +1100,13 @@ button[type="submit"]:hover,
 }
 
 .modal {
-  display: none;
   position: fixed;
   inset: 0;
-  background: var(--modal-backdrop);
-  z-index: 100;
+  display: none;
   align-items: center;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
   padding: 1.5rem;
 }
 
@@ -1115,13 +1115,14 @@ button[type="submit"]:hover,
 }
 
 .modal-content {
+  position: relative;
   background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   padding: 2rem;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-lg);
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: auto;
   margin: 0;
   width: min(640px, 100%);
 }

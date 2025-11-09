@@ -44,6 +44,82 @@ async function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+    let bodyOverflowBeforeModal = document.body.style.overflow || '';
+
+    const focusTrapState = new WeakMap();
+    const focusableSelectors = [
+        'a[href]',
+        'button:not([disabled])',
+        'textarea:not([disabled])',
+        'input:not([disabled])',
+        'select:not([disabled])',
+        '[tabindex]:not([tabindex="-1"])'
+    ].join(',');
+
+    const getFocusableElements = (container) => {
+        if (!container) {
+            return [];
+        }
+        return Array.from(container.querySelectorAll(focusableSelectors))
+            .filter((el) => el instanceof HTMLElement && el.tabIndex !== -1 && el.getAttribute('aria-hidden') !== 'true');
+    };
+
+    const activateFocusTrap = (modal) => {
+        if (!(modal instanceof HTMLElement)) {
+            return;
+        }
+        const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        const handleKeyDown = (event) => {
+            if (event.key !== 'Tab') {
+                return;
+            }
+            const focusable = getFocusableElements(modal);
+            if (focusable.length === 0) {
+                event.preventDefault();
+                modal.focus();
+                return;
+            }
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement;
+            if (event.shiftKey) {
+                if (active === first || !modal.contains(active)) {
+                    event.preventDefault();
+                    last.focus();
+                }
+            } else if (active === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        modal.addEventListener('keydown', handleKeyDown);
+        focusTrapState.set(modal, { handleKeyDown, previousFocus });
+
+        const focusable = getFocusableElements(modal);
+        const focusTarget = focusable[0] || modal.querySelector('.close-button');
+        if (focusTarget instanceof HTMLElement) {
+            focusTarget.focus();
+        } else {
+            modal.setAttribute('tabindex', '-1');
+            modal.focus();
+        }
+    };
+
+    const deactivateFocusTrap = (modal) => {
+        const state = focusTrapState.get(modal);
+        if (state) {
+            modal.removeEventListener('keydown', state.handleKeyDown);
+            const { previousFocus } = state;
+            if (previousFocus && document.contains(previousFocus)) {
+                previousFocus.focus();
+            }
+            focusTrapState.delete(modal);
+        }
+        if (modal instanceof HTMLElement && modal.hasAttribute('tabindex')) {
+            modal.removeAttribute('tabindex');
+        }
+    };
 
     const getEl = (id) => document.getElementById(id);
 
@@ -151,6 +227,19 @@ async function initializeApp() {
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
+    const modalsToCheck = [
+        ['#kalendarz-modal', kalendarzModal],
+        ['#assign-zlecenie-modal', assignModal],
+        ['#complete-zlecenie-modal', completeModal],
+        ['#stock-change-modal', stockModal],
+        ['#edit-klient-modal', editKlientModal],
+        ['#edit-maszyna-modal', editMaszynaModal],
+        ['#details-zlecenie-modal', detailsZlecenieModal],
+        ['#edit-zlecenie-modal', editZlecenieModal],
+        ['#machine-history-modal', machineHistoryModal]
+    ];
+    modalsToCheck.forEach(([label, element]) => warnIfMissing(element, label));
+
     const addListenerSafely = (element, eventName, handler, label) => {
         if (element) {
             element.addEventListener(eventName, handler);
@@ -179,20 +268,27 @@ async function initializeApp() {
     };
 
     const openModal = (modal) => {
-        if (!modal) {
+        if (!(modal instanceof HTMLElement)) {
             return;
+        }
+        if (!document.body.classList.contains('modal-open')) {
+            bodyOverflowBeforeModal = document.body.style.overflow || '';
         }
         modal.classList.add('open');
         document.body.classList.add('modal-open');
+        document.body.style.overflow = 'hidden';
+        activateFocusTrap(modal);
     };
 
     const closeModal = (modal) => {
-        if (!modal) {
+        if (!(modal instanceof HTMLElement)) {
             return;
         }
         modal.classList.remove('open');
+        deactivateFocusTrap(modal);
         if (!document.querySelector('.modal.open')) {
             document.body.classList.remove('modal-open');
+            document.body.style.overflow = bodyOverflowBeforeModal;
         }
     };
 
@@ -1382,6 +1478,7 @@ async function initializeApp() {
             ? '-- Brak klientów w bazie --'
             : (maWyniki ? '-- Wybierz klienta --' : '-- Brak klientów pasujących do filtra --');
         let optionsHtml = `<option value="">${placeholder}</option>`;
+        optionsHtml += "<option value=\"szybkie-zlecenie\">-- SZYBKIE ZLECENIE (bez klienta) --</option>";
 
         if (maWyniki) {
             klienciDlaSelecta.forEach(klient => {
@@ -1392,6 +1489,7 @@ async function initializeApp() {
         zlecenieKlientSelect.innerHTML = optionsHtml;
 
         const moznaPrzywrocic = poprzedniWybor === ''
+            || poprzedniWybor === 'szybkie-zlecenie'
             || klienciDlaSelecta.some(klient => klient.id === poprzedniWybor);
 
         zlecenieKlientSelect.value = moznaPrzywrocic ? poprzedniWybor : '';
@@ -1620,8 +1718,11 @@ async function initializeApp() {
         const historyLink = getClosest(event, '.machine-history-link');
         if (historyLink) {
             event.preventDefault();
-            const maszynaId = historyLink.dataset.maszynaId;
-            const maszynaNazwa = historyLink.dataset.maszynaNazwa;
+            const maszynaElement = getClosest(event, 'li[data-id]');
+            const maszynaId = historyLink.dataset.maszynaId || maszynaElement?.dataset.id || '';
+            const maszynaNazwa = historyLink.dataset.maszynaNazwa
+                || maszynaElement?.querySelector('span')?.textContent?.trim()
+                || '';
             if (maszynaId) {
                 pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
             }
@@ -1630,7 +1731,7 @@ async function initializeApp() {
 
         const editKlientBtn = getClosest(event, '.edit-klient-btn');
         if (editKlientBtn) {
-            const klientGroup = editKlientBtn.closest('.client-group');
+            const klientGroup = getClosest(event, '.client-group');
             const klientId = klientGroup?.dataset.id;
             if (klientId) {
                 otworzModalEdycjiKlienta(klientId);
@@ -1640,7 +1741,7 @@ async function initializeApp() {
 
         const deleteKlientBtn = getClosest(event, '.delete-btn');
         if (deleteKlientBtn) {
-            const klientGroup = deleteKlientBtn.closest('.client-group');
+            const klientGroup = getClosest(event, '.client-group');
             const klientId = klientGroup?.dataset.id;
             if (klientId && confirm('Usunięcie klienta usunie też jego maszyny i zlecenia. Kontynuować?')) {
                 if (!ensureDbOrNotify()) {
@@ -1718,9 +1819,9 @@ async function obslugaListyZlecenWModaluHistorii(event) {
         if (!(target instanceof Element)) {
             return;
         }
-         const detailsBtnModal = getClosest(event, '.details-zlecenie-btn');
+        const detailsBtnModal = getClosest(event, '.details-zlecenie-btn');
         if (detailsBtnModal) {
-            const zlecenieElement = detailsBtnModal.closest('li[data-id]');
+            const zlecenieElement = getClosest(event, 'li[data-id]');
             const zlecenieIdModalDetails = zlecenieElement?.dataset.id;
             if (zlecenieIdModalDetails) {
                 await otworzModalSzczegolowZlecenia(zlecenieIdModalDetails);
@@ -1730,7 +1831,7 @@ async function obslugaListyZlecenWModaluHistorii(event) {
         
         const editBtnModal = getClosest(event, '.edit-zlecenie-btn');
         if (editBtnModal) {
-            const zlecenieElement = editBtnModal.closest('li[data-id]');
+            const zlecenieElement = getClosest(event, 'li[data-id]');
             const zlecenieIdModalEdit = zlecenieElement?.dataset.id;
             if (zlecenieIdModalEdit) {
                 await otworzModalEdycjiZlecenia(zlecenieIdModalEdit);
@@ -1934,6 +2035,13 @@ async function obslugaListyZlecenWModaluHistorii(event) {
 
         const wybranyKlientId = zlecenieKlientSelect.value;
 
+        if (wybranyKlientId === 'szybkie-zlecenie') {
+            zlecenieMaszynaSelect.innerHTML = '<option value="">-- N/A --</option>';
+            zlecenieMaszynaSelect.disabled = true;
+            return;
+        }
+
+
         if (!wybranyKlientId) {
             zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
             zlecenieMaszynaSelect.disabled = true;
@@ -2006,8 +2114,11 @@ async function obslugaListyMaszyn(event) {
     const historyLink = getClosest(event, '.machine-history-link');
     if (historyLink) {
         event.preventDefault();
-        const maszynaId = historyLink.dataset.maszynaId;
-        const maszynaNazwa = historyLink.dataset.maszynaNazwa || '';
+        const maszynaElement = getClosest(event, 'li[data-id]');
+        const maszynaId = historyLink.dataset.maszynaId || maszynaElement?.dataset.id || '';
+        const maszynaNazwa = historyLink.dataset.maszynaNazwa
+            || maszynaElement?.querySelector('span')?.textContent?.trim()
+            || '';
         if (maszynaId) {
             pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
         }
@@ -2016,7 +2127,8 @@ async function obslugaListyMaszyn(event) {
 
     const detailsButton = getClosest(event, '.details-zlecenie-btn, .btn-details');
     if (detailsButton) {
-        const zlecenieId = detailsButton.dataset.id || detailsButton.closest('li')?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieId = detailsButton.dataset.id || zlecenieElement?.dataset.id;
         if (zlecenieId) {
             await otworzModalSzczegolowZlecenia(zlecenieId);
         }
@@ -2025,7 +2137,7 @@ async function obslugaListyMaszyn(event) {
 
     const editMaszynaBtn = getClosest(event, '.edit-maszyna-btn');
     if (editMaszynaBtn) {
-        const maszynaElement = editMaszynaBtn.closest('li[data-id]');
+        const maszynaElement = getClosest(event, 'li[data-id]');
         const maszynaId = maszynaElement?.dataset.id;
         if (maszynaId) {
             otworzModalEdycjiMaszyny(maszynaId);
@@ -2035,7 +2147,7 @@ async function obslugaListyMaszyn(event) {
 
     const deleteMaszynaBtn = getClosest(event, '.delete-btn');
     if (deleteMaszynaBtn) {
-        const maszynaElement = deleteMaszynaBtn.closest('li[data-id]');
+        const maszynaElement = getClosest(event, 'li[data-id]');
         const maszynaId = maszynaElement?.dataset.id;
         if (maszynaId && confirm('Usunąć tę maszynę (oraz jej zlecenia)?')) {
             if (!ensureDbOrNotify()) {
@@ -2254,44 +2366,72 @@ async function dodajZlecenie(event) {
 
     const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
 
+    const nrZleceniaValue = zlecenieForm['nr-zlecenia'].value.trim();
+    if (!nrZleceniaValue) {
+        alert('Podaj numer zlecenia.');
+        return;
+    }
+
+    const isQuickOrder = wybranyKlientId === 'szybkie-zlecenie';
     if (!wybranyKlientId) {
-        alert('Wybierz klienta przed utworzeniem zlecenia.');
+        alert('Wybierz klienta lub opcję "Szybkie zlecenie".');
         return;
     }
 
-    if (!wybranaMaszynaId) {
-        alert('Wybierz maszynę przypisaną do klienta.');
-        return;
+    let dane;
+
+    if (isQuickOrder) {
+        dane = {
+            maszynaId: null,
+            klientId: null,
+            klientNazwa: null,
+            typMaszyny: null,
+            model: null,
+            status: 'nieprzypisane',
+            nrZlecenia: nrZleceniaValue,
+            opis: zlecenieForm['opis-usterki'].value,
+            motogodziny: Number(zlecenieForm.motogodziny.value) || 0,
+            dataRozpoczecia,
+            dataZakonczenia,
+            historia,
+            createdAt: new Date(),
+            zakonczenieNotatka: null,
+            zakonczenieNumerWZ: null
+        };
+    } else {
+        if (!wybranaMaszynaId) {
+            alert('Wybierz maszynę przypisaną do klienta.');
+            return;
+        }
+
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === wybranaMaszynaId);
+        const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
+        if (!maszyna || !klient) {
+            alert('Błąd: Nie znaleziono danych klienta lub maszyny.');
+            return;
+        }
+
+        dane = {
+            maszynaId: wybranaMaszynaId,
+            klientId: klient.id,
+            klientNazwa: klient.nazwa,
+            typMaszyny: maszyna.typMaszyny,
+            model: maszyna.model,
+            status: 'aktywne',
+            nrZlecenia: nrZleceniaValue,
+            opis: zlecenieForm['opis-usterki'].value,
+            motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
+            dataRozpoczecia,
+            dataZakonczenia,
+            historia,
+            createdAt: new Date(),
+            zakonczenieNotatka: null,
+            zakonczenieNumerWZ: null
+        };
     }
-
-    const maszyna = _wszystkieMaszynyCache.find(m => m.id === wybranaMaszynaId);
-    const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
-    if (!maszyna || !klient) {
-        alert('Błąd: Nie znaleziono danych klienta lub maszyny.');
-        return;
-    }
-
-    const dane = {
-        maszynaId: wybranaMaszynaId,
-        klientId: klient.id,
-        klientNazwa: klient.nazwa,
-        typMaszyny: maszyna.typMaszyny,
-        model: maszyna.model,
-        status: 'aktywne',
-        nrZlecenia: zlecenieForm['nr-zlecenia'].value,
-        opis: zlecenieForm['opis-usterki'].value,
-        motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
-        dataRozpoczecia,
-        dataZakonczenia,
-        historia,
-        createdAt: new Date(),
-        zakonczenieNotatka: null,
-        zakonczenieNumerWZ: null
-    };
-
     try {
         await addDoc(collection(db, "zlecenia"), dane);
-        if (dane.maszynaId && zlecenieForm.motogodziny.value) {
+        if (!isQuickOrder && dane.maszynaId && zlecenieForm.motogodziny.value) {
             await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny });
         }
         zlecenieForm.reset();
@@ -2310,10 +2450,10 @@ async function obslugaListyZlecen(event) {
 
     const deleteBtnZlecenie = getClosest(event, '.delete-btn');
     if (deleteBtnZlecenie) {
-        const zlecenieElement = deleteBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdDelete = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdDelete = deleteBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdDelete) return;
-    if (confirm("Na pewno usunąć?")) {
+        if (confirm("Na pewno usunąć?")) {
             if (!ensureDbOrNotify()) {
                 return;
             }
@@ -2324,8 +2464,8 @@ async function obslugaListyZlecen(event) {
 
     const detailsBtnZlecenie = getClosest(event, '.details-zlecenie-btn');
     if (detailsBtnZlecenie) {
-        const zlecenieElement = detailsBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdDetails = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdDetails = detailsBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdDetails) return;
         await otworzModalSzczegolowZlecenia(zlecenieIdDetails);
         return;
@@ -2333,8 +2473,8 @@ async function obslugaListyZlecen(event) {
 
     const assignBtnZlecenie = getClosest(event, '.assign-btn');
     if (assignBtnZlecenie) {
-        const zlecenieElement = assignBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdAssign = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdAssign = assignBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdAssign) return;
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieIdAssign);
         if (zlecenie && assignForm && assignModal) {
@@ -2352,8 +2492,8 @@ async function obslugaListyZlecen(event) {
 
     const completeBtnZlecenie = getClosest(event, '.complete-btn');
     if (completeBtnZlecenie) {
-        const zlecenieElement = completeBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdComplete = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdComplete = completeBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdComplete) return;
         if (!completeModal || !completeModalForm) {
             console.warn('[Zlecenia] Brakuje elementów modala zakończenia zlecenia.');
@@ -2386,8 +2526,8 @@ async function obslugaListyZlecen(event) {
     
     const editBtnZlecenie = getClosest(event, '.edit-zlecenie-btn');
     if (editBtnZlecenie) {
-        const zlecenieElement = editBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdEdit = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdEdit = editBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdEdit) return;
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieIdEdit);
         if (zlecenie && zlecenie.status === 'ukończone') {
@@ -2400,8 +2540,8 @@ async function obslugaListyZlecen(event) {
     
     const reopenBtnZlecenie = getClosest(event, '.reopen-btn');
     if (reopenBtnZlecenie) {
-        const zlecenieElement = reopenBtnZlecenie.closest('li[data-id]');
-        const zlecenieIdReopen = zlecenieElement?.dataset.id;
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const zlecenieIdReopen = reopenBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdReopen) return;
         const confirmed = confirm('Czy na pewno ponownie otworzyć to zlecenie?');
         if (!confirmed) return;
@@ -3299,17 +3439,28 @@ async function obslugaZakonczeniaZlecenia(event) {
     document.addEventListener('click', (event) => {
         const t = event.target;
         if (!(t instanceof Element)) return;
-        if (t.classList.contains('modal')) {
+        
+        const closeBtn = getClosest(event, '.close-button');
+        if (closeBtn) {
+            const modalWrapper = getClosest(event, '.modal');
+            if (modalWrapper) {
+                closeModal(modalWrapper);
+            }
+            return;
+        }
+
+        if (t.classList.contains('modal') && event.target === t) {
             closeModal(t);
         }
     });
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            document.querySelectorAll('.modal.open').forEach((modalElement) => {
-                closeModal(modalElement);
-            });
+        if (event.key !== 'Escape') {
+            return;
         }
+        document.querySelectorAll('.modal.open').forEach((modalElement) => {
+            closeModal(modalElement);
+        });
     });
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
