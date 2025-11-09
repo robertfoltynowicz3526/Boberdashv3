@@ -752,21 +752,31 @@ button[type="submit"]:hover,
 }
 
 .client-machine-list-container {
-  padding: 0 1.2rem 1rem;
-  margin: 0 1.2rem 1rem;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
-  max-height: 540px;
+  max-height: 0;
   transition: max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease, border-width 0.3s ease;
-  border-left: 1px solid rgba(243, 247, 244, 0.08);
+  border-left: 0px solid rgba(243, 247, 244, 0.08);
   display: block;
 }
 
-.client-machine-list-container.collapsed {
-  max-height: 0;
-  padding: 0;
+.client-header.open {
+  background: rgba(243, 247, 244, 0.08);
+}
+
+.client-header.open + .client-machine-list-container {
+  padding: 0 1.2rem 1rem;
+  margin: 0 1.2rem 1rem;
+  max-height: 540px;
+  border-left-width: 1px;
+}
+
+.client-machine-empty {
   margin: 0;
-  border-width: 0;
-  overflow: hidden;
+  padding: 0.75rem 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .client-header.expanded {
@@ -967,11 +977,17 @@ button[type="submit"]:hover,
 
 .machine-list {
   list-style: none;
-  padding: 0 1rem 1rem;
+  padding: 0 ;
   margin: 0;
-  display: grid;
+  display: none;
   gap: 0.8rem;
 }
+
+.client-header.open + .machine-list {
+  display: grid;
+  padding: 0 1rem 1rem;
+}
+
 
 .zakonczone-overview {
   display: grid;
