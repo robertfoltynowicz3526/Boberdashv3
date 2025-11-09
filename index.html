@@ -212,14 +212,15 @@
             <form id="zlecenie-form">
               <div class="form-grid-2">
                 <div class="form-group">
-                    <label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label>
+                  <label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label>
                   <select id="zlecenie-klient-select"></select>
                     <option value="">-- Wybierz --</option>
+                    <option value="szybkie-zlecenie">-- Szybkie zlecenie (bez klienta) --</option>
                   </select>
                 </div>
-            <div class="form-group">
+                <div class="form-group">
                   <label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label>
-                  <select id="zlecenie-maszyna-select" name="zlecenie-maszyna-select" disabled></select>
+                  <select id="zlecenie-maszyna-select" name="zlecenie-maszyna-select" disabled>
                     <option value="">-- Najpierw wybierz klienta --</option>
                   </select>
                 </div>
@@ -261,8 +262,10 @@
               </h3>
             </div>
             <div class="finished-controls">
-              <label for="finished-month">Miesiąc zakończenia:</label>
-              <select id="finished-month"></select>
+              <label for="miesiac-summary">Miesiąc zakończenia:</label>
+              <div id="finished-month-slot" class="month-input-slot">
+                <input type="month" id="miesiac-summary" />
+              </div>
             </div>
             <div id="finished-mini-summary" class="finished-mini-summary"></div>
             <div id="zakonczone-zlecenia-content" class="collapsible-content">
@@ -348,7 +351,7 @@
               <p>Wynik: <strong id="result-litry">0.00 L</strong></p>
             </div>
             </div>
-            <div id="magazyn-header" class="magazyn-header summary-container-subtle"></div>
+            <div id="magazyn-metrics" class="magazyn-metrics summary-container-subtle"></div>
           <div class="table-section">
             <h3>Stan Magazynowy</h3>
             <table id="magazyn-table">
@@ -375,7 +378,7 @@
             <div id="summary-container">
               <div class="summary-controls">
                 <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
-                <input type="month" id="miesiac-summary" />
+                <div id="summary-month-slot" class="month-input-slot"></div>
                 <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
               </div>
               <div id="podsumowania-metryki" class="summary-cards"></div>

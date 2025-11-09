@@ -40,6 +40,8 @@ function initializeApp() {
 
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
+    const finishedMonthSlot = document.getElementById('finished-month-slot');
+    const summaryMonthSlot = document.getElementById('summary-month-slot');
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
@@ -59,20 +61,18 @@ function initializeApp() {
     const zlecenieForm = document.getElementById('zlecenie-form');
     const aktywneZleceniaLista = document.getElementById('aktywne-zlecenia-lista');
     const ukonczoneZleceniaLista = document.getElementById('ukonczone-zlecenia-lista');
-    const finishedMonthInput = document.getElementById('finished-month');
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const zakonczoneTopSummary = document.getElementById('zakonczone-top-summary');
     const zakonczoneMonthSummary = document.getElementById('zakonczone-month-summary');
-    const finishedMonthSelect = document.getElementById('finished-month');
     const finishedMiniSummary = document.getElementById('finished-mini-summary');
     const annualSummaryContainer = document.getElementById('annual-summary');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
     const magazynLista = document.getElementById('magazyn-lista');
-    const magazynHeaderContainer = document.getElementById('magazyn-header');
+    const magazynMetricsContainer = document.getElementById('magazyn-metrics');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const stockModalForm = document.getElementById('stock-change-form');
@@ -152,9 +152,22 @@ function initializeApp() {
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     document.querySelectorAll('#sidebar .tab-button').forEach(button => {
         button.addEventListener('click', () => {
-            setActiveTab(button.dataset.tab);
+            if (button.dataset.tab) {
+                window.openTab(button.dataset.tab);
+            }
         });
-        });
+    });
+
+    function relocateMonthInput(tabName) {
+        if (!miesiacSummaryInput) {
+            return;
+        }
+        if (tabName === 'podsumowania' && summaryMonthSlot) {
+            summaryMonthSlot.appendChild(miesiacSummaryInput);
+        } else if (finishedMonthSlot) {
+            finishedMonthSlot.appendChild(miesiacSummaryInput);
+        }
+    }
 
     function setActiveTab(tabName) {
         if (!tabName) return;
@@ -162,6 +175,7 @@ function initializeApp() {
         if (!tabElement) {
             console.warn(`[UI] Zakładka ${tabName} nie istnieje w DOM.`);
         }
+        relocateMonthInput(tabName);
         document.querySelectorAll('.tab-content').forEach(tab => {
             tab.classList.toggle('active', tab === tabElement);
         });
@@ -178,12 +192,11 @@ function initializeApp() {
     };
 
     const currentMonth = getCurrentMonthString();
-    if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-    if (finishedMonthSelect) {
-        if (!finishedMonthSelect.value) {
-            finishedMonthSelect.innerHTML = `<option value="${currentMonth}">${currentMonth}</option>`;
-            finishedMonthSelect.value = currentMonth;
-        }
+    if (miesiacSummaryInput && !miesiacSummaryInput.value) {
+        miesiacSummaryInput.value = currentMonth;
+    }
+    if (miesiacSummaryInput) {
+        miesiacSummaryInput.max = currentMonth;
     }
     if (manualCloseDateInput) {
         manualCloseDateInput.value = getCurrentDateString();
@@ -217,8 +230,16 @@ function initializeApp() {
             expandRows: true,
             eventContent: (arg) => {
                 const container = document.createElement('div');
+                container.classList.add('fc-event-inner');
                 const linie = Array.isArray(arg.event.extendedProps.linie) ? arg.event.extendedProps.linie : [];
                 const powiazane = Array.isArray(arg.event.extendedProps.powiazaneLinie) ? arg.event.extendedProps.powiazaneLinie : [];
+
+                if (arg.event.extendedProps.type === 'godziny_pracy') {
+                    const icon = document.createElement('span');
+                    icon.classList.add('event-icon');
+                    icon.textContent = '📝';
+                    container.appendChild(icon);
+                }
 
                 if (linie.length > 0) {
                     linie.forEach(tekst => {
@@ -884,16 +905,7 @@ function initializeApp() {
     }
 
     function getSelectedFinishedMonth() {
-        const fallback = getCurrentMonthString();
-        if (!finishedMonthSelect) {
-            return fallback;
-        }
-        const value = (finishedMonthSelect.value || '').trim();
-        if (!value) {
-            finishedMonthSelect.value = fallback;
-            return fallback;
-        }
-        return value;
+        return getSelectedMonth();
     }
 
 
@@ -966,7 +978,7 @@ function initializeApp() {
     }
 
     function updateFinishedMonthOptions() {
-        if (!finishedMonthSelect) return;
+        if (!miesiacSummaryInput) return;
         const fallback = getCurrentMonthString();
         const miesiaceSet = new Set();
         (_wszystkieZleceniaCache || []).forEach(zlecenie => {
@@ -977,19 +989,20 @@ function initializeApp() {
         if (!miesiaceSet.size) {
             miesiaceSet.add(fallback);
         }
-
-        const posortowane = Array.from(miesiaceSet).sort();
-        const poprzedniaWartosc = finishedMonthSelect.value;
-        finishedMonthSelect.innerHTML = posortowane
-            .map(miesiac => `<option value="${miesiac}">${miesiac}</option>`)
-            .join('');
-
-        if (poprzedniaWartosc && miesiaceSet.has(poprzedniaWartosc)) {
-            finishedMonthSelect.value = poprzedniaWartosc;
-        } else {
-            finishedMonthSelect.value = posortowane[posortowane.length - 1];
+        const poprzednia = (miesiacSummaryInput.value || '').trim();
+        const min = posortowane[0];
+        const max = posortowane[posortowane.length - 1];
+        if (min) {
+            miesiacSummaryInput.min = min;
         }
-    }
+        if (max) {
+            miesiacSummaryInput.max = max;
+      }
+      if (!poprzednia || !miesiaceSet.has(poprzednia)) {
+            miesiacSummaryInput.value = max || fallback;
+        }
+        miesiacSummaryInput.dataset.availableMonths = posortowane.join(',');
+    }    
 
     function renderFinishedMiniSummary(miesiac, zlecenia) {
         if (!finishedMiniSummary) return;
@@ -1378,28 +1391,27 @@ function initializeApp() {
 
     function wyswietlKlientow() {
         try {
-            const frazaWyszukiwania = ((klientSearchInput && klientSearchInput.value) ? klientSearchInput.value : '').toLowerCase();
+            const fraza = (klientSearchInput?.value || '').trim().toLowerCase();
             wszystkieKlienci = [];
 
             let klienciHtml = '';
             let selectHtml = '<option value="">-- Wybierz klienta --</option>';
 
-            const przefiltrowaniKlienci = (_wszystkieKlienciCache || []).filter(klient => {
-                if (!frazaWyszukiwania) return true;
-                const tekst = [
-                    klient.nazwa || '',
-                    klient.nip || '',
-                    klient.adres || '',
-                    klient.telefon || ''
-                ].join(' ').toLowerCase();
-                return tekst.includes(frazaWyszukiwania);
-            });
+            const posortowani = (_wszystkieKlienciCache || [])
+                .filter(klient => {
+                    if (!fraza) return true;
+                    const tekst = [klient.nazwa, klient.nip, klient.adres, klient.telefon]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                    return tekst.includes(fraza);
+                })
+                .sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl', { sensitivity: 'base' }));
 
-            przefiltrowaniKlienci.forEach(klient => {
+            posortowani.forEach(klient => {
                 wszystkieKlienci.push(klient);
                 const maszynyListaId = `client-${klient.id}-machines`;
-                const nipTxt = klient.nip ? ` (NIP: ${klient.nip})` : '';
-                const arrowHtml = `<span class="toggle-machines-arrow collapsed" data-target="${maszynyListaId}" data-client-id="${klient.id}">▼</span>`;
+                const nipTxt = klient.nip && klient.nip !== '---' ? ` (NIP: ${klient.nip})` : '';
 
                 klienciHtml += `
                     <div class="client-group" data-id="${klient.id}">
@@ -1408,7 +1420,7 @@ function initializeApp() {
                                 <strong>${klient.nazwa || '---'}</strong>${nipTxt}<br>
                                 <small>${klient.adres || '---'} | ${klient.telefon || '---'}</small>
                             </div>
-                            ${arrowHtml}
+                            <span class="toggle-machines-arrow collapsed" data-target="${maszynyListaId}" data-client-id="${klient.id}">▼</span>
                             <div class="client-header-actions">
                                 <button class="btn-edit edit-klient-btn" type="button">Edytuj</button>
                                 <button class="delete-btn" type="button">Usuń</button>
@@ -1423,101 +1435,81 @@ function initializeApp() {
             if (listaKlientowDiv) {
                 listaKlientowDiv.innerHTML = klienciHtml || '<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>';
             }
-            if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
+            if (maszynaKlientSelect) {
+                maszynaKlientSelect.innerHTML = selectHtml;
+            }
             odswiezSelectKlientaDoZlecenia();
-
             const assignKlientSelect = document.getElementById('assign-klient-select');
-            if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
-        } catch (err) {
-            console.error('wyswietlKlientow() — błąd:', err);
+            if (assignKlientSelect) {
+                assignKlientSelect.innerHTML = selectHtml;
+            }
+        } catch (error) {
+            console.error('wyswietlKlientow() — błąd:', error);
             if (listaKlientowDiv) {
-                listaKlientowDiv.innerHTML = `<p style="color:#e74c3c">Błąd renderowania listy klientów: ${String(err)}</p>`;
+                listaKlientowDiv.innerHTML = `<p style="color:#e74c3c">Błąd renderowania listy klientów: ${String(error)}</p>`;
             }
         }
     }
 
-
-function nasluchujNaKlientow() {
-  onSnapshot(
-    query(collection(db, "klienci"), orderBy("nazwa")),
-    (snapshot) => {
-      _wszystkieKlienciCache = [];  // odśwież cache
-      snapshot.forEach((docSnap) => {
-        _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      // Po załadowaniu klientów przerysuj listy, które ich potrzebują:
-      wyswietlMaszyny();   // żeby przypiąć maszyny pod klientów
-      wyswietlKlientow();  // żeby wyrenderować listę klientów + selecty
+    function nasluchujNaKlientow() {
+        onSnapshot(
+            query(collection(db, "klienci"), orderBy("nazwa")),
+            (snapshot) => {
+                _wszystkieKlienciCache = [];
+                snapshot.forEach((docSnap) => {
+                    _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                wyswietlMaszyny();
+                wyswietlKlientow();
+            }
+        );
     }
-  );
-}
-async function obslugaListyKlientow(e) {
-  const target = e.target;
 
-  // 1) Strzałka rozwijania maszyn dla klienta
-  if (target.classList.contains('toggle-machines-arrow')) {
-    const strzalka = target;
-    const targetId = strzalka.dataset.target; // np. "client-<ID>-machines"
-    const kontener = document.getElementById(targetId);
-    if (kontener) {
-      strzalka.classList.toggle('collapsed');
-      kontener.classList.toggle('collapsed');
+    async function obslugaListyKlientow(event) {
+        const arrow = event.target.closest('.toggle-machines-arrow');
+        if (arrow) {
+            const kontenerId = arrow.dataset.target;
+            const kontener = document.getElementById(kontenerId);
+            if (kontener) {
+                arrow.classList.toggle('collapsed');
+                kontener.classList.toggle('collapsed');
+                if (!kontener.dataset.loaded) {
+                    const klientId = kontener.dataset.clientId || arrow.closest('.client-group')?.dataset.id;
+                    await zaladujMaszynyKlienta(klientId, kontener);
+                }
+            }
+            return;
+        }
 
-      // Doładuj maszyny pierwszy raz po kliknięciu
-      if (!kontener.dataset.loaded) {
-        const klientId = targetId.replace('client-', '').replace('-machines', '');
-        const maszynyKlienta = _wszystkieMaszynyCache.filter(m => m.klientId === klientId);
-        kontener.innerHTML = maszynyKlienta.length
-          ? `<ul class="client-machine-list">
-              ${maszynyKlienta.map(m => `
-                <li>
-                  ${m.typMaszyny} ${m.model} (S/N: ${m.nrSeryjny})
-                  <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${m.typMaszyny} ${m.model}">Pokaż historię</a>
-                </li>`).join('')}
-             </ul>`
-          : `<p style="font-size:.85rem;color:var(--text-color-light)">Brak maszyn</p>`;
-        kontener.dataset.loaded = '1';
-      }
+        const historyLink = event.target.closest('.machine-history-link');
+        if (historyLink) {
+            event.preventDefault();
+            const maszynaId = historyLink.dataset.maszynaId;
+            const maszynaNazwa = historyLink.dataset.maszynaNazwa;
+            if (maszynaId) {
+                pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+            }
+            return;
+        }
+
+        const editBtn = event.target.closest('.edit-klient-btn');
+        if (editBtn) {
+            const klientId = editBtn.closest('.client-group')?.dataset.id;
+            if (klientId) {
+                otworzModalEdycjiKlienta(klientId);
+            }
+            return;
+        }
+
+        const deleteBtn = event.target.closest('.delete-btn');
+        if (deleteBtn) {
+            const klientId = deleteBtn.closest('.client-group')?.dataset.id;
+            if (klientId && confirm('Usunięcie klienta usunie też jego maszyny i zlecenia. Kontynuować?')) {
+                await deleteDoc(doc(db, "klienci", klientId));
+                wyswietlMaszyny();
+            }
+        }
     }
-    return;
-  }
-
-  const historyLink = target.closest('.machine-history-link');
-  if (historyLink) {
-    e.preventDefault();
-    const maszynaId = historyLink.dataset.maszynaId;
-    const maszynaNazwa = historyLink.dataset.maszynaNazwa;
-    if (!maszynaId) return;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
-    return;
-  }
-
-  const editBtn = target.closest('.edit-klient-btn');
-  if (editBtn) {
-    const group = target.closest('.client-group');
-    const klientId = group?.dataset.id;
-    if (!klientId) return;
-    otworzModalEdycjiKlienta(klientId);
-    return;
-  }
-
-  const delBtn = target.closest('.delete-btn');
-  if (delBtn) {
-    const group = target.closest('.client-group');
-    const klientId = group?.dataset.id;
-    if (!klientId) return;
-    if (confirm("Usunięcie klienta usunie też jego maszyny i zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "klienci", klientId));
-      wyswietlMaszyny(); // odśwież
-    }
-    return;
-  }
-
-    if (actionButton.classList.contains('edit-klient-btn')) {
-    otworzModalEdycjiKlienta(klientId);
-
-  }
-}
 
         async function pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa) {
         if (!machineHistoryModal || !machineHistoryList) return;
@@ -1686,72 +1678,71 @@ async function obslugaListyKlientow(e) {
     }
 
     function wyswietlMaszyny() {
+        if (!listaMaszynDiv) return;
         if (_wszystkieKlienciCache.length === 0 && _wszystkieMaszynyCache.length > 0) {
-            listaMaszynDiv.innerHTML = "<p>Ładowanie danych klientów...</p>";
+            listaMaszynDiv.innerHTML = '<p>Ładowanie danych klientów...</p>';
             return;
         }
-        const frazaWyszukiwania = (maszynaSearchInput?.value || '').toLowerCase();
+        
+        const fraza = (maszynaSearchInput?.value || '').trim().toLowerCase();
         wszystkieMaszyny = [];
 
-        const przefiltrowaneMaszyny = _wszystkieMaszynyCache.filter(maszyna => {
-            if (!frazaWyszukiwania) return true;
+        const przefiltrowaneMaszyny = (_wszystkieMaszynyCache || []).filter(maszyna => {
+            if (!fraza) return true;
             const tekst = `${maszyna.klientNazwa} ${maszyna.typMaszyny} ${maszyna.model} ${maszyna.nrSeryjny}`.toLowerCase();
-            return tekst.includes(frazaWyszukiwania);
+            return tekst.includes(fraza);
         });
 
-        const grupyMaszyn = przefiltrowaneMaszyny.reduce((mapa, maszyna, index) => {
+        const grupy = new Map();
+        przefiltrowaneMaszyny.forEach((maszyna, index) => {
+            wszystkieMaszyny.push(maszyna);
             const klientId = maszyna.klientId || '';
-            const klucz = klientId || `nieprzypisany-${maszyna.klientNazwa || index}`;
-            if (!mapa.has(klucz)) {
+            const key = klientId || `nieprzypisany-${index}`;
+            if (!grupy.has(key)) {
                 const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
                 const nazwa = klient?.nazwa || maszyna.klientNazwa || 'Nieprzypisany klient';
-                mapa.set(klucz, { klientId, nazwa, maszyny: [] });
+                grupy.set(key, { klientId, nazwa, maszyny: [] });
             }
-            mapa.get(klucz).maszyny.push(maszyna);
-            return mapa;
-        }, new Map());
+            grupy.get(key).maszyny.push(maszyna);
+        });
 
-        const posortowaneGrupy = Array.from(grupyMaszyn.values())
-            .sort((a, b) => a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' }));
+        const zawartosc = Array.from(grupy.values())
+            .sort((a, b) => a.nazwa.localeCompare(b.nazwa, 'pl', { sensitivity: 'base' }))
+            .map((grupa, idx) => {
+                const suffix = grupa.klientId || `group-${idx}`;
+                const targetId = `machines-${suffix}`;
+                const listaMaszyn = grupa.maszyny
+                    .sort((a, b) => (a.typMaszyny || '').localeCompare(b.typMaszyny || '', 'pl', { sensitivity: 'base' })
+                        || (a.model || '').localeCompare(b.model || '', 'pl', { sensitivity: 'base' }))
+                    .map(maszyna => {
+                        const typ = maszyna.typMaszyny || '---';
+                        const model = maszyna.model || '';
+                        const label = `${typ} ${model}`.trim();
+                        const numerSeryjny = maszyna.nrSeryjny && maszyna.nrSeryjny !== '---' ? maszyna.nrSeryjny : 'brak';
+                        return `
+                            <li data-id="${maszyna.id}">
+                                <span>${label} (S/N: ${numerSeryjny})</span>
+                                <div>
+                                    <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${label}">Historia</a>
+                                    <button class="btn-edit edit-maszyna-btn">Edytuj</button>
+                                    <button class="delete-btn">Usuń</button>
+                                </div>
+                            </li>`;
+                    }).join('');
 
-        const maszynyHtml = posortowaneGrupy.map((grupa, idx) => {
-            const suffix = grupa.klientId ? grupa.klientId : `group-${idx}`;
-            const targetId = `client-${suffix}-machines`;
-            const listaMaszyn = grupa.maszyny
-                .sort((a, b) => (a.typMaszyny || '').localeCompare(b.typMaszyny || '') || (a.model || '').localeCompare(b.model || ''))
-                .map(maszyna => {
-                    const typ = maszyna.typMaszyny || '---';
-                    const model = maszyna.model || '';
-                    const numerSeryjny = maszyna.nrSeryjny && maszyna.nrSeryjny !== '---' ? maszyna.nrSeryjny : 'brak';
-                    const label = `${typ} ${model}`.trim();
-                    return `
-                    <li data-id="${maszyna.id}">
-                        <span>${label} (S/N: ${numerSeryjny})</span>
-                        <div>
-                            <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${label}">Historia</a>
-                            <button class="btn-edit edit-maszyna-btn">Edytuj</button>
-                            <button class="delete-btn">Usuń</button>
+                return `
+                    <div class="client-group" data-id="${grupa.klientId || ''}">
+                        <div class="client-header" data-target="${targetId}">
+                            <div class="client-header-text"><h4>${grupa.nazwa}</h4></div>
+                            <span class="toggle-machines-arrow collapsed" data-target="${targetId}">▼</span>
                         </div>
-                    </li>`;
-                }).join('');
-
-            return `
-                <div class="client-group">
-                    <div class="client-header">
-                        <div class="client-header-text"><h4>${grupa.nazwa}</h4></div>
-                        <span class="toggle-machines-arrow collapsed" data-target="${targetId}">▼</span>
-                    </div>
-                    <div id="${targetId}" class="client-machine-list-container collapsed">
-                        <ul class="client-machine-list">
+                        <ul id="${targetId}" class="machine-list collapsed" data-client-id="${grupa.klientId || ''}">
                             ${listaMaszyn}
                         </ul>
-                    </div>
-                </div>`;
-        }).join('');
+                    </div>`;
+            }).join('');
 
-        if (listaMaszynDiv) {
-            listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
-        }
+        listaMaszynDiv.innerHTML = zawartosc || '<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>';
         if (zlecenieKlientSelect) {
             zlecenieKlientSelect.dispatchEvent(new Event('change'));
         }
@@ -1814,10 +1805,10 @@ async function obslugaListyKlientow(e) {
         });
     }
 
-function obslugaListyMaszyn(e) {
-  const t = e.target;
+async function obslugaListyMaszyn(event) {
+  const t = event.target;
 
-  // Klik w nagłówek grupy klienta (otwórz/zamknij listę ul.machine-list)
+  // 1) Rozwiń/zwiń grupę klienta (nagłówek)
   const header = t.closest('.client-header');
   if (header) {
     header.classList.toggle('open');
@@ -1826,38 +1817,40 @@ function obslugaListyMaszyn(e) {
     return;
   }
 
-  // Historia maszyny
+  // 2) Historia maszyny (link wiersza)
   const histLink = t.closest('.machine-history-link');
   if (histLink) {
-    e.preventDefault();
-    pokazHistorieSerwisowaMaszyny(histLink.dataset.maszynaId, histLink.dataset.maszynaNazwa);
+    event.preventDefault();
+    const maszynaId = histLink.dataset.maszynaId;
+    const maszynaNazwa = histLink.dataset.maszynaNazwa;
+    if (maszynaId) {
+      pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa || '');
+    }
     return;
   }
 
-  // Edytuj maszynę
+  // 3) Edytuj maszynę (przycisk w wierszu)
   const editBtn = t.closest('.edit-maszyna-btn');
   if (editBtn) {
-    const li = t.closest('li[data-id]');
+    const li = editBtn.closest('li[data-id]');
     if (!li) return;
     otworzModalEdycjiMaszyny(li.dataset.id);
     return;
   }
 
-  // Usuń maszynę
+  // 4) Usuń maszynę (przycisk w wierszu)
   const delBtn = t.closest('.delete-btn');
   if (delBtn) {
-    const li = t.closest('li[data-id]');
-    if (!li) return;
-    if (confirm("Usunąć tę maszynę (oraz jej zlecenia)?")) {
-      deleteDoc(doc(db, "maszyny", li.dataset.id));
+    const li = delBtn.closest('li[data-id]');
+    const maszynaId = li?.dataset.id;
+    if (maszynaId && confirm('Usunąć tę maszynę (oraz jej zlecenia)?')) {
+      await deleteDoc(doc(db, "maszyny", maszynaId));
+      // po usunięciu odśwież listę klientów (maszyny znikną spod klienta)
       wyswietlKlientow();
-        }
-
-
-        if (actionButton.classList.contains('edit-maszyna-btn')) {
-            otworzModalEdycjiMaszyny(maszynaId);
-        }
     }
+    return;
+  }
+}
 
 async function otworzModalEdycjiMaszyny(maszynaId) {
     if (!editMaszynaForm || !editMaszynaModal) return;
@@ -1932,126 +1925,95 @@ async function obslugaListyPrzejazdow(event) {}
 // --- ZLECENIA ---
 function wyswietlZlecenia() {
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
-        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
-        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = '<p>Ładowanie danych maszyn...</p>';
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = '<p>Ładowanie danych maszyn...</p>';
         return;
     }
-    function renderUkonczoneZlecenia() {
-  if (!ukonczoneZleceniaLista) return;
-  const miesiac = finishedMonthInput?.value || miesiacSummaryInput?.value || '';
-  const items = _wszystkieZleceniaCache
-    .filter(z => z.status === 'ukończone' && z.dataUkonczenia && (miesiac ? z.dataUkonczenia.startsWith(miesiac) : true))
-    .map(z => {
-      const m = _wszystkieMaszynyCache.find(mm => mm.id === z.maszynaId);
-      const k = _wszystkieKlienciCache.find(kk => kk.id === z.klientId);
-      const nazwa = k ? `${k.nazwa} - ${m ? `${m.typMaszyny} ${m.model}` : ''}` : (z.nrZlecenia || 'Zlecenie');
-      const uzyte = z.uzyteCzesci?.length ? `<br><small>Użyto: ${z.uzyteCzesci.map(c=>`${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-      return `
-        <li data-id="${z.id}">
-          <span>
-            <strong>${nazwa}</strong> (Nr: ${z.nrZlecenia})<br>
-            <em>Ukończono: ${z.dataUkonczenia || 'b.d.'}</em><br>
-            Fakturowane: <strong>${z.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${z.typZlecenia || '?'}</strong>
-            ${uzyte}
-          </span>
-          <div>
-            <button class="btn-details details-zlecenie-btn">Szczegóły</button>
-            <button class="btn-edit edit-zlecenie-btn">Edytuj</button>
-            <button class="delete-btn">Usuń</button>
-          </div>
-        </li>`;
-    }).join('');
 
-  ukonczoneZleceniaLista.innerHTML = items ? `<ul>${items}</ul>` : '<p>Brak zakończonych zleceń dla wybranego miesiąca.</p>';
-}
-
-// Delegacja klików w liście zakończonych
-function obslugaListyZakonczonych(e) {
-  const li = e.target.closest('li[data-id]');
-  if (!li) return;
-  const id = li.dataset.id;
-
-  if (e.target.closest('.details-zlecenie-btn')) {
-    otworzModalSzczegolowZlecenia(id);
-    return;
-  }
-  if (e.target.closest('.edit-zlecenie-btn')) {
-    otworzModalEdycjiZlecenia(id);
-    return;
-  }
-  if (e.target.closest('.delete-btn')) {
-    if (confirm("Usunąć zakończone zlecenie?")) {
-      deleteDoc(doc(db, "zlecenia", id));
-    }
-  }
-}
-
-    const frazaWyszukiwania = (zlecenieSearchInput?.value || '').toLowerCase();
+    const fraza = (zlecenieSearchInput?.value || '').trim().toLowerCase();
     const selectedMonth = getSelectedFinishedMonth();
     wszystkieZlecenia = [];
-    let aktywneHtml = '', ukonczoneHtml = '';
+    const aktywneItems = [];
+    const zakonczoneItems = [];
     const finishedForSummary = [];
 
-    const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => {
-        if (!frazaWyszukiwania) return true;
+    (_wszystkieZleceniaCache || []).forEach(zlecenie => {
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-        const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
-        const tekst = `${nazwa} ${zlecenie.nrZlecenia} ${klient ? klient.nazwa : ''} ${maszyna ? maszyna.model : ''} ${maszyna ? maszyna.typMaszyny : ''}`.toLowerCase();
-        return tekst.includes(frazaWyszukiwania);
-    });
+        const nazwa = klient
+            ? `${klient.nazwa}${maszyna ? ' - ' + [maszyna.typMaszyny, maszyna.model].filter(Boolean).join(' ') : ''}`
+            : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+        const searchable = [nazwa, zlecenie.nrZlecenia, klient?.nazwa, klient?.nip, klient?.adres, maszyna?.nrSeryjny]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+        if (fraza && !searchable.includes(fraza)) {
+            return;
+        }
 
-    przefiltrowaneZlecenia.forEach(zlecenie => {
         wszystkieZlecenia.push(zlecenie);
 
-        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-        const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
-
         if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
-            const przycisk = zlecenie.status === 'nieprzypisane'
-            ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
-            : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`; 
-            aktywneHtml += `<li data-id="${zlecenie.id}">
-                <span><strong>${nazwa}</strong><br><em>${zlecenie.opis || ''}</em></span>
-                <div>
-                    <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
-                    ${przycisk}
-                    <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
-                </div>
-            </li>`;
-        } else if (zlecenie.status === 'ukończone') {
-            const dataUkonczenia = zlecenie.dataUkonczenia || '';
-            if (!dataUkonczenia.startsWith(selectedMonth)) {
+            const opisHtml = zlecenie.opis ? `<em>${zlecenie.opis}</em>` : '<em>Brak opisu</em>';
+            const actionBtn = zlecenie.status === 'nieprzypisane'
+                ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
+                : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`;
+            aktywneItems.push(`
+                <li data-id="${zlecenie.id}">
+                    <span><strong>${nazwa}</strong><br>${opisHtml}</span>
+                    <div>
+                        <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                        ${actionBtn}
+                        <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
+                    </div>
+                </li>`);
+            return;
+        }
+
+        if (zlecenie.status === 'ukończone') {
+            const dataUkonczenia = typeof zlecenie.dataUkonczenia === 'string' ? zlecenie.dataUkonczenia : '';
+            if (selectedMonth && (!dataUkonczenia || !dataUkonczenia.startsWith(selectedMonth))) {
                 return;
             }
-            const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
-            const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
+           
+            const nazwaMaszyny = klient
+                ? `${klient.nazwa}${maszyna ? ' - ' + [maszyna.typMaszyny, maszyna.model].filter(Boolean).join(' ') : ''}`
+                : 'Zlecenie usuniętej maszyny';
+            const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length
+                ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
+                : '';
             const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
+
             finishedForSummary.push(zlecenie);
-            ukonczoneHtml += `<li data-id="${zlecenie.id}">
-                <span>
-                    <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
-                    <em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>
-                    Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>
-                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
-                </span>
-                <div>
-                    <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
-                    <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
-                    <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
-                    <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
-                </div>
-            </li>`;
+            
+            zakonczoneItems.push(`
+                <li data-id="${zlecenie.id}">
+                    <span>
+                        <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
+                        <em>Ukończono: ${dataUkonczenia || 'b.d.'}</em><br>
+                        Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
+                        ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
+                    </span>
+                    <div>
+                        <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                        <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
+                        <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
+                        <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
+                    </div>
+                </li>`);
         }
     });
 
     if (aktywneZleceniaLista) {
-        aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceń lub pasujących do wyszukiwania.</p>";
+        aktywneZleceniaLista.innerHTML = aktywneItems.length
+            ? `<ul>${aktywneItems.join('')}</ul>`
+            : '<p>Brak aktywnych zleceń lub pasujących do wyszukiwania.</p>';
     }
     if (ukonczoneZleceniaLista) {
-        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
+       ukonczoneZleceniaLista.innerHTML = zakonczoneItems.length
+            ? `<ul>${zakonczoneItems.join('')}</ul>`
+            : '<p>Brak ukończonych zleceń dla wybranego miesiąca.</p>'; 
     }
     renderFinishedMiniSummary(selectedMonth, finishedForSummary);
     renderZakonczoneSekcja();
@@ -2464,7 +2426,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
 
 }
 
- window.otworzModalSzczegolowZlecenia = otworzModalSzczegolowZlecenia;
+   window.otworzModalSzczegolowZlecenia = otworzModalSzczegolowZlecenia;
 
  
 async function zapiszPrzypisanie(event) {
@@ -2835,14 +2797,15 @@ async function obslugaZakonczeniaZlecenia(event) {
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
             let html = '';
             wszystkieProdukty = [];
-            let sumaIlosci = 0;
             let liczbaNiskich = 0;
+            let sumaLitrowOlejow = 0;
 
             if (snapshot.empty) {
                 magazynLista.innerHTML = '<tr><td colspan="6">Magazyn pusty.</td></tr>';
                 renderMagazynPodsumowanie(0, 0, 0);
                 return;
             }
+
             snapshot.forEach((docSnap) => {
                 const produkt = docSnap.data();
                 produkt.id = docSnap.id;
@@ -2854,72 +2817,63 @@ async function obslugaZakonczeniaZlecenia(event) {
                 const iloscWLitrach = jestOlejem && produkt.pojemnosc
                     ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
                     : '---';
-                const datasetQty = produkt.ilosc;            
+                const datasetQty = produkt.ilosc;
                 wszystkieProdukty.push(produkt);
 
                 const iloscLiczbowa = Number(datasetQty) || 0;
-                sumaIlosci += iloscLiczbowa;
+                if (jestOlejem && produkt.pojemnosc) {
+                    sumaLitrowOlejow += iloscLiczbowa * produkt.pojemnosc;
+                }
                 if (iloscLiczbowa <= NISKI_STAN_MAGAZYNOWY) {
                     liczbaNiskich += 1;
                 }
 
-                html += `<tr data-id=\"${produkt.id}\" data-name=\"${produkt.nazwa}\" data-qty=\"${datasetQty}\" data-is-oil=\"${jestOlejem}\"></span>
-                    <td>${produkt.index}</td>
-                    <td>${produkt.nazwa}</td>
-                    <td>${iloscFormatowana} szt.</td>
-                    <td>${iloscWLitrach}</td>
-                    <td>${produkt.klient}</td>
-                    <td>
-                        <button class=\"add-stock-btn\">Dodaj</button>
-                        <button class=\"remove-stock-btn\">Zdejmij</button>
-                        <button class=\"delete-btn\">Usuń</button>
-                    </td>
-                </tr>`;
+                html += `
+                    <tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
+                        <td>${produkt.index}</td>
+                        <td>${produkt.nazwa}</td>
+                        <td>${iloscFormatowana} szt.</td>
+                        <td>${iloscWLitrach}</td>
+                        <td>${produkt.klient}</td>
+                        <td>
+                            <button class="add-stock-btn">Dodaj</button>
+                            <button class="remove-stock-btn">Zdejmij</button>
+                            <button class="delete-btn">Usuń</button>
+                        </td>
+                    </tr>`;
             });
 
             magazynLista.innerHTML = html || '<tr><td colspan="6">Magazyn pusty.</td></tr>';
-            renderMagazynPodsumowanie(wszystkieProdukty.length, sumaIlosci, liczbaNiskich);
+            renderMagazynPodsumowanie(wszystkieProdukty.length, sumaLitrowOlejow, liczbaNiskich);
             renderMagazynWModalu();
         });
     }
 
-    function renderMagazynPodsumowanie(liczbaPozycji, sumaIlosci, liczbaNiskich) {
-        if (!magazynHeaderContainer) {
-            console.warn('[UI] Element #magazyn-header nie istnieje – pominięto podsumowanie magazynu.');
+    function renderMagazynPodsumowanie(liczbaPozycji, sumaLitrowOlejow, liczbaNiskich) {
+        if (!magazynMetricsContainer) {
+            console.warn('[UI] Element .magazyn-metrics nie istnieje – pominięto podsumowanie magazynu.');
             return;
         }
-        magazynHeaderContainer.innerHTML = `
-            <div class=\"summary-item\">
-                <span class=\"summary-label\">Łączna liczba pozycji</span>
-                <span class=\"summary-value\">${liczbaPozycji}</span>
+        
+        const lowStockClass = liczbaNiskich > 0 ? 'summary-value alert' : 'summary-value';
+        const litryTxt = sumaLitrowOlejow > 0 ? `${formatujLiczbe(sumaLitrowOlejow)} L` : '---';
+
+        magazynMetricsContainer.innerHTML = `
+            <div class="summary-item">
+                <span class="summary-label">Łączna liczba pozycji</span>
+                <span class="summary-value">${liczbaPozycji}</span>
             </div>
-            <div class=\"summary-item\">
-                <span class=\"summary-label\">Łączna ilość</span>
-                <span class=\"summary-value\">${formatujLiczbe(sumaIlosci)}</span>
+            <div class="summary-item">
+                <span class="summary-label">Suma litrów (oleje)</span>
+                <span class="summary-value">${litryTxt}</span>
             </div>
-            <div class=\"summary-item\">
-                <span class=\"summary-label\">Poniżej progu (${NISKI_STAN_MAGAZYNOWY})</span>
-                <span class=\"summary-value\">${liczbaNiskich}</span>
+            <div class="summary-item">
+                <span class="summary-label">Pozycji poniżej progu (${NISKI_STAN_MAGAZYNOWY})</span>
+                <span class="${lowStockClass}">${liczbaNiskich}</span>
             </div>
         `;
     }
   
-   // --- PODPIĘCIE EVENTÓW ---
-   // KLIENCI – delegacja
-listaKlientowDiv.removeEventListener('click', obslugaListyKlientow);
-listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
-
-// MASZYNY – delegacja
-listaMaszynDiv.removeEventListener('click', obslugaListyMaszyn);
-listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
-
-// ZAKOŃCZONE – delegacja
-ukonczoneZleceniaLista?.removeEventListener('click', obslugaListyZakonczonych);
-ukonczoneZleceniaLista?.addEventListener('click', obslugaListyZakonczonych);
-
-// ZAKOŃCZONE – zmiana miesiąca
-finishedMonthInput?.removeEventListener('change', renderUkonczoneZlecenia);
-finishedMonthInput?.addEventListener('change', renderUkonczoneZlecenia);
 
     addListenerSafely(klientForm, 'submit', dodajKlienta, '#klient-form');
     addListenerSafely(listaKlientowDiv, 'click', obslugaListyKlientow, '#lista-klientow');
@@ -3075,11 +3029,13 @@ finishedMonthInput?.addEventListener('change', renderUkonczoneZlecenia);
     nasluchujNaZlecenia();
     wyswietlPrzejazdy(); // puste – OK
     wyswietlMagazyn();
-    renderUkonczoneZlecenia();
-    setTimeout(renderUkonczoneZlecenia, 300); 
+    wyswietlZlecenia();
+    renderZakonczoneSekcja();
+    renderPodsumowanieSekcja();
+
 
 } // koniec initializeApp()
-} // brakujące zamknięcie bloku — dodane, aby zrównoważyć nawiasy klamrowe
+
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
