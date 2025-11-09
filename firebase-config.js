@@ -11,6 +11,21 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_APP_ID
 };
 
-// Inicjalizacja Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+let app = null;
+let firestore = null;
+
+const hasConfigValues = Object.values(firebaseConfig).every((value) => Boolean(value));
+
+if (!hasConfigValues) {
+  console.error('[Firebase] Brak konfiguracji Firebase – sprawdź zmienne środowiskowe. UI będzie działać w trybie offline.');
+} else {
+  try {
+    app = initializeApp(firebaseConfig);
+    firestore = getFirestore(app);
+  } catch (error) {
+    console.error('[Firebase] Nie udało się zainicjować aplikacji Firebase.', error);
+  }
+}
+
+export const db = firestore;
+export { app, firebaseConfig };

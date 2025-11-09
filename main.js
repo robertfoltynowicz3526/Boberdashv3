@@ -159,6 +159,44 @@ async function initializeApp() {
         return element;
     };
 
+    let hasWarnedAboutDb = false;
+    const ensureDb = () => {
+        if (db) {
+            return true;
+        }
+        if (!hasWarnedAboutDb) {
+            console.error('[Firebase] Brak połączenia z Firestore – akcja została pominięta.');
+            hasWarnedAboutDb = true;
+        }
+        return false;
+    };
+
+    const openModal = (modal) => {
+        if (!modal) {
+            return;
+        }
+        modal.classList.add('open');
+        document.body.classList.add('modal-open');
+    };
+
+    const closeModal = (modal) => {
+        if (!modal) {
+            return;
+        }
+        modal.classList.remove('open');
+        if (!document.querySelector('.modal.open')) {
+            document.body.classList.remove('modal-open');
+        }
+    };
+
+    const ensureDbOrNotify = () => {
+        if (ensureDb()) {
+            return true;
+        }
+        alert('Brak połączenia z bazą danych. Operacja nie może zostać wykonana.');
+        return false;
+    };
+
     const getCurrentMonthString = () => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -334,30 +372,32 @@ async function initializeApp() {
         renderMultiZlecenia();
 
 
-        const docRef = doc(db, "godziny_pracy", data);
-        try {
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const dane = docSnap.data();
-                kalendarzForm['godziny-pracy'].value = dane.praca || 0;
-                kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
-                kalendarzForm['czas-jazdy'].value = dane.jazda || 0;
-                kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
-                manualFakturowaneValue = Number(dane.fakturowane) || 0;
-                const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
-                multiZlecenia = powiazane;
-                if (maPowiazania) {
-                    manualFakturowaneValue = suma;
+        if (ensureDb()) {
+            const docRef = doc(db, "godziny_pracy", data);
+            try {
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const dane = docSnap.data();
+                    kalendarzForm['godziny-pracy'].value = dane.praca || 0;
+                    kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
+                    kalendarzForm['czas-jazdy'].value = dane.jazda || 0;
+                    kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
+                    manualFakturowaneValue = Number(dane.fakturowane) || 0;
+                    const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
+                    multiZlecenia = powiazane;
+                    if (maPowiazania) {
+                        manualFakturowaneValue = suma;
+                    }
+                    renderMultiZlecenia();
+                    if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
+                        aktualizujPoleFakturowane(manualFakturowaneValue, false);
+                    }
                 }
-                renderMultiZlecenia();
-                if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
-                    aktualizujPoleFakturowane(manualFakturowaneValue, false);
-                }
+            } catch (error) {
+                console.error("Błąd podczas pobierania danych ewidencji:", error);               
             }
-        } catch (error) {
-            console.error("Błąd podczas pobierania danych ewidencji:", error);
         }
-        kalendarzModal.style.display = 'block';
+        openModal(kalendarzModal);
     }
 
     function przygotujOpcjeMultiZlecen() {
@@ -531,9 +571,13 @@ async function initializeApp() {
             zlecenieId: powiazane.length === 1 ? powiazane[0].zlecenieId : null,
             klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null
         };
+        if (!ensureDb()) {
+            alert('Brak połączenia z bazą danych. Spróbuj ponownie, gdy Firestore będzie dostępny.');
+            return;
+        }
         try {
             await setDoc(doc(db, "godziny_pracy", data), dane);
-            kalendarzModal.style.display = 'none';
+            closeModal(kalendarzModal);
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
         }
@@ -542,6 +586,13 @@ async function initializeApp() {
     function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
             if (calendar) calendar.removeAllEvents();
+            return;
+        }
+        if (!ensureDb()) {
+            if (calendar) {
+                calendar.removeAllEvents();
+            }
+            odswiezPodsumowania();
             return;
         }
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
@@ -654,6 +705,9 @@ async function initializeApp() {
         if (deleteButton) {
             const data = deleteButton.dataset.date;
             if (data && confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
+                if (!ensureDbOrNotify()) {
+                    return;
+                }
                 await deleteDoc(doc(db, "godziny_pracy", data));
             }
         }
@@ -1286,6 +1340,9 @@ async function initializeApp() {
     // --- KLIENCI ---
     async function dodajKlienta(event) {
         event.preventDefault();
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const dane = {
             nazwa: klientForm['klient-nazwa'].value,
             nip: klientForm['klient-nip'].value || '---',
@@ -1341,6 +1398,9 @@ async function initializeApp() {
         if (!klientId) return null;
         const cached = _wszystkieKlienciCache.find(k => k.id === klientId);
         if (cached) return cached;
+        if (!ensureDb()) {
+            return null;
+        }
         try {
             const snap = await getDoc(doc(db, 'klienci', klientId));
             if (!snap.exists()) return null;
@@ -1358,6 +1418,9 @@ async function initializeApp() {
         let maszyny = _wszystkieMaszynyCache.filter(m => m.klientId === klientId);
         if (maszyny.length) {
             return maszyny;
+        }
+        if (!ensureDb()) {
+            return [];
         }
         try {
             const qMaszyny = query(collection(db, 'maszyny'), where('klientId', '==', klientId));
@@ -1378,6 +1441,9 @@ async function initializeApp() {
         if (!maszynaId) return null;
         const cached = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
         if (cached) return cached;
+        if (!ensureDb()) {
+            return null;
+        }
         try {
             const snap = await getDoc(doc(db, 'maszyny', maszynaId));
             if (!snap.exists()) return null;
@@ -1513,6 +1579,12 @@ async function initializeApp() {
     }
 
     function nasluchujNaKlientow() {
+        if (!ensureDb()) {
+            if (listaKlientowDiv) {
+                listaKlientowDiv.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+            }
+            return;
+        }
         onSnapshot(
             query(collection(db, "klienci"), orderBy("nazwa")),
             (snapshot) => {
@@ -1562,6 +1634,9 @@ async function initializeApp() {
         if (deleteKlientBtn) {
             const klientId = deleteKlientBtn.closest('.client-group')?.dataset.id;
             if (klientId && confirm('Usunięcie klienta usunie też jego maszyny i zlecenia. Kontynuować?')) {
+                if (!ensureDbOrNotify()) {
+                    return;
+                }
                 await deleteDoc(doc(db, "klienci", klientId));
                 wyswietlMaszyny();
                 wyswietlKlientow();
@@ -1577,7 +1652,13 @@ async function initializeApp() {
         const historyTitle = document.getElementById('machine-history-title');
         if (historyTitle) historyTitle.textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
-        machineHistoryModal.style.display = 'block';
+        openModal(machineHistoryModal);
+
+        if (!ensureDb()) {
+            machineHistoryList.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+            return;
+        }
+
 
         try {
             const qMasz = query(
@@ -1604,7 +1685,7 @@ async function initializeApp() {
                             <span>
                                 <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
                                 <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
-                                Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
+                                Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'} </strong>
                                 ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
                             </span>
                             <div>
@@ -1616,15 +1697,14 @@ async function initializeApp() {
                 historiaHtml = `<ul>${historiaHtml}</ul>`;
             }
 
-            machineHistoryList.innerHTML = historiaHtml;
+            machineHistoryList.innerHTML = historiaHtml || '<p>Brak historii serwisowej dla tej maszyny.</p>';
 
         } catch (error) {
             console.error("Błąd podczas pobierania historii serwisowej:", error);
             machineHistoryList.innerHTML = '<p style="color: red;">Wystąpił błąd podczas ładowania historii.</p>';
         }
     }
-
-    async function obslugaListyZlecenWModaluHistorii(event) {
+async function obslugaListyZlecenWModaluHistorii(event) {
          const detailsBtnModal = event.target.closest('.details-zlecenie-btn');
         if (detailsBtnModal) {
             const zlecenieElement = detailsBtnModal.closest('li[data-id]');
@@ -1657,7 +1737,7 @@ async function initializeApp() {
         editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
         editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
         editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
-        editKlientModal.style.display = 'block';
+        openModal(editKlientModal);
     }
 
     async function zapiszEdycjeKlienta(event) {
@@ -1667,6 +1747,9 @@ async function initializeApp() {
         if (!stareDane) {
             console.error("Nie znaleziono starych danych klienta w cache!");
             alert("Wystąpił błąd podczas zapisu - nie znaleziono danych klienta.");
+            return;
+        }
+        if (!ensureDbOrNotify()) {
             return;
         }
         const nowaNazwa = editKlientForm['edit-klient-nazwa'].value;
@@ -1715,7 +1798,7 @@ async function initializeApp() {
                 }
             }
 
-            editKlientModal.style.display = 'none';
+            closeModal(editKlientModal);
         } catch (e) {
             console.error("Błąd aktualizacji klienta lub powiązanych dokumentów:", e);
             alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
@@ -1725,6 +1808,9 @@ async function initializeApp() {
     // --- MASZYNY ---
     async function dodajMaszyne(event) {
         event.preventDefault();
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const wybranyKlientId = maszynaKlientSelect.value;
         if (!wybranyKlientId) { alert("Proszę wybrać klienta!"); return; }
         const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
@@ -1756,23 +1842,6 @@ async function initializeApp() {
             headerElement.classList.add('open');
             listaElement.classList.add('open');
             arrowElement?.classList.remove('collapsed');
-        }
-    }
-
-
-    function toggleMaszynyGrupy(listaElement, arrowElement, headerElement) {
-        if (!listaElement) {
-            return;
-        }
-        const jestZwinieta = listaElement.classList.contains('collapsed');
-        if (jestZwinieta) {
-            listaElement.classList.remove('collapsed');
-            arrowElement?.classList.remove('collapsed');
-            headerElement?.classList.add('expanded');
-        } else {
-            listaElement.classList.add('collapsed');
-            arrowElement?.classList.add('collapsed');
-            headerElement?.classList.remove('expanded');
         }
     }
 
@@ -1887,6 +1956,12 @@ async function initializeApp() {
 
 
     function nasluchujNaMaszyny() {
+        if (!ensureDb()) {
+            if (listaMaszynDiv) {
+                listaMaszynDiv.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+            }
+            return;
+        }
         onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
             _wszystkieMaszynyCache = [];
             wszystkieMaszyny = [];
@@ -1947,6 +2022,9 @@ async function obslugaListyMaszyn(event) {
         const maszynaElement = deleteMaszynaBtn.closest('li[data-id]');
         const maszynaId = maszynaElement?.dataset.id;
         if (maszynaId && confirm('Usunąć tę maszynę (oraz jej zlecenia)?')) {
+            if (!ensureDbOrNotify()) {
+                return;
+            }
             await deleteDoc(doc(db, "maszyny", maszynaId));
             wyswietlKlientow();
             wyswietlMaszyny();
@@ -1974,24 +2052,27 @@ async function otworzModalEdycjiMaszyny(maszynaId) {
         editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : (maszyna.nrSeryjny || '');
         editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji || '';
         editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny || 0;
-        editMaszynaModal.style.display = 'block';
+        openModal(editMaszynaModal);
     } catch (error) {
         console.error('Błąd podczas przygotowywania edycji maszyny:', error);
         alert('Nie udało się wczytać danych maszyny do edycji.');
     }
 }
 
-async function zapiszEdycjeMaszyny(event) {
-    if (!editMaszynaForm) return;
-    event.preventDefault();
-    const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
-    const stareDane = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
-    if (!stareDane) {
-        console.error("Nie znaleziono starych danych maszyny w cache!");
-        alert("Wystąpił błąd podczas zapisu - nie znaleziono danych maszyny.");
-        return;
-    }
-    const nowyModel = editMaszynaForm['edit-maszyna-model'].value;
+    async function zapiszEdycjeMaszyny(event) {
+        if (!editMaszynaForm) return;
+        event.preventDefault();
+        const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
+        const stareDane = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
+        if (!stareDane) {
+            console.error("Nie znaleziono starych danych maszyny w cache!");
+            alert("Wystąpił błąd podczas zapisu - nie znaleziono danych maszyny.");
+            return;
+        }
+        if (!ensureDbOrNotify()) {
+            return;
+        }
+        const nowyModel = editMaszynaForm['edit-maszyna-model'].value;
     const nowyTyp = editMaszynaForm['edit-maszyna-typ'].value;
 
     const dane = {
@@ -2014,7 +2095,7 @@ async function zapiszEdycjeMaszyny(event) {
             });
         }
 
-        editMaszynaModal.style.display = 'none';
+        closeModal(editMaszynaModal);
         wyswietlKlientow();
     } catch (e) {
         console.error("Błąd aktualizacji maszyny lub powiązanych zleceń:", e);
@@ -2126,6 +2207,11 @@ function wyswietlZlecenia() {
 }
 
 function nasluchujNaZlecenia() {
+    if (!ensureDb()) {
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+        return;
+    }
     onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
         _wszystkieZleceniaCache = [];
         wszystkieZlecenia = [];
@@ -2142,6 +2228,9 @@ function nasluchujNaZlecenia() {
 
 async function dodajZlecenie(event) {
     event.preventDefault();
+    if (!ensureDbOrNotify()) {
+        return;
+    }
     const wybranyKlientId = zlecenieKlientSelect.value;
     const wybranaMaszynaId = zlecenieMaszynaSelect.value;
     const dataRozpoczecia = null;
@@ -2203,7 +2292,12 @@ async function obslugaListyZlecen(event) {
         const zlecenieElement = deleteBtnZlecenie.closest('li[data-id]');
         const zlecenieIdDelete = zlecenieElement?.dataset.id;
         if (!zlecenieIdDelete) return;
-        if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", zlecenieIdDelete)); }
+    if (confirm("Na pewno usunąć?")) {
+        if (!ensureDbOrNotify()) {
+            return;
+        }
+        await deleteDoc(doc(db, "zlecenia", zlecenieIdDelete));
+    }
         return;
     }
 
@@ -2230,7 +2324,7 @@ async function obslugaListyZlecen(event) {
             if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
             if (assignMachineSection) assignMachineSection.style.display = 'none';
             assignForm.reset();
-            assignModal.style.display = 'block';
+            openModal(assignModal);
         }
         return;
     }
@@ -2264,7 +2358,7 @@ async function obslugaListyZlecen(event) {
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
             ensureZakonczenieNotatkaField();
-            completeModal.style.display = 'block';
+            openModal(completeModal);
         }
         return;
     }
@@ -2290,6 +2384,9 @@ async function obslugaListyZlecen(event) {
         if (!zlecenieIdReopen) return;
         const confirmed = confirm('Czy na pewno ponownie otworzyć to zlecenie?');
         if (!confirmed) return;
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const reopenReason = (prompt('Powód ponownego otwarcia (opcjonalnie):', '') || '').trim();
         try {
             const zlecenieRef = doc(db, "zlecenia", zlecenieIdReopen);
@@ -2324,6 +2421,9 @@ async function otworzModalEdycjiZlecenia(zlecenieId) {
     try {
         let zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
         if (!zlecenie) {
+            if (!ensureDbOrNotify()) {
+                return;
+            }
             const snap = await getDoc(doc(db, 'zlecenia', zlecenieId));
             if (!snap.exists()) {
                 alert('Nie znaleziono danych zlecenia do edycji.');
@@ -2344,7 +2444,7 @@ async function otworzModalEdycjiZlecenia(zlecenieId) {
         editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
         editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
 
-        editZlecenieModal.style.display = 'block';
+        openModal(editZlecenieModal);
     } catch (error) {
         console.error('Błąd podczas otwierania modala edycji zlecenia:', error);
         alert('Nie udało się otworzyć edycji zlecenia.');
@@ -2361,6 +2461,10 @@ async function zapiszEdycjeZlecenia(event) {
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
+        return;
+    }
+
+    if (!ensureDbOrNotify()) {
         return;
     }
 
@@ -2387,7 +2491,7 @@ async function zapiszEdycjeZlecenia(event) {
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
         if (zmiany.length === 0) {
-            editZlecenieModal.style.display = 'none';
+            closeModal(editZlecenieModal);
             return;
         }
         wpisHistorii += zmiany.join('; ');
@@ -2399,7 +2503,7 @@ async function zapiszEdycjeZlecenia(event) {
             zakonczenieNumerWZ: nowyNumerWz || null,
             historia: nowaHistoria
         });
-        editZlecenieModal.style.display = 'none';
+        closeModal(editZlecenieModal);
         alert("Zlecenie zaktualizowane.");
     } catch (e) {
         console.error("Błąd aktualizacji zlecenia:", e);
@@ -2420,6 +2524,15 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
         infoDiv.innerHTML = '<p>Ładowanie szczegółów zlecenia...</p>';
     historiaDiv.innerHTML = '';
     kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
+
+    if (!ensureDb()) {
+        infoDiv.innerHTML = '<p>Brak połączenia z bazą danych.</p>';
+        historiaDiv.innerHTML = '';
+        kalendarzDiv.innerHTML = '';
+        openModal(detailsZlecenieModal);
+        return;
+    }
+
 
     try {
         const snap = await getDoc(doc(db, 'zlecenia', zlecenieId));
@@ -2541,7 +2654,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
         }).join('');
 
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
-        detailsZlecenieModal.style.display = 'block';
+        openModal(detailsZlecenieModal);
     } catch (error) {
         console.error('Błąd otwierania szczegółów zlecenia:', error);
         infoDiv.innerHTML = '<p style="color: #f87171;">Nie udało się wczytać szczegółów zlecenia.</p>';
@@ -2557,6 +2670,9 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
 async function zapiszPrzypisanie(event) {
     if (!assignForm || !assignModal) return;
     event.preventDefault();
+    if (!ensureDbOrNotify()) {
+        return;
+    }
     const zlecenieId = assignForm['assign-zlecenie-id'].value;
     let klientId = assignForm['assign-klient-select'].value;
     let maszynaId = assignForm['assign-maszyna-select'].value;
@@ -2602,7 +2718,7 @@ async function zapiszPrzypisanie(event) {
             historia: nowaHistoria
         };
         await updateDoc(zlecenieRef, daneDoAktualizacji);
-        assignModal.style.display = 'none';
+        closeModal(assignModal);
     } catch (error) {
         console.error("Błąd podczas przypisywania:", error);
         alert(`Wystąpił błąd: ${error.message}`);
@@ -2675,6 +2791,9 @@ async function obslugaListyCzesci(event) {
 async function obslugaZakonczeniaZlecenia(event) {
     if (!completeModalForm || !completeModal) return;
     event.preventDefault();
+    if (!ensureDbOrNotify()) {
+        return;
+    }
     const docId = document.getElementById('complete-zlecenie-id').value;
     if (!docId) { alert('Brak identyfikatora zlecenia.'); return; }
     const godzinyInput = document.getElementById('wyfakturowane-godziny');
@@ -2735,7 +2854,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             }
         });
         alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
-        completeModal.style.display = 'none';
+        closeModal(completeModal);
         completeModalForm.reset();
         if (manualCloseDateInput) {
             manualCloseDateInput.value = getCurrentDateString();
@@ -2749,6 +2868,9 @@ async function obslugaZakonczeniaZlecenia(event) {
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const ilosc = Number(magazynForm['item-ilosc'].value);
         if (!Number.isFinite(ilosc) || ilosc <= 0) { alert("Podaj dodatnią ilość."); return; }
         if (!Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
@@ -2770,6 +2892,9 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     async function dodajMasowo(event) {
         event.preventDefault();
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const klient = bulkAddForm['bulk-klient'].value;
         const itemsText = bulkAddForm['bulk-items'].value.trim();
         if (!itemsText) return;
@@ -2812,6 +2937,9 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     async function dodajOlej() {
         if (!oilTypeSelect || !oilContainerSizeSelect) return;
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const typ = oilTypeSelect.value;
         const pojemnosc = Number(oilContainerSizeSelect.value);
         if (!Number.isFinite(pojemnosc) || pojemnosc <= 0) { alert("Wybierz poprawną pojemność."); return; }
@@ -2858,7 +2986,12 @@ async function obslugaZakonczeniaZlecenia(event) {
         const tr = event.target.closest('tr'); if (!tr) return;
         const docId = tr.dataset.id;
         if (event.target.classList.contains('delete-btn')) {
-            if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "magazyn", docId)); }
+            if (confirm("Na pewno usunąć?")) {
+                if (!ensureDbOrNotify()) {
+                    return;
+                }
+                await deleteDoc(doc(db, "magazyn", docId));
+            }
         } else if (event.target.classList.contains('add-stock-btn') || event.target.classList.contains('remove-stock-btn')) {
             if (!stockModal) return;
             const titleEl = document.getElementById('stock-modal-title');
@@ -2876,13 +3009,16 @@ async function obslugaZakonczeniaZlecenia(event) {
             qtyInput.step = tr.dataset.isOil === 'true' ? "0.01" : "1";
             qtyInput.placeholder = tr.dataset.isOil === 'true' ? "np. 0.5" : "Tylko liczby całkowite";
             qtyInput.value = '';
-            stockModal.style.display = 'block';
+            openModal(stockModal);
         }
     }
 
     async function obslugaZmianyStanu(event) {
         if (!stockModalForm) return;
         event.preventDefault();
+        if (!ensureDbOrNotify()) {
+            return;
+        }
         const docId = document.getElementById('stock-change-id').value;
         const changeInput = document.getElementById('stock-change-qty');
         if (!changeInput) return;
@@ -2906,7 +3042,7 @@ async function obslugaZakonczeniaZlecenia(event) {
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
                 t.update(docRef, { ilosc: newQty });
             });
-            if (stockModal) stockModal.style.display = 'none';
+            closeModal(stockModal);
             stockModalForm.reset();
         } catch (e) {
             console.error("Błąd transakcji: ", e);
@@ -2917,6 +3053,11 @@ async function obslugaZakonczeniaZlecenia(event) {
     function wyswietlMagazyn() {
         if (!magazynLista) {
             console.warn('[UI] Element #magazyn-lista nie istnieje – pominięto render magazynu.');
+            return;
+        }
+        if (!ensureDb()) {
+            magazynLista.innerHTML = '<tr><td colspan="6">Brak połączenia z bazą danych.</td></tr>';
+            renderMagazynPodsumowanie(0, 0, 0);
             return;
         }
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
@@ -3018,7 +3159,7 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     addListenerSafely(completeModalForm, 'submit', obslugaZakonczeniaZlecenia, '#complete-zlecenie-form');
     if (closeModalButton && completeModal) {
-        closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
+        closeModalButton.onclick = () => { closeModal(completeModal); };
     }
 
     if (miesiacSummaryInput) {
@@ -3056,7 +3197,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     addListenerSafely(partsToRemoveList, 'click', obslugaListyCzesci, '#parts-to-remove-list');
     addListenerSafely(stockModalForm, 'submit', obslugaZmianyStanu, '#stock-change-form');
     if (stockModalCloseButton && stockModal) {
-        stockModalCloseButton.onclick = () => { stockModal.style.display = 'none'; };
+        stockModalCloseButton.onclick = () => { closeModal(stockModal); };
     } else if (!stockModalCloseButton) {
         console.warn('[UI] Przycisk zamykania w #stock-change-modal nie istnieje.');
     }
@@ -3082,7 +3223,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
     if (kalendarzContainer) kalendarzContainer.addEventListener('click', obslugaKalendarza);
     if (kalendarzModalCloseButton && kalendarzModal) {
-        kalendarzModalCloseButton.onclick = () => { kalendarzModal.style.display = 'none'; };
+        kalendarzModalCloseButton.onclick = () => { closeModal(kalendarzModal); };
         } else if (!kalendarzModalCloseButton) {
         console.warn('[UI] Przycisk zamknięcia modala kalendarza nie istnieje.');
     }
@@ -3100,51 +3241,49 @@ async function obslugaZakonczeniaZlecenia(event) {
     addListenerSafely(editZlecenieForm, 'submit', zapiszEdycjeZlecenia, '#edit-zlecenie-form');
 
     if (editKlientCloseButton && editKlientModal) {
-        editKlientCloseButton.onclick = () => { editKlientModal.style.display = 'none'; };
+        editKlientCloseButton.onclick = () => { closeModal(editKlientModal); };
     } else if (!editKlientCloseButton) {
         console.warn('[UI] Brak przycisku zamknięcia w modalu edycji klienta.');    
     }
     if (editMaszynaCloseButton && editMaszynaModal) {
-        editMaszynaCloseButton.onclick = () => { editMaszynaModal.style.display = 'none'; };
+        editMaszynaCloseButton.onclick = () => { closeModal(editMaszynaModal); };
     } else if (!editMaszynaCloseButton) {
         console.warn('[UI] Brak przycisku zamknięcia w modalu edycji maszyny.');
     }
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
-        detailsZlecenieCloseButton.onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+        detailsZlecenieCloseButton.onclick = () => { closeModal(detailsZlecenieModal); };
      } else if (!detailsZlecenieCloseButton) {
         console.warn('[UI] Brak przycisku zamknięcia w szczegółach zlecenia.');
     }
     if (editZlecenieCloseButton && editZlecenieModal) {
-        editZlecenieCloseButton.onclick = () => { editZlecenieModal.style.display = 'none'; };
+        editZlecenieCloseButton.onclick = () => { closeModal(editZlecenieModal); };
     } else if (!editZlecenieCloseButton) {
         console.warn('[UI] Brak przycisku zamknięcia w modalu edycji zlecenia.');
     }
     if (machineHistoryCloseButton && machineHistoryModal) {
-        machineHistoryCloseButton.onclick = () => { machineHistoryModal.style.display = 'none'; };
+        machineHistoryCloseButton.onclick = () => { closeModal(machineHistoryModal); };
     } else if (!machineHistoryCloseButton) {
         console.warn('[UI] Brak przycisku zamknięcia w modalu historii maszyn.');
     }
 
     // Klik poza modal zamyka go
-    window.onclick = (event) => {
+    document.addEventListener('click', (event) => {
         const target = event.target;
         if (!target || !(target instanceof HTMLElement)) {
             return;
         }
-        if (
-            target === completeModal ||
-            target === stockModal ||
-            target === kalendarzModal ||
-            target === assignModal ||
-            target === editKlientModal ||
-            target === editMaszynaModal ||
-            target === detailsZlecenieModal ||
-            target === editZlecenieModal ||
-            target === machineHistoryModal 
-        ) {
-            target.style.display = 'none';
+        if (target.classList.contains('modal')) {
+            closeModal(target)
         }
-    };
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            document.querySelectorAll('.modal.open').forEach((modalElement) => {
+                closeModal(modalElement);
+            });
+        }
+    });
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     inicjalizujKalendarz();
