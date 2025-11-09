@@ -38,29 +38,46 @@ async function initializeApp() {
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
 
+    const getEl = (id) => document.getElementById(id);
+
     // --- SELEKTORY ---
-    const miesiacSummaryInput = document.getElementById('miesiac-summary');
-    const finishedMonthSlot = document.getElementById('finished-month-slot');
-    const summaryMonthSlot = document.getElementById('summary-month-slot');
-    const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
-    const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
-    const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
-    const kalendarzContainer = document.getElementById('kalendarz');
-    const kalendarzModal = document.getElementById('kalendarz-modal');
-    const kalendarzForm = document.getElementById('kalendarz-form');
-    const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
+    const miesiacSummaryInput = getEl('miesiac-summary');
+    const finishedMonthSlot = getEl('finished-month-slot');
+    const summaryMonthSlot = getEl('summary-month-slot');
+    const zlecenieKlientSelect = getEl('zlecenie-klient-select');
+    const zlecenieKlientFilterInput = getEl('zlecenie-klient-filter');
+    const zlecenieMaszynaSelect = getEl('zlecenie-maszyna-select');
+    const kalendarzContainer = getEl('kalendarz');
+    if (!kalendarzContainer) {
+        console.warn('Brak #kalendarz');
+    }
+    const kalendarzModal = getEl('kalendarz-modal');
+    const kalendarzForm = getEl('kalendarz-form');
+    const kalendarzModalTitle = getEl('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
-    const assignModal = document.getElementById('assign-zlecenie-modal');
-    const assignForm = document.getElementById('assign-zlecenie-form');
-    const klientForm = document.getElementById('klient-form');
-    const listaKlientowDiv = document.getElementById('lista-klientow');
-    const maszynaKlientSelect = document.getElementById('maszyna-klient-select');
-    const maszynaForm = document.getElementById('maszyna-form');
-    const listaMaszynDiv = document.getElementById('lista-maszyn');
-    const zlecenieForm = document.getElementById('zlecenie-form');
-    const aktywneZleceniaLista = document.getElementById('aktywne-zlecenia-lista');
-    const ukonczoneZleceniaLista = document.getElementById('ukonczone-zlecenia-lista');
+    const assignModal = getEl('assign-zlecenie-modal');
+    const assignForm = getEl('assign-zlecenie-form');
+    const klientForm = getEl('klient-form');
+    const listaKlientowDiv = getEl('lista-klientow');
+    if (!listaKlientowDiv) {
+        console.warn('Brak #lista-klientow');
+    }
+    const maszynaKlientSelect = getEl('maszyna-klient-select');
+    const maszynaForm = getEl('maszyna-form');
+    const listaMaszynDiv = getEl('lista-maszyn');
+    if (!listaMaszynDiv) {
+        console.warn('Brak #lista-maszyn');
+    }
+    const zlecenieForm = getEl('zlecenie-form');
+    const aktywneZleceniaLista = getEl('aktywne-zlecenia-lista');
+    if (!aktywneZleceniaLista) {
+        console.warn('Brak #aktywne-zlecenia-lista');
+    }
+    const ukonczoneZleceniaLista = getEl('ukonczone-zlecenia-lista');
+    if (!ukonczoneZleceniaLista) {
+        console.warn('Brak #ukonczone-zlecenia-lista');
+    }
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
@@ -218,7 +235,14 @@ async function initializeApp() {
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
-        if (!kalendarzContainer) return;
+        if (!kalendarzContainer) {
+            console.warn('Pominięto inicjalizację kalendarza – brak kontenera #kalendarz.');
+            return;
+        }
+        if (typeof FullCalendar === 'undefined' || !FullCalendar?.Calendar) {
+            console.error('FullCalendar nie został załadowany.');
+            return;
+        }
         calendar = new FullCalendar.Calendar(kalendarzContainer, {
             initialView: 'dayGridMonth',
             locale: 'pl',
@@ -614,10 +638,22 @@ async function initializeApp() {
 
     async function obslugaKalendarza(event) {
         const target = event.target;
-        if (target.classList.contains('event-edit-btn')) { otworzModalGodzin(target.dataset.date); }
-        if (target.classList.contains('event-delete-btn')) {
-            const data = target.dataset.date;
-            if (confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
+        if (!target || !(target instanceof HTMLElement)) {
+            return;
+        }
+
+        const editButton = target.closest('.event-edit-btn');
+        if (editButton) {
+            const data = editButton.dataset.date;
+            if (data) {
+                otworzModalGodzin(data);
+            }
+        }
+
+        const deleteButton = target.closest('.event-delete-btn');
+        if (deleteButton) {
+            const data = deleteButton.dataset.date;
+            if (data && confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
                 await deleteDoc(doc(db, "godziny_pracy", data));
             }
         }
@@ -3121,13 +3157,13 @@ async function obslugaZakonczeniaZlecenia(event) {
     wyswietlZlecenia();
     renderZakonczoneSekcja();
     renderPodsumowanieSekcja();
-
-
 } // koniec initializeApp()
 
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
-} else {
-    initializeApp();
-}
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        initializeApp();
+    } catch (e) {
+        console.error('Init error:', e);
+    }
+});
