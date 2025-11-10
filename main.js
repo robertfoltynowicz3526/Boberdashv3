@@ -28,15 +28,17 @@ async function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
-    const utworzPustyRekordMiesieczny = () => ({
-        praca: 0,
-        nadgodziny: 0,
-        jazda: 0,
-        wyfakturowaneGodziny: 0,
-        brutto: 0,
-        netto: 0,
-        absorpcja: 0
-    });
+    function utworzPustyRekordMiesieczny() {
+        return {
+            praca: 0,
+            nadgodziny: 0,
+            jazda: 0,
+            wyfakturowaneGodziny: 0,
+            brutto: 0,
+            netto: 0,
+            absorpcja: 0
+        };
+    }
     let wszystkieZlecenia = [], wszystkieProdukty = [], wszystkiePrzejazdy = [],
         czesciDoZlecenia = [], wszystkieMaszyny = [], wszystkieKlienci = [], wszystkieWpisyKalendarza = [];
     let ostatnieZestawienieMiesieczne = {
@@ -65,20 +67,20 @@ async function initializeApp() {
         '[tabindex]:not([tabindex="-1"])'
     ].join(',');
 
-    const getFocusableElements = (container) => {
+    function getFocusableElements(container) {
         if (!container) {
             return [];
         }
         return Array.from(container.querySelectorAll(focusableSelectors))
             .filter((el) => el instanceof HTMLElement && el.tabIndex !== -1 && el.getAttribute('aria-hidden') !== 'true');
-    };
+    }
 
-    const activateFocusTrap = (modal) => {
+    function activateFocusTrap(modal) {
         if (!(modal instanceof HTMLElement)) {
             return;
         }
         const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        const handleKeyDown = (event) => {
+        function handleKeyDown(event) {
             if (event.key !== 'Tab') {
                 return;
             }
@@ -100,7 +102,7 @@ async function initializeApp() {
                 event.preventDefault();
                 first.focus();
             }
-        };
+        }
 
         modal.addEventListener('keydown', handleKeyDown);
         focusTrapState.set(modal, { handleKeyDown, previousFocus });
@@ -113,9 +115,9 @@ async function initializeApp() {
             modal.setAttribute('tabindex', '-1');
             modal.focus();
         }
-    };
+    }
 
-    const deactivateFocusTrap = (modal) => {
+    function deactivateFocusTrap(modal) {
         const state = focusTrapState.get(modal);
         if (state) {
             modal.removeEventListener('keydown', state.handleKeyDown);
@@ -128,7 +130,7 @@ async function initializeApp() {
         if (modal instanceof HTMLElement && modal.hasAttribute('tabindex')) {
             modal.removeAttribute('tabindex');
         }
-    };
+    }
 
     const getEl = (id) => document.getElementById(id);
 
@@ -214,7 +216,9 @@ async function initializeApp() {
     const hoursChartContainer = document.getElementById('hours-chart');
     const calendarAbsorpcjaTag = document.getElementById('calendar-absorpcja');
     const podsumowaniaMetryki = document.getElementById('podsumowania-metryki');
-    const isPodsumowaniaViewMounted = () => Boolean(document.getElementById('podsumowania-view'))
+    function isPodsumowaniaViewMounted() {
+        return Boolean(document.getElementById('podsumowania-view'));
+    }
     const editKlientModal = document.getElementById('edit-klient-modal');
     const editKlientForm = document.getElementById('edit-klient-form');
     const editMaszynaModal = document.getElementById('edit-maszyna-modal');
@@ -266,7 +270,7 @@ async function initializeApp() {
     modalsToCheck.forEach(([label, element]) => warnIfMissing(element, label));
 
     let hasWarnedAboutDb = false;
-    const ensureDb = () => {
+    function ensureDb() {
         if (db) {
             return true;
         }
@@ -275,7 +279,7 @@ async function initializeApp() {
             hasWarnedAboutDb = true;
         }
         return false;
-    };
+    }
 
     function openModal(modal) {
         if (!(modal instanceof HTMLElement)) {
@@ -305,20 +309,22 @@ async function initializeApp() {
         }
     }
 
-    const ensureDbOrNotify = () => {
+    function ensureDbOrNotify() {
         if (ensureDb()) {
             return true;
         }
         alert('Brak połączenia z bazą danych. Operacja nie może zostać wykonana.');
         return false;
-    };
+    }
 
-    const getCurrentMonthString = () => {
+    function getCurrentMonthString() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    };
+    }
 
-    const getCurrentDateString = () => new Date().toISOString().split('T')[0];
+    function getCurrentDateString() {
+        return new Date().toISOString().split('T')[0];
+    }
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     document.querySelectorAll('#sidebar .tab-button').forEach(button => {
@@ -3381,7 +3387,8 @@ async function obslugaZakonczeniaZlecenia(event) {
             </div>
         `;
     }
-  
+
+    // --- PODPIĘCIE EVENTÓW ---
 
     addListenerSafely(klientForm, 'submit', dodajKlienta, '#klient-form');
     addListenerSafely(listaKlientowDiv, 'click', obslugaListyKlientow, '#lista-klientow');
