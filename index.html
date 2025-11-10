@@ -1,670 +1,586 @@
-
 <!DOCTYPE html>
 <html lang="pl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agro-Bober | Panel Serwisowy</title>
+    <title>Agro-Bober</title>
+    <link rel="icon" type="image/svg+xml" href="/javascript.svg" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
     <link rel="stylesheet" href="style.css" />
+    <script type="module" src="/main.js" defer></script>
   </head>
   <body>
-     <div class="layout">
-      <aside id="sidebar" class="sidebar">
-        <div class="brand">
-          <div class="brand-logo">
-            <span class="logo-circle">
-              <span class="logo-beaver"></span>
-            </span>
-            <div class="brand-copy">
-              <span class="brand-name">Agro-Bober</span>
-              <span class="brand-tag">Serwis maszyn rolniczych</span>
-            </div>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-logo" aria-hidden="true">
+            <span class="logo-circle"></span>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">Agro-Bober</span>
+            <span class="brand-subtitle">Panel serwisowy</span>
           </div>
         </div>
-        <nav class="side-nav">
-          <button type="button" class="tab-button" data-tab="pulpit">Pulpit</button>
-          <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
-          <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
-          <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
-          <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
-          <button type="button" class="tab-button" data-tab="podsumowania">Podsumowania</button>
+        <nav class="sidebar-nav" id="sidebar-nav">
+          <button class="tab-button active" data-tab="pulpit">Pulpit</button>
+          <button class="tab-button" data-tab="podsumowania">Podsumowania</button>
+          <button class="tab-button" data-tab="klienci">Klienci</button>
+          <button class="tab-button" data-tab="maszyny">Maszyny</button>
+          <button class="tab-button" data-tab="zlecenia">Zlecenia</button>
+          <button class="tab-button" data-tab="magazyn">Magazyn</button>
+          <button class="tab-button" data-tab="kalendarz">Kalendarz</button>
         </nav>
-        <div class="theme-switcher">
-          <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox" />
-          <label for="theme-toggle" class="theme-toggle-label"></label>
-          <span class="theme-label">Tryb nocny</span>
-        </div>
       </aside>
-      <main class="content">
-        <header class="main-header">
-          <h1>Panel Agro-Bober</h1>
-          <p>Kontrola serwisu i ewidencji czasu pracy</p>
-        </header>
-
-        <section id="pulpit" class="tab-content active">
-          <div class="dashboard-intro">
-            <h2>Pulpit</h2>
-            <p>Zarządzaj wydajnością serwisu w czasie rzeczywistym.</p>
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="topbar-title">
+            <h1>Agro-Bober</h1>
+            <p>Wewnętrzny system obsługi serwisu maszyn</p>
           </div>
-          <section class="calendar-section">
-          <div class="section-header">
-              <h3>Kalendarz pracy</h3>
-            </div>
-            <div id="calendar-absorpcja" class="absorpcja-tag">Absorpcja: 0%</div>
-            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
-            <div id="kalendarz" class="calendar-container"></div>
-          </section>
-          <div class="dashboard-kpi-grid">
-            <article class="kpi-card">
-              <h3>Nowe zlecenia (miesiąc)</h3>
-              <p class="kpi-value" id="kpi-nowe-zlecenia-value">0</p>
+          <div class="topbar-logo" aria-label="Logo">LOGO</div>
+        </header>
+        <section id="pulpit" class="tab-content active" aria-labelledby="tab-pulpit">
+          <div class="page-heading">
+            <h2>Pulpit</h2>
+            <p>Bieżące informacje operacyjne.</p>
+          </div>
+          <div class="dashboard-grid">
+            <article class="tile">
+              <header><h3>Aktywne zlecenia</h3></header>
+              <p class="tile-value" id="pulpit-aktywne-zlecenia">0</p>
             </article>
-            <article class="kpi-card">
-              <h3>Otwarte zlecenia</h3>
-              <p class="kpi-value" id="kpi-otwarte-zlecenia-value">0</p>
+            <article class="tile">
+              <header><h3>Godziny dzienne</h3></header>
+              <p class="tile-value" id="pulpit-godziny-dzienne">0</p>
             </article>
+            <article class="tile">
+              <header><h3>Magazyn — niskie stany</h3></header>
+              <ul class="tile-list" id="pulpit-niskie-stany"></ul>
+            </article>
+            <article class="tile">
+              <header><h3>Dzisiejsze zadania</h3></header>
+              <ul class="tile-list" id="pulpit-dzisiejsze-zadania"></ul>
+            </article>
+          </div>
+        </section>
+        <section id="podsumowania" class="tab-content" aria-labelledby="tab-podsumowania">
+          <div class="page-heading">
+            <h2>Podsumowania</h2>
+            <p>Kluczowe wskaźniki efektywności.</p>
+          </div>
+          <div class="summary-kpi-grid" id="summary-kpi-grid">
             <article class="kpi-card">
               <h3>Wyfakturowane godziny (miesiąc)</h3>
-              <p class="kpi-value" id="kpi-hours-month-value">0 h</p>
-              <p class="kpi-subvalue" id="kpi-hours-change-value">0% vs poprzedni</p>
+              <p class="kpi-value" id="summary-hours-month">0 h</p>
+              <p class="kpi-subvalue" id="summary-hours-trend">0% vs poprzedni</p>
             </article>
-            <article class="kpi-card highlight">
+            <article class="kpi-card">
               <h3>Absorpcja</h3>
-              <p class="kpi-value" id="kpi-absorpcja-value">0%</p>
+              <p class="kpi-value" id="summary-absorption">0%</p>
+              <p class="kpi-subvalue">przy założeniu 168 h</p>
+            </article>
+            <article class="kpi-card">
+              <h3>Średnia stawka</h3>
+              <p class="kpi-value" id="summary-stawka">0 zł</p>
+            </article>
+            <article class="kpi-card">
+              <h3>Nowe zlecenia</h3>
+              <p class="kpi-value" id="summary-new-orders">0</p>
             </article>
           </div>
-
-          <section class="weekly-summary">
-            <div class="section-header">
-              <h3>Podsumowanie tygodnia</h3>
-            </div>
-            <div class="weekly-grid">
-              <article class="weekly-card">
-                <span class="label">Praca</span>
-                <span class="value" id="week-praca-value">0 h</span>
-              </article>
-              <article class="weekly-card">
-                <span class="label">Jazda</span>
-                <span class="value" id="week-jazda-value">0 h</span>
-              </article>
-              <article class="weekly-card">
-                <span class="label">Nadgodziny</span>
-                <span class="value" id="week-nadgodziny-value">0 h</span>
-              </article>
-            </div>
-            </section>
-
-          <section class="chart-section">
-            <div class="section-header">
-              <h3>Wyfakturowane godziny — ostatnie 3 miesiące</h3>
-            </div>
-            <div id="hours-chart" class="bar-chart"></div>
+          <section class="kpi-section">
+            <header class="section-header">
+              <h3>Trendy 3-miesięczne</h3>
+            </header>
+            <div class="chart-placeholder" id="summary-trend-chart">Brak danych</div>
+          </section>
+          <section class="kpi-section">
+            <header class="section-header">
+              <h3>Historia miesięczna</h3>
+              <input type="month" id="miesiac-summary" />
+            </header>
+            <div class="history-grid" id="summary-history-grid"></div>
           </section>
         </section>
-
-        <section id="klienci" class="tab-content">
-          <div class="section-heading">
-            <h2>Baza Klientów</h2>
-            </div>
-          <div class="form-section">
-            <h3>Dodaj nowego klienta</h3>
-            <form id="klient-form">
-              <div class="form-group">
-                <label for="klient-nazwa">Nazwa / Imię i nazwisko:</label>
-                <input type="text" id="klient-nazwa" required />
+        <section id="klienci" class="tab-content" aria-labelledby="tab-klienci">
+          <div class="page-heading">
+            <h2>Klienci</h2>
+            <p>Zarządzaj bazą klientów i powiązanymi maszynami.</p>
+          </div>
+          <section class="form-card">
+            <h3>Dodaj klienta</h3>
+            <form id="klient-form" autocomplete="off">
+              <div class="form-row">
+                <label for="klient-nazwa">Nazwa</label>
+                <input id="klient-nazwa" type="text" required />
               </div>
-              <div class="form-group">
-                <label for="klient-nip">NIP (opcjonalnie):</label>
-                <input type="text" id="klient-nip" />
+              <div class="form-row">
+                <label for="klient-nip">NIP</label>
+                <input id="klient-nip" type="text" />
               </div>
-              <div class="form-group">
-                <label for="klient-adres">Adres (opcjonalnie):</label>
-                <input type="text" id="klient-adres" />
+              <div class="form-row">
+                <label for="klient-adres">Adres</label>
+                <input id="klient-adres" type="text" />
               </div>
-              <div class="form-group">
-                <label for="klient-telefon">Telefon (opcjonalnie):</label>
-                <input type="text" id="klient-telefon" />
+              <div class="form-row">
+                <label for="klient-telefon">Telefon</label>
+                <input id="klient-telefon" type="text" />
               </div>
-              <button type="submit">Dodaj Klienta</button>
+              <button type="submit" class="primary">Zapisz</button>
             </form>
-          </div>
-          <div class="search-section">
-            <div class="form-group">
-              <label for="klient-search-input">Wyszukaj klienta</label>
-              <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres..." />
+          </section>
+          <section class="form-card">
+            <div class="form-row">
+              <label for="klient-search-input">Wyszukaj</label>
+              <input id="klient-search-input" type="search" placeholder="Nazwa, NIP, adres..." />
             </div>
-          </div>
-          <div class="table-section">
-            <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
-            <div id="lista-klientow-content" class="collapsible-content">
-              <div id="lista-klientow"></div>
-            </div>
-          </div>
+          </section>
+          <section class="list-card">
+            <header class="section-header">
+              <h3>Lista klientów</h3>
+            </header>
+            <div id="lista-klientow" class="accordion"></div>
+          </section>
         </section>
-
-        <section id="maszyny" class="tab-content">
-          <div class="section-heading">
-            <h2>Baza Maszyn</h2>
+        <section id="maszyny" class="tab-content" aria-labelledby="tab-maszyny">
+          <div class="page-heading">
+            <h2>Maszyny</h2>
+            <p>Powiązane z klientami, z historią serwisową.</p>
           </div>
-          <div class="form-section">
-            <h3>Dodaj nową maszynę</h3>
-            <form id="maszyna-form">
-              <div class="form-group">
-                <label for="maszyna-klient-select">Wybierz klienta:</label>
-                <select id="maszyna-klient-select" required>
-                  <option value="">-- Najpierw dodaj klienta --</option>
-                </select>
+          <section class="form-card">
+            <h3>Dodaj maszynę</h3>
+            <form id="maszyna-form" autocomplete="off">
+              <div class="form-row">
+                <label for="maszyna-klient-select">Klient</label>
+                <select id="maszyna-klient-select" required></select>
               </div>
-              <div class="form-group">
-                <label for="maszyna-typ">Typ Maszyny:</label>
-                <select id="maszyna-typ" required>
-                  <option value="">-- Wybierz typ --</option>
-                  <option value="Traktor">Traktor</option>
-                  <option value="Kombajn">Kombajn</option>
-                  <option value="Prasa">Prasa</option>
-                  <option value="Sieczkarnia">Sieczkarnia</option>
-                  <option value="Opryskiwacz">Opryskiwacz</option>
-                  <option value="Inna">Inna</option>
-                </select>
+              <div class="form-row">
+                <label for="maszyna-model">Model</label>
+                <input id="maszyna-model" type="text" required />
               </div>
-              <div class="form-group">
-                <label for="maszyna-model">Model:</label>
-                <input type="text" id="maszyna-model" placeholder="Np. 6155M" required />
+              <div class="form-row">
+                <label for="maszyna-numer">Numer fabryczny</label>
+                <input id="maszyna-numer" type="text" required />
               </div>
-              <div class="form-group">
-                <label for="maszyna-serial">Numer seryjny:</label>
-                <input type="text" id="maszyna-serial" />
+              <div class="form-row">
+                <label for="maszyna-rok">Rok</label>
+                <input id="maszyna-rok" type="number" min="1980" max="2099" />
               </div>
-              <div class="form-group">
-                <label for="maszyna-rok">Rok produkcji:</label>
-                <input type="number" id="maszyna-rok" />
-              </div>
-              <div class="form-group">
-                <label for="maszyna-mth">Aktualne motogodziny:</label>
-                <input type="number" step="0.1" id="maszyna-mth" />
-              </div>
-              <button type="submit">Dodaj Maszynę</button>
+              <button type="submit" class="primary">Zapisz</button>
             </form>
-          </div>
-          <div class="search-section">
-            <div class="form-group">
-              <label for="maszyna-search-input">Wyszukaj maszynę</label>
-              <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta..." />
-            </div>
-            </div>
-          <div class="table-section">
-            <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
-            <div id="lista-maszyn-content" class="collapsible-content">
-              <div id="lista-maszyn"></div>
-            </div>
-          </div>
+          </section>
+          <section class="list-card">
+            <header class="section-header">
+              <h3>Maszyny według klientów</h3>
+            </header>
+            <div id="lista-maszyn" class="accordion"></div>
+          </section>
         </section>
-
-        <section id="zlecenia" class="tab-content">
-          <div class="section-heading">
+        <section id="zlecenia" class="tab-content" aria-labelledby="tab-zlecenia">
+          <div class="page-heading">
             <h2>Zlecenia</h2>
+            <p>Obsługa aktywnych i zakończonych zleceń.</p>
           </div>
-          <div class="form-section">
-            <h3>Dodaj nowe zlecenie</h3>
-            <form id="zlecenie-form">
-              <div class="form-grid-2">
-                <div class="form-group">
-                  <label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label>
-                  <select id="zlecenie-klient-select">
-                    <option value="">-- Wybierz klienta --</option>
-                    <option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label>
-                  <select id="zlecenie-maszyna-select" name="zlecenie-maszyna-select" disabled>
-                    <option value="">-- Najpierw wybierz klienta --</option>
-                  </select>
-                </div>
-                </div>
-              <div class="form-group">
-                <label for="zlecenie-klient-filter">lub wyszukaj klienta:</label>
-                <input type="search" id="zlecenie-klient-filter" name="zlecenie-klient-filter" placeholder="Filtruj klientów po nazwie, NIP, adresie..." />
+          <section class="form-card">
+            <h3>Dodaj zlecenie</h3>
+            <form id="zlecenie-form" autocomplete="off">
+              <div class="form-row">
+                <label for="zlecenie-klient-select">Klient</label>
+                <select id="zlecenie-klient-select" required></select>
               </div>
-              <div class="form-group">
-                <label for="nr-zlecenia">Nr zlecenia:</label>
-                <input type="text" id="nr-zlecenia" name="nr-zlecenia" required />
+              <div class="form-row">
+                <label for="zlecenie-maszyna-select">Maszyna</label>
+                <select id="zlecenie-maszyna-select" required>
+                  <option value="">-- wybierz --</option>
+                  <option id="szybkie-zlecenie-option" value="__quick__">Szybkie zlecenie</option>
+                </select>
               </div>
-              <div class="form-group">
-                <label for="opis-usterki">Opis usterki:</label>
-                 <textarea id="opis-usterki" name="opis-usterki" rows="3"></textarea>
+              <div class="form-row">
+                <label for="zlecenie-opis">Opis</label>
+                <textarea id="zlecenie-opis" rows="2" required></textarea>
               </div>
-              <div class="form-group">
-                <label for="motogodziny">Motogodziny (opcjonalnie):</label>
-                <input type="number" id="motogodziny" name="motogodziny" step="0.1" />
+              <div class="form-row">
+                <label for="zlecenie-data">Data przyjęcia</label>
+                <input id="zlecenie-data" type="date" required />
               </div>
-              <button type="submit">Dodaj Zlecenie</button>
+              <div class="form-row">
+                <label for="zlecenie-termin">Termin</label>
+                <input id="zlecenie-termin" type="date" />
+              </div>
+              <button type="submit" class="primary">Dodaj</button>
             </form>
-          </div>
-          <div class="search-section">
-            <div class="form-group">
-              <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
-              <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę..." />
-            </div>
-        </div>
-          <div class="table-section">
-            <h3>Aktywne zlecenia</h3>
-            <div id="aktywne-zlecenia-lista"></div>
-          </div>
-          <hr />
-          <div class="table-section">
-            <div class="section-header">
-              <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
-                Zakończone zlecenia <span class="arrow">▼</span>
-              </h3>
-            </div>
-            <div class="finished-controls">
-              <label for="zakonczone-miesiac">Miesiąc zakończenia:</label>
-              <div id="finished-month-slot" class="month-input-slot">
-                <input type="month" id="zakonczone-miesiac" />
+          </section>
+          <section class="list-card">
+            <header class="section-header">
+              <h3>Aktywne zlecenia</h3>
+            </header>
+            <div id="zlecenia-aktywne" class="card-list"></div>
+          </section>
+          <section class="list-card">
+            <header class="section-header">
+              <div>
+                <h3>Zakończone zlecenia</h3>
+                <p class="section-sub">Dane dla wybranego miesiąca.</p>
+              </div>
+              <input id="zakonczone-miesiac" type="month" />
+            </header>
+            <div class="finished-summary">
+              <div>
+                <span>Wyfakturowane godziny</span>
+                <strong id="zakonczone-podsumowanie-godziny">0 h</strong>
+              </div>
+              <div>
+                <span>Wartość brutto</span>
+                <strong id="zakonczone-podsumowanie-brutto">0 zł</strong>
+              </div>
+              <div>
+                <span>Wartość netto</span>
+                <strong id="zakonczone-podsumowanie-netto">0 zł</strong>
+              </div>
+              <div>
+                <span>Absorpcja</span>
+                <strong id="zakonczone-podsumowanie-absorpcja">0%</strong>
               </div>
             </div>
-            <div id="finished-mini-summary" class="finished-mini-summary"></div>
-            <div id="zakonczone-zlecenia-content" class="collapsible-content">
-              <div id="ukonczone-zlecenia-lista"></div>
-            </div>
-            </div>
+            <details class="finished-details" open>
+              <summary>Lista zakończonych</summary>
+              <div id="zlecenia-zakonczone" class="card-list"></div>
+            </details>
+          </section>
         </section>
-
-        <section id="magazyn" class="tab-content">
-          <div class="section-heading">
+        <section id="magazyn" class="tab-content" aria-labelledby="tab-magazyn">
+          <div class="page-heading">
             <h2>Magazyn</h2>
+            <p>Zarządzanie częściami i materiałami.</p>
           </div>
-          <div class="magazyn-forms">
-            <div class="form-section">
-              <h3>Dodaj produkt</h3>
-              <form id="magazyn-form">
-                <div class="form-group">
-                 <label for="item-index">Index:</label>
-                 <input type="text" id="item-index" required />
-                </div>
-            <div class="form-group">
-                  <label for="item-name">Nazwa:</label>
-                  <input type="text" id="item-name" required />
-                </div>
-                <div class="form-group">
-                  <label for="item-ilosc">Ilość:</label>
-                  <input type="number" step="1" id="item-ilosc" required />
-                </div>
-                <div class="form-group">
-                  <label for="item-klient">Klient:</label>
-                  <input type="text" id="item-klient" />
-                </div>
-                <button type="submit">Dodaj</button>
-              </form>
-            </div>
-        
-            <div class="form-section">
-                <h3>Masowe dodawanie</h3>
-                <form id="bulk-add-form">
-                <div class="form-group">
-                    <label for="bulk-klient">Klient:</label>
-                   <input type="text" id="bulk-klient" required />
-                </div>
-            <div class="form-group">
-                  <label for="bulk-items">Produkty:</label>
-                  <textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea>
-                </div>
-                <button type="submit">Dodaj</button>
-              </form>
-            </div>
-       <div class="form-section">
-              <h3>Zarządzanie Olejami</h3>
-              <div class="form-group">
-                <label for="oil-type">Typ Oleju:</label>
-                <select id="oil-type">
-                  <option value="HYGARD">HYGARD</option>
-                  <option value="PLUS50">PLUS50</option>
-                  <option value="COOLGARD">COOLGARD</option>
-                  <option value="EXTGARD">EXTGARD</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="oil-container-size">Pojemnik (L):</label>
-                <select id="oil-container-size">
-                  <option value="209">209L</option>
-                  <option value="55">55L</option>
-                  <option value="20">20L</option>
-                </select>
-              </div>
-              <button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button>
-              <hr />
-              <h4>Przelicznik</h4>
-              <div class="form-group">
-                <label for="converter-litry">Litry:</label>
-                <input type="number" step="0.01" id="converter-litry" />
-              </div>
-              <p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p>
-              <hr />
-              <div class="form-group">
-                <label for="converter-sztuki">Sztuki:</label>
-                <input type="number" step="0.01" id="converter-sztuki" />
-              </div>
-              <p>Wynik: <strong id="result-litry">0.00 L</strong></p>
-            </div>
-            </div>
-            <div id="magazyn-metrics" class="magazyn-metrics summary-container-subtle"></div>
-          <div class="table-section">
-            <h3>Stan Magazynowy</h3>
-            <table id="magazyn-table">
+          <section class="list-card">
+            <header class="section-header">
+              <h3>Stan magazynu</h3>
+            </header>
+            <table class="stock-table">
               <thead>
                 <tr>
                   <th>Index</th>
                   <th>Nazwa</th>
-                  <th>Ilość (szt.)</th>
-                  <th>Ilość (Litry)</th>
-                  <th>Klient</th>
+                  <th>Ilość</th>
                   <th>Akcje</th>
                 </tr>
               </thead>
-              <tbody id="magazyn-lista"></tbody>
+              <tbody id="magazyn-tabela"></tbody>
             </table>
-          </div>
-        </section>
-
-        <section id="podsumowania" class="tab-content">
-          <div id="podsumowania-view">
-            <div class="section-heading">
-              <h2>Podsumowania</h2>
-            </div>
-            <div id="summary-container">
-              <div class="summary-controls">
-                <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
-                <div id="summary-month-slot" class="month-input-slot">
-                  <input type="month" id="miesiac-summary" />
-                </div>
-                <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
+          </section>
+          <section class="form-card">
+            <h3>Dodaj produkt</h3>
+            <form id="magazyn-form" autocomplete="off">
+              <div class="form-row">
+                <label for="magazyn-index">Index</label>
+                <input id="magazyn-index" type="text" required />
               </div>
-              <div id="podsumowania-metryki" class="summary-cards"></div>
-              <div id="zakonczone-top-summary" class="summary-kpi-row"></div>
-              <div id="zakonczone-month-summary" class="summary-kpi-grid"></div>
-              <div class="podsumowanie-divider"></div>
-              <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
-              <div id="annual-summary"></div>
-            </div>
+              <div class="form-row">
+                <label for="magazyn-nazwa">Nazwa</label>
+                <input id="magazyn-nazwa" type="text" required />
+              </div>
+              <div class="form-row">
+                <label for="magazyn-ilosc">Ilość</label>
+                <input id="magazyn-ilosc" type="number" step="1" min="0" required />
+              </div>
+              <button type="submit" class="primary">Dodaj</button>
+            </form>
+          </section>
+          <section class="form-card">
+            <h3>Masowe dodawanie</h3>
+            <form id="magazyn-masowe-form">
+              <div class="form-row">
+                <label for="magazyn-masowe">Index;Nazwa;Ilość (jedna linia = produkt)</label>
+                <textarea id="magazyn-masowe" rows="4"></textarea>
+              </div>
+              <button type="submit" class="secondary">Dodaj wiele</button>
+            </form>
+          </section>
+          <section class="form-card">
+            <h3>Konwerter olejów</h3>
+            <form id="olej-konwerter-form" class="oil-converter">
+              <div class="form-row">
+                <label for="olej-typ">Typ</label>
+                <select id="olej-typ">
+                  <option value="HYGARD">Hy-Gard</option>
+                  <option value="PLUS50">Plus-50</option>
+                  <option value="COOLGARD">Cool-Gard</option>
+                  <option value="EXTGARD">Ext-Gard</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="olej-pojemnosc">Pojemnik</label>
+                <select id="olej-pojemnosc">
+                  <option value="209">209 L</option>
+                  <option value="55">55 L</option>
+                  <option value="20">20 L</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="olej-sztuki">Sztuki</label>
+                <input id="olej-sztuki" type="number" step="0.01" min="0" value="0" />
+              </div>
+              <div class="form-row">
+                <label for="olej-litry">Litry</label>
+                <input id="olej-litry" type="number" step="0.01" min="0" value="0" />
+              </div>
+              <button type="button" id="olej-przelicz" class="secondary">Przelicz</button>
+            </form>
+          </section>
+        </section>
+        <section id="kalendarz" class="tab-content" aria-labelledby="tab-kalendarz">
+          <div class="page-heading">
+            <h2>Kalendarz</h2>
+            <p>Ewidencja pracy i przypisanych zleceń.</p>
           </div>
+          <div class="calendar-summary" id="kalendarz-mini-podsumowanie">
+            <div><span>P</span><strong id="kalendarz-p">0 h</strong></div>
+            <div><span>F</span><strong id="kalendarz-f">0 h</strong></div>
+            <div><span>N</span><strong id="kalendarz-n">0 h</strong></div>
+            <div><span>J</span><strong id="kalendarz-j">0 h</strong></div>
+          </div>
+          <div id="calendar"></div>
         </section>
       </main>
     </div>
-
-    <div id="kalendarz-modal" class="modal">
-        <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2 id="kalendarz-modal-title">Ewidencja Czasu</h2>
+    <div class="modal" id="kalendarz-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="kalendarz-modal">×</button>
+        <h2 id="kalendarz-modal-title">Nowy wpis kalendarza</h2>
         <form id="kalendarz-form">
-          <input type="hidden" id="kalendarz-data" name="kalendarz-data" />
-          <div class="form-group">
-            <label for="godziny-pracy">Godziny Pracy:</label>
-            <input type="number" step="0.5" id="godziny-pracy" name="godziny-pracy" value="0" />
+          <input type="hidden" id="kalendarz-doc-id" />
+          <div class="form-row">
+            <label for="kalendarz-data">Data</label>
+            <input type="date" id="kalendarz-data" required />
           </div>
-          <div class="form-group">
-            <label for="godziny-fakturowane">Godziny Wyfakturowane:</label>
-            <input type="number" step="0.5" id="godziny-fakturowane" name="godziny-fakturowane" value="0" />
+          <div class="form-row">
+            <label for="kalendarz-praca">Praca (P)</label>
+            <input type="number" id="kalendarz-praca" step="0.25" min="0" value="0" />
           </div>
-          <div class="form-group">
-            <label for="nadgodziny">Nadgodziny:</label>
-            <input type="number" step="0.5" id="nadgodziny" name="nadgodziny" value="0" />
+          <div class="form-row">
+            <label for="kalendarz-faktura">Fakturowane (F)</label>
+            <input type="number" id="kalendarz-faktura" step="0.25" min="0" value="0" />
           </div>
-          <div class="form-group">
-            <label for="czas-jazdy">Czas Jazdy (h):</label>
-            <input type="number" step="0.25" id="czas-jazdy" name="czas-jazdy" value="0" />
+          <div class="form-row">
+            <label for="kalendarz-nadgodziny">Nadgodziny (N)</label>
+            <input type="number" id="kalendarz-nadgodziny" step="0.25" min="0" value="0" />
           </div>
-          <div class="form-group">
-            <label for="kalendarz-notatka">Notatka:</label>
-            <textarea id="kalendarz-notatka" name="kalendarz-notatka" rows="2"></textarea>
+          <div class="form-row">
+            <label for="kalendarz-jazda">Jazda (J)</label>
+            <input type="number" id="kalendarz-jazda" step="0.25" min="0" value="0" />
           </div>
-          <div id="kalendarz-zlecenia-multi">
-            <div class="multi-row">
-              <select class="multi-zlecenie-select">
-                <option value="">-- Wybierz zlecenie --</option>
-              </select>
-              <input type="number" step="0.5" class="multi-zlecenie-fh" placeholder="Fakturowane h" />
-              <button type="button" class="btn-add multi-add">Dodaj kolejne zlecenie</button>
-            </div>
-            <ul id="kalendarz-zlecenia-list"></ul>
+          <div class="form-row">
+            <label for="kalendarz-notatka">Notatka</label>
+            <textarea id="kalendarz-notatka" rows="2"></textarea>
           </div>
-          <button type="submit">Zapisz</button>
+          <div class="form-row">
+            <label for="kalendarz-zlecenia">Powiązane zlecenia</label>
+            <div id="kalendarz-zlecenia-tagi" class="tag-list"></div>
+            <select id="kalendarz-zlecenia" class="tag-select"></select>
+            <button type="button" id="kalendarz-dodaj-zlecenie" class="secondary">Dodaj</button>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
+            <button type="button" class="danger" id="kalendarz-usun">Usuń</button>
+          </div>
         </form>
       </div>
     </div>
-
-    <div id="complete-zlecenie-modal" class="modal">
-       <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2>Zakończ Zlecenie</h2>
-        <form id="complete-zlecenie-form">
-          <input type="hidden" id="complete-zlecenie-id" />
-          <p><strong>Maszyna:</strong> <span id="modal-klient"></span></p>
-          <p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
-          <div class="form-group">
-            <label for="wyfakturowane-godziny">Wyfakturowane godziny:</label>
-            <input type="number" step="0.1" id="wyfakturowane-godziny" required />
-          </div>
-          <div class="form-group">
-            <label for="typ-zlecenia">Typ zlecenia:</label>
-            <select id="typ-zlecenia" required>
-              <option value="S">S - Wyjazdowe (45zł)</option>
-              <option value="W">W - Warsztat (35zł)</option>
-              <option value="G">G - Gwarancja (35zł)</option>
-              <option value="Z">Z - Zbrojenie (30zł)</option>
-              <option value="P">P - Poprawka (0zł)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="manual-close-date">Data zakończenia:</label>
-            <input type="date" id="manual-close-date" />
-          </div>
-          <div class="form-group">
-            <label for="zakonczenie-wz">Numer WZ (opcjonalnie):</label>
-            <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024" />
-          </div>
-          <div class="form-group">
-            <label for="zakonczenie-notatka">Notatka z wykonanych prac (opcjonalnie):</label>
-            <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
-          </div>
-          <hr />
-          <h3>Wybierz części z magazynu</h3>
-          <div id="modal-magazyn-lista" class="modal-stock-list"></div>
-          <h4>Wybrane części do zdjęcia:</h4>
-          <ul id="parts-to-remove-list"></ul>
-          <hr />
-          <button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button>
-        </form>
-      </div> 
-    </div>
-
-    <div id="stock-change-modal" class="modal">
-      <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2 id="stock-modal-title">Zmień stan</h2>
-        <form id="stock-change-form">
-          <input type="hidden" id="stock-change-id" />
-          <p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p>
-          <p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p>
-          <div class="form-group">
-            <label for="stock-change-qty">Ilość:</label>
-            <input type="number" step="1" id="stock-change-qty" required />
-          </div>
-          <button type="submit">Zatwierdź Zmianę</button>
-        </form>
-      </div>
-    </div>
-
-    <div id="assign-zlecenie-modal" class="modal">
-      <div class="modal-content">
-        <span class="close-button">&times;</span>
+    <div class="modal" id="assign-zlecenie-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="assign-zlecenie-modal">×</button>
         <h2>Przypisz zlecenie</h2>
         <form id="assign-zlecenie-form">
-          <input type="hidden" id="assign-zlecenie-id" name="assign-zlecenie-id" />
-          <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
-          <div class="form-group">
-            <label for="assign-klient-select">1. Wybierz istniejącego klienta:</label>
-            <select id="assign-klient-select" name="assign-klient-select"></select>
+          <input type="hidden" id="assign-doc-id" />
+          <div class="form-row">
+            <label for="assign-data">Data</label>
+            <input id="assign-data" type="date" required />
           </div>
-          <p>...lub dodaj nowego:</p>
-          <div class="form-group">
-            <label for="assign-nowy-klient">Nazwa nowego klienta:</label>
-            <input type="text" id="assign-nowy-klient" name="assign-nowy-klient" />
+          <div class="form-row">
+            <label for="assign-klient-select">Klient</label>
+            <select id="assign-klient-select"></select>
           </div>
-          <hr />
-          <div id="assign-machine-section" class="assign-machine-section">
-            <div class="form-group">
-              <label for="assign-maszyna-select">2. Wybierz maszynę klienta:</label>
-              <select id="assign-maszyna-select" name="assign-maszyna-select"></select>
-            </div>
-            <p>...lub dodaj nową:</p>
-            <div class="form-group">
-              <label for="assign-nowa-maszyna-typ">Typ:</label>
-              <select id="assign-nowa-maszyna-typ" name="assign-nowa-maszyna-typ">
-                <option value="">Wybierz</option>
-                <option value="Traktor">Traktor</option>
-                <option value="Kombajn">Kombajn</option>
-                <option value="Prasa">Prasa</option>
-                <option value="Sieczkarnia">Sieczkarnia</option>
-                <option value="Opryskiwacz">Opryskiwacz</option>
-                <option value="Inna">Inna</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="assign-nowa-maszyna-model">Model:</label>
-              <input type="text" id="assign-nowa-maszyna-model" name="assign-nowa-maszyna-model" />
-            </div>
+          <div class="form-row">
+            <label for="assign-zlecenie-select">Zlecenie</label>
+            <select id="assign-zlecenie-select"></select>
           </div>
-          <button type="submit">Przypisz i Zapisz</button>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
+          </div>
         </form>
       </div>
     </div>
-
-    <div id="edit-klient-modal" class="modal">
-        <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2>Edytuj Klienta</h2>
-        <form id="edit-klient-form">
-          <input type="hidden" id="edit-klient-id" name="edit-klient-id" />
-          <div class="form-group">
-            <label for="edit-klient-nazwa">Nazwa / Imię i nazwisko:</label>
-            <input type="text" id="edit-klient-nazwa" name="edit-klient-nazwa" required />
+    <div class="modal" id="klient-edit-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="klient-edit-modal">×</button>
+        <h2>Edytuj klienta</h2>
+        <form id="klient-edit-form">
+          <input type="hidden" id="klient-edit-id" />
+          <div class="form-row">
+            <label for="klient-edit-nazwa">Nazwa</label>
+            <input id="klient-edit-nazwa" type="text" required />
           </div>
-          <div class="form-group">
-            <label for="edit-klient-nip">NIP:</label>
-            <input type="text" id="edit-klient-nip" name="edit-klient-nip" />
+          <div class="form-row">
+            <label for="klient-edit-nip">NIP</label>
+            <input id="klient-edit-nip" type="text" />
           </div>
-          <div class="form-group">
-            <label for="edit-klient-adres">Adres:</label>
-            <input type="text" id="edit-klient-adres" name="edit-klient-adres" />
+          <div class="form-row">
+            <label for="klient-edit-adres">Adres</label>
+            <input id="klient-edit-adres" type="text" />
           </div>
-          <div class="form-group">
-            <label for="edit-klient-telefon">Telefon:</label>
-            <input type="text" id="edit-klient-telefon" name="edit-klient-telefon" />
+          <div class="form-row">
+            <label for="klient-edit-telefon">Telefon</label>
+            <input id="klient-edit-telefon" type="text" />
           </div>
-          <button type="submit" class="btn-add">Zapisz Zmiany</button>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
+          </div>
         </form>
       </div>
     </div>
-
-    <div id="edit-maszyna-modal" class="modal">
-       <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2>Edytuj Maszynę</h2>
-        <form id="edit-maszyna-form">
-          <input type="hidden" id="edit-maszyna-id" name="edit-maszyna-id" />
-          <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
-          <div class="form-group">
-            <label for="edit-maszyna-typ">Typ Maszyny:</label>
-            <select id="edit-maszyna-typ" name="edit-maszyna-typ" required>
-              <option value="Traktor">Traktor</option>
-              <option value="Kombajn">Kombajn</option>
-              <option value="Prasa">Prasa</option>
-              <option value="Sieczkarnia">Sieczkarnia</option>
-              <option value="Opryskiwacz">Opryskiwacz</option>
-              <option value="Inna">Inna</option>
+    <div class="modal" id="maszyna-edit-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="maszyna-edit-modal">×</button>
+        <h2>Edytuj maszynę</h2>
+        <form id="maszyna-edit-form">
+          <input type="hidden" id="maszyna-edit-id" />
+          <div class="form-row">
+            <label for="maszyna-edit-model">Model</label>
+            <input id="maszyna-edit-model" type="text" required />
+          </div>
+          <div class="form-row">
+            <label for="maszyna-edit-numer">Numer</label>
+            <input id="maszyna-edit-numer" type="text" required />
+          </div>
+          <div class="form-row">
+            <label for="maszyna-edit-rok">Rok</label>
+            <input id="maszyna-edit-rok" type="number" min="1980" max="2099" />
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="maszyna-historia-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="maszyna-historia-modal">×</button>
+        <h2>Historia maszyny</h2>
+        <div id="maszyna-historia-lista" class="history-list"></div>
+      </div>
+    </div>
+    <div class="modal" id="zlecenie-szczegoly-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="zlecenie-szczegoly-modal">×</button>
+        <h2>Szczegóły zlecenia</h2>
+        <div id="zlecenie-szczegoly-kontent"></div>
+      </div>
+    </div>
+    <div class="modal" id="zlecenie-edytuj-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="zlecenie-edytuj-modal">×</button>
+        <h2>Edytuj zakończone zlecenie</h2>
+        <form id="zlecenie-edytuj-form">
+          <input type="hidden" id="zlecenie-edytuj-id" />
+          <div class="form-row">
+            <label for="zlecenie-edytuj-godziny">Wyfakturowane godziny</label>
+            <input id="zlecenie-edytuj-godziny" type="number" step="0.25" min="0" required />
+          </div>
+          <div class="form-row">
+            <label for="zlecenie-edytuj-typ">Typ zlecenia</label>
+            <select id="zlecenie-edytuj-typ" required></select>
+          </div>
+          <div class="form-row">
+            <label for="zlecenie-edytuj-notatka">Notatka</label>
+            <textarea id="zlecenie-edytuj-notatka" rows="2"></textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="zlecenie-zakoncz-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="zlecenie-zakoncz-modal">×</button>
+        <h2>Zakończ zlecenie</h2>
+        <form id="zlecenie-zakoncz-form">
+          <input type="hidden" id="zlecenie-zakoncz-id" />
+          <div class="form-row">
+            <label for="zlecenie-zakoncz-godziny">Wyfakturowane godziny</label>
+            <input id="zlecenie-zakoncz-godziny" type="number" step="0.25" min="0" required />
+          </div>
+          <div class="form-row">
+            <label for="zlecenie-zakoncz-typ">Typ zlecenia</label>
+            <select id="zlecenie-zakoncz-typ" required></select>
+          </div>
+          <div class="form-row">
+            <label for="zlecenie-zakoncz-data">Data zakończenia</label>
+            <input id="zlecenie-zakoncz-data" type="date" required />
+          </div>
+          <div class="form-row">
+            <label for="zlecenie-zakoncz-notatka">Notatka</label>
+            <textarea id="zlecenie-zakoncz-notatka" rows="3"></textarea>
+          </div>
+          <div class="form-row">
+            <label>Zużycie części</label>
+            <div class="stock-picker">
+              <div>
+                <h4>Magazyn</h4>
+                <ul id="zlecenie-magazyn-lista" class="stock-list"></ul>
+              </div>
+              <div>
+                <h4>Do zdjęcia</h4>
+                <ul id="zlecenie-magazyn-wybrane" class="stock-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zakończ</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="zlecenie-ponownie-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="zlecenie-ponownie-modal">×</button>
+        <h2>Otwórz ponownie</h2>
+        <form id="zlecenie-ponownie-form">
+          <input type="hidden" id="zlecenie-ponownie-id" />
+          <div class="form-row">
+            <label for="zlecenie-ponownie-status">Status</label>
+            <select id="zlecenie-ponownie-status">
+              <option value="aktywne">Aktywne</option>
+              <option value="nieprzypisane">Nieprzypisane</option>
             </select>
           </div>
-          <div class="form-group">
-            <label for="edit-maszyna-model">Model:</label>
-            <input type="text" id="edit-maszyna-model" name="edit-maszyna-model" required />
+          <div class="form-row">
+            <label for="zlecenie-ponownie-notatka">Notatka</label>
+            <textarea id="zlecenie-ponownie-notatka" rows="2"></textarea>
           </div>
-          <div class="form-group">
-            <label for="edit-maszyna-serial">Numer seryjny:</label>
-            <input type="text" id="edit-maszyna-serial" name="edit-maszyna-serial" />
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
           </div>
-          <div class="form-group">
-            <label for="edit-maszyna-rok">Rok produkcji:</label>
-            <input type="number" id="edit-maszyna-rok" name="edit-maszyna-rok" />
-          </div>
-          <div class="form-group">
-            <label for="edit-maszyna-mth">Aktualne motogodziny:</label>
-            <input type="number" step="0.1" id="edit-maszyna-mth" name="edit-maszyna-mth" />
-          </div>
-          <button type="submit" class="btn-add">Zapisz Zmiany</button>
         </form>
       </div>
-      </div>
-
-    <div id="details-zlecenie-modal" class="modal">
-        <div class="modal-content modal-content-large">
-        <span class="close-button">&times;</span>
-        <h2 id="details-zlecenie-title">Szczegóły Zlecenia</h2>
-        <div class="zlecenie-details-container">
-          <h3>Podstawowe Informacje</h3>
-          <div id="details-zlecenie-info"></div>
-          <hr />
-          <h3>Historia Zlecenia (Zmiany Statusu itp.)</h3>
-          <div id="details-zlecenie-historia"></div>
-          <hr />
-          <h3>Powiązane Wpisy z Kalendarza (Ewidencja Czasu)</h3>
-          <div id="details-zlecenie-kalendarz"></div>
-        </div>
-     </div>
     </div>
-
-    <div id="edit-zlecenie-modal" class="modal">
-       <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2>Edytuj Zakończone Zlecenie</h2>
-        <form id="edit-zlecenie-form">
-          <input type="hidden" id="edit-zlecenie-id" name="edit-zlecenie-id" />
-          <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
-          <p><strong>Nr zlecenia:</strong> <span id="edit-zlecenie-nr"></span></p>
-          <div class="form-group">
-            <label for="edit-wyfakturowane-godziny">Wyfakturowane godziny:</label>
-            <input type="number" step="0.1" id="edit-wyfakturowane-godziny" name="edit-wyfakturowane-godziny" required />
+    <div class="modal" id="magazyn-zmiana-modal" aria-hidden="true">
+      <div class="modal-dialog">
+        <button type="button" class="modal-close" data-close="magazyn-zmiana-modal">×</button>
+        <h2>Modyfikuj stan</h2>
+        <form id="magazyn-zmiana-form">
+          <input type="hidden" id="magazyn-zmiana-id" />
+          <div class="form-row">
+            <label for="magazyn-zmiana-ilosc">Ilość</label>
+            <input id="magazyn-zmiana-ilosc" type="number" step="1" min="0" />
           </div>
-          <div class="form-group">
-            <label for="edit-typ-zlecenia">Typ zlecenia:</label>
-            <select id="edit-typ-zlecenia" name="edit-typ-zlecenia" required>
-              <option value="S">S - Wyjazdowe (45zł)</option>
-              <option value="W">W - Warsztat (35zł)</option>
-              <option value="G">G - Gwarancja (35zł)</option>
-              <option value="Z">Z - Zbrojenie (30zł)</option>
-              <option value="P">P - Poprawka (0zł)</option>
-            </select>
+          <div class="modal-actions">
+            <button type="submit" class="primary">Zapisz</button>
           </div>
-          <div class="form-group">
-            <label for="edit-zakonczenie-wz">Numer WZ (opcjonalnie):</label>
-            <input type="text" id="edit-zakonczenie-wz" name="edit-zakonczenie-wz" placeholder="Np. WZ/05/2024" />
-          </div>
-          <button type="submit" class="btn-add">Zapisz Zmiany</button>
         </form>
-    </div>
-
-    <div id="machine-history-modal" class="modal">
-        <div class="modal-content modal-content-large">
-        <span class="close-button">&times;</span>
-        <h2 id="machine-history-title">Historia Serwisowa Maszyny</h2>
-        <div id="machine-history-list"></div>
       </div>
     </div>
-
-    <!-- Application entry -->
-    <script type='module' src='./main.js'></script>
   </body>
 </html>
