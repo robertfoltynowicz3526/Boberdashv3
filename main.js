@@ -134,8 +134,7 @@ async function initializeApp() {
 
     // --- SELEKTORY ---
     const miesiacSummaryInput = getEl('miesiac-summary');
-    const finishedMonthSlot = getEl('finished-month-slot');
-    const summaryMonthSlot = getEl('summary-month-slot');
+    const zakonczoneMiesiacInput = getEl('zakonczone-miesiac');
     const zlecenieKlientSelect = getEl('zlecenie-klient-select');
     const zlecenieKlientFilterInput = getEl('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = getEl('zlecenie-maszyna-select');
@@ -238,6 +237,21 @@ async function initializeApp() {
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
 
+    function warnIfMissing(element, label) {
+        if (!element) {
+            console.warn(`[UI] Element ${label} nie istnieje w DOM.`);
+        }
+        return element;
+    }
+
+    function addListenerSafely(element, eventName, handler, label) {
+        if (element) {
+            element.addEventListener(eventName, handler);
+        } else {
+            console.warn(`[UI] Pominięto nasłuch (${label}) – element nie istnieje w DOM.`);
+        }
+    }
+
     const modalsToCheck = [
         ['#kalendarz-modal', kalendarzModal],
         ['#assign-zlecenie-modal', assignModal],
@@ -250,21 +264,6 @@ async function initializeApp() {
         ['#machine-history-modal', machineHistoryModal]
     ];
     modalsToCheck.forEach(([label, element]) => warnIfMissing(element, label));
-
-    const addListenerSafely = (element, eventName, handler, label) => {
-        if (element) {
-            element.addEventListener(eventName, handler);
-        } else {
-            console.warn(`[UI] Pominięto nasłuch (${label}) – element nie istnieje w DOM.`);
-        }
-    };
-
-    const warnIfMissing = (element, label) => {
-        if (!element) {
-            console.warn(`[UI] Element ${label} nie istnieje w DOM.`);
-        }
-        return element;
-    };
 
     let hasWarnedAboutDb = false;
     const ensureDb = () => {
@@ -285,6 +284,8 @@ async function initializeApp() {
         if (!document.body.classList.contains('modal-open')) {
             bodyOverflowBeforeModal = document.body.style.overflow || '';
         }
+        modal.style.display = 'block';
+        modal.style.setProperty('display', 'flex', 'important');
         modal.classList.add('open');
         document.body.classList.add('modal-open');
         document.body.style.overflow = 'hidden';
@@ -296,6 +297,7 @@ async function initializeApp() {
             return;
         }
         modal.classList.remove('open');
+        modal.style.setProperty('display', 'none', 'important');
         deactivateFocusTrap(modal);
         if (!document.querySelector('.modal.open')) {
             document.body.classList.remove('modal-open');
@@ -327,22 +329,10 @@ async function initializeApp() {
         });
     });
 
-    function relocateMonthInput(tabName) {
-        if (!miesiacSummaryInput) {
-            return;
-        }
-        if (tabName === 'podsumowania' && summaryMonthSlot) {
-            summaryMonthSlot.appendChild(miesiacSummaryInput);
-        } else if (finishedMonthSlot) {
-            finishedMonthSlot.appendChild(miesiacSummaryInput);
-        }
-    }
-
     function setActiveTab(tabName, evt) {
         if (!tabName) {
             return;
         }
-        relocateMonthInput(tabName);
         const tabElement = document.getElementById(tabName);
         if (!tabElement) {
             console.warn(`[UI] Zakładka ${tabName} nie istnieje w DOM.`);
@@ -355,15 +345,20 @@ async function initializeApp() {
         });
          evt?.currentTarget?.classList?.add('active');
     }
-    window.openTab = openTab;
-
     const currentMonth = getCurrentMonthString();
     if (miesiacSummaryInput && !miesiacSummaryInput.value) {
         miesiacSummaryInput.value = currentMonth;
     }
+    if (zakonczoneMiesiacInput && !zakonczoneMiesiacInput.value) {
+        zakonczoneMiesiacInput.value = currentMonth;
+    }
     if (miesiacSummaryInput) {
         miesiacSummaryInput.max = currentMonth;
     }
+    if (zakonczoneMiesiacInput) {
+        zakonczoneMiesiacInput.max = currentMonth;
+    }
+    synchronizujWyborMiesiaca(pobierzWartoscMiesiaca(miesiacSummaryInput || zakonczoneMiesiacInput));
     if (manualCloseDateInput) {
         manualCloseDateInput.value = getCurrentDateString();
     }
@@ -1089,20 +1084,37 @@ async function initializeApp() {
     function formatujLiczbe(wartosc) {
         return (Number(wartosc) || 0).toFixed(2);
     }
-    function getSelectedMonth() {
+
+    function pobierzWartoscMiesiaca(input) {
         const fallback = getCurrentMonthString();
-        if (!miesiacSummaryInput) {
+        if (!input) {
             return fallback;
         }
-        const value = (miesiacSummaryInput.value || '').trim();
+        const value = (input.value || '').trim();
         if (!value) {
-            miesiacSummaryInput.value = fallback;
+            input.value = fallback;
             return fallback;
         }
         return value;
     }
 
+    function synchronizujWyborMiesiaca(wartosc) {
+        if (miesiacSummaryInput && miesiacSummaryInput.value !== wartosc) {
+            miesiacSummaryInput.value = wartosc;
+        }
+        if (zakonczoneMiesiacInput && zakonczoneMiesiacInput.value !== wartosc) {
+            zakonczoneMiesiacInput.value = wartosc;
+        }
+    }
+
+    function getSelectedMonth() {
+        return pobierzWartoscMiesiaca(miesiacSummaryInput);
+    }
+
     function getSelectedFinishedMonth() {
+        if (zakonczoneMiesiacInput) {
+            return pobierzWartoscMiesiaca(zakonczoneMiesiacInput);
+        }
         return getSelectedMonth();
     }
 
@@ -1176,7 +1188,7 @@ async function initializeApp() {
     }
 
     function updateFinishedMonthOptions() {
-        if (!miesiacSummaryInput) return;
+        if (!miesiacSummaryInput && !zakonczoneMiesiacInput) return;
         const fallback = getCurrentMonthString();
         const miesiaceSet = new Set();
         (_wszystkieZleceniaCache || []).forEach(zlecenie => {
@@ -1187,21 +1199,28 @@ async function initializeApp() {
         if (!miesiaceSet.size) {
             miesiaceSet.add(fallback);
         }
-        const poprzednia = (miesiacSummaryInput.value || '').trim();
         const posortowane = Array.from(miesiaceSet).sort();
         const min = posortowane[0];
         const max = posortowane[posortowane.length - 1];
+        const obecna = miesiacSummaryInput?.value?.trim() || zakonczoneMiesiacInput?.value?.trim() || '';
         if (min) {
-            miesiacSummaryInput.min = min;
+            if (miesiacSummaryInput) miesiacSummaryInput.min = min;
+            if (zakonczoneMiesiacInput) zakonczoneMiesiacInput.min = min;
         }
         if (max) {
-            miesiacSummaryInput.max = max;
+            if (miesiacSummaryInput) miesiacSummaryInput.max = max;
+            if (zakonczoneMiesiacInput) zakonczoneMiesiacInput.max = max;
         }
-        if (!poprzednia || !miesiaceSet.has(poprzednia)) {
-            miesiacSummaryInput.value = max || fallback;
+        const docelowy = (!obecna || !miesiaceSet.has(obecna)) ? (max || fallback) : obecna;
+        synchronizujWyborMiesiaca(docelowy);
+        const joined = posortowane.join(',');
+        if (miesiacSummaryInput) {
+            miesiacSummaryInput.dataset.availableMonths = joined;
         }
-        miesiacSummaryInput.dataset.availableMonths = posortowane.join(',');
-    }    
+        if (zakonczoneMiesiacInput) {
+            zakonczoneMiesiacInput.dataset.availableMonths = joined;
+        }
+    }
 
     function renderFinishedMiniSummary(miesiac, zlecenia) {
         if (!finishedMiniSummary) return;
@@ -1238,7 +1257,7 @@ async function initializeApp() {
             return;
         }
 
-        const wybranyMiesiac = getSelectedMonth();
+        const wybranyMiesiac = getSelectedFinishedMonth();
         const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
         const kalendarz = pobierzSumyKalendarza(wybranyMiesiac);
         const absorpcja = obliczAbsorpcje(kalendarz.fakturowane);
@@ -3394,7 +3413,17 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     if (miesiacSummaryInput) {
         miesiacSummaryInput.addEventListener('change', () => {
-            getSelectedMonth();
+            const wartosc = getSelectedMonth();
+            synchronizujWyborMiesiaca(wartosc);
+            wyswietlZlecenia();
+            renderZakonczoneSekcja();
+            renderPodsumowanieSekcja();
+        });
+    }
+    if (zakonczoneMiesiacInput) {
+        zakonczoneMiesiacInput.addEventListener('change', () => {
+            const wartosc = getSelectedFinishedMonth();
+            synchronizujWyborMiesiaca(wartosc);
             wyswietlZlecenia();
             renderZakonczoneSekcja();
             renderPodsumowanieSekcja();
