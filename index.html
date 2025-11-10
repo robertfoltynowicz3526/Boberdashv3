@@ -262,9 +262,9 @@
               </h3>
             </div>
             <div class="finished-controls">
-              <label for="miesiac-summary">Miesiąc zakończenia:</label>
+              <label for="zakonczone-miesiac">Miesiąc zakończenia:</label>
               <div id="finished-month-slot" class="month-input-slot">
-                <input type="month" id="miesiac-summary" />
+                <input type="month" id="zakonczone-miesiac" />
               </div>
             </div>
             <div id="finished-mini-summary" class="finished-mini-summary"></div>
@@ -378,7 +378,9 @@
             <div id="summary-container">
               <div class="summary-controls">
                 <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
-                <div id="summary-month-slot" class="month-input-slot"></div>
+                <div id="summary-month-slot" class="month-input-slot">
+                  <input type="month" id="miesiac-summary" />
+                </div>
                 <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
               </div>
               <div id="podsumowania-metryki" class="summary-cards"></div>
@@ -480,7 +482,7 @@
     </div>
 
     <div id="stock-change-modal" class="modal">
-     <div class="modal-content">
+      <div class="modal-content">
         <span class="close-button">&times;</span>
         <h2 id="stock-modal-title">Zmień stan</h2>
         <form id="stock-change-form">
@@ -494,8 +496,10 @@
           <button type="submit">Zatwierdź Zmianę</button>
         </form>
       </div>
+    </div>
+
     <div id="assign-zlecenie-modal" class="modal">
-        <div class="modal-content">
+      <div class="modal-content">
         <span class="close-button">&times;</span>
         <h2>Przypisz zlecenie</h2>
         <form id="assign-zlecenie-form">
@@ -519,11 +523,13 @@
             <p>...lub dodaj nową:</p>
             <div class="form-group">
               <label for="assign-nowa-maszyna-typ">Typ:</label>
-              <select id="assign-nowa-maszyna-typ" name="assign-nowa-maszyna-typ"></select>
+              <select id="assign-nowa-maszyna-typ" name="assign-nowa-maszyna-typ">
                 <option value="">Wybierz</option>
                 <option value="Traktor">Traktor</option>
                 <option value="Kombajn">Kombajn</option>
                 <option value="Prasa">Prasa</option>
+                <option value="Sieczkarnia">Sieczkarnia</option>
+                <option value="Opryskiwacz">Opryskiwacz</option>
                 <option value="Inna">Inna</option>
               </select>
             </div>
@@ -573,7 +579,7 @@
           <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
           <div class="form-group">
             <label for="edit-maszyna-typ">Typ Maszyny:</label>
-            <select id="edit-maszyna-typ" name="edit-maszyna-typ" required></select>
+            <select id="edit-maszyna-typ" name="edit-maszyna-typ" required>
               <option value="Traktor">Traktor</option>
               <option value="Kombajn">Kombajn</option>
               <option value="Prasa">Prasa</option>
@@ -634,7 +640,7 @@
           </div>
           <div class="form-group">
             <label for="edit-typ-zlecenia">Typ zlecenia:</label>
-            <select id="edit-typ-zlecenia" name="edit-typ-zlecenia" required></select>
+            <select id="edit-typ-zlecenia" name="edit-typ-zlecenia" required>
               <option value="S">S - Wyjazdowe (45zł)</option>
               <option value="W">W - Warsztat (35zł)</option>
               <option value="G">G - Gwarancja (35zł)</option>
