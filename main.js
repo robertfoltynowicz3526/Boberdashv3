@@ -395,6 +395,7 @@ async function initializeApp() {
         }
         calendar = new CalendarCtor(calendarElement, {
             initialView: 'dayGridMonth',
+            locale: 'pl',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
             eventContent: (arg) => {
                 const container = document.createElement('div');
@@ -3576,10 +3577,22 @@ async function obslugaZakonczeniaZlecenia(event) {
 } // koniec initializeApp()
 
 
-document.addEventListener('DOMContentLoaded', () => {
+let appInitialized = false;
+
+function initializeSafe() {
+    if (appInitialized) {
+        return;
+    }
+    appInitialized = true;
     try {
         initializeApp();
-    } catch (e) {
-        console.error('Init error:', e);
+    } catch (error) {
+        console.error('Init error:', error);
     }
-});
+}
+
+document.addEventListener('DOMContentLoaded', initializeSafe);
+
+if (document.readyState !== 'loading') {
+    initializeSafe();
+}
