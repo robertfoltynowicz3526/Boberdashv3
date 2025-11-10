@@ -150,6 +150,8 @@ async function initializeApp() {
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const assignModal = getEl('assign-zlecenie-modal');
     const assignForm = getEl('assign-zlecenie-form');
+    const assignKlientSelect = getEl('assign-klient-select');
+    const assignMaszynaSelect = getEl('assign-maszyna-select');
     const klientForm = getEl('klient-form');
     const listaKlientowDiv = getEl('lista-klientow');
     if (!listaKlientowDiv) {
@@ -1186,6 +1188,7 @@ async function initializeApp() {
             miesiaceSet.add(fallback);
         }
         const poprzednia = (miesiacSummaryInput.value || '').trim();
+        const posortowane = Array.from(miesiaceSet).sort();
         const min = posortowane[0];
         const max = posortowane[posortowane.length - 1];
         if (min) {
@@ -1193,8 +1196,8 @@ async function initializeApp() {
         }
         if (max) {
             miesiacSummaryInput.max = max;
-      }
-      if (!poprzednia || !miesiaceSet.has(poprzednia)) {
+        }
+        if (!poprzednia || !miesiaceSet.has(poprzednia)) {
             miesiacSummaryInput.value = max || fallback;
         }
         miesiacSummaryInput.dataset.availableMonths = posortowane.join(',');
@@ -1683,9 +1686,9 @@ async function initializeApp() {
                 maszynaKlientSelect.innerHTML = selectHtml;
             }
             odswiezSelectKlientaDoZlecenia();
-            const assignKlientSelect = document.getElementById('assign-klient-select');
             if (assignKlientSelect) {
                 assignKlientSelect.innerHTML = selectHtml;
+                assignKlientSelect.dispatchEvent(new Event('change'));
             }
         } catch (error) {
             console.error('wyswietlKlientow() — błąd:', error);
@@ -2090,6 +2093,36 @@ async function initializeApp() {
         zlecenieMaszynaSelect.disabled = false;
     }
 
+    function aktualizujMaszynyDlaAssign(klientId) {
+        if (!assignMaszynaSelect) {
+            return;
+        }
+        const bazowaOpcja = '<option value="">-- Wybierz maszynę --</option>';
+        if (!klientId) {
+            assignMaszynaSelect.innerHTML = bazowaOpcja;
+            assignMaszynaSelect.disabled = true;
+            return;
+        }
+        const maszynyKlienta = (_wszystkieMaszynyCache || [])
+            .filter(maszyna => maszyna.klientId === klientId)
+            .sort((a, b) => (a.typMaszyny || '').localeCompare(b.typMaszyny || '', 'pl', { sensitivity: 'base' })
+                || (a.model || '').localeCompare(b.model || '', 'pl', { sensitivity: 'base' }));
+        if (maszynyKlienta.length === 0) {
+            assignMaszynaSelect.innerHTML = `${bazowaOpcja}<option value="">-- Brak maszyn przypisanych --</option>`;
+            assignMaszynaSelect.disabled = true;
+            return;
+        }
+        const opcje = maszynyKlienta.map(maszyna => {
+            const typ = maszyna.typMaszyny || '';
+            const model = maszyna.model || '';
+            const sn = maszyna.nrSeryjny && maszyna.nrSeryjny !== '---' ? ` (S/N: ${maszyna.nrSeryjny})` : '';
+            const etykieta = [typ, model].filter(Boolean).join(' ') || 'Maszyna';
+            return `<option value="${maszyna.id}">${etykieta}${sn}</option>`;
+        }).join('');
+        assignMaszynaSelect.innerHTML = `${bazowaOpcja}${opcje}`;
+        assignMaszynaSelect.disabled = false;
+    }
+
 
     function nasluchujNaMaszyny() {
         if (!ensureDb()) {
@@ -2482,27 +2515,41 @@ async function obslugaListyZlecen(event) {
         return;
     }
 
-    const btnAssignZlecenie = getClosest(event, '.assign-btn');
-    if (btnAssignZlecenie) {
+    const assignButton = getClosest(event, '.assign-btn');
+    if (assignButton) {
         const zlecenieElement = getClosest(event, 'li[data-id]');
-        const zlecenieIdAssign = btnAssignZlecenie.dataset.id || zlecenieElement?.dataset.id;
-        ieIdAssign = assignBtnZlecenie.dataset.id || zlecenieElement?.dataset.id;
+        const zlecenieIdAssign = assignButton.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdAssign) return;
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieIdAssign);
         if (zlecenie && assignForm && assignModal) {
+            assignForm.reset();
             const assignIdInput = assignForm.querySelector('#assign-zlecenie-id');
             const assignOpis = document.getElementById('assign-zlecenie-opis');
-            const assignMachineSection = document.getElementById('assign-machine-section');
             if (assignIdInput) assignIdInput.value = zlecenieIdAssign;
             if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
-            if (assignMachineSection) assignMachineSection.style.display = 'none';
-            assignForm.reset();
+            if (assignKlientSelect) {
+                assignKlientSelect.value = zlecenie.klientId || '';
+                aktualizujMaszynyDlaAssign(assignKlientSelect.value);
+            }
+            if (assignMaszynaSelect) {
+                assignMaszynaSelect.value = zlecenie.maszynaId || '';
+            }
             openModal(assignModal);
         }
         return;
     }
-        const btnCompleteZlecenie = getClosest(event, '.complete-btn');
-        if (!btnCompleteZlecenie) return;
+
+    const reopenButton = getClosest(event, '.reopen-btn');
+    if (reopenButton) {
+        const zlecenieElement = getClosest(event, 'li[data-id]');
+        const reopenId = reopenButton.dataset.id || zlecenieElement?.dataset.id;
+        if (!reopenId) return;
+        await przywrocZlecenie(reopenId);
+        return;
+    }
+
+    const btnCompleteZlecenie = getClosest(event, '.complete-btn');
+    if (!btnCompleteZlecenie) return;
         const zlecenieElement = getClosest(event, 'li[data-id]');
         const zlecenieIdComplete = btnCompleteZlecenie.dataset.id || zlecenieElement?.dataset.id;
         if (!zlecenieIdComplete) return;
@@ -2543,6 +2590,39 @@ async function obslugaListyZlecen(event) {
             console.error('Błąd podczas otwierania modala zakończenia:', error);
             alert('Wystąpił błąd podczas otwierania formularza zakończenia zlecenia.');
         }
+    }
+}
+
+async function przywrocZlecenie(zlecenieId) {
+    if (!zlecenieId) return;
+    if (!ensureDbOrNotify()) {
+        return;
+    }
+    try {
+        await runTransaction(db, async (transaction) => {
+            const zlecenieRef = doc(db, 'zlecenia', zlecenieId);
+            const snap = await transaction.get(zlecenieRef);
+            if (!snap.exists()) {
+                throw new Error('Zlecenie nie istnieje');
+            }
+            const dane = snap.data();
+            const historia = Array.isArray(dane.historia) ? dane.historia.slice() : [];
+            historia.push({
+                timestamp: new Date().toISOString(),
+                akcja: 'Przywrócono zlecenie do statusu aktywnego.'
+            });
+            transaction.update(zlecenieRef, {
+                status: 'aktywne',
+                dataUkonczenia: null,
+                wyfakturowaneGodziny: dane.wyfakturowaneGodziny || 0,
+                zakonczenieNotatka: null,
+                zakonczenieNumerWZ: null,
+                historia
+            });
+        });
+    } catch (error) {
+        console.error('Błąd przywracania zlecenia:', error);
+        alert('Nie udało się przywrócić zlecenia.');
     }
 }
 async function otworzModalEdycjiZlecenia(zlecenieId) {
@@ -3292,9 +3372,16 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // ZLECENIA
     addListenerSafely(zlecenieForm, 'submit', dodajZlecenie, '#zlecenie-form');
+    addListenerSafely(assignForm, 'submit', zapiszPrzypisanie, '#assign-zlecenie-form');
     if (warnIfMissing(zlecenieKlientSelect, '#zlecenie-klient-select')) {
         zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    }
+    if (assignKlientSelect) {
+        assignKlientSelect.addEventListener('change', () => {
+            aktualizujMaszynyDlaAssign(assignKlientSelect.value);
+        });
+        aktualizujMaszynyDlaAssign(assignKlientSelect.value);
     }
     addListenerSafely(aktywneZleceniaLista, 'click', obslugaListyZlecen, '#aktywne-zlecenia-lista');
     addListenerSafely(ukonczoneZleceniaLista, 'click', obslugaListyZlecen, '#ukonczone-zlecenia-lista');
@@ -3411,9 +3498,11 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // Klik poza modal zamyka go
     document.addEventListener('click', (event) => {
-        const t = event?.target;
-        if (!(t instanceof Element)) return;
-        
+        const targetElement = event?.target;
+        if (!(targetElement instanceof Element)) {
+            return;
+        }
+
         const closeBtn = getClosest(event, '.close-button');
         if (closeBtn) {
             const modalWrapper = getClosest(event, '.modal');
@@ -3422,8 +3511,10 @@ async function obslugaZakonczeniaZlecenia(event) {
             }
             return;
         }
-        
-        closeModal(t);
+
+        if (targetElement.classList.contains('modal') && targetElement.classList.contains('open')) {
+            closeModal(targetElement);
+        }
     });
 
     document.addEventListener('keydown', (event) => {
