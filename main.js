@@ -377,12 +377,16 @@ async function initializeApp() {
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
+        if (!window.FullCalendar) {
+            console.warn('Pominięto inicjalizację kalendarza – FullCalendar nie został załadowany.');
+            return;
+        }
         const calendarElement = document.getElementById('kalendarz');
-        const CalendarCtor = window.FullCalendar?.Calendar;
         if (!calendarElement) {
             console.warn('Pominięto inicjalizację kalendarza – brak kontenera #kalendarz.');
             return;
         }
+        const CalendarCtor = window.FullCalendar?.Calendar;
         if (!CalendarCtor) {
             console.error('FullCalendar nie został załadowany.');
             return;
@@ -3381,7 +3385,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             </div>
         `;
     }
-  
+    // --- PODPIĘCIE EVENTÓW ---
 
     addListenerSafely(klientForm, 'submit', dodajKlienta, '#klient-form');
     addListenerSafely(listaKlientowDiv, 'click', obslugaListyKlientow, '#lista-klientow');
@@ -3467,8 +3471,8 @@ async function obslugaZakonczeniaZlecenia(event) {
     addListenerSafely(converterSztukiInput, 'input', przeliczOlej, '#converter-sztuki');
     if (oilContainerSizeSelect) {
         oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
-       } else {
-        console.warn('[UI] Element #oil-container-size nie istnieje w DOM.'); 
+    } else {
+        console.warn('[UI] Element #oil-container-size nie istnieje w DOM.');
     }
 
     // KALENDARZ (modal + klik w kalendarzu)
@@ -3573,6 +3577,6 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         initializeApp();
     } catch (e) {
-        console.error('Init error:', e);
+        console.error(e);
     }
 });
