@@ -485,7 +485,7 @@ button,
 .btn-add,
 .btn-edit,
 .btn-remove,
-.btn-details {
+.btn-szczegoly {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -504,7 +504,7 @@ button:hover,
 .btn-add:hover,
 .btn-edit:hover,
 .btn-remove:hover,
-.btn-details:hover {
+.btn-szczegoly:hover {
   transform: translateY(-1px);
   box-shadow: 0 22px 38px -25px rgba(0, 0, 0, 0.75);
 }
@@ -513,7 +513,7 @@ button:active,
 .btn-add:active,
 .btn-edit:active,
 .btn-remove:active,
-.btn-details:active {
+.btn-szczegoly:active {
   transform: translateY(0);
   box-shadow: 0 6px 12px -10px rgba(15, 23, 42, 0.35);
 }
@@ -532,16 +532,31 @@ button,
   border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
-.btn-details {
-  background: rgba(255, 222, 0, 0.15);
-  color: #3a3a00;
-  border: 1px solid rgba(255, 222, 0, 0.35);
+
+.btn-szczegoly {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #ffde00;
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.btn-szczegoly:hover {
+  filter: brightness(0.95);
+}
+
+.btn-szczegoly:focus {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 2px;
 }
 
 button:focus-visible,
 .btn-add:focus-visible,
 .btn-edit:focus-visible,
-.btn-details:focus-visible,
+.btn-szczegoly:focus-visible,
 .btn-remove:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -656,22 +671,29 @@ select {
   background: rgba(239, 68, 68, 0.85);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: var(--modal-backdrop);
+  backdrop-filter: blur(8px);
+  display: none;
+  z-index: 900;
+}
+
 .modal {
   display: none;
   position: fixed;
-  z-index: 30;
+  z-index: 901;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   overflow: auto;
-  background-color: var(--modal-backdrop);
-  backdrop-filter: blur(8px);
   padding: 2rem;
 }
 
 .modal#details-zlecenie-modal {
-  z-index: 60;
+  z-index: 902;
 }
 
 #details-zlecenie-modal .modal-content {

@@ -1,5 +1,5 @@
 import { db } from './firebase-config.js';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 
 // Uruchom dopiero po załadowaniu DOM:
@@ -48,6 +48,52 @@ function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+
+    const toDateSafe = (value) => {
+        if (!value) return null;
+        if (value.toDate && typeof value.toDate === 'function') {
+            return value.toDate();
+        }
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value;
+        }
+        if (typeof value === 'string' || typeof value === 'number') {
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+    };
+
+    const formatDateTimeLabel = (value, fallback = '—') => {
+        const date = toDateSafe(value);
+        if (!date) return fallback;
+        const datePart = date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timePart = date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+        return `${datePart} ${timePart}`;
+    };
+
+    const formatDatetimeLocalInput = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+        const offset = date.getTimezoneOffset();
+        const local = new Date(date.getTime() - offset * 60000);
+        return local.toISOString().slice(0, 16);
+    };
+
+    const parseDatetimeInput = (value) => {
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const walidujPrzedzialCzasu = (startValue, endValue) => {
+        const startDate = toDateSafe(startValue);
+        const endDate = toDateSafe(endValue);
+        if (startDate && endDate && startDate > endDate) {
+            alert('Data zakończenia nie może być wcześniejsza niż rozpoczęcie.');
+            return false;
+        }
+        return true;
+    };
 
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
@@ -125,6 +171,14 @@ function initializeApp() {
     [kalendarzModal, completeModal, stockModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
         .forEach(modal => { if (modal) trackedModals.push(modal); });
 
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.classList.add('modal-backdrop');
+    document.body.appendChild(modalBackdrop);
+
+    const showBackdrop = () => { modalBackdrop.style.display = 'block'; };
+    const hideBackdrop = () => { modalBackdrop.style.display = 'none'; };
+    const isAnyModalOpen = () => trackedModals.some(modal => modal && modal.style.display === 'block');
+
     const ensureMagazynSummaryPlacement = () => {
         if (magazynTab && magazynSummaryBox && magazynTab.firstElementChild !== magazynSummaryBox) {
             magazynTab.insertBefore(magazynSummaryBox, magazynTab.firstChild);
@@ -137,7 +191,27 @@ function initializeApp() {
                 modal.style.display = 'none';
             }
         });
+        if (!isAnyModalOpen()) {
+            hideBackdrop();
+        }
     };
+
+    const openModal = (modal) => {
+        if (!modal) return;
+        closeAllModals(modal);
+        modal.style.display = 'block';
+        showBackdrop();
+    };
+
+    const hideModal = (modal) => {
+        if (!modal) return;
+        modal.style.display = 'none';
+        if (!isAnyModalOpen()) {
+            hideBackdrop();
+        }
+    };
+
+    modalBackdrop.addEventListener('click', () => closeAllModals());
 
     const debounce = (fn, wait = 200) => {
         let timeout;
@@ -273,7 +347,7 @@ function initializeApp() {
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
         }
-        kalendarzModal.style.display = 'block';
+        openModal(kalendarzModal);
     }
 
     function przygotujOpcjeMultiZlecen() {
@@ -449,7 +523,7 @@ function initializeApp() {
         };
         try {
             await setDoc(doc(db, "godziny_pracy", data), dane);
-            kalendarzModal.style.display = 'none';
+            hideModal(kalendarzModal);
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
         }
@@ -1162,8 +1236,7 @@ async function obslugaListyKlientow(event) {
         const historyTitle = document.getElementById('machine-history-title');
         if (historyTitle) historyTitle.textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
-        closeAllModals(machineHistoryModal);
-        machineHistoryModal.style.display = 'block';
+        openModal(machineHistoryModal);
 
         try {
             const qMasz = query(
@@ -1194,7 +1267,7 @@ async function obslugaListyKlientow(event) {
                                 ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
                             </span>
                             <div>
-                                <button type="button" class="btn-details details-zlecenie-btn" data-id="${d.id}">Szczegóły</button>
+                                <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${d.id}">Szczegóły</button>
                                 <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${d.id}">Edytuj</button>
                             </div>
                         </li>`;
@@ -1216,7 +1289,7 @@ async function obslugaListyKlientow(event) {
         const docId = target.dataset.id || li?.dataset.id;
         if (!docId) return;
         if (target.classList.contains('details-zlecenie-btn')) {
-            otworzModalSzczegolowZlecenia(docId);
+            handleDetailsButtonClick(docId, event);
         }
         if (target.classList.contains('edit-zlecenie-btn')) {
             otworzModalEdycjiZlecenia(docId);
@@ -1232,8 +1305,7 @@ async function obslugaListyKlientow(event) {
         editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
         editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
         editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
-        closeAllModals(editKlientModal);
-        editKlientModal.style.display = 'block';
+        openModal(editKlientModal);
     }
 
     async function zapiszEdycjeKlienta(event) {
@@ -1291,7 +1363,7 @@ async function obslugaListyKlientow(event) {
                 }
             }
 
-            editKlientModal.style.display = 'none';
+            hideModal(editKlientModal);
         } catch (e) {
             console.error("Błąd aktualizacji klienta lub powiązanych dokumentów:", e);
             alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
@@ -1469,8 +1541,7 @@ function otworzModalEdycjiMaszyny(maszynaId) {
     editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : maszyna.nrSeryjny;
     editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji || '';
     editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny || 0;
-    closeAllModals(editMaszynaModal);
-    editMaszynaModal.style.display = 'block';
+    openModal(editMaszynaModal);
 }
 
 async function zapiszEdycjeMaszyny(event) {
@@ -1506,7 +1577,7 @@ async function zapiszEdycjeMaszyny(event) {
             });
         }
 
-        editMaszynaModal.style.display = 'none';
+        hideModal(editMaszynaModal);
     } catch (e) {
         console.error("Błąd aktualizacji maszyny lub powiązanych zleceń:", e);
         alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
@@ -1556,18 +1627,6 @@ function createZlecenieListItem(zlecenie, bodyHtml, actionsHtml) {
     return li;
 }
 
-function walidujPlanowaneTerminy(start, end) {
-    if (start && end) {
-        const startDate = new Date(start);
-        const endDate = new Date(end);
-        if (startDate > endDate) {
-            alert('Planowane zakończenie nie może być wcześniejsze niż rozpoczęcie.');
-            return false;
-        }
-    }
-    return true;
-}
-
 function wyswietlZlecenia() {
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
         if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -1596,8 +1655,10 @@ function wyswietlZlecenia() {
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
         const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
-        const planHtml = (zlecenie.dataRozpoczecia || zlecenie.dataZakonczenia)
-            ? `<br><small>Plan: ${zlecenie.dataRozpoczecia || '---'} → ${zlecenie.dataZakonczenia || '---'}</small>`
+        const startLabel = formatDateTimeLabel(zlecenie.startAt, '');
+        const endLabel = formatDateTimeLabel(zlecenie.endAt, '');
+        const timelineHtml = (startLabel || endLabel)
+            ? `<br><small>Start: ${startLabel || '—'}${endLabel ? ` → Koniec: ${endLabel}` : ''}</small>`
             : '';
 
         if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
@@ -1607,9 +1668,9 @@ function wyswietlZlecenia() {
             const opisHtml = `<em>${zlecenie.opis || 'Brak opisu'}</em>`;
             aktywneElements.push(createZlecenieListItem(
                 zlecenie,
-                `<strong>${nazwa}</strong><br>${opisHtml}${planHtml}`,
+                `<strong>${nazwa}</strong><br>${opisHtml}${timelineHtml}`,
                 `
-                    <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                    <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     ${przycisk}
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
@@ -1629,10 +1690,10 @@ function wyswietlZlecenia() {
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
                     <em>Ukończono (${zlecenie.dataUkonczenia || 'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
-                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${planHtml}
+                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
                 `,
                 `
-                    <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                    <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
@@ -1668,20 +1729,48 @@ function nasluchujNaZlecenia() {
         });
         wyswietlZlecenia();
         odswiezPodsumowania();
+        przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
     });
+}
+
+let migracjaStartEndWykonana = false;
+
+async function przeprowadzMigracjeStartEnd() {
+    if (migracjaStartEndWykonana) return;
+    migracjaStartEndWykonana = true;
+    const aktualizacje = [];
+    for (const zlecenie of _wszystkieZleceniaCache) {
+        const payload = {};
+        if (!zlecenie.startAt) {
+            // Migracja 2024-05: dla starszych zleceń zapisujemy start na podstawie createdAt lub bieżącego czasu serwera.
+            payload.startAt = zlecenie.createdAt || serverTimestamp();
+        }
+        if (!zlecenie.endAt && zlecenie.status === 'ukończone' && zlecenie.dataUkonczenia) {
+            const parsed = new Date(`${zlecenie.dataUkonczenia}T12:00:00`);
+            if (!Number.isNaN(parsed.getTime())) {
+                payload.endAt = parsed;
+            }
+        }
+        if (Object.keys(payload).length > 0) {
+            aktualizacje.push(
+                updateDoc(doc(db, "zlecenia", zlecenie.id), payload)
+                    .catch(err => console.error('[Migracja start/end 2024-05] Nie udało się zaktualizować', zlecenie.id, err))
+            );
+        }
+    }
+    if (aktualizacje.length > 0) {
+        await Promise.all(aktualizacje);
+    }
 }
 
 async function dodajZlecenie(event) {
     event.preventDefault();
     const wybranyKlientId = zlecenieKlientSelect.value;
     const wybranaMaszynaId = zlecenieMaszynaSelect.value;
-    const dataRozpoczecia = zlecenieForm['zlecenie-rozpoczecie']?.value || null;
-    const dataZakonczenia = zlecenieForm['zlecenie-zakonczenie']?.value || null;
-    if (!walidujPlanowaneTerminy(dataRozpoczecia, dataZakonczenia)) {
-        return;
-    }
-
     const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
+    // Start zlecenia zapisujemy automatycznie w chwili utworzenia (brak inicjacji z widoku kalendarza),
+    // dlatego bazujemy na serverTimestamp(), który odpowiada czasowi zapisowemu na serwerze.
+    const startAtFieldValue = serverTimestamp();
 
     let dane;
     if (wybranyKlientId === "szybkie-zlecenie") {
@@ -1689,7 +1778,8 @@ async function dodajZlecenie(event) {
             status: 'nieprzypisane',
             nrZlecenia: zlecenieForm['nr-zlecenia'].value,
             opis: zlecenieForm['opis-usterki'].value,
-            dataRozpoczecia, dataZakonczenia,
+            startAt: startAtFieldValue,
+            endAt: null,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -1705,7 +1795,8 @@ async function dodajZlecenie(event) {
             typMaszyny: maszyna.typMaszyny, model: maszyna.model, status: 'aktywne',
             nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value,
             motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
-            dataRozpoczecia, dataZakonczenia,
+            startAt: startAtFieldValue,
+            endAt: null,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -1726,6 +1817,23 @@ async function dodajZlecenie(event) {
     } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
 }
 
+function handleDetailsButtonClick(docId, event) {
+    if (!docId || !detailsZlecenieModal) return;
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const infoDiv = document.getElementById('details-zlecenie-info');
+    const historiaDiv = document.getElementById('details-zlecenie-historia');
+    const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
+    if (infoDiv) infoDiv.innerHTML = '<p>Ładowanie danych zlecenia...</p>';
+    if (historiaDiv) historiaDiv.innerHTML = '';
+    if (kalendarzDiv) kalendarzDiv.innerHTML = '';
+    closeAllModals();
+    openModal(detailsZlecenieModal);
+    otworzModalSzczegolowZlecenia(docId, { skipOpen: true });
+}
+
 async function obslugaListyZlecen(event) {
     const target = event.target;
     const li = target.closest('li');
@@ -1737,7 +1845,7 @@ async function obslugaListyZlecen(event) {
         return;
     }
     if (target.classList.contains('details-zlecenie-btn')) {
-        otworzModalSzczegolowZlecenia(docId);
+        handleDetailsButtonClick(docId, event);
         return;
     }
     if (target.classList.contains('assign-btn')) {
@@ -1750,8 +1858,7 @@ async function obslugaListyZlecen(event) {
             if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
             if (assignMachineSection) assignMachineSection.style.display = 'none';
             assignForm.reset();
-            closeAllModals(assignModal);
-            assignModal.style.display = 'block';
+            openModal(assignModal);
         }
         return;
     }
@@ -1770,12 +1877,15 @@ async function obslugaListyZlecen(event) {
             completeModalForm.reset();
             const completeIdInput = document.getElementById('complete-zlecenie-id');
             if (completeIdInput) completeIdInput.value = docId;
+            const completeEndInput = document.getElementById('complete-zlecenie-end-at');
+            if (completeEndInput) {
+                completeEndInput.value = formatDatetimeLocalInput(new Date());
+            }
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
             ensureZakonczenieNotatkaField();
-            closeAllModals(completeModal);
-            completeModal.style.display = 'block';
+            openModal(completeModal);
         }
         return;
     }
@@ -1802,6 +1912,7 @@ async function obslugaListyZlecen(event) {
             await updateDoc(zlecenieRef, {
                 status: 'aktywne',
                 dataUkonczenia: null,
+                endAt: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
@@ -1830,15 +1941,16 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
-    if (editZlecenieForm['edit-data-rozpoczecia']) {
-        editZlecenieForm['edit-data-rozpoczecia'].value = zlecenie.dataRozpoczecia || '';
+    const editStartInput = editZlecenieForm['edit-start-at'];
+    if (editStartInput) {
+        editStartInput.value = formatDatetimeLocalInput(toDateSafe(zlecenie.startAt));
     }
-    if (editZlecenieForm['edit-data-zakonczenia']) {
-        editZlecenieForm['edit-data-zakonczenia'].value = zlecenie.dataZakonczenia || '';
+    const editEndInput = editZlecenieForm['edit-end-at'];
+    if (editEndInput) {
+        editEndInput.value = formatDatetimeLocalInput(toDateSafe(zlecenie.endAt));
     }
 
-    closeAllModals(editZlecenieModal);
-    editZlecenieModal.style.display = 'block';
+    openModal(editZlecenieModal);
 }
 
 async function zapiszEdycjeZlecenia(event) {
@@ -1848,14 +1960,14 @@ async function zapiszEdycjeZlecenia(event) {
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
-    const nowePlanowaneRozpoczecie = editZlecenieForm['edit-data-rozpoczecia']?.value || null;
-    const nowePlanowaneZakonczenie = editZlecenieForm['edit-data-zakonczenia']?.value || null;
+    const noweStartAt = parseDatetimeInput(editZlecenieForm['edit-start-at']?.value || '');
+    const noweEndAt = parseDatetimeInput(editZlecenieForm['edit-end-at']?.value || '');
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
         return;
     }
-    if (!walidujPlanowaneTerminy(nowePlanowaneRozpoczecie, nowePlanowaneZakonczenie)) {
+    if (!walidujPrzedzialCzasu(noweStartAt, noweEndAt)) {
         return;
     }
 
@@ -1867,8 +1979,12 @@ async function zapiszEdycjeZlecenia(event) {
         const staryTyp = zlecenieData.typZlecenia;
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
-        const starePlanowaneRozpoczecie = zlecenieData.dataRozpoczecia || null;
-        const starePlanowaneZakonczenie = zlecenieData.dataZakonczenia || null;
+        const staryStartAt = toDateSafe(zlecenieData.startAt);
+        const staryEndAt = toDateSafe(zlecenieData.endAt);
+        const staryStartMs = staryStartAt ? staryStartAt.getTime() : null;
+        const staryEndMs = staryEndAt ? staryEndAt.getTime() : null;
+        const nowyStartMs = noweStartAt ? noweStartAt.getTime() : null;
+        const nowyEndMs = noweEndAt ? noweEndAt.getTime() : null;
 
         let wpisHistorii = `Edytowano zakończone zlecenie: `;
         const zmiany = [];
@@ -1879,18 +1995,18 @@ async function zapiszEdycjeZlecenia(event) {
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
-        if (starePlanowaneRozpoczecie !== nowePlanowaneRozpoczecie) {
-            const staryTekst = starePlanowaneRozpoczecie || 'brak';
-            const nowyTekst = nowePlanowaneRozpoczecie || 'brak';
-            zmiany.push(`Plan rozpoczęcia zmieniono z ${staryTekst} na ${nowyTekst}`);
+        if (staryStartMs !== nowyStartMs) {
+            const staryTekst = formatDateTimeLabel(staryStartAt, 'brak');
+            const nowyTekst = formatDateTimeLabel(noweStartAt, 'brak');
+            zmiany.push(`Start zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
-        if (starePlanowaneZakonczenie !== nowePlanowaneZakonczenie) {
-            const staryTekst = starePlanowaneZakonczenie || 'brak';
-            const nowyTekst = nowePlanowaneZakonczenie || 'brak';
-            zmiany.push(`Plan zakończenia zmieniono z ${staryTekst} na ${nowyTekst}`);
+        if (staryEndMs !== nowyEndMs) {
+            const staryTekst = formatDateTimeLabel(staryEndAt, 'brak');
+            const nowyTekst = formatDateTimeLabel(noweEndAt, 'brak');
+            zmiany.push(`Koniec zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
         if (zmiany.length === 0) {
-            editZlecenieModal.style.display = 'none';
+            hideModal(editZlecenieModal);
             return;
         }
         wpisHistorii += zmiany.join('; ');
@@ -1900,11 +2016,11 @@ async function zapiszEdycjeZlecenia(event) {
             wyfakturowaneGodziny: noweGodziny,
             typZlecenia: nowyTyp,
             zakonczenieNumerWZ: nowyNumerWz || null,
-            dataRozpoczecia: nowePlanowaneRozpoczecie || null,
-            dataZakonczenia: nowePlanowaneZakonczenie || null,
+            startAt: noweStartAt || null,
+            endAt: noweEndAt || null,
             historia: nowaHistoria
         });
-        editZlecenieModal.style.display = 'none';
+        hideModal(editZlecenieModal);
         alert("Zlecenie zaktualizowane.");
     } catch (e) {
         console.error("Błąd aktualizacji zlecenia:", e);
@@ -1912,7 +2028,7 @@ async function zapiszEdycjeZlecenia(event) {
     }
 }
 
-async function otworzModalSzczegolowZlecenia(zlecenieId) {
+async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = {}) {
     const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
     if (!zlecenie) { alert("Nie znaleziono zlecenia!"); return; }
     const titleEl = document.getElementById('details-zlecenie-title');
@@ -1938,8 +2054,8 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     infoDiv.innerHTML = `
         <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
         <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
-        <div class="details-group"><strong>Data Rozpoczęcia:</strong> <p>${zlecenie.dataRozpoczecia || 'Brak'}</p></div>
-        <div class="details-group"><strong>Data Zakończenia:</strong> <p>${zlecenie.dataZakonczenia || 'Brak'}</p></div>
+        <div class="details-group"><strong>Start:</strong> <p>${formatDateTimeLabel(zlecenie.startAt)}</p></div>
+        <div class="details-group"><strong>Koniec:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
         <div class="details-group"><strong>Opis:</strong> <p>${zlecenie.opis || 'Brak opisu'}</p></div>
     `;
@@ -1997,7 +2113,9 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
 
-    detailsZlecenieModal.style.display = 'block';
+    if (!skipOpen) {
+        openModal(detailsZlecenieModal);
+    }
 }
 
 async function zapiszPrzypisanie(event) {
@@ -2048,7 +2166,7 @@ async function zapiszPrzypisanie(event) {
             historia: nowaHistoria
         };
         await updateDoc(zlecenieRef, daneDoAktualizacji);
-        assignModal.style.display = 'none';
+        hideModal(assignModal);
     } catch (error) {
         console.error("Błąd podczas przypisywania:", error);
         alert(`Wystąpił błąd: ${error.message}`);
@@ -2125,20 +2243,39 @@ async function obslugaZakonczeniaZlecenia(event) {
     const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
     const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
     const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
-    const numerWz = zakonczenieWzInput && 'value' in zakonczenieWzInput ? zakonczenieWzInput.value.trim() : '';
     const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
+    const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
+    const zlecenieRef = doc(db, "zlecenia", docId);
+
+    try {
+        const zlecenieStartSnap = await getDoc(zlecenieRef);
+        if (!zlecenieStartSnap.exists()) {
+            alert("Nie znaleziono zlecenia do zakończenia.");
+            return;
+        }
+        const startAtDate = toDateSafe(zlecenieStartSnap.data().startAt);
+        if (!walidujPrzedzialCzasu(startAtDate, manualEndAt)) {
+            return;
+        }
+    } catch (error) {
+        console.error("Błąd walidacji czasu zakończenia:", error);
+        alert("Nie udało się zweryfikować czasu zakończenia. Spróbuj ponownie.");
+        return;
+    }
+
+    const fallbackEndAtDate = manualEndAt || new Date();
     const dane = {
         status: 'ukończone',
         wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
         typZlecenia: document.getElementById('typ-zlecenia').value,
-        dataUkonczenia: new Date().toISOString().split('T')[0],
+        dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
+        endAt: manualEndAt || serverTimestamp(),
         uzyteCzesci: czesciDoZlecenia,
         zakonczenieNotatka: notatka || null,
         zakonczenieNumerWZ: numerWzValue || null
     };
     try {
         await runTransaction(db, async (t) => {
-            const zlecenieRef = doc(db, "zlecenia", docId);
             const zlecenieSnap = await t.get(zlecenieRef);
             if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
             const zlecenieData = zlecenieSnap.data();
@@ -2170,7 +2307,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             }
         });
         alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
-        completeModal.style.display = 'none';
+        hideModal(completeModal);
         completeModalForm.reset();
     } catch (error) {
         console.error("BŁĄD TRANSAKCJI: ", error);
@@ -2308,7 +2445,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             qtyInput.step = tr.dataset.isOil === 'true' ? "0.01" : "1";
             qtyInput.placeholder = tr.dataset.isOil === 'true' ? "np. 0.5" : "Tylko liczby całkowite";
             qtyInput.value = '';
-            stockModal.style.display = 'block';
+            openModal(stockModal);
         }
     }
 
@@ -2338,7 +2475,7 @@ async function obslugaZakonczeniaZlecenia(event) {
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
                 t.update(docRef, { ilosc: newQty });
             });
-            if (stockModal) stockModal.style.display = 'none';
+            if (stockModal) hideModal(stockModal);
             stockModalForm.reset();
         } catch (e) {
             console.error("Błąd transakcji: ", e);
@@ -2402,7 +2539,7 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     if (completeModalForm) completeModalForm.addEventListener('submit', obslugaZakonczeniaZlecenia);
     if (closeModalButton && completeModal) {
-        closeModalButton.onclick = () => { completeModal.style.display = 'none'; };
+        closeModalButton.onclick = () => { hideModal(completeModal); };
     }
 
     if (miesiacSummaryInput) {
@@ -2435,7 +2572,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (partsToRemoveList) partsToRemoveList.addEventListener('click', obslugaListyCzesci);
     if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
     if (stockModalCloseButton && stockModal) {
-        stockModalCloseButton.onclick = () => { stockModal.style.display = 'none'; };
+        stockModalCloseButton.onclick = () => { hideModal(stockModal); };
     }
 
     if (addOilBtn) addOilBtn.addEventListener('click', dodajOlej);
@@ -2456,7 +2593,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
     if (kalendarzContainer) kalendarzContainer.addEventListener('click', obslugaKalendarza);
     if (kalendarzModalCloseButton && kalendarzModal) {
-        kalendarzModalCloseButton.onclick = () => { kalendarzModal.style.display = 'none'; };
+        kalendarzModalCloseButton.onclick = () => { hideModal(kalendarzModal); };
     }
     if (kalendarzMultiAddButton) kalendarzMultiAddButton.addEventListener('click', dodajLubZapiszMultiZlecenie);
     if (kalendarzMultiList) kalendarzMultiList.addEventListener('click', obslugaListyMulti);
@@ -2476,35 +2613,25 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
     if (editKlientCloseButton && editKlientModal) {
-        editKlientCloseButton.onclick = () => { editKlientModal.style.display = 'none'; };
+        editKlientCloseButton.onclick = () => { hideModal(editKlientModal); };
     }
     if (editMaszynaCloseButton && editMaszynaModal) {
-        editMaszynaCloseButton.onclick = () => { editMaszynaModal.style.display = 'none'; };
+        editMaszynaCloseButton.onclick = () => { hideModal(editMaszynaModal); };
     }
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
-        detailsZlecenieCloseButton.onclick = () => { detailsZlecenieModal.style.display = 'none'; };
+        detailsZlecenieCloseButton.onclick = () => { hideModal(detailsZlecenieModal); };
     }
     if (editZlecenieCloseButton && editZlecenieModal) {
-        editZlecenieCloseButton.onclick = () => { editZlecenieModal.style.display = 'none'; };
+        editZlecenieCloseButton.onclick = () => { hideModal(editZlecenieModal); };
     }
     if (machineHistoryCloseButton && machineHistoryModal) {
-        machineHistoryCloseButton.onclick = () => { machineHistoryModal.style.display = 'none'; };
+        machineHistoryCloseButton.onclick = () => { hideModal(machineHistoryModal); };
     }
 
     // Klik poza modal zamyka go
     window.onclick = (event) => {
-        if (
-            event.target == completeModal ||
-            event.target == stockModal ||
-            event.target == kalendarzModal ||
-            event.target == assignModal ||
-            event.target == editKlientModal ||
-            event.target == editMaszynaModal ||
-            event.target == detailsZlecenieModal ||
-            event.target == editZlecenieModal ||
-            event.target == machineHistoryModal
-        ) {
-            event.target.style.display = "none";
+        if (trackedModals.includes(event.target)) {
+            hideModal(event.target);
         }
     };
 
