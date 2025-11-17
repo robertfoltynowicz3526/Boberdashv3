@@ -25,6 +25,7 @@
             <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
             <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
             <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
+            <button class="tab-button" onclick="openTab(event, 'dodaj-zlecenie')">Dodaj Zlecenie</button>
             <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
             <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Podsumowanie</button>
         </nav>
@@ -96,24 +97,15 @@
         </div>
         <div id="zlecenia" class="tab-content">
             <h2>Zlecenia</h2>
-            <div class="form-section">
-                <h3>Dodaj nowe zlecenie</h3>
-                <form id="zlecenie-form">
-                    <div class="form-grid-2">
-                        <div class="form-group"><label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label><select id="zlecenie-klient-select"><option value="">-- Wybierz --</option></select></div>
-                        <div class="form-group"><label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
+            <div class="orders-layout">
+                <div class="search-section">
+                    <div class="form-group">
+                        <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
+                        <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
                     </div>
-                    <div class="form-group"><label for="zlecenie-klient-filter">lub wyszukaj klienta:</label><input type="search" id="zlecenie-klient-filter" placeholder="Filtruj klientów po nazwie, NIP, adresie..."></div>
-                    <div class="form-group"><label for="nr-zlecenia">Nr zlecenia / Nazwa dla szybkiego zlecenia:</label><input type="text" id="nr-zlecenia" required></div>
-                    <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
-                    <div class="form-group"><label for="motogodziny">Motogodziny (opcjonalnie):</label><input type="number" id="motogodziny" step="0.1"></div>
-                    <button type="submit">Dodaj Zlecenie</button>
-                </form>
-            </div>
-            <div class="search-section">
-                <div class="form-group">
-                    <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
-                    <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
+                </div>
+                <div class="orders-hint">
+                    <p>Przeglądaj aktywne i zakończone zlecenia bez przełączania widoków. Formularz tworzenia znajdziesz teraz w zakładce <strong>Dodaj Zlecenie</strong>.</p>
                 </div>
             </div>
             <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div><hr>
@@ -122,7 +114,7 @@
                     Zakończone zlecenia <span class="arrow">▼</span>
                 </h3>
 
-                
+
                 <div id="zakonczone-zlecenia-content" class="collapsible-content">
                     <div class="summary-controls">
                         <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
@@ -133,6 +125,27 @@
                     <div id="ukonczone-zlecenia-lista"></div>
                 </div>
             </div>
+        </div>
+        <div id="dodaj-zlecenie" class="tab-content">
+            <h2>Dodaj nowe zlecenie</h2>
+            <div class="form-section">
+                <form id="zlecenie-form">
+                    <div class="form-grid-2">
+                        <div class="form-group"><label for="zlecenie-klient-select">1. Wybierz klienta (opcjonalnie):</label><select id="zlecenie-klient-select"><option value="">-- Wybierz --</option></select></div>
+                        <div class="form-group"><label for="zlecenie-maszyna-select">2. Wybierz maszynę (opcjonalnie):</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
+                    </div>
+                    <div class="form-group"><label for="zlecenie-klient-filter">lub wyszukaj klienta:</label><input type="search" id="zlecenie-klient-filter" placeholder="Filtruj klientów po nazwie, NIP, adresie..."></div>
+                    <div class="form-group"><label for="nr-zlecenia">Nr zlecenia / Nazwa dla szybkiego zlecenia:</label><input type="text" id="nr-zlecenia" required></div>
+                    <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
+                    <div class="form-grid-2">
+                        <div class="form-group"><label for="zlecenie-rozpoczecie">Planowane rozpoczęcie (opcjonalnie):</label><input type="datetime-local" id="zlecenie-rozpoczecie"></div>
+                        <div class="form-group"><label for="zlecenie-zakonczenie">Planowane zakończenie (opcjonalnie):</label><input type="datetime-local" id="zlecenie-zakonczenie"></div>
+                    </div>
+                    <div class="form-group"><label for="motogodziny">Motogodziny (opcjonalnie):</label><input type="number" id="motogodziny" step="0.1"></div>
+                    <button type="submit">Dodaj Zlecenie</button>
+                </form>
+            </div>
+            <p class="orders-tip">Podpowiedź: wybierz opcję „Szybkie Zlecenie”, aby dodać zgłoszenie bez przypisania klienta.</p>
         </div>
         <div id="magazyn" class="tab-content">
             <div id="magazyn-summary" class="summary-container-subtle"></div>
@@ -276,6 +289,16 @@
                         <option value="Z">Z - Zbrojenie (30zł)</option>
                         <option value="P">P - Poprawka (0zł)</option>
                     </select>
+                </div>
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label for="edit-data-rozpoczecia">Planowane rozpoczęcie:</label>
+                        <input type="datetime-local" id="edit-data-rozpoczecia">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-data-zakonczenia">Planowane zakończenie:</label>
+                        <input type="datetime-local" id="edit-data-zakonczenia">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="edit-zakonczenie-wz">Numer WZ (opcjonalnie):</label>
