@@ -118,6 +118,59 @@ function initializeApp() {
     const machineHistoryList = document.getElementById('machine-history-list');
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
+    const magazynTab = document.getElementById('magazyn');
+    const magazynSummaryBox = document.getElementById('magazyn-summary');
+
+    const trackedModals = [];
+    [kalendarzModal, completeModal, stockModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
+        .forEach(modal => { if (modal) trackedModals.push(modal); });
+
+    const ensureMagazynSummaryPlacement = () => {
+        if (magazynTab && magazynSummaryBox && magazynTab.firstElementChild !== magazynSummaryBox) {
+            magazynTab.insertBefore(magazynSummaryBox, magazynTab.firstChild);
+        }
+    };
+
+    const closeAllModals = (exceptModal = null) => {
+        trackedModals.forEach(modal => {
+            if (modal && modal !== exceptModal) {
+                modal.style.display = 'none';
+            }
+        });
+    };
+
+    const debounce = (fn, wait = 200) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn.apply(null, args), wait);
+        };
+    };
+
+    const throttle = (fn, wait = 200) => {
+        let last = 0;
+        let timeout;
+        return (...args) => {
+            const now = Date.now();
+            const remaining = wait - (now - last);
+            if (remaining <= 0) {
+                if (timeout) {
+                    clearTimeout(timeout);
+                    timeout = null;
+                }
+                last = now;
+                fn.apply(null, args);
+            } else if (!timeout) {
+                timeout = setTimeout(() => {
+                    last = Date.now();
+                    timeout = null;
+                    fn.apply(null, args);
+                }, remaining);
+            }
+        };
+    };
+
+    ensureMagazynSummaryPlacement();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     window.openTab = (evt, tabName) => {
@@ -125,6 +178,9 @@ function initializeApp() {
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
         document.getElementById(tabName).style.display = 'block';
         evt.currentTarget.classList.add('active');
+        if (tabName === 'magazyn') {
+            ensureMagazynSummaryPlacement();
+        }
     };
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -139,10 +195,9 @@ function initializeApp() {
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
 
+    const odswiezSelectDebounced = debounce(() => odswiezSelectKlientaDoZlecenia(), 220);
     if (zlecenieKlientFilterInput) {
-        zlecenieKlientFilterInput.addEventListener('input', () => {
-            odswiezSelectKlientaDoZlecenia();
-        });
+        zlecenieKlientFilterInput.addEventListener('input', odswiezSelectDebounced);
     }
     odswiezSelectKlientaDoZlecenia();
 
@@ -1107,6 +1162,7 @@ async function obslugaListyKlientow(event) {
         const historyTitle = document.getElementById('machine-history-title');
         if (historyTitle) historyTitle.textContent = `Historia Serwisowa: ${maszynaNazwa}`;
         machineHistoryList.innerHTML = '<p>Ładowanie historii...</p>';
+        closeAllModals(machineHistoryModal);
         machineHistoryModal.style.display = 'block';
 
         try {
@@ -1176,6 +1232,7 @@ async function obslugaListyKlientow(event) {
         editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
         editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
         editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
+        closeAllModals(editKlientModal);
         editKlientModal.style.display = 'block';
     }
 
@@ -1412,6 +1469,7 @@ function otworzModalEdycjiMaszyny(maszynaId) {
     editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : maszyna.nrSeryjny;
     editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji || '';
     editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny || 0;
+    closeAllModals(editMaszynaModal);
     editMaszynaModal.style.display = 'block';
 }
 
@@ -1462,6 +1520,54 @@ async function dodajLubEdytujPrzejazd(event) { event.preventDefault(); }
 async function obslugaListyPrzejazdow(event) {}
 
 // --- ZLECENIA ---
+function renderListInBatches(container, elements, emptyMessage) {
+    if (!container) return;
+    if (!elements || elements.length === 0) {
+        container.innerHTML = `<p>${emptyMessage}</p>`;
+        return;
+    }
+    container.innerHTML = '';
+    const ul = document.createElement('ul');
+    container.appendChild(ul);
+    const chunkSize = 20;
+    let index = 0;
+    const renderChunk = () => {
+        const fragment = document.createDocumentFragment();
+        for (let i = 0; i < chunkSize && index < elements.length; i += 1, index += 1) {
+            fragment.appendChild(elements[index]);
+        }
+        ul.appendChild(fragment);
+        if (index < elements.length) {
+            requestAnimationFrame(renderChunk);
+        }
+    };
+    requestAnimationFrame(renderChunk);
+}
+
+function createZlecenieListItem(zlecenie, bodyHtml, actionsHtml) {
+    const li = document.createElement('li');
+    li.dataset.id = zlecenie.id;
+    const span = document.createElement('span');
+    span.innerHTML = bodyHtml;
+    const actions = document.createElement('div');
+    actions.innerHTML = actionsHtml;
+    li.appendChild(span);
+    li.appendChild(actions);
+    return li;
+}
+
+function walidujPlanowaneTerminy(start, end) {
+    if (start && end) {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+        if (startDate > endDate) {
+            alert('Planowane zakończenie nie może być wcześniejsze niż rozpoczęcie.');
+            return false;
+        }
+    }
+    return true;
+}
+
 function wyswietlZlecenia() {
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
         if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -1472,7 +1578,8 @@ function wyswietlZlecenia() {
     const frazaWyszukiwania = (zlecenieSearchInput?.value || '').toLowerCase();
     const selectedMonth = getSelectedMonth();
     wszystkieZlecenia = [];
-    let aktywneHtml = '', ukonczoneHtml = '';
+    const aktywneElements = [];
+    const ukonczoneElements = [];
 
     const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => {
         if (!frazaWyszukiwania) return true;
@@ -1489,19 +1596,24 @@ function wyswietlZlecenia() {
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
         const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+        const planHtml = (zlecenie.dataRozpoczecia || zlecenie.dataZakonczenia)
+            ? `<br><small>Plan: ${zlecenie.dataRozpoczecia || '---'} → ${zlecenie.dataZakonczenia || '---'}</small>`
+            : '';
 
         if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
             const przycisk = zlecenie.status === 'nieprzypisane'
-            ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
-            : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`; 
-            aktywneHtml += `<li data-id="${zlecenie.id}">
-                <span><strong>${nazwa}</strong><br><em>${zlecenie.opis || ''}</em></span>
-                <div>
+                ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
+                : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`;
+            const opisHtml = `<em>${zlecenie.opis || 'Brak opisu'}</em>`;
+            aktywneElements.push(createZlecenieListItem(
+                zlecenie,
+                `<strong>${nazwa}</strong><br>${opisHtml}${planHtml}`,
+                `
                     <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     ${przycisk}
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
-                </div>
-            </li>`;
+                `
+            ));
         } else if (zlecenie.status === 'ukończone') {
             const dataUkonczenia = zlecenie.dataUkonczenia || '';
             if (!dataUkonczenia.startsWith(selectedMonth)) {
@@ -1511,31 +1623,39 @@ function wyswietlZlecenia() {
             const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
             const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
-            ukonczoneHtml += `<li data-id="${zlecenie.id}">
-                <span>
+            ukonczoneElements.push(createZlecenieListItem(
+                zlecenie,
+                `
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
-                    <em>Ukończono (${zlecenie.dataUkonczenia||'b.d.'})</em><br>
-                    Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny||0}h</strong> | Typ: <strong>${zlecenie.typZlecenia||'?'}</strong>
-                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
-                </span>
-                <div>
+                    <em>Ukończono (${zlecenie.dataUkonczenia || 'b.d.'})</em><br>
+                    Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
+                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${planHtml}
+                `,
+                `
                     <button type="button" class="btn-details details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
-                </div>
-            </li>`;
+                `
+            ));
         }
     });
 
-    if (aktywneZleceniaLista) {
-        aktywneZleceniaLista.innerHTML = aktywneHtml ? `<ul>${aktywneHtml}</ul>` : "<p>Brak aktywnych zleceń lub pasujących do wyszukiwania.</p>";
-    }
-    if (ukonczoneZleceniaLista) {
-        ukonczoneZleceniaLista.innerHTML = ukonczoneHtml ? `<ul>${ukonczoneHtml}</ul>` : "<p>Brak ukończonych zleceń lub pasujących do wyszukiwania.</p>";
-    }
+    renderListInBatches(
+        aktywneZleceniaLista,
+        aktywneElements,
+        "Brak aktywnych zleceń lub pasujących do wyszukiwania."
+    );
+    renderListInBatches(
+        ukonczoneZleceniaLista,
+        ukonczoneElements,
+        "Brak ukończonych zleceń lub pasujących do wyszukiwania."
+    );
     obliczIPokazPodsumowanieFinansowe();
 }
+
+
+
 
 function nasluchujNaZlecenia() {
     onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
@@ -1555,8 +1675,11 @@ async function dodajZlecenie(event) {
     event.preventDefault();
     const wybranyKlientId = zlecenieKlientSelect.value;
     const wybranaMaszynaId = zlecenieMaszynaSelect.value;
-    const dataRozpoczecia = null;
-    const dataZakonczenia = null;
+    const dataRozpoczecia = zlecenieForm['zlecenie-rozpoczecie']?.value || null;
+    const dataZakonczenia = zlecenieForm['zlecenie-zakonczenie']?.value || null;
+    if (!walidujPlanowaneTerminy(dataRozpoczecia, dataZakonczenia)) {
+        return;
+    }
 
     const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
 
@@ -1627,6 +1750,7 @@ async function obslugaListyZlecen(event) {
             if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
             if (assignMachineSection) assignMachineSection.style.display = 'none';
             assignForm.reset();
+            closeAllModals(assignModal);
             assignModal.style.display = 'block';
         }
         return;
@@ -1650,6 +1774,7 @@ async function obslugaListyZlecen(event) {
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
             ensureZakonczenieNotatkaField();
+            closeAllModals(completeModal);
             completeModal.style.display = 'block';
         }
         return;
@@ -1705,7 +1830,14 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
-    
+    if (editZlecenieForm['edit-data-rozpoczecia']) {
+        editZlecenieForm['edit-data-rozpoczecia'].value = zlecenie.dataRozpoczecia || '';
+    }
+    if (editZlecenieForm['edit-data-zakonczenia']) {
+        editZlecenieForm['edit-data-zakonczenia'].value = zlecenie.dataZakonczenia || '';
+    }
+
+    closeAllModals(editZlecenieModal);
     editZlecenieModal.style.display = 'block';
 }
 
@@ -1716,9 +1848,14 @@ async function zapiszEdycjeZlecenia(event) {
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
+    const nowePlanowaneRozpoczecie = editZlecenieForm['edit-data-rozpoczecia']?.value || null;
+    const nowePlanowaneZakonczenie = editZlecenieForm['edit-data-zakonczenia']?.value || null;
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
+        return;
+    }
+    if (!walidujPlanowaneTerminy(nowePlanowaneRozpoczecie, nowePlanowaneZakonczenie)) {
         return;
     }
 
@@ -1730,6 +1867,8 @@ async function zapiszEdycjeZlecenia(event) {
         const staryTyp = zlecenieData.typZlecenia;
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
+        const starePlanowaneRozpoczecie = zlecenieData.dataRozpoczecia || null;
+        const starePlanowaneZakonczenie = zlecenieData.dataZakonczenia || null;
 
         let wpisHistorii = `Edytowano zakończone zlecenie: `;
         const zmiany = [];
@@ -1739,6 +1878,16 @@ async function zapiszEdycjeZlecenia(event) {
             const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
+        }
+        if (starePlanowaneRozpoczecie !== nowePlanowaneRozpoczecie) {
+            const staryTekst = starePlanowaneRozpoczecie || 'brak';
+            const nowyTekst = nowePlanowaneRozpoczecie || 'brak';
+            zmiany.push(`Plan rozpoczęcia zmieniono z ${staryTekst} na ${nowyTekst}`);
+        }
+        if (starePlanowaneZakonczenie !== nowePlanowaneZakonczenie) {
+            const staryTekst = starePlanowaneZakonczenie || 'brak';
+            const nowyTekst = nowePlanowaneZakonczenie || 'brak';
+            zmiany.push(`Plan zakończenia zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
         if (zmiany.length === 0) {
             editZlecenieModal.style.display = 'none';
@@ -1751,6 +1900,8 @@ async function zapiszEdycjeZlecenia(event) {
             wyfakturowaneGodziny: noweGodziny,
             typZlecenia: nowyTyp,
             zakonczenieNumerWZ: nowyNumerWz || null,
+            dataRozpoczecia: nowePlanowaneRozpoczecie || null,
+            dataZakonczenia: nowePlanowaneZakonczenie || null,
             historia: nowaHistoria
         });
         editZlecenieModal.style.display = 'none';
@@ -1769,6 +1920,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId) {
     const historiaDiv = document.getElementById('details-zlecenie-historia');
     const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
     if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv) return;
+    closeAllModals(detailsZlecenieModal);
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
     const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
     const typStawkiOpis = STAWKI[zlecenie.typZlecenia]?.nazwa || 'Brak danych';
@@ -2309,10 +2461,14 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (kalendarzMultiAddButton) kalendarzMultiAddButton.addEventListener('click', dodajLubZapiszMultiZlecenie);
     if (kalendarzMultiList) kalendarzMultiList.addEventListener('click', obslugaListyMulti);
 
+    const wyswietlKlientowDebounced = debounce(() => wyswietlKlientow(), 200);
+    const wyswietlMaszynyDebounced = debounce(() => wyswietlMaszyny(), 200);
+    const wyswietlZleceniaThrottled = throttle(() => wyswietlZlecenia(), 150);
+
     // WYSZUKIWANIA
-    if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientow);
-    if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszyny);
-    if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZlecenia);
+    if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientowDebounced);
+    if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszynyDebounced);
+    if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZleceniaThrottled);
 
     // EDYCJE (modale)
     if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
