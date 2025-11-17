@@ -15,14 +15,23 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+    const BAZA_MIESIECZNA_GODZIN = 168;
+    function obliczAbsorpcja(wyfakturowaneGodziny) {
+        const v = Number(wyfakturowaneGodziny || 0);
+        return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
+    }
+    function fmtPct(x, places = 1) {
+        return `${(Number(x) || 0).toFixed(places)}%`;
+    }
     const utworzPustyRekordMiesieczny = () => ({
         praca: 0,
         nadgodziny: 0,
         jazda: 0,
         wyfakturowaneGodziny: 0,
         brutto: 0,
-        netto: 0
-    }); 
+        netto: 0,
+        absorpcja: 0
+    });
     let wszystkieZlecenia = [], wszystkieProdukty = [], wszystkiePrzejazdy = [],
         czesciDoZlecenia = [], wszystkieMaszyny = [], wszystkieKlienci = [], wszystkieWpisyKalendarza = [];
     let ostatnieZestawienieMiesieczne = {
@@ -461,6 +470,7 @@ function initializeApp() {
             acc.jazda += wpis.jazda || 0;
             return acc;
         }, { praca: 0, fakturowane: 0, nadgodziny: 0, jazda: 0 });
+        const absorpcja = obliczAbsorpcja(sumy.fakturowane);
 
         if (!kalendarzPodsumowanieDiv) return;
         kalendarzPodsumowanieDiv.innerHTML = `
@@ -468,6 +478,7 @@ function initializeApp() {
             <p>Fakturowane: <strong>${sumy.fakturowane.toFixed(1)} h</strong></p>
             <p>Nadgodziny: <strong>${sumy.nadgodziny.toFixed(1)} h</strong></p>
             <p>Czas Jazdy: <strong>${sumy.jazda.toFixed(1)} h</strong></p>
+            <div class="metric">Absorpcja: <strong>${fmtPct(absorpcja)}</strong></div>
         `;
     }
 
@@ -579,7 +590,7 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
         const mapa = {};
-        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0 });
+        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0, absorpcja: 0 });
         const pobierzRekord = (miesiac) => {
             if (!mapa[miesiac]) {
                 mapa[miesiac] = pustyRekord();
@@ -613,7 +624,14 @@ function initializeApp() {
 
         const miesiace = Object.keys(mapa)
             .sort()
-            .map(miesiac => ({ miesiac, ...mapa[miesiac] }));
+            .map(miesiac => {
+                const rekord = mapa[miesiac];
+                return {
+                    miesiac,
+                    ...rekord,
+                    absorpcja: obliczAbsorpcja(rekord.wyfakturowaneGodziny)
+                };
+            });
 
         const sumyRoczne = miesiace.reduce((acc, rekord) => {
             acc.praca += rekord.praca;
@@ -624,6 +642,7 @@ function initializeApp() {
             acc.netto += rekord.netto;
             return acc;
         }, pustyRekord());
+        sumyRoczne.absorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
 
         return { miesiace, sumyRoczne };
     }
@@ -679,10 +698,12 @@ function initializeApp() {
         const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
         if (zakonczoneSummaryContainer) {
             const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
+            const absorpcja = obliczAbsorpcja(sumaGodzin);
             zakonczoneSummaryContainer.innerHTML = `
             <p>Godziny wyfakturowane: <strong>${sumaGodzin.toFixed(2)} h</strong></p>
             <p>Wartość brutto: <strong>${sumaBrutto.toFixed(2)} zł</strong></p>
-            <p>Wartość netto: <strong>${sumaNetto.toFixed(2)} zł</strong></p>    
+            <p>Wartość netto: <strong>${sumaNetto.toFixed(2)} zł</strong></p>
+            <div>Absorpcja: <strong>${fmtPct(absorpcja)}</strong></div>
             `;
         }
 
@@ -706,9 +727,11 @@ function initializeApp() {
                 <td>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
                 <td>${formatujLiczbe(rekord.brutto)} zł</td>
                 <td>${formatujLiczbe(rekord.netto)} zł</td>
+                <td>${fmtPct(rekord.absorpcja)}</td>
             </tr>
         `).join('');
 
+        const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
             <tr>
                 <td>Razem</td>
@@ -718,6 +741,7 @@ function initializeApp() {
                 <td>${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
                 <td>${formatujLiczbe(sumyRoczne.brutto)} zł</td>
                 <td>${formatujLiczbe(sumyRoczne.netto)} zł</td>
+                <td>${fmtPct(sumaAbsorpcja)}</td>
             </tr>`;
 
         annualSummaryContainer.innerHTML = `
@@ -732,6 +756,7 @@ function initializeApp() {
                             <th>Godziny wyfakturowane</th>
                             <th>Brutto</th>
                             <th>Netto</th>
+                            <th>Absorpcja</th>
                         </tr>
                     </thead>
                     <tbody>${wiersze}</tbody>
