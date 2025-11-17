@@ -1,7 +1,15 @@
 :root {
-  --jd-green: #1f6f26;
-  --jd-green-dark: #0c4112;
-  --jd-yellow: #ffd430;
+  --jd-green: #367C2B;
+  --jd-green-dark: #24541E;
+  --jd-yellow: #FFDE00;
+
+  --total-bg: linear-gradient(90deg, #FFE95A 0%, #FFDE00 100%);
+  --total-text: #1a1a1a;
+  --total-border: rgba(0, 0, 0, 0.25);
+
+  --total-bg-dark: linear-gradient(90deg, #2A5A20 0%, #367C2B 100%);
+  --total-text-dark: #FFFFFF;
+  --total-border-dark: rgba(0, 0, 0, 0.35);
   --bg-color: #050f05;
   --bg-elevated: #0f1f0b;
   --bg-elevated-hover: #162d12;
@@ -1342,4 +1350,60 @@ body[data-theme="dark"] .client-group strong {
 
 .fc .fc-daygrid-day-events {
   margin-top: 2px;
+}
+
+/* Karta/wiersz podsumowania: Razem */
+.summary-total {
+  background: var(--total-bg);
+  color: var(--total-text);
+  border: 1px solid var(--total-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-weight: 800;
+  position: relative;
+}
+
+.summary-total strong,
+.summary-total em,
+.summary-total .label,
+.summary-total .title {
+  color: inherit;
+  opacity: 0.95;
+}
+
+.summary-total .value {
+  color: inherit;
+  opacity: 0.95;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+table .summary-total td {
+  background: transparent;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-top: 2px solid var(--total-border);
+}
+
+body[data-theme="dark"] .summary-total {
+  background: var(--total-bg-dark);
+  color: var(--total-text-dark);
+  border-color: var(--total-border-dark);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+body[data-theme="dark"] table .summary-total td {
+  border-top-color: var(--total-border-dark);
+}
+
+.summary-total::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--jd-yellow);
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
 }

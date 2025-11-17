@@ -862,7 +862,7 @@ function initializeApp() {
 
         const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
-            <tr>
+            <tr class="summary-total">
                 <td>Razem</td>
                 <td>${formatujLiczbe(sumyRoczne.praca)} h</td>
                 <td>${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
