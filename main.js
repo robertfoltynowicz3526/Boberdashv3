@@ -144,6 +144,8 @@ function initializeApp() {
             initialView: 'dayGridMonth',
             locale: 'pl',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+            dayMaxEventRows: 3,
+            moreLinkClick: 'popover',
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
             displayEventEnd: true,
             eventContent: (arg) => {
