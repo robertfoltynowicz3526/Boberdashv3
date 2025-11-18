@@ -15,6 +15,81 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+    function ymFromMonthInput() {
+        const el = document.getElementById('miesiac-summary');
+        if (el && el.value) {
+            const [y, m] = el.value.split('-').map(Number);
+            return { y, m };
+        }
+        const d = new Date();
+        return { y: d.getFullYear(), m: d.getMonth() + 1 };
+    }
+    function lastMonths(y, m, n = 4) {
+        const out = [];
+        for (let i = n - 1; i >= 0; i--) {
+            const d = new Date(y, m - 1 - i, 1);
+            out.push({ y: d.getFullYear(), m: d.getMonth() + 1 });
+        }
+        return out;
+    }
+    function getFHfromSummary(y, m) {
+        const list = (window.ostatnieZestawienieMiesieczne?.miesiace) || [];
+        const rec = list.find(r => {
+            let recordYear = Number(r?.rok ?? r?.year);
+            let recordMonth = Number(r?.month ?? r?.mm);
+            if (Number.isNaN(recordYear)) recordYear = null;
+            if (Number.isNaN(recordMonth)) recordMonth = null;
+            const rawMiesiac = r?.miesiac;
+            if (!recordYear || !recordMonth) {
+                if (typeof rawMiesiac === 'string') {
+                    const normalized = rawMiesiac.replace(/[./]/g, '-');
+                    const [yPart, mPart] = normalized.split('-');
+                    if (!recordYear && yPart && yPart.length >= 4) recordYear = Number(yPart);
+                    if (!recordMonth && mPart) recordMonth = Number(mPart);
+                } else if (typeof rawMiesiac === 'number') {
+                    recordMonth = recordMonth ?? Number(rawMiesiac);
+                }
+            }
+            return recordYear === y && recordMonth === m;
+        });
+        if (rec && rec.wyfakturowaneGodziny != null) return Number(rec.wyfakturowaneGodziny) || 0;
+        try {
+            if (window.calendar?.getEvents) {
+                const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+                const end = new Date(y, m, 0, 23, 59, 59, 999);
+                return window.calendar.getEvents().reduce((s, e) => {
+                    const fh = Number(e.extendedProps?.fh) || 0;
+                    const d = e.start;
+                    if (d && d >= start && d <= end) s += fh;
+                    return s;
+                }, 0);
+            }
+        } catch (_) { }
+        return 0;
+    }
+    function renderFH3M(host, y, m) {
+        if (!host) return;
+        const months = lastMonths(y, m, 4);
+        const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
+        const max = Math.max(...vals, 1);
+        const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
+        const curr = vals[3];
+        const avg3 = (vals[0] + vals[1] + vals[2]) / 3;
+        const deltaPct = avg3 > 0 ? ((curr - avg3) / avg3) * 100 : 0;
+        host.innerHTML = `
+    <div class="fh3m">
+      <div class="row">
+        <div><strong>Wyfakturowane – ostatnie 3 mies.</strong></div>
+        <div class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</div>
+      </div>
+      <div class="bars">
+        ${vals.map((v, i) => `<div class="bar ${i < 3 ? 'dim' : ''}" style="height:${(v / max) * 100}%;" title="${labels[i]}: ${v.toFixed(1)} h"></div>`).join('')}
+      </div>
+      <div class="legend">
+        <span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span><span>${labels[3]}</span>
+      </div>
+    </div>`;
+    }
     const BAZA_MIESIECZNA_GODZIN = 168;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
@@ -40,9 +115,11 @@ function initializeApp() {
         sumyRocznePerRok: [],
         lata: []
     };
+    window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
+    window.calendar = null;
     let calendarResizeBound = false;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
@@ -332,6 +409,7 @@ function initializeApp() {
                 obliczSumeGodzinZKalendarza(currentStart, currentEnd);
             }
         });
+        window.calendar = calendar;
         calendar.render();
         if (!calendarResizeBound) {
             window.addEventListener('resize', handleCalendarResize, { passive: true });
@@ -622,23 +700,30 @@ function initializeApp() {
             const dataWpisu = new Date(wpis.id);
             return dataWpisu >= start && dataWpisu < end;
         });
-        const sumy = wpisyZMiesiaca.reduce((acc, wpis) => {
+        const sumyMies = wpisyZMiesiaca.reduce((acc, wpis) => {
             acc.praca += wpis.praca || 0;
-            acc.fakturowane += wpis.fakturowane || 0;
+            acc.wyfakturowaneGodziny += wpis.fakturowane || 0;
             acc.nadgodziny += wpis.nadgodziny || 0;
             acc.jazda += wpis.jazda || 0;
             return acc;
-        }, { praca: 0, fakturowane: 0, nadgodziny: 0, jazda: 0 });
-        const absorpcja = obliczAbsorpcja(sumy.fakturowane);
+        }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
+        const absorpcja = obliczAbsorpcja(sumyMies.wyfakturowaneGodziny);
 
         if (!kalendarzPodsumowanieDiv) return;
+        const metricsHTML = `
+  <div class="metric"><div class="label">Praca w miesiącu</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Fakturowane</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Nadgodziny</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(obliczAbsorpcja(sumyMies.wyfakturowaneGodziny))}</div></div>
+`;
         kalendarzPodsumowanieDiv.innerHTML = `
-            <p>Praca w miesiącu: <strong>${sumy.praca.toFixed(1)} h</strong></p>
-            <p>Fakturowane: <strong>${sumy.fakturowane.toFixed(1)} h</strong></p>
-            <p>Nadgodziny: <strong>${sumy.nadgodziny.toFixed(1)} h</strong></p>
-            <p>Czas Jazdy: <strong>${sumy.jazda.toFixed(1)} h</strong></p>
-            <div class="metric">Absorpcja: <strong>${fmtPct(absorpcja)}</strong></div>
-        `;
+  <div class="metrics-row">
+    <div class="metrics-left"><div class="metrics-grid">${metricsHTML}</div></div>
+    <div class="metrics-right"><div id="fh3m-pulpit"></div></div>
+  </div>`;
+        const { y, m } = ymFromMonthInput();
+        renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
     }
 
     async function obslugaKalendarza(event) {
@@ -858,12 +943,19 @@ function initializeApp() {
         if (zakonczoneSummaryContainer) {
             const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
             const absorpcja = obliczAbsorpcja(sumaGodzin);
+            const leftHTML = `
+  <div class="metric"><div class="label">Godziny wyfakturowane</div><div class="value num">${(sumaGodzin || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Wartość brutto</div><div class="value num">${(sumaBrutto || 0).toFixed(2)} zł</div></div>
+  <div class="metric"><div class="label">Wartość netto</div><div class="value num">${(sumaNetto || 0).toFixed(2)} zł</div></div>
+  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(absorpcja)}</div></div>
+`;
             zakonczoneSummaryContainer.innerHTML = `
-            <p>Godziny wyfakturowane: <strong>${sumaGodzin.toFixed(2)} h</strong></p>
-            <p>Wartość brutto: <strong>${sumaBrutto.toFixed(2)} zł</strong></p>
-            <p>Wartość netto: <strong>${sumaNetto.toFixed(2)} zł</strong></p>
-            <div>Absorpcja: <strong>${fmtPct(absorpcja)}</strong></div>
-            `;
+  <div class="metrics-row">
+    <div class="metrics-left"><div class="metrics-grid" style="grid-template-columns:repeat(4,minmax(140px,1fr));">${leftHTML}</div></div>
+    <div class="metrics-right"><div id="fh3m-zlecenia"></div></div>
+  </div>`;
+            const { y, m } = ymFromMonthInput();
+            renderFH3M(document.getElementById('fh3m-zlecenia'), y, m);
         }
 
 
@@ -926,6 +1018,7 @@ function initializeApp() {
 
     function odswiezPodsumowania() {
         ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
+        window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
         if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
             const miesiace = ostatnieZestawienieMiesieczne.miesiace;
             const aktualny = miesiacSummaryInput.value;
@@ -2579,6 +2672,11 @@ async function obslugaZakonczeniaZlecenia(event) {
             getSelectedMonth();
             wyswietlZlecenia();
             obliczIPokazPodsumowanieFinansowe();
+            const { y, m } = ymFromMonthInput();
+            const hostP = document.getElementById('fh3m-pulpit');
+            if (hostP) renderFH3M(hostP, y, m);
+            const hostZ = document.getElementById('fh3m-zlecenia');
+            if (hostZ) renderFH3M(hostZ, y, m);
         });
     }
     const exportZleceniaBtn = document.getElementById('export-zlecenia-btn');
