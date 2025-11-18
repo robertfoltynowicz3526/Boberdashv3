@@ -1396,11 +1396,6 @@ body[data-theme="dark"] .client-group strong {
   position: relative;
 }
 
-.summary-total.total-row {
-  margin-left: 0 !important;
-  padding-left: 8px !important;
-}
-
 .summary-total strong,
 .summary-total em,
 .summary-total .label,
@@ -1571,4 +1566,62 @@ body[data-theme="dark"] table .summary-total td {
   .modal button {
     min-height: 44px;
   }
+}
+
+/* Wersja gridowa */
+#annual-summary .summary-grid .summary-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+#annual-summary .summary-grid .summary-row .label {
+  text-align: left;
+}
+
+#annual-summary .summary-grid .summary-row .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#annual-summary .summary-grid .summary-row.total {
+  font-weight: 700;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* Wersja tabelowa */
+#annual-summary table.summary-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#annual-summary table.summary-table th,
+#annual-summary table.summary-table td {
+  padding: 8px;
+}
+
+#annual-summary table.summary-table td.label,
+#annual-summary .summary-row .label {
+  text-align: left;
+  white-space: nowrap;
+}
+
+#annual-summary table.summary-table td.num,
+#annual-summary .summary-row .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#annual-summary .summary-row.total,
+#annual-summary tr.total-row td {
+  font-weight: 700;
+}
+
+#annual-summary tr.total-row td {
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  margin-left: 0 !important;
+  padding-left: 8px !important;
 }
