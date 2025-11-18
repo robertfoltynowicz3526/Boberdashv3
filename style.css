@@ -1721,30 +1721,35 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   color:inherit;
 }
 
-/* Sekcja "Zakończone zlecenia" jako czysty grid */
+/* Sekcja "Zakończone zlecenia" jako dwa rzędy: kafle + wykres */
 .orders-summary{
   display:grid;
   grid-template-rows:auto auto;
-  gap:14px;
-  position:relative;
+  gap:16px;
 }
 .orders-summary .controls{
   display:flex;
   flex-wrap:wrap;
-  gap:10px;
+  gap:12px;
   align-items:center;
 }
 .orders-summary .metrics-grid{
   display:grid;
-  grid-template-columns:repeat(4,minmax(160px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
   gap:12px;
+}
+@media (min-width:1200px){
+  .orders-summary .metrics-grid{
+    grid-template-columns:repeat(4,minmax(220px,1fr));
+    gap:16px;
+  }
 }
 .orders-summary .metric{
   background:rgba(255,255,255,.04);
   border:1px solid rgba(255,255,255,.10);
   border-radius:12px;
-  padding:14px 16px;
-  min-height:72px;
+  padding:16px 18px;
+  min-height:76px;
 }
 .orders-summary .metric .label{ font-size:.85rem; opacity:.8; }
 .orders-summary .metric .value{ font-size:1.25rem; font-weight:700; }
@@ -1752,8 +1757,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   background:rgba(255,255,255,.03);
   border:1px solid rgba(255,255,255,.10);
   border-radius:12px;
-  padding:10px 12px;
-  z-index:0;
+  padding:12px 14px;
 }
 .orders-summary .chart .fh3m{ margin-top:0; }
 .orders-summary .chart h4{
@@ -1767,10 +1771,59 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 .section-calendar,
 .calendar-wrap,
+.calendar-card,
+.calendar-container,
 #kalendarz-container{
   width:100%;
   max-width:none;
 }
 #kalendarz{ width:100%; }
 .fc{ font-size:0.95rem; }
+@media (min-width:1200px){
+  .fc{ font-size:1rem; }
+}
+
+/* Dwa panele magazynu obok siebie */
+.warehouse-grid{
+  display:grid;
+  gap:16px;
+  grid-template-columns:1fr 1fr;
+  align-items:start;
+}
+.warehouse-grid > *{ min-width:0; }
+@media (max-width:768px){
+  .warehouse-grid{ grid-template-columns:1fr; }
+}
+
+/* Szeroki kontener aplikacji na desktopie */
+@media (min-width:1200px){
+  .app,
+  .app-shell,
+  .page,
+  .content,
+  .container,
+  main{
+    max-width:1440px;
+    margin-inline:auto;
+    padding-inline:24px;
+  }
+}
+
+/* Usuń wąskie ograniczenia */
+.app,
+.app-shell,
+.page,
+.content,
+.container,
+main{
+  width:100%;
+}
+
+/* Zwiększ bazowe odstępy i czytelność na desktopie */
+@media (min-width:1200px){
+  .card,
+  .metric{ padding:16px 18px; }
+  table.responsive th,
+  table.responsive td{ padding:12px 12px; }
+}
 
