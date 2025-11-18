@@ -109,8 +109,8 @@
         </div>
         <div id="zlecenia" class="tab-content">
             <h2>Zlecenia</h2>
-            <div class="panel-grid">
-                <div class="panel-column">
+            <div class="orders-grid">
+                <div class="side">
                     <div class="orders-layout">
                         <div class="search-section">
                             <div class="form-group">
@@ -122,9 +122,9 @@
                             <p>Przeglądaj aktywne i zakończone zlecenia bez przełączania widoków. Formularz tworzenia znajdziesz teraz w zakładce <strong>Dodaj Zlecenie</strong>.</p>
                         </div>
                     </div>
-                    <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
                 </div>
-                <div class="panel-column">
+                <div class="main">
+                    <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
                     <div class="table-section">
                         <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
                             Zakończone zlecenia <span class="arrow">▼</span>
@@ -135,7 +135,7 @@
                                 <input type="month" id="miesiac-summary">
                                 <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
                             </div>
-                            <div id="summary-container" class="summary-container-subtle summary-total"></div>
+                            <div id="summary-container" class="orders-summary summary-container-subtle summary-total"></div>
                             <div id="ukonczone-zlecenia-lista"></div>
                         </div>
                     </div>
@@ -163,14 +163,14 @@
             <div id="magazyn-summary" class="summary-container-subtle"></div>
             <h2>Magazyn</h2>
             <div class="warehouse-grid">
-                <div class="panel-left">
+                <div class="side">
                     <div class="magazyn-forms">
                         <div class="form-section"><h3>Dodaj produkt</h3><form id="magazyn-form"><div class="form-group"><label for="item-index">Index:</label><input type="text" id="item-index" required></div><div class="form-group"><label for="item-name">Nazwa:</label><input type="text" id="item-name" required></div><div class="form-group"><label for="item-ilosc">Ilość:</label><input type="number" step="1" id="item-ilosc" required inputmode="numeric"></div><div class="form-group"><label for="item-klient">Klient:</label><input type="text" id="item-klient"></div><button type="submit">Dodaj</button></form></div>
                         <div class="form-section"><h3>Masowe dodawanie</h3><form id="bulk-add-form"><div class="form-group"><label for="bulk-klient">Klient:</label><input type="text" id="bulk-klient" required></div><div class="form-group"><label for="bulk-items">Produkty:</label><textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea></div><button type="submit">Dodaj</button></form></div>
                         <div class="form-section"><h3>Zarządzanie Olejami</h3><div class="form-group"><label for="oil-type">Typ Oleju:</label><select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select></div><div class="form-group"><label for="oil-container-size">Pojemnik (L):</label><select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select></div><button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button><hr style="margin-top:1rem; margin-bottom: 1rem;"><h4>Przelicznik</h4><div class="form-group"><label for="converter-litry">Litry:</label><input type="number" step="0.01" id="converter-litry" inputmode="decimal"></div><p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p><hr style="margin-top:1rem; margin-bottom: 1rem;"><div class="form-group"><label for="converter-sztuki">Sztuki:</label><input type="number" step="0.01" id="converter-sztuki" inputmode="decimal"></div><p>Wynik: <strong id="result-litry">0.00 L</strong></p></div>
                     </div>
                 </div>
-                <div class="panel-right">
+                <div class="main">
                     <div class="table-section"><h3>Stan Magazynowy</h3><table id="magazyn-table" class="responsive"><thead><tr><th>Index</th><th>Nazwa</th><th>Ilość (szt.)</th><th>Ilość (Litry)</th><th>Klient</th><th>Akcje</th></tr></thead><tbody id="magazyn-lista"></tbody></table></div>
                 </div>
             </div>
