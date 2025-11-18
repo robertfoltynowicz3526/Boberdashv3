@@ -45,22 +45,6 @@ function initializeApp() {
         } catch (_) { }
         return 0;
     }
-    function renderFH3Bars(host) {
-        if (!host) return;
-        const { y, m } = ymNow();
-        const months = lastMonths(y, m, 3);
-        const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
-        const vals = months.map(({ y, m }) => getFH(y, m));
-        const max = Math.max(...vals, 1);
-        host.innerHTML = `
-      <div class="fh3m">
-        <div class="row"><div><strong>Wyfakturowane – 3 poprzednie mies.</strong></div></div>
-        <div class="bars">
-          ${vals.map((v) => `<div class="bar dim" style="height:${(v / max) * 100}%" title="${v.toFixed(1)} h"></div>`).join('')}
-        </div>
-        <div class="legend"><span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span></div>
-      </div>`;
-    }
     function ymFromMonthInput() {
         const el = document.getElementById('miesiac-summary');
         if (el && el.value) {
@@ -136,6 +120,7 @@ function initializeApp() {
       </div>
     </div>`;
     }
+    const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
     const BAZA_MIESIECZNA_GODZIN = 168;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
@@ -229,7 +214,6 @@ function initializeApp() {
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
-    const fh3mNadKalendarzem = document.getElementById('fh3m-nad-kalendarzem');
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
@@ -397,7 +381,6 @@ function initializeApp() {
     inicjujCiemnyMotyw();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
-    if (fh3mNadKalendarzem) renderFH3Bars(fh3mNadKalendarzem);
 
     const odswiezSelectDebounced = debounce(() => odswiezSelectKlientaDoZlecenia(), 220);
     if (zlecenieKlientFilterInput) {
@@ -425,7 +408,9 @@ function initializeApp() {
             expandRows: true,
             eventContent(arg) {
                 const p = arg.event.extendedProps || {};
-                const client = p.client || arg.event.title || '';
+                const rawTitle = arg.event.title || '';
+                const cleanTitle = stripEwidencjaPrefix(rawTitle);
+                const client = p.client || cleanTitle || '';
                 const model = p.machineModel ? ` • ${p.machineModel}` : '';
                 const fh = p.fh ? `<span class="ev-meta">${Number(p.fh).toFixed(1)}h</span>` : '';
                 const el = document.createElement('div');
@@ -441,8 +426,9 @@ function initializeApp() {
                     el.style.borderColor = map[t];
                     el.style.color = '#fff';
                 }
+                const sanitizedTitle = stripEwidencjaPrefix(event.title || '');
                 el.title = [
-                    event.title,
+                    sanitizedTitle,
                     event.extendedProps?.client && `Klient: ${event.extendedProps.client}`,
                     event.extendedProps?.fh && `Fakturowane: ${event.extendedProps.fh}h`
                 ].filter(Boolean).join(' • ');
@@ -1060,7 +1046,7 @@ function initializeApp() {
 
         const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
-            <tr class="summary-row summary-total total-row">
+            <tr class="summary-row total-row">
                 <td class="label">Razem</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.praca)} h</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
@@ -1104,7 +1090,6 @@ function initializeApp() {
         }
         renderRocznePodsumowanie();
         obliczIPokazPodsumowanieFinansowe();
-        if (fh3mNadKalendarzem) renderFH3Bars(fh3mNadKalendarzem);
     }
 
     function eksportujDoCSV(dane, nazwaPliku) {
