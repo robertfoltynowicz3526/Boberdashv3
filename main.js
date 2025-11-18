@@ -1035,13 +1035,6 @@ function initializeApp() {
 
         zakonczoneSummaryContainer.classList.add('orders-summary');
 
-        if (ordersSummaryControls) {
-            ordersSummaryControls.classList.add('controls');
-            if (ordersSummaryControls.parentElement !== zakonczoneSummaryContainer || zakonczoneSummaryContainer.firstElementChild !== ordersSummaryControls) {
-                zakonczoneSummaryContainer.insertAdjacentElement('afterbegin', ordersSummaryControls);
-            }
-        }
-
         Array.from(zakonczoneSummaryContainer.children)
             .filter(child => child.classList.contains('metrics-grid') || child.classList.contains('chart'))
             .forEach(el => el.remove());
