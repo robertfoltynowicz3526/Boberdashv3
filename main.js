@@ -36,6 +36,7 @@ function initializeApp() {
                 const s = new Date(y, m - 1, 1);
                 const e = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((acc, ev) => {
+                    if (ev.extendedProps?.typ === 'LEAVE') return acc;
                     const fh = +ev.extendedProps?.fh || 0;
                     const st = ev.start;
                     if (st && st >= s && st <= e) acc += fh;
@@ -88,6 +89,7 @@ function initializeApp() {
                 const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
                 const end = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((s, e) => {
+                    if (e.extendedProps?.typ === 'LEAVE') return s;
                     const fh = Number(e.extendedProps?.fh) || 0;
                     const d = e.start;
                     if (d && d >= start && d <= end) s += fh;
@@ -121,6 +123,7 @@ function initializeApp() {
     </div>`;
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
+    const LEAVE_TITLE_MAP = { WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
@@ -151,6 +154,8 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
+    let workEvents = [];
+    let leaveEvents = [];
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
@@ -219,6 +224,10 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const leaveKindSelect = document.getElementById('leave-kind');
+    const leaveFromInput = document.getElementById('leave-from');
+    const leaveToInput = document.getElementById('leave-to');
+    const leaveAddButton = document.getElementById('leave-add');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -417,10 +426,16 @@ function initializeApp() {
                 if (event && typeof event.title === 'string') {
                     event.title = stripEwidencjaPrefix(event.title);
                 }
+                if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
+                    event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
+                }
                 return event;
             },
             eventContent(arg) {
                 const p = arg.event.extendedProps || {};
+                if (p.typ === 'LEAVE') {
+                    return { domNodes: [] };
+                }
                 const rawTitle = arg.event.title || '';
                 const cleanTitle = stripEwidencjaPrefix(rawTitle);
                 const client = stripEwidencjaPrefix(p.client || '') || cleanTitle || rawTitle;
@@ -431,26 +446,32 @@ function initializeApp() {
                 el.innerHTML = `<span class="ev-client">${client}${model}</span>${fh}`;
                 return { domNodes: [el] };
             },
-            eventDidMount({ el, event }) {
-                const t = event.extendedProps?.typ;
+            eventDidMount(info) {
+                const p = info.event.extendedProps || {};
+                if (p.typ === 'LEAVE') {
+                    const k = (p.leaveKind || '').toLowerCase();
+                    if (k) info.el.classList.add(k);
+                    return;
+                }
+                const t = p.typ;
                 const map = { S: '#16a34a', W: '#2563eb', G: '#f59e0b', Z: '#64748b', P: '#94a3b8' };
                 if (map[t]) {
-                    el.style.background = map[t];
-                    el.style.borderColor = map[t];
-                    el.style.color = '#fff';
+                    info.el.style.background = map[t];
+                    info.el.style.borderColor = map[t];
+                    info.el.style.color = '#fff';
                 }
-                const sanitizedTitle = stripEwidencjaPrefix(event.title || '');
-                const sanitizedClient = stripEwidencjaPrefix(event.extendedProps?.client || '');
-                const titleNode = el.querySelector('.fc-event-title');
+                const sanitizedTitle = stripEwidencjaPrefix(info.event.title || '');
+                const sanitizedClient = stripEwidencjaPrefix(info.event.extendedProps?.client || '');
+                const titleNode = info.el.querySelector('.fc-event-title');
                 if (titleNode) {
                     titleNode.textContent = sanitizedTitle;
                 }
-                const listTitleNode = el.querySelector('.fc-list-event-title');
+                const listTitleNode = info.el.querySelector('.fc-list-event-title');
                 if (listTitleNode) {
                     listTitleNode.textContent = sanitizedTitle;
                 }
-                const fhValue = Number(event.extendedProps?.fh);
-                el.title = [
+                const fhValue = Number(info.event.extendedProps?.fh);
+                info.el.title = [
                     sanitizedTitle,
                     sanitizedClient && `Klient: ${sanitizedClient}`,
                     Number.isFinite(fhValue) && fhValue > 0 ? `Fakturowane: ${fhValue.toFixed(1)}h` : null
@@ -460,7 +481,10 @@ function initializeApp() {
                 const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
                 const sum = info.view.calendar.getEvents()
                     .filter(e => e.start && same(e.start, info.date))
-                    .reduce((s, e) => s + (Number(e.extendedProps?.fh) || 0), 0);
+                    .reduce((s, e) => {
+                        if (e.extendedProps?.typ === 'LEAVE') return s;
+                        return s + (Number(e.extendedProps?.fh) || 0);
+                    }, 0);
                 if (sum > 0) {
                     const badge = document.createElement('span');
                     badge.className = 'fc-day-badge';
@@ -709,6 +733,19 @@ function initializeApp() {
         }
     }
 
+    function przerysujZdarzeniaKalendarza(options = {}) {
+        const { skipSummary = false } = options;
+        if (!calendar) return;
+        const combined = [...workEvents, ...leaveEvents];
+        calendar.removeAllEvents();
+        if (combined.length) {
+            calendar.addEventSource(combined);
+        }
+        if (!skipSummary && calendar.view) {
+            obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
+        }
+    }
+
     function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
             if (calendar) calendar.removeAllEvents();
@@ -773,13 +810,83 @@ function initializeApp() {
                     });
                 }
             });
-
-            if (calendar) {
-                calendar.removeAllEvents();
-                calendar.addEventSource(events);
-                obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
-            }
+            workEvents = events;
+            przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
+        });
+    }
+
+    function nasluchujNaUrlopy() {
+        try {
+            onSnapshot(collection(db, 'events'), (snapshot) => {
+                leaveEvents = snapshot.docs.map(docSnap => {
+                    const data = docSnap.data() || {};
+                    const baseProps = data.extendedProps || {};
+                    const rawKind = baseProps.leaveKind || data.leaveKind || '';
+                    const normalizedKind = rawKind ? String(rawKind).toUpperCase() : '';
+                    const typ = baseProps.typ || data.typ;
+                    const isLeave = typ === 'LEAVE' || Boolean(normalizedKind);
+                    if (!isLeave || !data.start || !data.end) return null;
+                    return {
+                        id: docSnap.id,
+                        title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
+                        start: data.start,
+                        end: data.end,
+                        allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
+                        display: data.display || 'background',
+                        extendedProps: {
+                            typ: 'LEAVE',
+                            leaveKind: normalizedKind || ''
+                        }
+                    };
+                }).filter(Boolean);
+                przerysujZdarzeniaKalendarza({ skipSummary: true });
+            });
+        } catch (error) {
+            console.error('Nie udało się pobrać urlopów:', error);
+        }
+    }
+
+    function inicjalizujLeaveBar() {
+        if (!leaveAddButton) return;
+        leaveAddButton.addEventListener('click', async () => {
+            const kind = (leaveKindSelect?.value || '').toUpperCase();
+            const from = leaveFromInput?.value;
+            const to = leaveToInput?.value;
+            if (!kind || !from || !to) {
+                alert('Wybierz typ oraz zakres dat.');
+                return;
+            }
+            const start = new Date(from);
+            const endInc = new Date(to);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(endInc.getTime())) {
+                alert('Niepoprawny zakres dat.');
+                return;
+            }
+            if (endInc < start) {
+                alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
+                return;
+            }
+            endInc.setDate(endInc.getDate() + 1);
+            const leaveDoc = {
+                title: LEAVE_TITLE_MAP[kind] || 'Urlop',
+                start: start.toISOString().slice(0, 10),
+                end: endInc.toISOString().slice(0, 10),
+                allDay: true,
+                display: 'background',
+                extendedProps: { typ: 'LEAVE', leaveKind: kind }
+            };
+            try {
+                await addDoc(collection(db, 'events'), leaveDoc);
+                if (calendar) {
+                    try { calendar.addEvent(leaveDoc); } catch (_) { }
+                }
+                if (leaveFromInput) leaveFromInput.value = '';
+                if (leaveToInput) leaveToInput.value = '';
+            } catch (error) {
+                console.error('Nie udało się dodać urlopu:', error);
+                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
+            }
         });
     }
 
@@ -789,6 +896,9 @@ function initializeApp() {
             return dataWpisu >= start && dataWpisu < end;
         });
         const sumyMies = wpisyZMiesiaca.reduce((acc, wpis) => {
+            if (wpis?.typ === 'LEAVE' || wpis?.extendedProps?.typ === 'LEAVE') {
+                return acc;
+            }
             acc.praca += wpis.praca || 0;
             acc.wyfakturowaneGodziny += wpis.fakturowane || 0;
             acc.nadgodziny += wpis.nadgodziny || 0;
@@ -2867,7 +2977,9 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     inicjalizujKalendarz();
+    inicjalizujLeaveBar();
     wyswietlWpisyKalendarza();
+    nasluchujNaUrlopy();
     nasluchujNaKlientow();
     nasluchujNaMaszyny();
     nasluchujNaZlecenia();
