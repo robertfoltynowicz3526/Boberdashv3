@@ -15,6 +15,52 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+    function ymNow() {
+        const d = new Date();
+        return { y: d.getFullYear(), m: d.getMonth() + 1 };
+    }
+    function lastMonths(y, m, n = 3) {
+        const out = [];
+        for (let i = 1; i <= n; i++) {
+            const d = new Date(y, m - 1 - i, 1);
+            out.push({ y: d.getFullYear(), m: d.getMonth() + 1 });
+        }
+        return out;
+    }
+    function getFH(y, m) {
+        const list = (window.ostatnieZestawienieMiesieczne?.miesiace) || [];
+        const rec = list.find(r => (r.rok === y || r.year === y) && ((r.miesiac === m) || (r.month === m) || (r.mm === m)));
+        if (rec && rec.wyfakturowaneGodziny != null) return Number(rec.wyfakturowaneGodziny) || 0;
+        try {
+            if (window.calendar?.getEvents) {
+                const s = new Date(y, m - 1, 1);
+                const e = new Date(y, m, 0, 23, 59, 59, 999);
+                return window.calendar.getEvents().reduce((acc, ev) => {
+                    const fh = +ev.extendedProps?.fh || 0;
+                    const st = ev.start;
+                    if (st && st >= s && st <= e) acc += fh;
+                    return acc;
+                }, 0);
+            }
+        } catch (_) { }
+        return 0;
+    }
+    function renderFH3Bars(host) {
+        if (!host) return;
+        const { y, m } = ymNow();
+        const months = lastMonths(y, m, 3);
+        const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
+        const vals = months.map(({ y, m }) => getFH(y, m));
+        const max = Math.max(...vals, 1);
+        host.innerHTML = `
+      <div class="fh3m">
+        <div class="row"><div><strong>Wyfakturowane – 3 poprzednie mies.</strong></div></div>
+        <div class="bars">
+          ${vals.map((v) => `<div class="bar dim" style="height:${(v / max) * 100}%" title="${v.toFixed(1)} h"></div>`).join('')}
+        </div>
+        <div class="legend"><span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span></div>
+      </div>`;
+    }
     function ymFromMonthInput() {
         const el = document.getElementById('miesiac-summary');
         if (el && el.value) {
@@ -24,7 +70,7 @@ function initializeApp() {
         const d = new Date();
         return { y: d.getFullYear(), m: d.getMonth() + 1 };
     }
-    function lastMonths(y, m, n = 4) {
+    function lastMonthsInclusive(y, m, n = 4) {
         const out = [];
         for (let i = n - 1; i >= 0; i--) {
             const d = new Date(y, m - 1 - i, 1);
@@ -69,7 +115,7 @@ function initializeApp() {
     }
     function renderFH3M(host, y, m) {
         if (!host) return;
-        const months = lastMonths(y, m, 4);
+        const months = lastMonthsInclusive(y, m, 4);
         const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
         const max = Math.max(...vals, 1);
         const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
@@ -77,7 +123,7 @@ function initializeApp() {
         const avg3 = (vals[0] + vals[1] + vals[2]) / 3;
         const deltaPct = avg3 > 0 ? ((curr - avg3) / avg3) * 100 : 0;
         host.innerHTML = `
-    <div class="fh3m">
+    <div class="fh3m fh3m--trend">
       <div class="row">
         <div><strong>Wyfakturowane – ostatnie 3 mies.</strong></div>
         <div class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</div>
@@ -120,7 +166,6 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
-    let calendarResizeBound = false;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
@@ -184,6 +229,7 @@ function initializeApp() {
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
+    const fh3mNadKalendarzem = document.getElementById('fh3m-nad-kalendarzem');
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
@@ -351,6 +397,7 @@ function initializeApp() {
     inicjujCiemnyMotyw();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
+    if (fh3mNadKalendarzem) renderFH3Bars(fh3mNadKalendarzem);
 
     const odswiezSelectDebounced = debounce(() => odswiezSelectKlientaDoZlecenia(), 220);
     if (zlecenieKlientFilterInput) {
@@ -362,14 +409,6 @@ function initializeApp() {
     const getCalendarHeaderToolbar = () => (isMobileCalendarView()
         ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
         : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' });
-    const handleCalendarResize = () => {
-        if (!calendar) return;
-        const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
-        if (calendar.view?.type !== nextView) {
-            calendar.changeView(nextView);
-        }
-        calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
-    };
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
@@ -384,24 +423,49 @@ function initializeApp() {
             moreLinkClick: 'popover',
             nowIndicator: true,
             expandRows: true,
-            eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-            displayEventEnd: true,
-            eventContent: (arg) => {
-                let eventEl = document.createElement('div');
-                eventEl.innerHTML = `<div>${arg.event.title || ''}</div>`;
-                if (arg.event.extendedProps.type === 'godziny_pracy') {
-                    if (arg.event.extendedProps.notatka) {
-                        eventEl.innerHTML += ` <small title="${arg.event.extendedProps.notatka}">📝</small>`;
-                    }
-                    let actionsEl = document.createElement('div');
-                    actionsEl.classList.add('event-actions');
-                    actionsEl.innerHTML = `
-                        <button type="button" class="btn-edit event-edit-btn" data-date="${arg.event.startStr}">E</button>
-                        <button type="button" class="btn-remove event-delete-btn" data-date="${arg.event.startStr}">X</button>
-                    `;
-                    eventEl.appendChild(actionsEl);
+            eventContent(arg) {
+                const p = arg.event.extendedProps || {};
+                const client = p.client || arg.event.title || '';
+                const model = p.machineModel ? ` • ${p.machineModel}` : '';
+                const fh = p.fh ? `<span class="ev-meta">${Number(p.fh).toFixed(1)}h</span>` : '';
+                const el = document.createElement('div');
+                el.className = 'ev-chip';
+                el.innerHTML = `<span class="ev-client">${client}${model}</span>${fh}`;
+                return { domNodes: [el] };
+            },
+            eventDidMount({ el, event }) {
+                const t = event.extendedProps?.typ;
+                const map = { S: '#16a34a', W: '#2563eb', G: '#f59e0b', Z: '#64748b', P: '#94a3b8' };
+                if (map[t]) {
+                    el.style.background = map[t];
+                    el.style.borderColor = map[t];
+                    el.style.color = '#fff';
                 }
-                return { domNodes: [eventEl] };
+                el.title = [
+                    event.title,
+                    event.extendedProps?.client && `Klient: ${event.extendedProps.client}`,
+                    event.extendedProps?.fh && `Fakturowane: ${event.extendedProps.fh}h`
+                ].filter(Boolean).join(' • ');
+            },
+            dayCellDidMount(info) {
+                const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+                const sum = info.view.calendar.getEvents()
+                    .filter(e => e.start && same(e.start, info.date))
+                    .reduce((s, e) => s + (Number(e.extendedProps?.fh) || 0), 0);
+                if (sum > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'fc-day-badge';
+                    const formatted = Number.isInteger(sum) ? sum : Number(sum.toFixed(1));
+                    badge.textContent = `${formatted}h`;
+                    info.el.querySelector('.fc-daygrid-day-top')?.appendChild(badge);
+                }
+            },
+            windowResize() {
+                try {
+                    const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
+                    calendar.changeView(nextView);
+                    calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
+                } catch (_) { }
             },
             dateClick: (info) => otworzModalGodzin(info.dateStr),
             datesSet: (viewInfo) => {
@@ -411,10 +475,6 @@ function initializeApp() {
         });
         window.calendar = calendar;
         calendar.render();
-        if (!calendarResizeBound) {
-            window.addEventListener('resize', handleCalendarResize, { passive: true });
-            calendarResizeBound = true;
-        }
     }
 
     async function otworzModalGodzin(data) {
@@ -659,29 +719,45 @@ function initializeApp() {
                 wszystkieWpisyKalendarza.push(wpis);
 
                 const linie = [];
-                if (dane.praca > 0) linie.push(`P: ${formatujLiczbe(dane.praca)}h`);
-                if (suma > 0) linie.push(`F: ${formatujLiczbe(suma)}h`);
-                if (dane.nadgodziny > 0) linie.push(`N: ${formatujLiczbe(dane.nadgodziny)}h`);
-                if (dane.jazda > 0) linie.push(`J: ${formatujLiczbe(dane.jazda)}h`);
+                if (dane.praca > 0) linie.push(`Praca: ${formatujLiczbe(dane.praca)}h`);
+                if (dane.nadgodziny > 0) linie.push(`Nadgodziny: ${formatujLiczbe(dane.nadgodziny)}h`);
+                if (dane.jazda > 0) linie.push(`Jazda: ${formatujLiczbe(dane.jazda)}h`);
+                if (!powiazane.length && suma > 0) linie.push(`Fakturowane: ${formatujLiczbe(suma)}h`);
 
-                let className = 'fc-event-godziny';
-                let title = linie.join('<br>');
-                if (powiazane.length > 0) {
-                    const dodatkoweLinie = powiazane
-                        .map(p => `F: ${formatujLiczbe(p.fakturowane)}h — ${p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId)}`)
-                        .join('<br>');
-                    title += `${title ? "<hr style='margin: 2px 0; border-color: rgba(255,255,255,0.5)'>" : ''}${dodatkoweLinie}`;
-                    className = 'fc-event-godziny-zlecenie';
+                if (powiazane.length) {
+                    powiazane.forEach((powiazanie, index) => {
+                        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
+                        const maszyna = zlecenie?.maszynaId ? _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId) : null;
+                        const machineModel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (zlecenie?.maszynaModel || '');
+                        const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
+                        const typZlecenia = zlecenie?.typZlecenia || null;
+                        events.push({
+                            id: `powiazane_${id}_${powiazanie.zlecenieId || 'brak'}_${index}`,
+                            title: klientLabel,
+                            start: id,
+                            allDay: true,
+                            extendedProps: {
+                                client: klientLabel,
+                                machineModel,
+                                fh: Number(powiazanie.fakturowane) || 0,
+                                typ: typZlecenia
+                            }
+                        });
+                    });
                 }
 
-                if (title) {
+                if (linie.length) {
                     events.push({
                         id: `godziny_${id}`,
-                        title: title.trim(),
+                        title: 'Ewidencja dnia',
                         start: id,
                         allDay: true,
-                        classNames: [className],
-                        extendedProps: { notatka: dane.notatka, type: 'godziny_pracy', zleceniaPowiazane: powiazane }
+                        extendedProps: {
+                            client: 'Ewidencja dnia',
+                            machineModel: linie.join(' • '),
+                            fh: (!powiazane.length && suma > 0) ? suma : null,
+                            typ: null
+                        }
                     });
                 }
             });
@@ -984,7 +1060,7 @@ function initializeApp() {
 
         const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
-            <tr class="summary-total total-row">
+            <tr class="summary-row summary-total total-row">
                 <td class="label">Razem</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.praca)} h</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
@@ -1028,7 +1104,8 @@ function initializeApp() {
         }
         renderRocznePodsumowanie();
         obliczIPokazPodsumowanieFinansowe();
-    }   
+        if (fh3mNadKalendarzem) renderFH3Bars(fh3mNadKalendarzem);
+    }
 
     function eksportujDoCSV(dane, nazwaPliku) {
         if (dane.length === 0) { alert("Brak danych do wyeksportowania."); return; }
