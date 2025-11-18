@@ -408,6 +408,11 @@ function initializeApp() {
             moreLinkClick: 'popover',
             nowIndicator: true,
             expandRows: true,
+            windowResize() {
+                try {
+                    calendar.updateSize();
+                } catch (_) { }
+            },
             eventDataTransform(event) {
                 if (event && typeof event.title === 'string') {
                     event.title = stripEwidencjaPrefix(event.title);
