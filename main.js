@@ -43,6 +43,7 @@ function initializeApp() {
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
+    let calendarResizeBound = false;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
@@ -85,10 +86,15 @@ function initializeApp() {
         return Number.isNaN(parsed.getTime()) ? null : parsed;
     };
 
-    const walidujPrzedzialCzasu = (startValue, endValue) => {
+    const walidujPrzedzialCzasu = (startValue, endValue, options = {}) => {
+        const { allowEndBeforeStart = false } = options;
         const startDate = toDateSafe(startValue);
         const endDate = toDateSafe(endValue);
         if (startDate && endDate && startDate > endDate) {
+            if (allowEndBeforeStart) {
+                alert('Zamykasz zlecenie datą wcześniejszą niż dodanie.');
+                return true;
+            }
             alert('Data zakończenia nie może być wcześniejsza niż rozpoczęcie.');
             return false;
         }
@@ -275,15 +281,32 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
+    const isMobileCalendarView = () => window.matchMedia('(max-width: 640px)').matches;
+    const getCalendarHeaderToolbar = () => (isMobileCalendarView()
+        ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
+        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' });
+    const handleCalendarResize = () => {
+        if (!calendar) return;
+        const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
+        if (calendar.view?.type !== nextView) {
+            calendar.changeView(nextView);
+        }
+        calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
+    };
+
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
+        const initialView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
         calendar = new FullCalendar.Calendar(kalendarzContainer, {
-            initialView: 'dayGridMonth',
+            initialView,
             locale: 'pl',
-            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth' },
+            headerToolbar: getCalendarHeaderToolbar(),
+            contentHeight: 'auto',
             dayMaxEventRows: 3,
             moreLinkClick: 'popover',
+            nowIndicator: true,
+            expandRows: true,
             eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
             displayEventEnd: true,
             eventContent: (arg) => {
@@ -304,9 +327,16 @@ function initializeApp() {
                 return { domNodes: [eventEl] };
             },
             dateClick: (info) => otworzModalGodzin(info.dateStr),
-            datesSet: (view) => { obliczSumeGodzinZKalendarza(view.view.currentStart, view.view.currentEnd); }
+            datesSet: (viewInfo) => {
+                const { currentStart, currentEnd } = viewInfo.view;
+                obliczSumeGodzinZKalendarza(currentStart, currentEnd);
+            }
         });
         calendar.render();
+        if (!calendarResizeBound) {
+            window.addEventListener('resize', handleCalendarResize, { passive: true });
+            calendarResizeBound = true;
+        }
     }
 
     async function otworzModalGodzin(data) {
@@ -848,29 +878,29 @@ function initializeApp() {
         }
 
         const wiersze = miesiace.map(rekord => `
-            <tr>
-                <td>${formatujMiesiac(rekord.miesiac)}</td>
-                <td>${formatujLiczbe(rekord.praca)} h</td>
-                <td>${formatujLiczbe(rekord.nadgodziny)} h</td>
-                <td>${formatujLiczbe(rekord.jazda)} h</td>
-                <td>${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
-                <td>${formatujLiczbe(rekord.brutto)} zł</td>
-                <td>${formatujLiczbe(rekord.netto)} zł</td>
-                <td>${fmtPct(rekord.absorpcja)}</td>
+            <tr class="summary-row">
+                <td class="label">${formatujMiesiac(rekord.miesiac)}</td>
+                <td class="num">${formatujLiczbe(rekord.praca)} h</td>
+                <td class="num">${formatujLiczbe(rekord.nadgodziny)} h</td>
+                <td class="num">${formatujLiczbe(rekord.jazda)} h</td>
+                <td class="num">${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
+                <td class="num">${formatujLiczbe(rekord.brutto)} zł</td>
+                <td class="num">${formatujLiczbe(rekord.netto)} zł</td>
+                <td class="num">${fmtPct(rekord.absorpcja)}</td>
             </tr>
         `).join('');
 
         const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
-            <tr class="summary-total">
-                <td>Razem</td>
-                <td>${formatujLiczbe(sumyRoczne.praca)} h</td>
-                <td>${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
-                <td>${formatujLiczbe(sumyRoczne.jazda)} h</td>
-                <td>${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
-                <td>${formatujLiczbe(sumyRoczne.brutto)} zł</td>
-                <td>${formatujLiczbe(sumyRoczne.netto)} zł</td>
-                <td>${fmtPct(sumaAbsorpcja)}</td>
+            <tr class="summary-total total-row">
+                <td class="label">Razem</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.praca)} h</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.jazda)} h</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.brutto)} zł</td>
+                <td class="num">${formatujLiczbe(sumyRoczne.netto)} zł</td>
+                <td class="num">${fmtPct(sumaAbsorpcja)}</td>
             </tr>`;
 
         annualSummaryContainer.innerHTML = `
@@ -2254,7 +2284,7 @@ async function obslugaZakonczeniaZlecenia(event) {
             return;
         }
         const startAtDate = toDateSafe(zlecenieStartSnap.data().startAt);
-        if (!walidujPrzedzialCzasu(startAtDate, manualEndAt)) {
+        if (!walidujPrzedzialCzasu(startAtDate, manualEndAt, { allowEndBeforeStart: true })) {
             return;
         }
     } catch (error) {
@@ -2264,12 +2294,13 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     const fallbackEndAtDate = manualEndAt || new Date();
+    const endAtValue = manualEndAt || serverTimestamp();
     const dane = {
         status: 'ukończone',
         wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
         typZlecenia: document.getElementById('typ-zlecenia').value,
         dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
-        endAt: manualEndAt || serverTimestamp(),
+        endAt: endAtValue,
         uzyteCzesci: czesciDoZlecenia,
         zakonczenieNotatka: notatka || null,
         zakonczenieNumerWZ: numerWzValue || null
@@ -2487,8 +2518,9 @@ async function obslugaZakonczeniaZlecenia(event) {
         if (!magazynLista) return;
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
             let html = '';
+            const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="6">Magazyn pusty.</td></tr>';
             wszystkieProdukty = [];
-            if (snapshot.empty) { magazynLista.innerHTML = '<tr><td colspan="6">Magazyn pusty.</td></tr>'; return; }
+            if (snapshot.empty) { magazynLista.innerHTML = emptyRowHtml; return; }
             snapshot.forEach((docSnap) => {
                 const produkt = docSnap.data();
                 produkt.id = docSnap.id;
@@ -2503,19 +2535,19 @@ async function obslugaZakonczeniaZlecenia(event) {
                 const datasetQty = produkt.ilosc;               
                 wszystkieProdukty.push(produkt);
                 html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
-                    <td>${produkt.index}</td>
-                    <td>${produkt.nazwa}</td>
-                    <td>${iloscFormatowana} szt.</td>
-                    <td>${iloscWLitrach}</td>
-                    <td>${produkt.klient}</td>
-                    <td>
+                    <td data-label="Index">${produkt.index}</td>
+                    <td data-label="Nazwa">${produkt.nazwa}</td>
+                    <td data-label="Ilość (szt.)">${iloscFormatowana} szt.</td>
+                    <td data-label="Ilość (Litry)">${iloscWLitrach}</td>
+                    <td data-label="Klient">${produkt.klient}</td>
+                    <td data-label="Akcje">
                         <button class="add-stock-btn">Dodaj</button>
                         <button class="remove-stock-btn">Zdejmij</button>
                         <button class="delete-btn">Usuń</button>
                     </td>
                 </tr>`;
             });
-            magazynLista.innerHTML = html || '<tr><td colspan="6">Magazyn pusty.</td></tr>';
+            magazynLista.innerHTML = html || emptyRowHtml;
             renderMagazynWModalu();
         });
     }

@@ -437,6 +437,16 @@ table tbody tr:hover {
   margin-bottom: 1rem;
 }
 
+.form-grid,
+.form-grid-2 {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
 label {
   font-size: 0.95rem;
   font-weight: 600;
@@ -720,6 +730,19 @@ select {
   box-shadow: 0 30px 60px -28px rgba(15, 23, 42, 0.55);
 }
 
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
 .modal-content-large {
   width: min(900px, 92%);
 }
@@ -825,6 +848,7 @@ select {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
+  table-layout: fixed;
 }
 
 .summary-table thead {
@@ -834,8 +858,17 @@ select {
 
 .summary-table th,
 .summary-table td {
-  padding: 0.75rem;
+  padding: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.label {
+  text-align: left;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .summary-table tfoot {
@@ -1363,6 +1396,11 @@ body[data-theme="dark"] .client-group strong {
   position: relative;
 }
 
+.summary-total.total-row {
+  margin-left: 0 !important;
+  padding-left: 8px !important;
+}
+
 .summary-total strong,
 .summary-total em,
 .summary-total .label,
@@ -1406,4 +1444,131 @@ body[data-theme="dark"] table .summary-total td {
   background: var(--jd-yellow);
   border-top-left-radius: 12px;
   border-bottom-left-radius: 12px;
+}
+
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+  }
+  header {
+    width: 100%;
+    min-height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  main {
+    padding: 1.5rem 1rem 4rem;
+  }
+  .sidebar-nav {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  table.responsive {
+    display: block;
+    border: 0;
+  }
+  table.responsive thead {
+    display: none;
+  }
+  table.responsive tbody {
+    display: grid;
+    gap: 8px;
+  }
+  table.responsive tr {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+    border-radius: 12px;
+    background: var(--card-bg, rgba(255, 255, 255, 0.03));
+  }
+  table.responsive td {
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    gap: 6px;
+  }
+  table.responsive td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    opacity: 0.8;
+  }
+}
+
+@media (max-width: 640px) {
+  header {
+    padding-bottom: 56px;
+  }
+  .tabs-row {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    display: grid;
+    grid-auto-flow: column;
+    gap: 6px;
+    padding: 8px env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    background: var(--header-bg, rgba(22, 27, 34, 0.9));
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
+  .tab-button {
+    min-height: 44px;
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 13px;
+    scroll-snap-align: start;
+    text-align: center;
+  }
+  main {
+    padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .form-row,
+  .form-group {
+    display: grid;
+    gap: 6px;
+  }
+  input,
+  select,
+  textarea,
+  button {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .modal .modal-content {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    border-radius: 0;
+    margin: 0;
+    inset: 0;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+  .modal .modal-body {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .modal .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: inherit;
+    padding: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .modal .button,
+  .modal button {
+    min-height: 44px;
+  }
 }
