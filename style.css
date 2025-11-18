@@ -311,27 +311,7 @@ main {
   display: grid;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
-}
-
-@media (min-width: 992px) {
-  .orders-layout {
-    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
-    align-items: stretch;
-  }
-}
-
-.orders-hint {
-  background: var(--bg-muted);
-  border-radius: 16px;
-  padding: 1.25rem 1.35rem;
-  border: 1px dashed var(--border-strong);
-  color: var(--text-color);
-  box-shadow: var(--shadow-sm);
-}
-
-.orders-hint p {
-  margin: 0;
-  font-size: 0.95rem;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .orders-tip {
