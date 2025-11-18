@@ -233,6 +233,7 @@ function initializeApp() {
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
+    const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
     const annualSummaryContainer = document.getElementById('annual-summary');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
@@ -411,7 +412,7 @@ function initializeApp() {
                 const p = arg.event.extendedProps || {};
                 const rawTitle = arg.event.title || '';
                 const cleanTitle = stripEwidencjaPrefix(rawTitle);
-                const client = p.client || cleanTitle || '';
+                const client = stripEwidencjaPrefix(p.client || '') || cleanTitle || rawTitle;
                 const model = p.machineModel ? ` • ${p.machineModel}` : '';
                 const fh = p.fh ? `<span class="ev-meta">${Number(p.fh).toFixed(1)}h</span>` : '';
                 const el = document.createElement('div');
@@ -428,14 +429,20 @@ function initializeApp() {
                     el.style.color = '#fff';
                 }
                 const sanitizedTitle = stripEwidencjaPrefix(event.title || '');
+                const sanitizedClient = stripEwidencjaPrefix(event.extendedProps?.client || '');
                 const titleNode = el.querySelector('.fc-event-title');
                 if (titleNode) {
                     titleNode.textContent = sanitizedTitle;
                 }
+                const listTitleNode = el.querySelector('.fc-list-event-title');
+                if (listTitleNode) {
+                    listTitleNode.textContent = sanitizedTitle;
+                }
+                const fhValue = Number(event.extendedProps?.fh);
                 el.title = [
                     sanitizedTitle,
-                    event.extendedProps?.client && `Klient: ${event.extendedProps.client}`,
-                    event.extendedProps?.fh && `Fakturowane: ${event.extendedProps.fh}h`
+                    sanitizedClient && `Klient: ${sanitizedClient}`,
+                    Number.isFinite(fhValue) && fhValue > 0 ? `Fakturowane: ${fhValue.toFixed(1)}h` : null
                 ].filter(Boolean).join(' • ');
             },
             dayCellDidMount(info) {
@@ -453,6 +460,7 @@ function initializeApp() {
             },
             windowResize() {
                 try {
+                    calendar.updateSize();
                     const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
                     calendar.changeView(nextView);
                     calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
@@ -1007,25 +1015,44 @@ function initializeApp() {
     function obliczIPokazPodsumowanieFinansowe() {
         const wybranyMiesiac = getSelectedMonth();
         const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
-        if (zakonczoneSummaryContainer) {
-            const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
-            const absorpcja = obliczAbsorpcja(sumaGodzin);
-            const leftHTML = `
-  <div class="metric"><div class="label">Godziny wyfakturowane</div><div class="value num">${(sumaGodzin || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Wartość brutto</div><div class="value num">${(sumaBrutto || 0).toFixed(2)} zł</div></div>
-  <div class="metric"><div class="label">Wartość netto</div><div class="value num">${(sumaNetto || 0).toFixed(2)} zł</div></div>
-  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(absorpcja)}</div></div>
-`;
-            zakonczoneSummaryContainer.innerHTML = `
-  <div class="metrics-row">
-    <div class="metrics-left"><div class="metrics-grid" style="grid-template-columns:repeat(4,minmax(140px,1fr));">${leftHTML}</div></div>
-    <div class="metrics-right"><div id="fh3m-zlecenia"></div></div>
-  </div>`;
-            const { y, m } = ymFromMonthInput();
-            renderFH3M(document.getElementById('fh3m-zlecenia'), y, m);
+        if (!zakonczoneSummaryContainer) return;
+
+        const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
+        const absorpcja = obliczAbsorpcja(sumaGodzin);
+
+        zakonczoneSummaryContainer.classList.add('orders-summary');
+
+        if (ordersSummaryControls) {
+            ordersSummaryControls.classList.add('controls');
+            if (ordersSummaryControls.parentElement !== zakonczoneSummaryContainer || zakonczoneSummaryContainer.firstElementChild !== ordersSummaryControls) {
+                zakonczoneSummaryContainer.insertAdjacentElement('afterbegin', ordersSummaryControls);
+            }
         }
 
+        Array.from(zakonczoneSummaryContainer.children)
+            .filter(child => child.classList.contains('metrics-grid') || child.classList.contains('chart'))
+            .forEach(el => el.remove());
 
+        const metricsGrid = document.createElement('div');
+        metricsGrid.className = 'metrics-grid';
+        metricsGrid.innerHTML = `
+    <div class="metric"><div class="label">Godziny wyfakturowane</div><div class="value num">${(sumaGodzin || 0).toFixed(1)} h</div></div>
+    <div class="metric"><div class="label">Wartość brutto</div><div class="value num">${(sumaBrutto || 0).toFixed(2)} zł</div></div>
+    <div class="metric"><div class="label">Wartość netto</div><div class="value num">${(sumaNetto || 0).toFixed(2)} zł</div></div>
+    <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(absorpcja)}</div></div>
+  `;
+
+        const chart = document.createElement('div');
+        chart.className = 'chart';
+        chart.innerHTML = `
+    <h4>Wyfakturowane — ostatnie 3 mies.</h4>
+    <div id="fh3m-zlecenia"></div>
+  `;
+
+        zakonczoneSummaryContainer.append(metricsGrid, chart);
+
+        const { y, m } = typeof ymFromMonthInput === 'function' ? ymFromMonthInput() : ymNow();
+        renderFH3M(document.getElementById('fh3m-zlecenia'), y, m);
     }
 
     function renderRocznePodsumowanie() {
