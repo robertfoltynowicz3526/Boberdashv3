@@ -401,6 +401,7 @@ function initializeApp() {
             initialView,
             locale: 'pl',
             headerToolbar: getCalendarHeaderToolbar(),
+            height: 'auto',
             contentHeight: 'auto',
             dayMaxEventRows: 3,
             moreLinkClick: 'popover',
@@ -427,6 +428,10 @@ function initializeApp() {
                     el.style.color = '#fff';
                 }
                 const sanitizedTitle = stripEwidencjaPrefix(event.title || '');
+                const titleNode = el.querySelector('.fc-event-title');
+                if (titleNode) {
+                    titleNode.textContent = sanitizedTitle;
+                }
                 el.title = [
                     sanitizedTitle,
                     event.extendedProps?.client && `Klient: ${event.extendedProps.client}`,
@@ -1046,7 +1051,7 @@ function initializeApp() {
 
         const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
         const suma = `
-            <tr class="summary-row total-row">
+            <tr class="summary-row total total-row">
                 <td class="label">Razem</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.praca)} h</td>
                 <td class="num">${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>

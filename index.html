@@ -45,84 +45,100 @@
         </div>
         <div id="klienci" class="tab-content">
             <h2>Baza Klientów</h2>
-            <div class="form-section">
-                <h3>Dodaj nowego klienta</h3>
-                <form id="klient-form">
-                    <div class="form-group"><label for="klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="klient-nazwa" required></div>
-                    <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
-                    <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
-                    <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon" inputmode="tel"></div>
-                    <button type="submit">Dodaj Klienta</button>
-                </form>
-            </div>
-            <div class="search-section">
-                <div class="form-group">
-                    <label for="klient-search-input">Wyszukaj klienta</label>
-                    <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres...">
+            <div class="section-grid">
+                <div class="side">
+                    <div class="form-section">
+                        <h3>Dodaj nowego klienta</h3>
+                        <form id="klient-form">
+                            <div class="form-group"><label for="klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="klient-nazwa" required></div>
+                            <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
+                            <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
+                            <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon" inputmode="tel"></div>
+                            <button type="submit">Dodaj Klienta</button>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            <div class="table-section">
-                <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
-                <div id="lista-klientow-content" class="collapsible-content">
-                    <div id="lista-klientow"></div>
+                <div class="main">
+                    <div class="search-section">
+                        <div class="form-group">
+                            <label for="klient-search-input">Wyszukaj klienta</label>
+                            <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres...">
+                        </div>
+                    </div>
+                    <div class="table-section">
+                        <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
+                        <div id="lista-klientow-content" class="collapsible-content">
+                            <div id="lista-klientow"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         <div id="maszyny" class="tab-content">
             <h2>Baza Maszyn</h2>
-            <div class="form-section">
-                <h3>Dodaj nową maszynę</h3>
-                <form id="maszyna-form">
-                    <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
-                    <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
-                    <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
-                    <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
-                    <div class="form-group"><label for="maszyna-rok">Rok produkcji:</label><input type="number" id="maszyna-rok" inputmode="numeric"></div>
-                    <div class="form-group"><label for="maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="maszyna-mth" inputmode="decimal"></div>
-                    <button type="submit">Dodaj Maszynę</button>
-                </form>
-            </div>
-            <div class="search-section">
-                <div class="form-group">
-                    <label for="maszyna-search-input">Wyszukaj maszynę</label>
-                    <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta...">
+            <div class="section-grid">
+                <div class="side">
+                    <div class="form-section">
+                        <h3>Dodaj nową maszynę</h3>
+                        <form id="maszyna-form">
+                            <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
+                            <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
+                            <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
+                            <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
+                            <div class="form-group"><label for="maszyna-rok">Rok produkcji:</label><input type="number" id="maszyna-rok" inputmode="numeric"></div>
+                            <div class="form-group"><label for="maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="maszyna-mth" inputmode="decimal"></div>
+                            <button type="submit">Dodaj Maszynę</button>
+                        </form>
+                    </div>
                 </div>
-            </div>
-            <div class="table-section">
-                <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
-                <div id="lista-maszyn-content" class="collapsible-content">
-                    <div id="lista-maszyn"></div>
+                <div class="main">
+                    <div class="search-section">
+                        <div class="form-group">
+                            <label for="maszyna-search-input">Wyszukaj maszynę</label>
+                            <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta...">
+                        </div>
+                    </div>
+                    <div class="table-section">
+                        <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
+                        <div id="lista-maszyn-content" class="collapsible-content">
+                            <div id="lista-maszyn"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         <div id="zlecenia" class="tab-content">
             <h2>Zlecenia</h2>
-            <div class="orders-layout">
-                <div class="search-section">
-                    <div class="form-group">
-                        <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
-                        <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
+            <div class="panel-grid">
+                <div class="panel-column">
+                    <div class="orders-layout">
+                        <div class="search-section">
+                            <div class="form-group">
+                                <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
+                                <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
+                            </div>
+                        </div>
+                        <div class="orders-hint">
+                            <p>Przeglądaj aktywne i zakończone zlecenia bez przełączania widoków. Formularz tworzenia znajdziesz teraz w zakładce <strong>Dodaj Zlecenie</strong>.</p>
+                        </div>
                     </div>
+                    <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
                 </div>
-                <div class="orders-hint">
-                    <p>Przeglądaj aktywne i zakończone zlecenia bez przełączania widoków. Formularz tworzenia znajdziesz teraz w zakładce <strong>Dodaj Zlecenie</strong>.</p>
-                </div>
-            </div>
-            <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div><hr>
-            <div class="table-section">
-                <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
-                    Zakończone zlecenia <span class="arrow">▼</span>
-                </h3>
-
-
-                <div id="zakonczone-zlecenia-content" class="collapsible-content">
-                    <div class="summary-controls">
-                        <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
-                        <input type="month" id="miesiac-summary">
-                        <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
+                <div class="panel-column">
+                    <div class="table-section">
+                        <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
+                            Zakończone zlecenia <span class="arrow">▼</span>
+                        </h3>
+                        <div id="zakonczone-zlecenia-content" class="collapsible-content">
+                            <div class="summary-controls">
+                                <label for="miesiac-summary">Podsumowanie dla miesiąca:</label>
+                                <input type="month" id="miesiac-summary">
+                                <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
+                            </div>
+                            <div id="summary-container" class="summary-container-subtle summary-total"></div>
+                            <div id="ukonczone-zlecenia-lista"></div>
+                        </div>
                     </div>
-                    <div id="summary-container" class="summary-container-subtle summary-total"></div>
-                    <div id="ukonczone-zlecenia-lista"></div>
                 </div>
             </div>
         </div>
@@ -146,12 +162,18 @@
         <div id="magazyn" class="tab-content">
             <div id="magazyn-summary" class="summary-container-subtle"></div>
             <h2>Magazyn</h2>
-            <div class="magazyn-forms">
-            <div class="form-section"><h3>Dodaj produkt</h3><form id="magazyn-form"><div class="form-group"><label for="item-index">Index:</label><input type="text" id="item-index" required></div><div class="form-group"><label for="item-name">Nazwa:</label><input type="text" id="item-name" required></div><div class="form-group"><label for="item-ilosc">Ilość:</label><input type="number" step="1" id="item-ilosc" required inputmode="numeric"></div><div class="form-group"><label for="item-klient">Klient:</label><input type="text" id="item-klient"></div><button type="submit">Dodaj</button></form></div>
-                <div class="form-section"><h3>Masowe dodawanie</h3><form id="bulk-add-form"><div class="form-group"><label for="bulk-klient">Klient:</label><input type="text" id="bulk-klient" required></div><div class="form-group"><label for="bulk-items">Produkty:</label><textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea></div><button type="submit">Dodaj</button></form></div>
-                <div class="form-section"><h3>Zarządzanie Olejami</h3><div class="form-group"><label for="oil-type">Typ Oleju:</label><select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select></div><div class="form-group"><label for="oil-container-size">Pojemnik (L):</label><select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select></div><button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button><hr style="margin-top:1rem; margin-bottom: 1rem;"><h4>Przelicznik</h4><div class="form-group"><label for="converter-litry">Litry:</label><input type="number" step="0.01" id="converter-litry" inputmode="decimal"></div><p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p><hr style="margin-top:1rem; margin-bottom: 1rem;"><div class="form-group"><label for="converter-sztuki">Sztuki:</label><input type="number" step="0.01" id="converter-sztuki" inputmode="decimal"></div><p>Wynik: <strong id="result-litry">0.00 L</strong></p></div>
+            <div class="panel-grid">
+                <div class="panel-column">
+                    <div class="magazyn-forms">
+                        <div class="form-section"><h3>Dodaj produkt</h3><form id="magazyn-form"><div class="form-group"><label for="item-index">Index:</label><input type="text" id="item-index" required></div><div class="form-group"><label for="item-name">Nazwa:</label><input type="text" id="item-name" required></div><div class="form-group"><label for="item-ilosc">Ilość:</label><input type="number" step="1" id="item-ilosc" required inputmode="numeric"></div><div class="form-group"><label for="item-klient">Klient:</label><input type="text" id="item-klient"></div><button type="submit">Dodaj</button></form></div>
+                        <div class="form-section"><h3>Masowe dodawanie</h3><form id="bulk-add-form"><div class="form-group"><label for="bulk-klient">Klient:</label><input type="text" id="bulk-klient" required></div><div class="form-group"><label for="bulk-items">Produkty:</label><textarea id="bulk-items" rows="5" placeholder="Index;Nazwa;Ilość" required></textarea></div><button type="submit">Dodaj</button></form></div>
+                        <div class="form-section"><h3>Zarządzanie Olejami</h3><div class="form-group"><label for="oil-type">Typ Oleju:</label><select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select></div><div class="form-group"><label for="oil-container-size">Pojemnik (L):</label><select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select></div><button type="button" id="add-oil-btn" class="btn-add">Dodaj Olej</button><hr style="margin-top:1rem; margin-bottom: 1rem;"><h4>Przelicznik</h4><div class="form-group"><label for="converter-litry">Litry:</label><input type="number" step="0.01" id="converter-litry" inputmode="decimal"></div><p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p><hr style="margin-top:1rem; margin-bottom: 1rem;"><div class="form-group"><label for="converter-sztuki">Sztuki:</label><input type="number" step="0.01" id="converter-sztuki" inputmode="decimal"></div><p>Wynik: <strong id="result-litry">0.00 L</strong></p></div>
+                    </div>
+                </div>
+                <div class="panel-column">
+                    <div class="table-section"><h3>Stan Magazynowy</h3><table id="magazyn-table" class="responsive"><thead><tr><th>Index</th><th>Nazwa</th><th>Ilość (szt.)</th><th>Ilość (Litry)</th><th>Klient</th><th>Akcje</th></tr></thead><tbody id="magazyn-lista"></tbody></table></div>
+                </div>
             </div>
-            <div class="table-section"><h3>Stan Magazynowy</h3><table id="magazyn-table" class="responsive"><thead><tr><th>Index</th><th>Nazwa</th><th>Ilość (szt.)</th><th>Ilość (Litry)</th><th>Klient</th><th>Akcje</th></tr></thead><tbody id="magazyn-lista"></tbody></table></div>
         </div>
         <div id="podsumowanie" class="tab-content">
             <h2>Podsumowanie Roczne</h2>
