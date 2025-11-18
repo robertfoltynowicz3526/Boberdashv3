@@ -408,6 +408,12 @@ function initializeApp() {
             moreLinkClick: 'popover',
             nowIndicator: true,
             expandRows: true,
+            eventDataTransform(event) {
+                if (event && typeof event.title === 'string') {
+                    event.title = stripEwidencjaPrefix(event.title);
+                }
+                return event;
+            },
             eventContent(arg) {
                 const p = arg.event.extendedProps || {};
                 const rawTitle = arg.event.title || '';
@@ -461,6 +467,8 @@ function initializeApp() {
             windowResize() {
                 try {
                     calendar.updateSize();
+                } catch (_) { }
+                try {
                     const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
                     calendar.changeView(nextView);
                     calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
