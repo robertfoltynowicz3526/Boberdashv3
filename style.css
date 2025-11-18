@@ -1718,3 +1718,56 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   background:transparent;
   color:inherit;
 }
+
+/* Sekcja "Zakończone zlecenia" jako czysty grid */
+.orders-summary{
+  display:grid;
+  grid-template-rows:auto auto;
+  gap:14px;
+  position:relative;
+}
+.orders-summary .controls{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+}
+.orders-summary .metrics-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(160px,1fr));
+  gap:12px;
+}
+.orders-summary .metric{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  padding:12px 14px;
+  min-height:72px;
+}
+.orders-summary .metric .label{ font-size:.85rem; opacity:.8; }
+.orders-summary .metric .value{ font-size:1.25rem; font-weight:700; }
+.orders-summary .chart{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  padding:10px 12px;
+  z-index:0;
+}
+.orders-summary .chart .fh3m{ margin-top:0; }
+.orders-summary .chart h4{
+  margin:0 0 8px 0;
+  font-size:.95rem;
+  opacity:.9;
+}
+@media (max-width:900px){
+  .orders-summary .metrics-grid{ grid-template-columns:1fr 1fr; }
+}
+
+.section-calendar,
+.calendar-wrap,
+#kalendarz-container{
+  width:100%;
+  max-width:none;
+}
+#kalendarz{ width:100%; }
+
