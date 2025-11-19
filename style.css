@@ -39,8 +39,11 @@
   --calendar-event-bg: linear-gradient(135deg, rgba(31, 111, 38, 0.95), rgba(12, 56, 17, 0.95));
   --calendar-event-text: #f6ffe2;
   --modal-backdrop: rgba(5, 8, 5, 0.92);
-  --chip-bg: rgba(255, 212, 48, 0.15);
+  --chip-bg: rgba(255, 255, 255, 0.08);
+  --chip-border: rgba(255, 255, 255, 0.18);
   --chip-text: #1b2601;
+  --text-strong: #f2f7ff;
+  --text-mid: #d6e0ea;
 }
 
 body[data-theme="dark"] {
@@ -71,8 +74,11 @@ body[data-theme="dark"] {
   --calendar-event-bg: linear-gradient(135deg, rgba(12, 56, 17, 0.95), rgba(4, 20, 6, 0.95));
   --calendar-event-text: #f9ffe8;
   --modal-backdrop: rgba(3, 7, 3, 0.94);
-  --chip-bg: rgba(255, 222, 0, 0.2);
+  --chip-bg: rgba(255, 255, 255, 0.08);
+  --chip-border: rgba(255, 255, 255, 0.25);
   --chip-text: #1b2601;
+  --text-strong: #f4f9ff;
+  --text-mid: #dfe7f2;
 }
 
 * {
@@ -305,6 +311,18 @@ main {
   margin: 0 0 1.25rem;
   font-size: clamp(1.3rem, 2vw + 0.1rem, 1.6rem);
   color: var(--text-color);
+}
+
+.metric .value,
+.card .value,
+.kasa .value {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.metric .label,
+.card .label {
+  color: var(--text-mid);
 }
 
 .orders-layout {
@@ -1606,11 +1624,27 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 .leave-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .leave-legend{display:flex;gap:8px;margin:6px 0 12px}
-.chip.leave{padding:4px 8px;border-radius:9999px;border:1px solid rgba(255,255,255,.15);font-size:.85rem}
+.chip.leave{padding:4px 8px;border-radius:9999px;border:1px solid var(--chip-border);font-size:.85rem}
 .chip.leave.wolne {background:#0d402e;color:#8ff0c6}
 .chip.leave.l4    {background:#40220d;color:#ffd5a8}
 .chip.leave.swieto{background:#30343a;color:#d7dde5}
-.fc .fc-bg-event { opacity:.30; }
+.fc .leave-badge{
+  position:absolute;
+  top:4px;
+  right:4px;
+  z-index:5;
+  font-size:14px;
+  line-height:1;
+  background:rgba(0,0,0,0.35);
+  color:#fff;
+  border-radius:8px;
+  padding:2px 6px;
+  backdrop-filter:blur(2px);
+}
+.fc .leave-badge.wolne{ background:rgba(22,163,74,0.35); }
+.fc .leave-badge.l4{ background:rgba(217,119,6,0.35); }
+.fc .leave-badge.swieto{ background:rgba(100,116,139,0.35); }
+.fc .fc-bg-event { opacity:.28; }
 .fc .fc-bg-event.wolne  { background:#16a34a !important; }
 .fc .fc-bg-event.l4     { background:#d97706 !important; }
 .fc .fc-bg-event.swieto { background:#64748b !important; }
@@ -1732,17 +1766,74 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   .orders-summary .metrics-grid{ grid-template-columns:1fr 1fr; }
 }
 
+.orders-active .btn-szczegoly,
+.orders-finished .btn-szczegoly{
+  background:#ffd100;
+  color:#0b0f14;
+  border:1px solid rgba(0,0,0,0.2);
+}
+
+.orders-active .complete-btn,
+.orders-finished .complete-btn{
+  background:#2ecc71;
+  color:#0b0f14;
+  border:1px solid rgba(0,0,0,0.25);
+}
+
+.orders-active .delete-btn,
+.orders-finished .delete-btn{
+  background:#2a3b2b;
+  color:#e8f1f7;
+  border:1px solid rgba(255,255,255,0.25);
+}
+
+.orders-active .btn-szczegoly:hover,
+.orders-finished .btn-szczegoly:hover,
+.orders-active .complete-btn:hover,
+.orders-finished .complete-btn:hover,
+.orders-active .delete-btn:hover,
+.orders-finished .delete-btn:hover{
+  filter:brightness(0.97);
+}
+
+.orders-page{
+  max-width:1200px;
+  margin:0 auto;
+  width:100%;
+  padding-inline:16px;
+}
+
 .orders-grid{
   display:grid;
   gap:16px;
-  grid-template-columns:360px 1fr;
+  grid-template-columns:minmax(0, 1fr);
   align-items:start;
 }
-.orders-grid .side{ position:sticky; top:84px; align-self:start; }
+.orders-grid .side{ position:static; }
 .orders-grid .main{ min-width:0; display:flex; flex-direction:column; gap:16px; }
 @media (max-width:768px){
   .orders-grid{ grid-template-columns:1fr; }
-  .orders-grid .side{ position:static; }
+}
+
+.orders-active,
+.orders-finished{
+  width:100%;
+  display:block;
+}
+
+.orders-active,
+.orders-finished,
+.orders-finished .list{
+  overflow:visible;
+}
+
+.orders-search-mid{
+  width:100%;
+  margin:18px 0 12px;
+}
+
+#orders-search{
+  width:100%;
 }
 
 .section-calendar,
@@ -1868,7 +1959,3 @@ main,
   cursor: pointer;
 }
 
-.fc .fc-bg-event{ opacity: .30; }
-.fc .fc-bg-event.wolne{ background: #16a34a !important; }
-.fc .fc-bg-event.l4{ background: #d97706 !important; }
-.fc .fc-bg-event.swieto{ background: #64748b !important; }

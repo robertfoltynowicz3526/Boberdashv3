@@ -123,12 +123,12 @@
                 </div>
             </div>
         </div>
-        <div id="zlecenia" class="tab-content">
+        <div id="zlecenia" class="tab-content orders-page">
             <h2>Zlecenia</h2>
             <div class="orders-grid">
                 <div class="side">
                     <div class="orders-layout">
-                        <div class="search-section">
+                        <div class="search-section" id="orders-search">
                             <div class="form-group">
                                 <label for="zlecenie-search-input">Wyszukaj zlecenie (po nr, kliencie, maszynie)</label>
                                 <input type="search" id="zlecenie-search-input" placeholder="Wpisz frazę...">
@@ -137,8 +137,8 @@
                     </div>
                 </div>
                 <div class="main">
-                    <div class="table-section"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
-                    <div class="table-section">
+                    <div class="table-section orders-active"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
+                    <div class="table-section orders-finished">
                         <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
                             Zakończone zlecenia <span class="arrow">▼</span>
                         </h3>

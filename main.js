@@ -15,6 +15,7 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+    const fhOf = (event) => (event?.extendedProps?.typ === 'LEAVE') ? 0 : Number(event?.extendedProps?.fh || 0);
     function ymNow() {
         const d = new Date();
         return { y: d.getFullYear(), m: d.getMonth() + 1 };
@@ -36,10 +37,8 @@ function initializeApp() {
                 const s = new Date(y, m - 1, 1);
                 const e = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((acc, ev) => {
-                    if (ev.extendedProps?.typ === 'LEAVE') return acc;
-                    const fh = +ev.extendedProps?.fh || 0;
                     const st = ev.start;
-                    if (st && st >= s && st <= e) acc += fh;
+                    if (st && st >= s && st <= e) acc += fhOf(ev);
                     return acc;
                 }, 0);
             }
@@ -89,10 +88,8 @@ function initializeApp() {
                 const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
                 const end = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((s, e) => {
-                    if (e.extendedProps?.typ === 'LEAVE') return s;
-                    const fh = Number(e.extendedProps?.fh) || 0;
                     const d = e.start;
-                    if (d && d >= start && d <= end) s += fh;
+                    if (d && d >= start && d <= end) s += fhOf(e);
                     return s;
                 }, 0);
             }
@@ -124,6 +121,7 @@ function initializeApp() {
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
     const LEAVE_TITLE_MAP = { WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
+    const LEAVE_ICON = { WOLNE: '🌿', L4: '🩺', SWIETO: '🏳️' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     const ONE_DAY_MS = 86400000;
     const LEAVE_KIND_OPTIONS = [
@@ -331,6 +329,52 @@ function initializeApp() {
         return `${dateLabel} • ${daysLabel}`;
     };
 
+    function addLeaveBadgeToCell(info) {
+        if (!info?.event) return;
+        const baseCell = info.el?.closest?.('.fc-daygrid-day') || info.cellEl;
+        if (!baseCell) return;
+        const rawKind = info.event.extendedProps?.leaveKind || '';
+        const icon = LEAVE_ICON[rawKind.toUpperCase()] || '';
+        if (!icon) return;
+        baseCell.querySelectorAll('.leave-badge').forEach(node => node.remove());
+        const topBar = baseCell.querySelector('.fc-daygrid-day-top') || baseCell;
+        if (!topBar) return;
+        if (typeof window !== 'undefined' && window.getComputedStyle && window.getComputedStyle(topBar).position === 'static') {
+            topBar.style.position = 'relative';
+        } else if (!topBar.style.position || topBar.style.position === 'static') {
+            topBar.style.position = 'relative';
+        }
+        const badge = document.createElement('span');
+        badge.className = `leave-badge ${(rawKind || '').toLowerCase()}`;
+        badge.textContent = icon;
+        topBar.appendChild(badge);
+    }
+
+    function applyLeaveBadges() {
+        if (!calendar) return;
+        const run = () => {
+            document.querySelectorAll('.fc .leave-badge').forEach(node => node.remove());
+            calendar.getEvents().forEach(event => {
+                if (event.extendedProps?.typ !== 'LEAVE') return;
+                const startDate = normalizeAllDayDate(event.start);
+                const exclusiveEnd = event.end ? normalizeAllDayDate(event.end) : addDaysToDate(startDate, 1);
+                if (!startDate || !exclusiveEnd) return;
+                const cursor = new Date(startDate.getTime());
+                while (cursor < exclusiveEnd) {
+                    const dateStr = formatDateForStorage(cursor);
+                    const cell = document.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`);
+                    if (cell) addLeaveBadgeToCell({ event, cellEl: cell });
+                    cursor.setDate(cursor.getDate() + 1);
+                }
+            });
+        };
+        if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+            window.requestAnimationFrame(run);
+        } else {
+            setTimeout(run, 0);
+        }
+    }
+
     const getLeavePopoverAnchor = (jsEvent) => {
         if (jsEvent && typeof jsEvent.pageX === 'number' && typeof jsEvent.pageY === 'number') {
             return { x: jsEvent.pageX, y: jsEvent.pageY };
@@ -508,6 +552,23 @@ function initializeApp() {
         }
     };
 
+    function moveOrdersSearchBetweenSections() {
+        const search = document.querySelector('#orders-search');
+        const activeSection = document.querySelector('.orders-active');
+        const finishedSection = document.querySelector('.orders-finished');
+        if (!search || !activeSection || !finishedSection) return;
+
+        let mid = document.querySelector('#orders-search-mid');
+        if (!mid) {
+            mid = document.createElement('div');
+            mid.id = 'orders-search-mid';
+            mid.className = 'orders-search-mid';
+            finishedSection.parentElement.insertBefore(mid, finishedSection);
+        }
+
+        mid.appendChild(search);
+    }
+
     const closeAllModals = (exceptModal = null) => {
         trackedModals.forEach(modal => {
             if (modal && modal !== exceptModal) {
@@ -654,6 +715,7 @@ function initializeApp() {
                 if (p.typ === 'LEAVE') {
                     const k = (p.leaveKind || '').toLowerCase();
                     if (k) info.el.classList.add(k);
+                    addLeaveBadgeToCell(info);
                     return;
                 }
                 const t = p.typ;
@@ -685,8 +747,7 @@ function initializeApp() {
                 const sum = info.view.calendar.getEvents()
                     .filter(e => e.start && same(e.start, info.date))
                     .reduce((s, e) => {
-                        if (e.extendedProps?.typ === 'LEAVE') return s;
-                        return s + (Number(e.extendedProps?.fh) || 0);
+                        return s + fhOf(e);
                     }, 0);
                 if (sum > 0) {
                     const badge = document.createElement('span');
@@ -716,6 +777,7 @@ function initializeApp() {
             datesSet: (viewInfo) => {
                 const { currentStart, currentEnd } = viewInfo.view;
                 obliczSumeGodzinZKalendarza(currentStart, currentEnd);
+                applyLeaveBadges();
             }
         });
         window.calendar = calendar;
@@ -953,6 +1015,7 @@ function initializeApp() {
         if (!skipSummary && calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
+        applyLeaveBadges();
     }
 
     function wyswietlWpisyKalendarza() {
@@ -3173,6 +3236,7 @@ async function obslugaZakonczeniaZlecenia(event) {
     };
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
+    moveOrdersSearchBetweenSections();
     inicjalizujKalendarz();
     inicjalizujLeaveBar();
     wyswietlWpisyKalendarza();
