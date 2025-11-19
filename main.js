@@ -47,9 +47,9 @@ function eventTouchesDay(ev, dayStr){
   const e = ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
   return dayStr >= s && dayStr <= e;
 }
-function calcDaySums(dayStr){
+function sumForDay(dayStr){
   let work=0, drive=0, invoiced=0;
-  window.calendar?.getEvents()?.forEach(ev=>{
+  (window.calendar?.getEvents?.()||[]).forEach(ev=>{
     const p = ev.extendedProps || {};
     if (p.typ === 'LEAVE') return; // nie licz urlopów
     if (!eventTouchesDay(ev, dayStr)) return;
@@ -60,6 +60,39 @@ function calcDaySums(dayStr){
   return {work, drive, invoiced};
 }
 function fmt(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2).replace('.',','); }
+function fmtH(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2)+'h'; }
+function removeHeaderForDay(dayStr){
+  (window.calendar?.getEvents?.()||[]).forEach(e=>{
+    if(e.extendedProps?.typ==='HEADER' && e.startStr===dayStr){ e.remove(); }
+  });
+}
+function upsertHeaderForDay(dayStr){
+  const {work, drive, invoiced} = sumForDay(dayStr);
+  if( (work||0)===0 && (drive||0)===0 && (invoiced||0)===0 ){
+    removeHeaderForDay(dayStr);
+    return;
+  }
+  removeHeaderForDay(dayStr);
+  const title =
+    `• Praca: ${fmtH(work)} •\n`+
+    `Jazda: ${fmtH(drive)} •\n`+
+    `Fakturowane: ${fmtH(invoiced)}`;
+  const end = new Date(dayStr); end.setDate(end.getDate()+1);
+  window.calendar?.addEvent({
+    id:`HDR-${dayStr}`,
+    start:dayStr,
+    end:end.toISOString().slice(0,10),
+    allDay:true,
+    title,
+    extendedProps:{ typ:'HEADER', order:-1000 },
+    classNames:['hdr-event']
+  });
+}
+function refreshAllHeaders(){
+  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
+    upsertHeaderForDay(cell.getAttribute('data-date'));
+  });
+}
 
 // Tworzy (jeśli brak) i uzupełnia metryki w komórce dnia
 function paintDayMetrics(dayCellEl, dayStr){
@@ -71,7 +104,7 @@ function paintDayMetrics(dayCellEl, dayStr){
     box.className='day-metrics';
     frame.prepend(box);
   }
-  const {work, drive, invoiced} = calcDaySums(dayStr);
+  const {work, drive, invoiced} = sumForDay(dayStr);
   box.innerHTML = `• Praca: <strong>${fmt(work)}h</strong><span class="sep">•</span>Jazda: <strong>${fmt(drive)}h</strong><span class="sep">•</span>Fakturowane: <strong>${fmt(invoiced)}h</strong>`;
 }
 
@@ -658,16 +691,28 @@ function initializeApp() {
                     }
                 }
                 refreshDayMetricsForEvent(info.event);
-            }
+            },
+            eventOrder: 'extendedProps.order,start,-duration',
         });
         window.calendar = calendar;
         calendar.render();
         calendar.on('datesSet', () => window.recalcMonthStats());
+        calendar.on('datesSet', refreshAllHeaders);
         calendar.on('eventsSet', () => window.recalcMonthStats());
         calendar.on('eventsSet', refreshAllDayMetrics);
-        calendar.on('eventAdd',   ({event}) => refreshDayMetricsForEvent(event));
-        calendar.on('eventChange',({event}) => refreshDayMetricsForEvent(event));
-        calendar.on('eventRemove',({event}) => refreshDayMetricsForEvent(event));
+        calendar.on('eventsSet', refreshAllHeaders);
+        calendar.on('eventAdd',   ({event}) => {
+            refreshDayMetricsForEvent(event);
+            if(event?.start) upsertHeaderForDay( ymd(event.start) );
+        });
+        calendar.on('eventChange',({event}) => {
+            refreshDayMetricsForEvent(event);
+            if(event?.start) upsertHeaderForDay( ymd(event.start) );
+        });
+        calendar.on('eventRemove',({event}) => {
+            refreshDayMetricsForEvent(event);
+            upsertHeaderForDay( ymd(event?.start || new Date()) );
+        });
     }
 
     async function otworzModalGodzin(data) {
