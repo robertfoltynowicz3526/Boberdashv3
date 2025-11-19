@@ -1,14 +1,44 @@
+// ==== PANIC SAFETY START ====
+console.clear?.();
+const noop = () => {};
+window.openEwidencjaDnia = window.openEwidencjaDnia || noop;
+window.openEwidencjaDniaRange = window.openEwidencjaDniaRange || noop;
+window.recalcMonthStats = window.recalcMonthStats || noop;
+
+function safe(fn) {
+    try {
+        return fn && fn();
+    } catch (e) {
+        console.error('[SAFE]', e);
+        showPanic(e);
+    }
+}
+function showPanic(err) {
+    if (document.getElementById('__panic')) return;
+    const b = document.createElement('pre');
+    b.id = '__panic';
+    b.style.cssText = 'position:fixed;inset:8px;z-index:99999;background:#0b1020;color:#ffd100;padding:12px;overflow:auto;border:1px solid #333;border-radius:8px;font:12px/1.4 ui-monospace,monospace';
+    b.textContent = 'Runtime error:\n' + (err?.stack || err?.message || String(err));
+    document.body.appendChild(b);
+}
+window.addEventListener('error', e => showPanic(e.error || e.message));
+window.addEventListener('unhandledrejection', e => showPanic(e.reason || e));
+// ==== PANIC SAFETY END ====
+
 import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 
-function clearDailyBadges(root = document) {
-    if (!root || typeof root.querySelectorAll !== 'function') return;
-    root.querySelectorAll('.daily-fh-badge,.fh-badge,.hours-badge').forEach(node => node.remove());
-}
-
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
+
+(function killOverlays(){
+  const sel = ['#leave-bar','#leave-toolbar','.leave-pop','.leave-legend','.daily-fh-badge','.fh-badge','.hours-badge'];
+  sel.forEach(s=>document.querySelectorAll(s).forEach(n=>n.remove()));
+  const st=document.createElement('style');
+  st.textContent='#leave-bar,#leave-toolbar,.leave-pop,.leave-legend,.daily-fh-badge,.fh-badge,.hours-badge{display:none!important}.leave-badge{pointer-events:none!important}';
+  document.head.appendChild(st);
+})();
 
 
 function initializeApp() {
@@ -42,6 +72,7 @@ function initializeApp() {
                 const s = new Date(y, m - 1, 1);
                 const e = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((acc, ev) => {
+                    if (ev?.extendedProps?.typ === 'LEAVE') return acc;
                     const st = ev.start;
                     if (st && st >= s && st <= e) acc += fhOf(ev);
                     return acc;
@@ -93,6 +124,7 @@ function initializeApp() {
                 const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
                 const end = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((s, e) => {
+                    if (e?.extendedProps?.typ === 'LEAVE') return s;
                     const d = e.start;
                     if (d && d >= start && d <= end) s += fhOf(e);
                     return s;
@@ -131,7 +163,6 @@ function initializeApp() {
         L4: 'L4',
         SWIETO: 'Dzień wolny od pracy'
     };
-    const LEAVE_ICON = { URL: '🌿', L4: '🩺', SWIETO: '🏳️' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
@@ -351,123 +382,11 @@ function initializeApp() {
         return normalized === DAY_LEAVE_NONE ? null : normalized;
     };
 
-    const getLeaveKindClass = (value) => {
-        const lower = (value || '').toLowerCase();
-        return lower === 'url' ? 'wolne' : lower;
-    };
-
-    function addLeaveBadgeToCell(info) {
-        if (!info?.event || !info.el) return;
-        const iconKey = info.event.extendedProps?.leaveKind;
-        if (!iconKey) return;
-        const kind = getLeaveKindClass(iconKey);
-        const icon = LEAVE_ICON[String(iconKey).toUpperCase()] || '•';
-
-        let host = info.el.closest('.fc-daygrid-day');
-        let frameSelector = '.fc-daygrid-day-frame';
-        if (!host) {
-            host = info.el.closest('.fc-timegrid-col');
-            frameSelector = '.fc-timegrid-col-frame';
-        }
-        if (!host) return;
-
-        const frame = host.querySelector(frameSelector) || host;
-        frame.style.position = 'relative';
-        frame.querySelectorAll('.leave-badge').forEach(node => node.remove());
-
-        const badge = document.createElement('span');
-        badge.className = `leave-badge ${kind}`;
-        badge.textContent = icon;
-        frame.appendChild(badge);
-    }
-
-    function ensureLeaveBadgesForBackgroundEvents() {
-        if (!calendar) return;
-        document.querySelectorAll('.fc .leave-badge').forEach(node => node.remove());
-        calendar.getEvents().forEach(event => {
-            if (event.extendedProps?.typ !== 'LEAVE') return;
-            const selector = `.fc-daygrid-day[data-date="${event.startStr}"] .fc-daygrid-day-frame`;
-            const timeSelector = `.fc-timegrid-col[data-date="${event.startStr}"] .fc-timegrid-col-frame`;
-            const cell = document.querySelector(selector) || document.querySelector(timeSelector);
-            if (cell) {
-                addLeaveBadgeToCell({ el: cell, event });
-            }
-        });
-    }
-
     function ymd(value) {
         if (!value) return '';
         const x = new Date(value);
         if (Number.isNaN(x.getTime())) return '';
         return x.toISOString().slice(0, 10);
-    }
-
-    function eventTouchesDay(event, dayStr) {
-        if (!event?.start || !dayStr) return false;
-        const start = ymd(event.start);
-        let end = start;
-        if (event.end) {
-            const eventEnd = new Date(event.end);
-            if (!Number.isNaN(eventEnd.getTime())) {
-                eventEnd.setMilliseconds(eventEnd.getMilliseconds() - 1);
-                end = ymd(eventEnd);
-            }
-        }
-        return dayStr >= start && dayStr <= end;
-    }
-
-    function calcDaySums(dayStr) {
-        if (!calendar?.getEvents || !dayStr) {
-            return { work: 0, drive: 0, invoiced: 0 };
-        }
-        let work = 0, drive = 0, invoiced = 0;
-        calendar.getEvents().forEach(event => {
-            const props = event.extendedProps || {};
-            if (props.typ === 'LEAVE') return;
-            if (eventTouchesDay(event, dayStr)) {
-                work += Number(props.workHours || props.praca || 0);
-                drive += Number(props.driveHours || props.jazda || 0);
-                invoiced += Number(props.fh || props.fakturowane || props.invoicedHours || 0);
-            }
-        });
-        return { work, drive, invoiced };
-    }
-
-    function upsertDayHeaderEvent(dayStr) {
-        if (!calendar || !dayStr) return;
-        calendar.getEvents().forEach(event => {
-            if (event.extendedProps?.typ === 'HEADER' && event.startStr === dayStr) {
-                event.remove();
-            }
-        });
-        const { work, drive, invoiced } = calcDaySums(dayStr);
-        const title = `• Praca: ${work.toFixed(2)}h • Jazda: ${drive.toFixed(2)}h • Fakturowane: ${invoiced.toFixed(2)}h`;
-        const end = new Date(dayStr);
-        if (Number.isNaN(end.getTime())) return;
-        end.setDate(end.getDate() + 1);
-        calendar.addEvent({
-            id: `HEADER-${dayStr}`,
-            title,
-            start: dayStr,
-            end: end.toISOString().slice(0, 10),
-            allDay: true,
-            display: 'block',
-            extendedProps: { typ: 'HEADER' }
-        });
-    }
-
-    function refreshAllDayHeaders() {
-        if (!calendar) return;
-        const cells = document.querySelectorAll('.fc-daygrid-day[data-date]');
-        if (!cells.length) return;
-        const seen = new Set();
-        cells.forEach(cell => {
-            const dayStr = cell.getAttribute('data-date');
-            if (dayStr && !seen.has(dayStr)) {
-                seen.add(dayStr);
-                upsertDayHeaderEvent(dayStr);
-            }
-        });
     }
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -601,24 +520,43 @@ function initializeApp() {
     ensureMagazynSummaryPlacement();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    window.openTab = (evt, tabName) => {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        document.getElementById(tabName).style.display = 'block';
-        evt.currentTarget.classList.add('active');
-        if (tabName === 'magazyn') {
-            ensureMagazynSummaryPlacement();
+    let tabRouterReady = false;
+    function setupTabRouter(defaultId = 'pulpit') {
+        if (tabRouterReady) return;
+        tabRouterReady = true;
+        const activateTab = (id, triggerEl = null) => {
+            document.querySelectorAll('[data-tab]').forEach(btn => {
+                const isActive = btn === triggerEl || (!triggerEl && btn.getAttribute('data-tab') === id);
+                btn.classList.toggle('active', isActive);
+            });
+            document.querySelectorAll('[data-section]').forEach(sec => {
+                const match = sec.getAttribute('data-section') === id;
+                sec.style.display = match ? 'block' : 'none';
+            });
+            if (id === 'magazyn') {
+                ensureMagazynSummaryPlacement();
+            }
+        };
+        document.addEventListener('click', (e) => {
+            const t = e.target.closest?.('[data-tab]');
+            if (!t) return;
+            e.preventDefault();
+            const id = t.getAttribute('data-tab');
+            if (!id) return;
+            activateTab(id, t);
+        });
+        const defaultTrigger = document.querySelector(`[data-tab="${defaultId}"]`);
+        const fallbackId = defaultTrigger?.getAttribute('data-tab') || document.querySelector('[data-section]')?.getAttribute('data-section');
+        if (fallbackId) {
+            activateTab(fallbackId, defaultTrigger);
         }
-    };
+    }
+    setupTabRouter();
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     const currentMonth = `${year}-${month}`;
     if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-    const firstTabButton = document.querySelector('.tab-button');
-    if (firstTabButton) {
-        firstTabButton.click(); // Otwórz pierwszą zakładkę
-    }
     inicjujCiemnyMotyw();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
@@ -629,160 +567,47 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
-    const isMobileCalendarView = () => window.matchMedia('(max-width: 640px)').matches;
-    const getCalendarHeaderToolbar = () => (isMobileCalendarView()
-        ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
-        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' });
-
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
-        if (!kalendarzContainer) return;
-        const initialView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
-        calendar = new FullCalendar.Calendar(kalendarzContainer, {
-            initialView,
-            locale: 'pl',
-            headerToolbar: getCalendarHeaderToolbar(),
+        const el = document.getElementById('kalendarz');
+        if (!el || typeof FullCalendar === 'undefined' || !FullCalendar?.Calendar) return;
+        window.calendar?.destroy?.();
+        calendar = new FullCalendar.Calendar(el, {
+            initialView: 'dayGridMonth',
             height: 'auto',
-            contentHeight: 'auto',
-            dayMaxEventRows: 3,
-            moreLinkClick: 'popover',
-            nowIndicator: true,
-            expandRows: true,
             selectable: true,
             selectMirror: true,
             unselectAuto: true,
-            windowResize() {
-                try {
-                    calendar.updateSize();
-                } catch (_) { }
-            },
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+            dateClick(info) { safe(() => window.openEwidencjaDnia(info.date)); },
+            select(info) { safe(() => window.openEwidencjaDniaRange(info.start, info.end)); },
             eventDataTransform(event) {
-                if (event && typeof event.title === 'string') {
-                    event.title = stripEwidencjaPrefix(event.title);
-                }
-                if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
-                    event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
+                if (event?.title) {
+                    event.title = event.title.replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
                 }
                 return event;
-            },
-            eventContent(arg) {
-                const p = arg.event.extendedProps || {};
-                if (p.typ === 'LEAVE') {
-                    return { domNodes: [] };
-                }
-                const rawTitle = arg.event.title || '';
-                const cleanTitle = stripEwidencjaPrefix(rawTitle);
-                const client = stripEwidencjaPrefix(p.client || '') || cleanTitle || rawTitle;
-                const model = p.machineModel ? ` • ${p.machineModel}` : '';
-                const fh = p.fh ? `<span class="ev-meta">${Number(p.fh).toFixed(1)}h</span>` : '';
-                const el = document.createElement('div');
-                el.className = 'ev-chip';
-                el.innerHTML = `<span class="ev-client">${client}${model}</span>${fh}`;
-                return { domNodes: [el] };
             },
             eventDidMount(info) {
                 const p = info.event.extendedProps || {};
                 if (p.typ === 'LEAVE') {
-                    const k = getLeaveKindClass(p.leaveKind);
-                    if (k) info.el.classList.add(k);
-                    addLeaveBadgeToCell(info);
-                    return;
-                }
-                if (p.typ === 'HEADER') {
-                    info.el.style.background = 'transparent';
-                    info.el.style.border = '0';
-                    info.el.style.padding = '0';
-                    const titleNode = info.el.querySelector('.fc-event-title, .fc-sticky');
-                    if (titleNode) {
-                        titleNode.style.fontWeight = '600';
-                        titleNode.style.fontSize = '12px';
-                        titleNode.style.color = '#eaf2ff';
+                    const host = info.el.closest('.fc-daygrid-day')?.querySelector('.fc-daygrid-day-frame');
+                    if (host) {
+                        host.style.position = 'relative';
+                        host.querySelectorAll('.leave-badge').forEach(node => node.remove());
+                        const map = { URL: '🌿', L4: '🩺', SWIETO: '🏳️' };
+                        const badge = document.createElement('span');
+                        badge.className = 'leave-badge';
+                        badge.textContent = map[p.leaveKind] || '•';
+                        badge.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;padding:6px 10px;border-radius:12px;background:rgba(0,0,0,.18);color:#fff;pointer-events:none;z-index:6;';
+                        host.appendChild(badge);
                     }
-                    return;
-                }
-                const t = p.typ;
-                const map = { S: '#16a34a', W: '#2563eb', G: '#f59e0b', Z: '#64748b', P: '#94a3b8' };
-                if (map[t]) {
-                    info.el.style.background = map[t];
-                    info.el.style.borderColor = map[t];
-                    info.el.style.color = '#fff';
-                }
-                const sanitizedTitle = stripEwidencjaPrefix(info.event.title || '');
-                const sanitizedClient = stripEwidencjaPrefix(info.event.extendedProps?.client || '');
-                const titleNode = info.el.querySelector('.fc-event-title');
-                if (titleNode) {
-                    titleNode.textContent = sanitizedTitle;
-                }
-                const listTitleNode = info.el.querySelector('.fc-list-event-title');
-                if (listTitleNode) {
-                    listTitleNode.textContent = sanitizedTitle;
-                }
-                const fhValue = Number(info.event.extendedProps?.fh);
-                info.el.title = [
-                    sanitizedTitle,
-                    sanitizedClient && `Klient: ${sanitizedClient}`,
-                    Number.isFinite(fhValue) && fhValue > 0 ? `Fakturowane: ${fhValue.toFixed(1)}h` : null
-                ].filter(Boolean).join(' • ');
-            },
-            windowResize() {
-                try {
-                    calendar.updateSize();
-                } catch (_) { }
-                try {
-                    const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
-                    calendar.changeView(nextView);
-                    calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
-                } catch (_) { }
-            },
-            dateClick(info) {
-                const normalized = info?.dateStr || formatDateForStorage(normalizeAllDayDate(info?.date));
-                if (normalized) {
-                    otworzModalGodzin(normalized);
-                }
-                if (calendar && typeof calendar.unselect === 'function') {
-                    calendar.unselect();
-                }
-            },
-            select(info) {
-                const startDate = normalizeAllDayDate(info?.start);
-                const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
-                if (normalized) {
-                    otworzModalGodzin(normalized);
-                }
-                if (calendar && typeof calendar.unselect === 'function') {
-                    calendar.unselect();
                 }
             }
         });
         window.calendar = calendar;
         calendar.render();
-        calendar.on('viewDidMount', () => {
-            clearDailyBadges();
-            refreshAllDayHeaders();
-        });
-        calendar.on('datesSet', () => clearDailyBadges());
-        calendar.on('datesSet', refreshAllDayHeaders);
-        calendar.on('eventsSet', refreshAllDayHeaders);
-        calendar.on('eventAdd', (info) => {
-            if (info.event.extendedProps?.typ === 'HEADER') return;
-            const day = ymd(info.event.start);
-            if (day) upsertDayHeaderEvent(day);
-        });
-        calendar.on('eventChange', (info) => {
-            if (info.event.extendedProps?.typ === 'HEADER') return;
-            const day = ymd(info.event.start);
-            if (day) upsertDayHeaderEvent(day);
-        });
-        calendar.on('eventRemove', (info) => {
-            if (info.event.extendedProps?.typ === 'HEADER') return;
-            const day = ymd(info.event.start || new Date());
-            if (day) upsertDayHeaderEvent(day);
-        });
-        calendar.on('datesSet', (viewInfo) => {
-            const { currentStart, currentEnd } = viewInfo.view;
-            obliczSumeGodzinZKalendarza(currentStart, currentEnd);
-            ensureLeaveBadgesForBackgroundEvents();
-        });
+        calendar.on('datesSet', () => window.recalcMonthStats());
+        calendar.on('eventsSet', () => window.recalcMonthStats());
     }
 
     async function otworzModalGodzin(data) {
@@ -827,6 +652,20 @@ function initializeApp() {
         }
         openModal(kalendarzModal);
     }
+
+    window.openEwidencjaDnia = (date) => {
+        const normalized = formatDateForStorage(normalizeAllDayDate(date));
+        if (normalized) {
+            otworzModalGodzin(normalized);
+        }
+    };
+
+    window.openEwidencjaDniaRange = (start) => {
+        const normalized = formatDateForStorage(normalizeAllDayDate(start));
+        if (normalized) {
+            otworzModalGodzin(normalized);
+        }
+    };
 
     function przygotujOpcjeMultiZlecen() {
         if (!kalendarzMultiSelect) return;
@@ -1021,7 +860,6 @@ function initializeApp() {
         if (!skipSummary && calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
-        ensureLeaveBadgesForBackgroundEvents();
     }
 
     function wyswietlWpisyKalendarza() {
@@ -1181,6 +1019,12 @@ function initializeApp() {
         renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
     }
 
+    window.recalcMonthStats = () => {
+        if (calendar?.view) {
+            obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
+        }
+    };
+
     async function obslugaKalendarza(event) {
         const target = event.target;
         if (target.classList.contains('event-edit-btn')) { otworzModalGodzin(target.dataset.date); }
@@ -1300,6 +1144,7 @@ function initializeApp() {
 
         wpisy.forEach(wpis => {
             if (!wpis?.id) return;
+            if (wpis?.leaveKind || wpis?.typ === 'LEAVE' || wpis?.extendedProps?.typ === 'LEAVE') return;
             const miesiac = normalizujMiesiac(wpis.id);
             if (!miesiac) return;
             const rekord = pobierzRekord(miesiac);

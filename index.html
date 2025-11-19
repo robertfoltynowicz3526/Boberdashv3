@@ -9,7 +9,7 @@
     <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css'>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link rel='stylesheet' href='style.css'>
-    <script type='module' src='/main.js' defer></script>
+    <script type="module" src="./main.js"></script>
   </head>
   <body>
     <header>
@@ -21,13 +21,13 @@
             </div>
         </div>
         <nav class="sidebar-nav tabs-row">
-            <button class="tab-button" onclick="openTab(event, 'pulpit')">Pulpit</button>
-            <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
-            <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
-            <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
-            <button class="tab-button" onclick="openTab(event, 'dodaj-zlecenie')">Dodaj Zlecenie</button>
-            <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
-            <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Podsumowanie</button>
+            <button class="tab-button" data-tab="pulpit">Pulpit</button>
+            <button class="tab-button" data-tab="klienci">Klienci</button>
+            <button class="tab-button" data-tab="maszyny">Maszyny</button>
+            <button class="tab-button" data-tab="zlecenia">Zlecenia</button>
+            <button class="tab-button" data-tab="dodaj-zlecenie">Dodaj Zlecenie</button>
+            <button class="tab-button" data-tab="magazyn">Magazyn</button>
+            <button class="tab-button" data-tab="podsumowanie">Podsumowanie</button>
         </nav>
         <div class="sidebar-footer">
             <p class="sidebar-label">Motyw interfejsu</p>
@@ -38,12 +38,12 @@
         </div>
     </header>
     <main>
-        <div id="pulpit" class="tab-content">
+        <div id="pulpit" class="tab-content" data-section="pulpit">
             <h2>Pulpit i Ewidencja Czasu Pracy</h2>
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
             <div id="kalendarz" class="calendar-container"></div>
         </div>
-        <div id="klienci" class="tab-content">
+        <div id="klienci" class="tab-content" data-section="klienci">
             <h2>Baza Klientów</h2>
             <div class="section-grid">
                 <div class="side">
@@ -74,7 +74,7 @@
                 </div>
             </div>
         </div>
-        <div id="maszyny" class="tab-content">
+        <div id="maszyny" class="tab-content" data-section="maszyny">
             <h2>Baza Maszyn</h2>
             <div class="section-grid">
                 <div class="side">
@@ -107,7 +107,7 @@
                 </div>
             </div>
         </div>
-        <div id="zlecenia" class="tab-content orders-page">
+        <div id="zlecenia" class="tab-content orders-page" data-section="zlecenia">
             <h2>Zlecenia</h2>
             <div class="orders-grid">
                 <div class="side">
@@ -139,7 +139,7 @@
                 </div>
             </div>
         </div>
-        <div id="dodaj-zlecenie" class="tab-content">
+        <div id="dodaj-zlecenie" class="tab-content" data-section="dodaj-zlecenie">
             <h2>Dodaj nowe zlecenie</h2>
             <div class="form-section">
                 <form id="zlecenie-form">
@@ -156,7 +156,7 @@
             </div>
             <p class="orders-tip">Podpowiedź: wybierz opcję „Szybkie Zlecenie”, aby dodać zgłoszenie bez przypisania klienta.</p>
         </div>
-        <div id="magazyn" class="tab-content">
+        <div id="magazyn" class="tab-content" data-section="magazyn">
             <div id="magazyn-summary" class="summary-container-subtle"></div>
             <h2>Magazyn</h2>
             <div class="warehouse-grid">
@@ -172,7 +172,7 @@
                 </div>
             </div>
         </div>
-        <div id="podsumowanie" class="tab-content">
+        <div id="podsumowanie" class="tab-content" data-section="podsumowanie">
             <h2>Podsumowanie Roczne</h2>
             <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
             <div id="annual-summary"></div>
