@@ -40,6 +40,55 @@ window.addEventListener('DOMContentLoaded', initializeApp);
   document.head.appendChild(st);
 })();
 
+// ===== DAY METRICS – helpers =====
+function ymd(d){ const x = new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); }
+function eventTouchesDay(ev, dayStr){
+  const s = ymd(ev.start);
+  const e = ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
+  return dayStr >= s && dayStr <= e;
+}
+function calcDaySums(dayStr){
+  let work=0, drive=0, invoiced=0;
+  window.calendar?.getEvents()?.forEach(ev=>{
+    const p = ev.extendedProps || {};
+    if (p.typ === 'LEAVE') return; // nie licz urlopów
+    if (!eventTouchesDay(ev, dayStr)) return;
+    work     += Number(p.workHours ?? p.praca ?? 0);
+    drive    += Number(p.driveHours ?? p.jazda ?? 0);
+    invoiced += Number(p.fh ?? p.fakturowane ?? p.invoicedHours ?? 0);
+  });
+  return {work, drive, invoiced};
+}
+function fmt(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2).replace('.',','); }
+
+// Tworzy (jeśli brak) i uzupełnia metryki w komórce dnia
+function paintDayMetrics(dayCellEl, dayStr){
+  if(!dayCellEl) return;
+  const frame = dayCellEl.querySelector('.fc-daygrid-day-frame') || dayCellEl;
+  let box = frame.querySelector('.day-metrics');
+  if(!box){
+    box = document.createElement('div');
+    box.className='day-metrics';
+    frame.prepend(box);
+  }
+  const {work, drive, invoiced} = calcDaySums(dayStr);
+  box.innerHTML = `• Praca: <strong>${fmt(work)}h</strong><span class="sep">•</span>Jazda: <strong>${fmt(drive)}h</strong><span class="sep">•</span>Fakturowane: <strong>${fmt(invoiced)}h</strong>`;
+}
+
+// Przelicza metryki dla wszystkich widocznych dni
+function refreshAllDayMetrics(){
+  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
+    const dayStr = cell.getAttribute('data-date');
+    paintDayMetrics(cell, dayStr);
+  });
+}
+
+function refreshDayMetricsForEvent(event){
+  const d = event?.start ? ymd(event.start) : ymd(new Date());
+  const cell = document.querySelector(`.fc-daygrid-day[data-date="${d}"]`);
+  if(cell) paintDayMetrics(cell, d);
+}
+
 
 function initializeApp() {
     // --- STAŁE I ZMIENNE GLOBALNE ---
@@ -579,6 +628,12 @@ function initializeApp() {
             selectMirror: true,
             unselectAuto: true,
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+            dayCellDidMount(info){
+                paintDayMetrics(info.el, info.date.toISOString().slice(0,10));
+            },
+            datesSet(){
+                refreshAllDayMetrics();
+            },
             dateClick(info) { safe(() => window.openEwidencjaDnia(info.date)); },
             select(info) { safe(() => window.openEwidencjaDniaRange(info.start, info.end)); },
             eventDataTransform(event) {
@@ -602,12 +657,17 @@ function initializeApp() {
                         host.appendChild(badge);
                     }
                 }
+                refreshDayMetricsForEvent(info.event);
             }
         });
         window.calendar = calendar;
         calendar.render();
         calendar.on('datesSet', () => window.recalcMonthStats());
         calendar.on('eventsSet', () => window.recalcMonthStats());
+        calendar.on('eventsSet', refreshAllDayMetrics);
+        calendar.on('eventAdd',   ({event}) => refreshDayMetricsForEvent(event));
+        calendar.on('eventChange',({event}) => refreshDayMetricsForEvent(event));
+        calendar.on('eventRemove',({event}) => refreshDayMetricsForEvent(event));
     }
 
     async function otworzModalGodzin(data) {
