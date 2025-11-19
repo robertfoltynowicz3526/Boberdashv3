@@ -36,10 +36,9 @@ function initializeApp() {
                 const s = new Date(y, m - 1, 1);
                 const e = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((acc, ev) => {
-                    if (ev.extendedProps?.typ === 'LEAVE') return acc;
-                    const fh = +ev.extendedProps?.fh || 0;
+                    const fh = fhFromEvent(ev);
                     const st = ev.start;
-                    if (st && st >= s && st <= e) acc += fh;
+                    if (fh > 0 && st && st >= s && st <= e) acc += fh;
                     return acc;
                 }, 0);
             }
@@ -89,10 +88,9 @@ function initializeApp() {
                 const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
                 const end = new Date(y, m, 0, 23, 59, 59, 999);
                 return window.calendar.getEvents().reduce((s, e) => {
-                    if (e.extendedProps?.typ === 'LEAVE') return s;
-                    const fh = Number(e.extendedProps?.fh) || 0;
+                    const fh = fhFromEvent(e);
                     const d = e.start;
-                    if (d && d >= start && d <= end) s += fh;
+                    if (fh > 0 && d && d >= start && d <= end) s += fh;
                     return s;
                 }, 0);
             }
@@ -123,14 +121,15 @@ function initializeApp() {
     </div>`;
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
-    const LEAVE_TITLE_MAP = { WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
+    const LEAVE_TITLE_MAP = { URL: 'Urlop', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
+    const LEAVE_CLASS_MAP = { URL: 'wolne', L4: 'l4', SWIETO: 'swieto' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     const ONE_DAY_MS = 86400000;
-    const LEAVE_KIND_OPTIONS = [
-        { kind: 'WOLNE', label: 'Wolne' },
-        { kind: 'L4', label: 'L4' },
-        { kind: 'SWIETO', label: 'Dzień wolny' }
-    ];
+    const fhFromEvent = (event) => {
+        if (!event) return 0;
+        if (event.extendedProps?.typ === 'LEAVE') return 0;
+        return Number(event.extendedProps?.fh) || 0;
+    };
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -161,15 +160,12 @@ function initializeApp() {
     let calendar;
     window.calendar = null;
     let workEvents = [];
-    let leaveEvents = [];
-    let leavePopoverEl = null;
-    let leavePopoverOutsideHandler = null;
-    let leavePopoverEscHandler = null;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+    let hourInputsCache = null;
 
     const toDateSafe = (value) => {
         if (!value) return null;
@@ -207,6 +203,22 @@ function initializeApp() {
         return Number.isNaN(parsed.getTime()) ? null : parsed;
     };
 
+    const formatDateToYMD = (date) => {
+        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const addDaysToYmd = (ymd, days = 1) => {
+        if (!ymd) return '';
+        const base = new Date(`${ymd}T00:00:00`);
+        if (Number.isNaN(base.getTime())) return '';
+        base.setDate(base.getDate() + days);
+        return formatDateToYMD(base);
+    };
+
     const walidujPrzedzialCzasu = (startValue, endValue, options = {}) => {
         const { allowEndBeforeStart = false } = options;
         const startDate = toDateSafe(startValue);
@@ -233,10 +245,6 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
-    const leaveKindSelect = document.getElementById('leave-kind');
-    const leaveFromInput = document.getElementById('leave-from');
-    const leaveToInput = document.getElementById('leave-to');
-    const leaveAddButton = document.getElementById('leave-add');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -299,196 +307,6 @@ function initializeApp() {
     const magazynTab = document.getElementById('magazyn');
     const magazynSummaryBox = document.getElementById('magazyn-summary');
 
-    const normalizeAllDayDate = (value) => {
-        if (!value) return null;
-        const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    };
-
-    const formatDateForStorage = (date) => {
-        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const addDaysToDate = (date, days) => {
-        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
-        const clone = new Date(date.getTime());
-        clone.setDate(clone.getDate() + days);
-        return clone;
-    };
-
-    const formatLeaveRangeLabel = (startDate, endDate) => {
-        if (!(startDate instanceof Date) || !(endDate instanceof Date)) return '';
-        const formatter = (d) => d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const sameDay = startDate.getTime() === endDate.getTime();
-        const diffDays = Math.max(1, Math.floor((endDate - startDate) / ONE_DAY_MS) + 1);
-        const daysLabel = diffDays === 1 ? '1 dzień' : `${diffDays} dni`;
-        const dateLabel = sameDay ? formatter(startDate) : `${formatter(startDate)} – ${formatter(endDate)}`;
-        return `${dateLabel} • ${daysLabel}`;
-    };
-
-    const getLeavePopoverAnchor = (jsEvent) => {
-        if (jsEvent && typeof jsEvent.pageX === 'number' && typeof jsEvent.pageY === 'number') {
-            return { x: jsEvent.pageX, y: jsEvent.pageY };
-        }
-        if (jsEvent?.target?.getBoundingClientRect) {
-            const rect = jsEvent.target.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        if (kalendarzContainer?.getBoundingClientRect) {
-            const rect = kalendarzContainer.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        return {
-            x: window.scrollX + window.innerWidth / 2,
-            y: window.scrollY + window.innerHeight / 2
-        };
-    };
-
-    const positionLeavePopoverElement = (popover, coords) => {
-        if (!popover || !coords) return;
-        const { x, y } = coords;
-        popover.style.left = '0px';
-        popover.style.top = '0px';
-        const rect = popover.getBoundingClientRect();
-        const viewportWidth = document.documentElement.clientWidth;
-        const viewportHeight = document.documentElement.clientHeight;
-        let left = x + 12;
-        if (left + rect.width > window.scrollX + viewportWidth) {
-            left = x - rect.width - 12;
-        }
-        if (left < window.scrollX + 8) {
-            left = window.scrollX + 8;
-        }
-        let top = y + 12;
-        if (top + rect.height > window.scrollY + viewportHeight) {
-            top = y - rect.height - 12;
-        }
-        if (top < window.scrollY + 8) {
-            top = window.scrollY + 8;
-        }
-        popover.style.left = `${left}px`;
-        popover.style.top = `${top}px`;
-    };
-
-    function closeLeavePopover(options = {}) {
-        const { skipUnselect = false } = options;
-        if (leavePopoverEl?.parentNode) {
-            leavePopoverEl.parentNode.removeChild(leavePopoverEl);
-        }
-        leavePopoverEl = null;
-        if (leavePopoverOutsideHandler) {
-            document.removeEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.removeEventListener('touchstart', leavePopoverOutsideHandler, true);
-            leavePopoverOutsideHandler = null;
-        }
-        if (leavePopoverEscHandler) {
-            document.removeEventListener('keydown', leavePopoverEscHandler, true);
-            leavePopoverEscHandler = null;
-        }
-        if (!skipUnselect && calendar && typeof calendar.unselect === 'function') {
-            calendar.unselect();
-        }
-    }
-
-    async function zapiszUrlopDoBazy(kind, startDate, endDate) {
-        const normalizedKind = (kind || '').toUpperCase();
-        const normalizedStart = normalizeAllDayDate(startDate);
-        const normalizedEnd = normalizeAllDayDate(endDate);
-        if (!normalizedKind || !normalizedStart || !normalizedEnd) {
-            throw new Error('Brak zakresu dat lub typu urlopu.');
-        }
-        const payload = {
-            title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
-            start: formatDateForStorage(normalizedStart),
-            end: formatDateForStorage(addDaysToDate(normalizedEnd, 1)),
-            allDay: true,
-            display: 'background',
-            extendedProps: { typ: 'LEAVE', leaveKind: normalizedKind }
-        };
-        const docRef = await addDoc(collection(db, 'events'), payload);
-        leaveEvents = [...leaveEvents.filter(event => event.id !== docRef.id), { id: docRef.id, ...payload }];
-        przerysujZdarzeniaKalendarza({ skipSummary: true });
-        return { id: docRef.id, ...payload };
-    }
-
-    function openLeavePopover({ start, end, jsEvent }) {
-        const rawStart = normalizeAllDayDate(start);
-        const rawEnd = normalizeAllDayDate(end);
-        if (!rawStart || !rawEnd) return;
-        let startDate = rawStart;
-        let endDate = rawEnd;
-        if (endDate < startDate) {
-            [startDate, endDate] = [endDate, startDate];
-        }
-        closeLeavePopover({ skipUnselect: true });
-        const popover = document.createElement('div');
-        popover.className = 'leave-pop';
-        const closeBtn = document.createElement('div');
-        closeBtn.className = 'close';
-        closeBtn.textContent = '×';
-        closeBtn.addEventListener('click', () => closeLeavePopover());
-        const heading = document.createElement('h4');
-        heading.textContent = 'Dodaj urlop';
-        const rangeInfo = document.createElement('div');
-        rangeInfo.className = 'small';
-        rangeInfo.textContent = formatLeaveRangeLabel(startDate, endDate);
-        const hint = document.createElement('div');
-        hint.className = 'small';
-        hint.textContent = 'Wybierz rodzaj urlopu:';
-        popover.append(closeBtn, heading, rangeInfo, hint);
-        const handleLeaveSelection = async (kind) => {
-            if (!kind) return;
-            const buttons = popover.querySelectorAll('button[data-kind]');
-            buttons.forEach(btn => { btn.disabled = true; });
-            try {
-                await zapiszUrlopDoBazy(kind, startDate, endDate);
-                closeLeavePopover();
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-                buttons.forEach(btn => { btn.disabled = false; });
-            }
-        };
-        for (let i = 0; i < LEAVE_KIND_OPTIONS.length; i += 2) {
-            const row = document.createElement('div');
-            row.className = 'row';
-            LEAVE_KIND_OPTIONS.slice(i, i + 2).forEach(option => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.dataset.kind = option.kind;
-                button.textContent = option.label;
-                button.addEventListener('click', () => handleLeaveSelection(option.kind));
-                row.appendChild(button);
-            });
-            popover.appendChild(row);
-        }
-        document.body.appendChild(popover);
-        leavePopoverEl = popover;
-        positionLeavePopoverElement(popover, getLeavePopoverAnchor(jsEvent));
-        leavePopoverOutsideHandler = (event) => {
-            if (!leavePopoverEl || leavePopoverEl.contains(event.target)) return;
-            closeLeavePopover();
-        };
-        leavePopoverEscHandler = (event) => {
-            if (event.key === 'Escape') closeLeavePopover();
-        };
-        setTimeout(() => {
-            document.addEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.addEventListener('touchstart', leavePopoverOutsideHandler, true);
-            document.addEventListener('keydown', leavePopoverEscHandler, true);
-        }, 0);
-    }
 
     const trackedModals = [];
     [kalendarzModal, completeModal, stockModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
@@ -603,6 +421,28 @@ function initializeApp() {
         ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
         : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' });
 
+    function upsertLeaveBgEvent(ymd, leaveCode) {
+        if (!calendar || !ymd) return;
+        const normalized = (leaveCode || '').toUpperCase();
+        calendar.getEvents().forEach(event => {
+            if (event.allDay && event.display === 'background' && event.startStr === ymd) {
+                event.remove();
+            }
+        });
+        if (!normalized || normalized === 'NONE') return;
+        const end = addDaysToYmd(ymd, 1) || ymd;
+        const className = LEAVE_CLASS_MAP[normalized];
+        calendar.addEvent({
+            title: LEAVE_TITLE_MAP[normalized] || 'Urlop',
+            start: ymd,
+            end,
+            allDay: true,
+            display: 'background',
+            classNames: className ? [className] : [],
+            extendedProps: { typ: 'LEAVE', leaveKind: normalized }
+        });
+    }
+
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
@@ -652,7 +492,8 @@ function initializeApp() {
             eventDidMount(info) {
                 const p = info.event.extendedProps || {};
                 if (p.typ === 'LEAVE') {
-                    const k = (p.leaveKind || '').toLowerCase();
+                    const leaveKind = (p.leaveKind || '').toUpperCase();
+                    const k = LEAVE_CLASS_MAP[leaveKind] || leaveKind.toLowerCase();
                     if (k) info.el.classList.add(k);
                     return;
                 }
@@ -684,10 +525,7 @@ function initializeApp() {
                 const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
                 const sum = info.view.calendar.getEvents()
                     .filter(e => e.start && same(e.start, info.date))
-                    .reduce((s, e) => {
-                        if (e.extendedProps?.typ === 'LEAVE') return s;
-                        return s + (Number(e.extendedProps?.fh) || 0);
-                    }, 0);
+                    .reduce((s, e) => s + fhFromEvent(e), 0);
                 if (sum > 0) {
                     const badge = document.createElement('span');
                     badge.className = 'fc-day-badge';
@@ -707,11 +545,8 @@ function initializeApp() {
                 } catch (_) { }
             },
             dateClick(info) {
-                openLeavePopover({ start: info.date, end: info.date, jsEvent: info.jsEvent });
-            },
-            select(info) {
-                const endDate = info.end ? new Date(info.end.getTime() - ONE_DAY_MS) : info.start;
-                openLeavePopover({ start: info.start, end: endDate, jsEvent: info.jsEvent });
+                const ymd = info.dateStr || formatDateToYMD(info.date);
+                if (ymd) otworzModalGodzin(ymd);
             },
             datesSet: (viewInfo) => {
                 const { currentStart, currentEnd } = viewInfo.view;
@@ -726,6 +561,8 @@ function initializeApp() {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
+        hourInputsCache = null;
+        setDayLeaveSelection('NONE');
         const kalendarzDataInput = document.getElementById('kalendarz-data');
         if (kalendarzDataInput) kalendarzDataInput.value = data;
 
@@ -746,6 +583,7 @@ function initializeApp() {
                 kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
                 kalendarzForm['czas-jazdy'].value = dane.jazda || 0;
                 kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
+                const leave = dane.leaveKind ? String(dane.leaveKind).toUpperCase() : 'NONE';
                 manualFakturowaneValue = Number(dane.fakturowane) || 0;
                 const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
                 multiZlecenia = powiazane;
@@ -755,6 +593,10 @@ function initializeApp() {
                 renderMultiZlecenia();
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
+                }
+                setDayLeaveSelection(leave);
+                if (leave !== 'NONE') {
+                    manualFakturowaneValue = 0;
                 }
             }
         } catch (error) {
@@ -785,6 +627,58 @@ function initializeApp() {
         if (kalendarzMultiSelect) kalendarzMultiSelect.value = '';
         if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = '';
         if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj';
+    }
+
+    function setHourInputsEnabled(enabled) {
+        if (!kalendarzForm) return;
+        const fieldNames = ['godziny-pracy', 'godziny-fakturowane', 'nadgodziny', 'czas-jazdy'];
+        if (!enabled && !hourInputsCache) {
+            hourInputsCache = {};
+            fieldNames.forEach(name => {
+                const input = kalendarzForm[name];
+                if (input) hourInputsCache[name] = input.value;
+            });
+        }
+        fieldNames.forEach(name => {
+            const input = kalendarzForm[name];
+            if (!input) return;
+            input.disabled = !enabled;
+            if (!enabled) {
+                input.value = '0';
+            } else if (hourInputsCache && Object.prototype.hasOwnProperty.call(hourInputsCache, name)) {
+                input.value = hourInputsCache[name];
+            }
+        });
+        if (enabled) {
+            hourInputsCache = null;
+        }
+        const disable = !enabled;
+        if (kalendarzMultiSelect) kalendarzMultiSelect.disabled = disable;
+        if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.disabled = disable;
+        if (kalendarzMultiAddButton) kalendarzMultiAddButton.disabled = disable;
+        if (kalendarzMultiList) {
+            kalendarzMultiList.classList.toggle('disabled', disable);
+            if (disable) {
+                kalendarzMultiList.setAttribute('aria-disabled', 'true');
+            } else {
+                kalendarzMultiList.removeAttribute('aria-disabled');
+            }
+        }
+    }
+
+    function setDayLeaveSelection(value = 'NONE') {
+        if (!kalendarzForm) return;
+        const normalized = value && value !== 'NONE' ? value : 'NONE';
+        const radios = kalendarzForm.querySelectorAll('input[name="dayLeave"]');
+        radios.forEach(radio => {
+            radio.checked = radio.value === normalized;
+        });
+        setHourInputsEnabled(normalized === 'NONE');
+    }
+
+    function getSelectedDayLeave() {
+        const selected = kalendarzForm?.querySelector('input[name="dayLeave"]:checked');
+        return selected ? selected.value : 'NONE';
     }
 
     function aktualizujPoleFakturowane(wartosc, tylkoOdczyt = false) {
@@ -835,6 +729,7 @@ function initializeApp() {
     }
 
     function dodajLubZapiszMultiZlecenie() {
+        if (getSelectedDayLeave() !== 'NONE') return;
         if (!kalendarzMultiSelect || !kalendarzMultiHoursInput) return;
         const zlecenieId = kalendarzMultiSelect.value;
         const godziny = Number(kalendarzMultiHoursInput.value);
@@ -876,6 +771,7 @@ function initializeApp() {
     }
 
     function obslugaListyMulti(event) {
+        if (getSelectedDayLeave() !== 'NONE') return;
         const target = event.target;
         const li = target.closest('li');
         if (!li || !li.dataset.index) return;
@@ -914,28 +810,34 @@ function initializeApp() {
         if (!kalendarzForm || !kalendarzModal) return;
         event.preventDefault();
         const data = kalendarzForm['kalendarz-data'].value;
-        const powiazane = multiZlecenia.map(p => ({
+        const selectedLeave = getSelectedDayLeave();
+        const isLeaveDay = selectedLeave !== 'NONE';
+        const powiazane = isLeaveDay ? [] : multiZlecenia.map(p => ({
             zlecenieId: p.zlecenieId,
             klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
             fakturowane: Number(p.fakturowane) || 0
         }));
         const sumaFakturowane = powiazane.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         const wartoscZFormularza = Number(kalendarzForm['godziny-fakturowane'].value) || 0;
-        const fakturowaneDoZapisu = powiazane.length > 0 ? sumaFakturowane : wartoscZFormularza;
+        const fakturowaneDoZapisu = isLeaveDay ? 0 : (powiazane.length > 0 ? sumaFakturowane : wartoscZFormularza);
         manualFakturowaneValue = fakturowaneDoZapisu;
 
         const dane = {
-            praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
+            praca: isLeaveDay ? 0 : (Number(kalendarzForm['godziny-pracy'].value) || 0),
             fakturowane: fakturowaneDoZapisu,
-            nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0,
-            jazda: Number(kalendarzForm['czas-jazdy'].value) || 0,
+            nadgodziny: isLeaveDay ? 0 : (Number(kalendarzForm['nadgodziny'].value) || 0),
+            jazda: isLeaveDay ? 0 : (Number(kalendarzForm['czas-jazdy'].value) || 0),
             notatka: kalendarzForm['kalendarz-notatka'].value || '',
             zleceniaPowiazane: powiazane,
             zlecenieId: powiazane.length === 1 ? powiazane[0].zlecenieId : null,
-            klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null
+            klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null,
+            leaveKind: isLeaveDay ? selectedLeave : null
         };
         try {
             await setDoc(doc(db, "godziny_pracy", data), dane);
+            upsertLeaveBgEvent(data, selectedLeave);
+            window.recalcMonthStats?.();
+            calendar?.updateSize?.();
             hideModal(kalendarzModal);
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
@@ -945,7 +847,7 @@ function initializeApp() {
     function przerysujZdarzeniaKalendarza(options = {}) {
         const { skipSummary = false } = options;
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
+        const combined = [...workEvents];
         calendar.removeAllEvents();
         if (combined.length) {
             calendar.addEventSource(combined);
@@ -967,13 +869,18 @@ function initializeApp() {
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
+                const leaveKind = dane.leaveKind ? String(dane.leaveKind).toUpperCase() : null;
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
                 const wpis = {
                     id,
                     ...dane,
                     fakturowane: suma,
-                    zleceniaPowiazane: powiazane
+                    zleceniaPowiazane: powiazane,
+                    leaveKind
                 };
+                if (leaveKind) {
+                    wpis.typ = 'LEAVE';
+                }
                 wszystkieWpisyKalendarza.push(wpis);
 
                 const linie = [];
@@ -982,7 +889,25 @@ function initializeApp() {
                 if (dane.jazda > 0) linie.push(`Jazda: ${formatujLiczbe(dane.jazda)}h`);
                 if (!powiazane.length && suma > 0) linie.push(`Fakturowane: ${formatujLiczbe(suma)}h`);
 
-                if (powiazane.length) {
+                if (leaveKind) {
+                    const end = addDaysToYmd(id, 1) || id;
+                    const className = LEAVE_CLASS_MAP[leaveKind];
+                    events.push({
+                        id: `leave_${id}`,
+                        title: LEAVE_TITLE_MAP[leaveKind] || 'Urlop',
+                        start: id,
+                        end,
+                        allDay: true,
+                        display: 'background',
+                        classNames: className ? [className] : [],
+                        extendedProps: {
+                            typ: 'LEAVE',
+                            leaveKind
+                        }
+                    });
+                }
+
+                if (!leaveKind && powiazane.length) {
                     powiazane.forEach((powiazanie, index) => {
                         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
                         const maszyna = zlecenie?.maszynaId ? _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId) : null;
@@ -1004,7 +929,7 @@ function initializeApp() {
                     });
                 }
 
-                if (linie.length) {
+                if (!leaveKind && linie.length) {
                     events.push({
                         id: `godziny_${id}`,
                         title: 'Ewidencja dnia',
@@ -1022,68 +947,6 @@ function initializeApp() {
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
-        });
-    }
-
-    function nasluchujNaUrlopy() {
-        try {
-            onSnapshot(collection(db, 'events'), (snapshot) => {
-                leaveEvents = snapshot.docs.map(docSnap => {
-                    const data = docSnap.data() || {};
-                    const baseProps = data.extendedProps || {};
-                    const rawKind = baseProps.leaveKind || data.leaveKind || '';
-                    const normalizedKind = rawKind ? String(rawKind).toUpperCase() : '';
-                    const typ = baseProps.typ || data.typ;
-                    const isLeave = typ === 'LEAVE' || Boolean(normalizedKind);
-                    if (!isLeave || !data.start || !data.end) return null;
-                    return {
-                        id: docSnap.id,
-                        title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
-                        start: data.start,
-                        end: data.end,
-                        allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
-                        display: data.display || 'background',
-                        extendedProps: {
-                            typ: 'LEAVE',
-                            leaveKind: normalizedKind || ''
-                        }
-                    };
-                }).filter(Boolean);
-                przerysujZdarzeniaKalendarza({ skipSummary: true });
-            });
-        } catch (error) {
-            console.error('Nie udało się pobrać urlopów:', error);
-        }
-    }
-
-    function inicjalizujLeaveBar() {
-        if (!leaveAddButton) return;
-        leaveAddButton.addEventListener('click', async () => {
-            const kind = (leaveKindSelect?.value || '').toUpperCase();
-            const from = leaveFromInput?.value;
-            const to = leaveToInput?.value;
-            if (!kind || !from || !to) {
-                alert('Wybierz typ oraz zakres dat.');
-                return;
-            }
-            const start = new Date(from);
-            const end = new Date(to);
-            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-                alert('Niepoprawny zakres dat.');
-                return;
-            }
-            if (end < start) {
-                alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
-                return;
-            }
-            try {
-                await zapiszUrlopDoBazy(kind, start, end);
-                if (leaveFromInput) leaveFromInput.value = '';
-                if (leaveToInput) leaveToInput.value = '';
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-            }
         });
     }
 
@@ -3120,7 +2983,15 @@ async function obslugaZakonczeniaZlecenia(event) {
     }
 
     // KALENDARZ (modal + klik w kalendarzu)
-    if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+    if (kalendarzForm) {
+        kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+        kalendarzForm.addEventListener('change', (event) => {
+            if (event.target && event.target.name === 'dayLeave') {
+                const value = event.target.value || 'NONE';
+                setHourInputsEnabled(value === 'NONE');
+            }
+        });
+    }
     if (kalendarzForm && kalendarzForm['godziny-fakturowane']) {
         kalendarzForm['godziny-fakturowane'].addEventListener('input', () => {
             if (multiZlecenia.length === 0) {
@@ -3174,9 +3045,7 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     inicjalizujKalendarz();
-    inicjalizujLeaveBar();
     wyswietlWpisyKalendarza();
-    nasluchujNaUrlopy();
     nasluchujNaKlientow();
     nasluchujNaMaszyny();
     nasluchujNaZlecenia();
