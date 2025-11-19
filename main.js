@@ -2,6 +2,11 @@ import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 
+function clearDailyBadges(root = document) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    root.querySelectorAll('.daily-fh-badge,.fh-badge,.hours-badge').forEach(node => node.remove());
+}
+
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -390,6 +395,81 @@ function initializeApp() {
         });
     }
 
+    function ymd(value) {
+        if (!value) return '';
+        const x = new Date(value);
+        if (Number.isNaN(x.getTime())) return '';
+        return x.toISOString().slice(0, 10);
+    }
+
+    function eventTouchesDay(event, dayStr) {
+        if (!event?.start || !dayStr) return false;
+        const start = ymd(event.start);
+        let end = start;
+        if (event.end) {
+            const eventEnd = new Date(event.end);
+            if (!Number.isNaN(eventEnd.getTime())) {
+                eventEnd.setMilliseconds(eventEnd.getMilliseconds() - 1);
+                end = ymd(eventEnd);
+            }
+        }
+        return dayStr >= start && dayStr <= end;
+    }
+
+    function calcDaySums(dayStr) {
+        if (!calendar?.getEvents || !dayStr) {
+            return { work: 0, drive: 0, invoiced: 0 };
+        }
+        let work = 0, drive = 0, invoiced = 0;
+        calendar.getEvents().forEach(event => {
+            const props = event.extendedProps || {};
+            if (props.typ === 'LEAVE') return;
+            if (eventTouchesDay(event, dayStr)) {
+                work += Number(props.workHours || props.praca || 0);
+                drive += Number(props.driveHours || props.jazda || 0);
+                invoiced += Number(props.fh || props.fakturowane || props.invoicedHours || 0);
+            }
+        });
+        return { work, drive, invoiced };
+    }
+
+    function upsertDayHeaderEvent(dayStr) {
+        if (!calendar || !dayStr) return;
+        calendar.getEvents().forEach(event => {
+            if (event.extendedProps?.typ === 'HEADER' && event.startStr === dayStr) {
+                event.remove();
+            }
+        });
+        const { work, drive, invoiced } = calcDaySums(dayStr);
+        const title = `• Praca: ${work.toFixed(2)}h • Jazda: ${drive.toFixed(2)}h • Fakturowane: ${invoiced.toFixed(2)}h`;
+        const end = new Date(dayStr);
+        if (Number.isNaN(end.getTime())) return;
+        end.setDate(end.getDate() + 1);
+        calendar.addEvent({
+            id: `HEADER-${dayStr}`,
+            title,
+            start: dayStr,
+            end: end.toISOString().slice(0, 10),
+            allDay: true,
+            display: 'block',
+            extendedProps: { typ: 'HEADER' }
+        });
+    }
+
+    function refreshAllDayHeaders() {
+        if (!calendar) return;
+        const cells = document.querySelectorAll('.fc-daygrid-day[data-date]');
+        if (!cells.length) return;
+        const seen = new Set();
+        cells.forEach(cell => {
+            const dayStr = cell.getAttribute('data-date');
+            if (dayStr && !seen.has(dayStr)) {
+                seen.add(dayStr);
+                upsertDayHeaderEvent(dayStr);
+            }
+        });
+    }
+
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
 
     async function syncLeaveEventForDay(dateKey, leaveKind) {
@@ -608,6 +688,18 @@ function initializeApp() {
                     addLeaveBadgeToCell(info);
                     return;
                 }
+                if (p.typ === 'HEADER') {
+                    info.el.style.background = 'transparent';
+                    info.el.style.border = '0';
+                    info.el.style.padding = '0';
+                    const titleNode = info.el.querySelector('.fc-event-title, .fc-sticky');
+                    if (titleNode) {
+                        titleNode.style.fontWeight = '600';
+                        titleNode.style.fontSize = '12px';
+                        titleNode.style.color = '#eaf2ff';
+                    }
+                    return;
+                }
                 const t = p.typ;
                 const map = { S: '#16a34a', W: '#2563eb', G: '#f59e0b', Z: '#64748b', P: '#94a3b8' };
                 if (map[t]) {
@@ -631,21 +723,6 @@ function initializeApp() {
                     sanitizedClient && `Klient: ${sanitizedClient}`,
                     Number.isFinite(fhValue) && fhValue > 0 ? `Fakturowane: ${fhValue.toFixed(1)}h` : null
                 ].filter(Boolean).join(' • ');
-            },
-            dayCellDidMount(info) {
-                const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-                const sum = info.view.calendar.getEvents()
-                    .filter(e => e.start && same(e.start, info.date))
-                    .reduce((s, e) => {
-                        return s + fhOf(e);
-                    }, 0);
-                if (sum > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'fc-day-badge';
-                    const formatted = Number.isInteger(sum) ? sum : Number(sum.toFixed(1));
-                    badge.textContent = `${formatted}h`;
-                    info.el.querySelector('.fc-daygrid-day-top')?.appendChild(badge);
-                }
             },
             windowResize() {
                 try {
@@ -679,6 +756,28 @@ function initializeApp() {
         });
         window.calendar = calendar;
         calendar.render();
+        calendar.on('viewDidMount', () => {
+            clearDailyBadges();
+            refreshAllDayHeaders();
+        });
+        calendar.on('datesSet', () => clearDailyBadges());
+        calendar.on('datesSet', refreshAllDayHeaders);
+        calendar.on('eventsSet', refreshAllDayHeaders);
+        calendar.on('eventAdd', (info) => {
+            if (info.event.extendedProps?.typ === 'HEADER') return;
+            const day = ymd(info.event.start);
+            if (day) upsertDayHeaderEvent(day);
+        });
+        calendar.on('eventChange', (info) => {
+            if (info.event.extendedProps?.typ === 'HEADER') return;
+            const day = ymd(info.event.start);
+            if (day) upsertDayHeaderEvent(day);
+        });
+        calendar.on('eventRemove', (info) => {
+            if (info.event.extendedProps?.typ === 'HEADER') return;
+            const day = ymd(info.event.start || new Date());
+            if (day) upsertDayHeaderEvent(day);
+        });
         calendar.on('datesSet', (viewInfo) => {
             const { currentStart, currentEnd } = viewInfo.view;
             obliczSumeGodzinZKalendarza(currentStart, currentEnd);
