@@ -120,15 +120,17 @@ function initializeApp() {
     </div>`;
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
-    const LEAVE_TITLE_MAP = { WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
-    const LEAVE_ICON = { WOLNE: '🌿', L4: '🩺', SWIETO: '🏳️' };
+    const LEAVE_TITLE_MAP = {
+        URL: 'Urlop',
+        WOLNE: 'Wolne',
+        L4: 'L4',
+        SWIETO: 'Dzień wolny od pracy'
+    };
+    const LEAVE_ICON = { URL: '🌿', WOLNE: '🌿', L4: '🩺', SWIETO: '🏳️' };
     const BAZA_MIESIECZNA_GODZIN = 168;
-    const ONE_DAY_MS = 86400000;
-    const LEAVE_KIND_OPTIONS = [
-        { kind: 'WOLNE', label: 'Wolne' },
-        { kind: 'L4', label: 'L4' },
-        { kind: 'SWIETO', label: 'Dzień wolny' }
-    ];
+    const LEAVE_EVENT_PREFIX = 'leave_';
+    const DAY_LEAVE_NONE = 'NONE';
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -160,9 +162,7 @@ function initializeApp() {
     window.calendar = null;
     let workEvents = [];
     let leaveEvents = [];
-    let leavePopoverEl = null;
-    let leavePopoverOutsideHandler = null;
-    let leavePopoverEscHandler = null;
+    let leaveEventsReady = false;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
@@ -231,10 +231,6 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
-    const leaveKindSelect = document.getElementById('leave-kind');
-    const leaveFromInput = document.getElementById('leave-from');
-    const leaveToInput = document.getElementById('leave-to');
-    const leaveAddButton = document.getElementById('leave-add');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -319,14 +315,35 @@ function initializeApp() {
         return clone;
     };
 
-    const formatLeaveRangeLabel = (startDate, endDate) => {
-        if (!(startDate instanceof Date) || !(endDate instanceof Date)) return '';
-        const formatter = (d) => d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const sameDay = startDate.getTime() === endDate.getTime();
-        const diffDays = Math.max(1, Math.floor((endDate - startDate) / ONE_DAY_MS) + 1);
-        const daysLabel = diffDays === 1 ? '1 dzień' : `${diffDays} dni`;
-        const dateLabel = sameDay ? formatter(startDate) : `${formatter(startDate)} – ${formatter(endDate)}`;
-        return `${dateLabel} • ${daysLabel}`;
+    const normalizeDayLeaveValue = (value) => {
+        const upper = (value ?? '').toString().trim().toUpperCase();
+        if (!upper) return DAY_LEAVE_NONE;
+        if (upper === 'WOLNE') return 'URL';
+        return DAY_LEAVE_VALUES.includes(upper) ? upper : DAY_LEAVE_NONE;
+    };
+
+    const setDayLeaveValue = (value) => {
+        if (!kalendarzForm) return;
+        const normalized = normalizeDayLeaveValue(value);
+        let matched = false;
+        kalendarzForm.querySelectorAll('input[name="dayLeave"]').forEach(radio => {
+            const radioValue = normalizeDayLeaveValue(radio.value);
+            const isMatch = radioValue === normalized;
+            radio.checked = isMatch;
+            if (isMatch) matched = true;
+        });
+        if (!matched) {
+            const fallback = kalendarzForm.querySelector('input[name="dayLeave"][value="NONE"]');
+            if (fallback) fallback.checked = true;
+        }
+    };
+
+    const getSelectedDayLeaveValue = () => {
+        if (!kalendarzForm) return null;
+        const checked = kalendarzForm.querySelector('input[name="dayLeave"]:checked');
+        if (!checked) return null;
+        const normalized = normalizeDayLeaveValue(checked.value);
+        return normalized === DAY_LEAVE_NONE ? null : normalized;
     };
 
     function addLeaveBadgeToCell(info) {
@@ -375,163 +392,38 @@ function initializeApp() {
         }
     }
 
-    const getLeavePopoverAnchor = (jsEvent) => {
-        if (jsEvent && typeof jsEvent.pageX === 'number' && typeof jsEvent.pageY === 'number') {
-            return { x: jsEvent.pageX, y: jsEvent.pageY };
-        }
-        if (jsEvent?.target?.getBoundingClientRect) {
-            const rect = jsEvent.target.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        if (kalendarzContainer?.getBoundingClientRect) {
-            const rect = kalendarzContainer.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        return {
-            x: window.scrollX + window.innerWidth / 2,
-            y: window.scrollY + window.innerHeight / 2
-        };
-    };
+    const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
 
-    const positionLeavePopoverElement = (popover, coords) => {
-        if (!popover || !coords) return;
-        const { x, y } = coords;
-        popover.style.left = '0px';
-        popover.style.top = '0px';
-        const rect = popover.getBoundingClientRect();
-        const viewportWidth = document.documentElement.clientWidth;
-        const viewportHeight = document.documentElement.clientHeight;
-        let left = x + 12;
-        if (left + rect.width > window.scrollX + viewportWidth) {
-            left = x - rect.width - 12;
+    async function syncLeaveEventForDay(dateKey, leaveKind) {
+        if (!dateKey) return;
+        const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
+        const leaveDocId = getLeaveEventDocId(dateKey);
+        const leaveDocRef = doc(db, 'events', leaveDocId);
+        if (!normalizedKind || normalizedKind === DAY_LEAVE_NONE) {
+            try {
+                await deleteDoc(leaveDocRef);
+            } catch (_) { /* brak wpisu – pomijamy */ }
+            const nextEvents = leaveEvents.filter(event => event.id !== leaveDocId);
+            if (nextEvents.length !== leaveEvents.length) {
+                leaveEvents = nextEvents;
+                przerysujZdarzeniaKalendarza({ skipSummary: true });
+            }
+            return;
         }
-        if (left < window.scrollX + 8) {
-            left = window.scrollX + 8;
-        }
-        let top = y + 12;
-        if (top + rect.height > window.scrollY + viewportHeight) {
-            top = y - rect.height - 12;
-        }
-        if (top < window.scrollY + 8) {
-            top = window.scrollY + 8;
-        }
-        popover.style.left = `${left}px`;
-        popover.style.top = `${top}px`;
-    };
-
-    function closeLeavePopover(options = {}) {
-        const { skipUnselect = false } = options;
-        if (leavePopoverEl?.parentNode) {
-            leavePopoverEl.parentNode.removeChild(leavePopoverEl);
-        }
-        leavePopoverEl = null;
-        if (leavePopoverOutsideHandler) {
-            document.removeEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.removeEventListener('touchstart', leavePopoverOutsideHandler, true);
-            leavePopoverOutsideHandler = null;
-        }
-        if (leavePopoverEscHandler) {
-            document.removeEventListener('keydown', leavePopoverEscHandler, true);
-            leavePopoverEscHandler = null;
-        }
-        if (!skipUnselect && calendar && typeof calendar.unselect === 'function') {
-            calendar.unselect();
-        }
-    }
-
-    async function zapiszUrlopDoBazy(kind, startDate, endDate) {
-        const normalizedKind = (kind || '').toUpperCase();
-        const normalizedStart = normalizeAllDayDate(startDate);
-        const normalizedEnd = normalizeAllDayDate(endDate);
-        if (!normalizedKind || !normalizedStart || !normalizedEnd) {
-            throw new Error('Brak zakresu dat lub typu urlopu.');
-        }
+        const startDate = normalizeAllDayDate(dateKey);
+        if (!startDate) return;
         const payload = {
             title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
-            start: formatDateForStorage(normalizedStart),
-            end: formatDateForStorage(addDaysToDate(normalizedEnd, 1)),
+            start: formatDateForStorage(startDate),
+            end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
             display: 'background',
             extendedProps: { typ: 'LEAVE', leaveKind: normalizedKind }
         };
-        const docRef = await addDoc(collection(db, 'events'), payload);
-        leaveEvents = [...leaveEvents.filter(event => event.id !== docRef.id), { id: docRef.id, ...payload }];
+        await setDoc(leaveDocRef, payload);
+        const withoutCurrent = leaveEvents.filter(event => event.id !== leaveDocId);
+        leaveEvents = [...withoutCurrent, { id: leaveDocId, ...payload }];
         przerysujZdarzeniaKalendarza({ skipSummary: true });
-        return { id: docRef.id, ...payload };
-    }
-
-    function openLeavePopover({ start, end, jsEvent }) {
-        const rawStart = normalizeAllDayDate(start);
-        const rawEnd = normalizeAllDayDate(end);
-        if (!rawStart || !rawEnd) return;
-        let startDate = rawStart;
-        let endDate = rawEnd;
-        if (endDate < startDate) {
-            [startDate, endDate] = [endDate, startDate];
-        }
-        closeLeavePopover({ skipUnselect: true });
-        const popover = document.createElement('div');
-        popover.className = 'leave-pop';
-        const closeBtn = document.createElement('div');
-        closeBtn.className = 'close';
-        closeBtn.textContent = '×';
-        closeBtn.addEventListener('click', () => closeLeavePopover());
-        const heading = document.createElement('h4');
-        heading.textContent = 'Dodaj urlop';
-        const rangeInfo = document.createElement('div');
-        rangeInfo.className = 'small';
-        rangeInfo.textContent = formatLeaveRangeLabel(startDate, endDate);
-        const hint = document.createElement('div');
-        hint.className = 'small';
-        hint.textContent = 'Wybierz rodzaj urlopu:';
-        popover.append(closeBtn, heading, rangeInfo, hint);
-        const handleLeaveSelection = async (kind) => {
-            if (!kind) return;
-            const buttons = popover.querySelectorAll('button[data-kind]');
-            buttons.forEach(btn => { btn.disabled = true; });
-            try {
-                await zapiszUrlopDoBazy(kind, startDate, endDate);
-                closeLeavePopover();
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-                buttons.forEach(btn => { btn.disabled = false; });
-            }
-        };
-        for (let i = 0; i < LEAVE_KIND_OPTIONS.length; i += 2) {
-            const row = document.createElement('div');
-            row.className = 'row';
-            LEAVE_KIND_OPTIONS.slice(i, i + 2).forEach(option => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.dataset.kind = option.kind;
-                button.textContent = option.label;
-                button.addEventListener('click', () => handleLeaveSelection(option.kind));
-                row.appendChild(button);
-            });
-            popover.appendChild(row);
-        }
-        document.body.appendChild(popover);
-        leavePopoverEl = popover;
-        positionLeavePopoverElement(popover, getLeavePopoverAnchor(jsEvent));
-        leavePopoverOutsideHandler = (event) => {
-            if (!leavePopoverEl || leavePopoverEl.contains(event.target)) return;
-            closeLeavePopover();
-        };
-        leavePopoverEscHandler = (event) => {
-            if (event.key === 'Escape') closeLeavePopover();
-        };
-        setTimeout(() => {
-            document.addEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.addEventListener('touchstart', leavePopoverOutsideHandler, true);
-            document.addEventListener('keydown', leavePopoverEscHandler, true);
-        }, 0);
     }
 
     const trackedModals = [];
@@ -768,11 +660,23 @@ function initializeApp() {
                 } catch (_) { }
             },
             dateClick(info) {
-                openLeavePopover({ start: info.date, end: info.date, jsEvent: info.jsEvent });
+                const normalized = info?.dateStr || formatDateForStorage(normalizeAllDayDate(info?.date));
+                if (normalized) {
+                    otworzModalGodzin(normalized);
+                }
+                if (calendar && typeof calendar.unselect === 'function') {
+                    calendar.unselect();
+                }
             },
             select(info) {
-                const endDate = info.end ? new Date(info.end.getTime() - ONE_DAY_MS) : info.start;
-                openLeavePopover({ start: info.start, end: endDate, jsEvent: info.jsEvent });
+                const startDate = normalizeAllDayDate(info?.start);
+                const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
+                if (normalized) {
+                    otworzModalGodzin(normalized);
+                }
+                if (calendar && typeof calendar.unselect === 'function') {
+                    calendar.unselect();
+                }
             },
             datesSet: (viewInfo) => {
                 const { currentStart, currentEnd } = viewInfo.view;
@@ -788,6 +692,7 @@ function initializeApp() {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
+        setDayLeaveValue(DAY_LEAVE_NONE);
         const kalendarzDataInput = document.getElementById('kalendarz-data');
         if (kalendarzDataInput) kalendarzDataInput.value = data;
 
@@ -818,6 +723,7 @@ function initializeApp() {
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
                 }
+                setDayLeaveValue(dane.leaveKind || DAY_LEAVE_NONE);
             }
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
@@ -986,6 +892,7 @@ function initializeApp() {
         const fakturowaneDoZapisu = powiazane.length > 0 ? sumaFakturowane : wartoscZFormularza;
         manualFakturowaneValue = fakturowaneDoZapisu;
 
+        const selectedLeaveKind = getSelectedDayLeaveValue();
         const dane = {
             praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
             fakturowane: fakturowaneDoZapisu,
@@ -994,10 +901,12 @@ function initializeApp() {
             notatka: kalendarzForm['kalendarz-notatka'].value || '',
             zleceniaPowiazane: powiazane,
             zlecenieId: powiazane.length === 1 ? powiazane[0].zlecenieId : null,
-            klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null
+            klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null,
+            leaveKind: selectedLeaveKind || null
         };
         try {
             await setDoc(doc(db, "godziny_pracy", data), dane);
+            await syncLeaveEventForDay(data, selectedLeaveKind);
             hideModal(kalendarzModal);
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
@@ -1038,6 +947,24 @@ function initializeApp() {
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
+                if (leaveEventsReady) {
+                    const normalizedLeave = dane.leaveKind ? normalizeDayLeaveValue(dane.leaveKind) : null;
+                    const leaveEventId = getLeaveEventDocId(id);
+                    const existingLeaveEvent = leaveEvents.find(event => event.id === leaveEventId) || null;
+                    const existingKind = existingLeaveEvent?.extendedProps?.leaveKind || existingLeaveEvent?.leaveKind || '';
+                    const normalizedExisting = existingKind ? normalizeDayLeaveValue(existingKind) : null;
+                    if (normalizedLeave) {
+                        if (normalizedExisting !== normalizedLeave) {
+                            syncLeaveEventForDay(id, normalizedLeave).catch(err => {
+                                console.warn('Nie udało się zsynchronizować urlopu dla dnia', id, err);
+                            });
+                        }
+                    } else if (existingLeaveEvent) {
+                        syncLeaveEventForDay(id, null).catch(err => {
+                            console.warn('Nie udało się usunąć urlopu dla dnia', id, err);
+                        });
+                    }
+                }
 
                 const linie = [];
                 if (dane.praca > 0) linie.push(`Praca: ${formatujLiczbe(dane.praca)}h`);
@@ -1113,41 +1040,11 @@ function initializeApp() {
                     };
                 }).filter(Boolean);
                 przerysujZdarzeniaKalendarza({ skipSummary: true });
+                leaveEventsReady = true;
             });
         } catch (error) {
             console.error('Nie udało się pobrać urlopów:', error);
         }
-    }
-
-    function inicjalizujLeaveBar() {
-        if (!leaveAddButton) return;
-        leaveAddButton.addEventListener('click', async () => {
-            const kind = (leaveKindSelect?.value || '').toUpperCase();
-            const from = leaveFromInput?.value;
-            const to = leaveToInput?.value;
-            if (!kind || !from || !to) {
-                alert('Wybierz typ oraz zakres dat.');
-                return;
-            }
-            const start = new Date(from);
-            const end = new Date(to);
-            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-                alert('Niepoprawny zakres dat.');
-                return;
-            }
-            if (end < start) {
-                alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
-                return;
-            }
-            try {
-                await zapiszUrlopDoBazy(kind, start, end);
-                if (leaveFromInput) leaveFromInput.value = '';
-                if (leaveToInput) leaveToInput.value = '';
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-            }
-        });
     }
 
     function obliczSumeGodzinZKalendarza(start, end) {
@@ -1156,6 +1053,9 @@ function initializeApp() {
             return dataWpisu >= start && dataWpisu < end;
         });
         const sumyMies = wpisyZMiesiaca.reduce((acc, wpis) => {
+            if (wpis?.leaveKind) {
+                return acc;
+            }
             if (wpis?.typ === 'LEAVE' || wpis?.extendedProps?.typ === 'LEAVE') {
                 return acc;
             }
@@ -1191,6 +1091,7 @@ function initializeApp() {
             const data = target.dataset.date;
             if (confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
                 await deleteDoc(doc(db, "godziny_pracy", data));
+                await syncLeaveEventForDay(data, null);
             }
         }
     }
@@ -3238,7 +3139,6 @@ async function obslugaZakonczeniaZlecenia(event) {
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
     inicjalizujKalendarz();
-    inicjalizujLeaveBar();
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();
