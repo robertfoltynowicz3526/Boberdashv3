@@ -1,126 +1,90 @@
-// ==== PANIC SAFETY START ====
-console.clear?.();
-const noop = () => {};
-window.openEwidencjaDnia = window.openEwidencjaDnia || noop;
+// === PANIC SAFETY (nie psuje UI, pokaże błąd gdyby coś jeszcze było nie tak) ===
+const noop=()=>{};
+window.openEwidencjaDnia      = window.openEwidencjaDnia      || noop;
 window.openEwidencjaDniaRange = window.openEwidencjaDniaRange || noop;
-window.recalcMonthStats = window.recalcMonthStats || noop;
-
-function safe(fn) {
-    try {
-        return fn && fn();
-    } catch (e) {
-        console.error('[SAFE]', e);
-        showPanic(e);
-    }
+window.recalcMonthStats       = window.recalcMonthStats       || noop;
+function safe(fn){ try{ return fn&&fn(); } catch(e){ console.error(e); showPanic(e); } }
+function showPanic(err){
+  if(document.getElementById('__panic')) return;
+  const pre=document.createElement('pre');
+  pre.id='__panic';
+  pre.style.cssText='position:fixed;inset:8px;z-index:99999;background:#0b1020;color:#ffd100;padding:12px;overflow:auto;border:1px solid #333;border-radius:8px;font:12px/1.4 ui-monospace,monospace';
+  pre.textContent='Runtime error:\n'+(err?.stack||err?.message||String(err));
+  document.body.appendChild(pre);
 }
-function showPanic(err) {
-    if (document.getElementById('__panic')) return;
-    const b = document.createElement('pre');
-    b.id = '__panic';
-    b.style.cssText = 'position:fixed;inset:8px;z-index:99999;background:#0b1020;color:#ffd100;padding:12px;overflow:auto;border:1px solid #333;border-radius:8px;font:12px/1.4 ui-monospace,monospace';
-    b.textContent = 'Runtime error:\n' + (err?.stack || err?.message || String(err));
-    document.body.appendChild(b);
-}
-window.addEventListener('error', e => showPanic(e.error || e.message));
-window.addEventListener('unhandledrejection', e => showPanic(e.reason || e));
-// ==== PANIC SAFETY END ====
+window.addEventListener('error',e=>showPanic(e.error||e.message));
+window.addEventListener('unhandledrejection',e=>showPanic(e.reason||e));
 
 import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 
-// Uruchom dopiero po załadowaniu DOM:
-window.addEventListener('DOMContentLoaded', initializeApp);
+const FULLCALENDAR_SRC = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js';
+let fullCalendarPromise = null;
+function ensureFullCalendar(){
+    if (window.FullCalendar?.Calendar) return Promise.resolve(window.FullCalendar);
+    if (!fullCalendarPromise) {
+        fullCalendarPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = FULLCALENDAR_SRC;
+            script.async = true;
+            script.onload = () => resolve(window.FullCalendar);
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+    return fullCalendarPromise;
+}
 
-(function killOverlays(){
-  const sel = ['#leave-bar','#leave-toolbar','.leave-pop','.leave-legend','.daily-fh-badge','.fh-badge','.hours-badge'];
-  sel.forEach(s=>document.querySelectorAll(s).forEach(n=>n.remove()));
-  const st=document.createElement('style');
-  st.textContent='#leave-bar,#leave-toolbar,.leave-pop,.leave-legend,.daily-fh-badge,.fh-badge,.hours-badge{display:none!important}.leave-badge{pointer-events:none!important}';
-  document.head.appendChild(st);
-})();
-
-// ===== DAY METRICS – helpers =====
-function ymd(d){ const x = new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); }
+//// helpers ////
+function ymd(d){ const x=new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); }
 function eventTouchesDay(ev, dayStr){
-  const s = ymd(ev.start);
-  const e = ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
-  return dayStr >= s && dayStr <= e;
+    const s=ymd(ev.start);
+    const e=ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
+    return dayStr>=s && dayStr<=e;
 }
-function sumForDay(dayStr){
-  let work=0, drive=0, invoiced=0;
-  (window.calendar?.getEvents?.()||[]).forEach(ev=>{
-    const p = ev.extendedProps || {};
-    if (p.typ === 'LEAVE') return; // nie licz urlopów
-    if (!eventTouchesDay(ev, dayStr)) return;
-    work     += Number(p.workHours ?? p.praca ?? 0);
-    drive    += Number(p.driveHours ?? p.jazda ?? 0);
-    invoiced += Number(p.fh ?? p.fakturowane ?? p.invoicedHours ?? 0);
-  });
-  return {work, drive, invoiced};
+function sumsForDay(dayStr){
+    let work=0, drive=0, invoiced=0;
+    (window.calendar?.getEvents?.()||[]).forEach(ev=>{
+        const p=ev.extendedProps||{};
+        if(p.typ==='LEAVE' || p.typ==='HEADER') return;
+        if(!eventTouchesDay(ev, dayStr)) return;
+        work     += Number(p.workHours ?? p.praca ?? 0);
+        drive    += Number(p.driveHours ?? p.jazda ?? 0);
+        invoiced += Number(p.fh ?? p.fakturowane ?? p.invoicedHours ?? 0);
+    });
+    return {work, drive, invoiced};
 }
-function fmt(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2).replace('.',','); }
 function fmtH(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2)+'h'; }
 function removeHeaderForDay(dayStr){
-  (window.calendar?.getEvents?.()||[]).forEach(e=>{
-    if(e.extendedProps?.typ==='HEADER' && e.startStr===dayStr){ e.remove(); }
-  });
+    (window.calendar?.getEvents?.()||[]).forEach(e=>{
+        if(e.extendedProps?.typ==='HEADER' && e.startStr===dayStr) e.remove();
+    });
 }
 function upsertHeaderForDay(dayStr){
-  const {work, drive, invoiced} = sumForDay(dayStr);
-  if( (work||0)===0 && (drive||0)===0 && (invoiced||0)===0 ){
+    const {work, drive, invoiced}=sumsForDay(dayStr);
+    if((work||0)===0 && (drive||0)===0 && (invoiced||0)===0){ removeHeaderForDay(dayStr); return; }
     removeHeaderForDay(dayStr);
-    return;
-  }
-  removeHeaderForDay(dayStr);
-  const title =
-    `• Praca: ${fmtH(work)} •\n`+
-    `Jazda: ${fmtH(drive)} •\n`+
-    `Fakturowane: ${fmtH(invoiced)}`;
-  const end = new Date(dayStr); end.setDate(end.getDate()+1);
-  window.calendar?.addEvent({
-    id:`HDR-${dayStr}`,
-    start:dayStr,
-    end:end.toISOString().slice(0,10),
-    allDay:true,
-    title,
-    extendedProps:{ typ:'HEADER', order:-1000 },
-    classNames:['hdr-event']
-  });
+    const end=new Date(dayStr); end.setDate(end.getDate()+1);
+    const title=`• Praca: ${fmtH(work)} •\nJazda: ${fmtH(drive)} •\nFakturowane: ${fmtH(invoiced)}`;
+    window.calendar?.addEvent({
+        id:`HDR-${dayStr}`,
+        start:dayStr,
+        end:end.toISOString().slice(0,10),
+        allDay:true,
+        title,
+        classNames:['hdr-event'],
+        extendedProps:{ typ:'HEADER', order:-1000 }
+    });
 }
 function refreshAllHeaders(){
-  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
-    upsertHeaderForDay(cell.getAttribute('data-date'));
-  });
+    document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
+        upsertHeaderForDay(cell.getAttribute('data-date'));
+    });
 }
 
-// Tworzy (jeśli brak) i uzupełnia metryki w komórce dnia
-function paintDayMetrics(dayCellEl, dayStr){
-  if(!dayCellEl) return;
-  const frame = dayCellEl.querySelector('.fc-daygrid-day-frame') || dayCellEl;
-  let box = frame.querySelector('.day-metrics');
-  if(!box){
-    box = document.createElement('div');
-    box.className='day-metrics';
-    frame.prepend(box);
-  }
-  const {work, drive, invoiced} = sumForDay(dayStr);
-  box.innerHTML = `• Praca: <strong>${fmt(work)}h</strong><span class="sep">•</span>Jazda: <strong>${fmt(drive)}h</strong><span class="sep">•</span>Fakturowane: <strong>${fmt(invoiced)}h</strong>`;
-}
-
-// Przelicza metryki dla wszystkich widocznych dni
-function refreshAllDayMetrics(){
-  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
-    const dayStr = cell.getAttribute('data-date');
-    paintDayMetrics(cell, dayStr);
-  });
-}
-
-function refreshDayMetricsForEvent(event){
-  const d = event?.start ? ymd(event.start) : ymd(new Date());
-  const cell = document.querySelector(`.fc-daygrid-day[data-date="${d}"]`);
-  if(cell) paintDayMetrics(cell, d);
-}
+// Uruchom dopiero po załadowaniu DOM:
+window.addEventListener('DOMContentLoaded', initializeApp);
 
 
 function initializeApp() {
@@ -602,38 +566,33 @@ function initializeApp() {
     ensureMagazynSummaryPlacement();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    let tabRouterReady = false;
-    function setupTabRouter(defaultId = 'pulpit') {
-        if (tabRouterReady) return;
-        tabRouterReady = true;
-        const activateTab = (id, triggerEl = null) => {
-            document.querySelectorAll('[data-tab]').forEach(btn => {
-                const isActive = btn === triggerEl || (!triggerEl && btn.getAttribute('data-tab') === id);
-                btn.classList.toggle('active', isActive);
-            });
-            document.querySelectorAll('[data-section]').forEach(sec => {
-                const match = sec.getAttribute('data-section') === id;
-                sec.style.display = match ? 'block' : 'none';
-            });
-            if (id === 'magazyn') {
-                ensureMagazynSummaryPlacement();
-            }
-        };
-        document.addEventListener('click', (e) => {
-            const t = e.target.closest?.('[data-tab]');
-            if (!t) return;
-            e.preventDefault();
-            const id = t.getAttribute('data-tab');
-            if (!id) return;
-            activateTab(id, t);
+    const activateTab = (btn) => {
+        if (!btn) return;
+        const id = btn.getAttribute('data-tab');
+        if (!id) return;
+        document.querySelectorAll('[data-tab]').forEach(el => {
+            el.classList.toggle('active', el === btn);
         });
-        const defaultTrigger = document.querySelector(`[data-tab="${defaultId}"]`);
-        const fallbackId = defaultTrigger?.getAttribute('data-tab') || document.querySelector('[data-section]')?.getAttribute('data-section');
-        if (fallbackId) {
-            activateTab(fallbackId, defaultTrigger);
+        document.querySelectorAll('[data-section]').forEach(sec => {
+            sec.style.display = sec.getAttribute('data-section') === id ? 'block' : 'none';
+        });
+        if (id === 'magazyn') {
+            ensureMagazynSummaryPlacement();
         }
+    };
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest?.('[data-tab]');
+        if (!btn) return;
+        e.preventDefault();
+        activateTab(btn);
+    });
+    const initialTab = document.querySelector('[data-tab].active') || document.querySelector('[data-tab]');
+    if (initialTab) {
+        activateTab(initialTab);
+    } else {
+        const firstSection = document.querySelector('[data-section]');
+        if (firstSection) firstSection.style.display = 'block';
     }
-    setupTabRouter();
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
@@ -650,9 +609,11 @@ function initializeApp() {
     odswiezSelectKlientaDoZlecenia();
 
     // --- KALENDARZ ---
-    function inicjalizujKalendarz() {
+    async function inicjalizujKalendarz() {
         const el = document.getElementById('kalendarz');
-        if (!el || typeof FullCalendar === 'undefined' || !FullCalendar?.Calendar) return;
+        if (!el) return;
+        await ensureFullCalendar().catch(showPanic);
+        if (typeof FullCalendar === 'undefined' || !FullCalendar?.Calendar) return;
         window.calendar?.destroy?.();
         calendar = new FullCalendar.Calendar(el, {
             initialView: 'dayGridMonth',
@@ -661,58 +622,43 @@ function initializeApp() {
             selectMirror: true,
             unselectAuto: true,
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
-            dayCellDidMount(info){
-                paintDayMetrics(info.el, info.date.toISOString().slice(0,10));
-            },
-            datesSet(){
-                refreshAllDayMetrics();
-            },
-            dateClick(info) { safe(() => window.openEwidencjaDnia(info.date)); },
-            select(info) { safe(() => window.openEwidencjaDniaRange(info.start, info.end)); },
-            eventDataTransform(event) {
-                if (event?.title) {
-                    event.title = event.title.replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
+            eventOrder: 'extendedProps.order,start,-duration',
+            dateClick(info){ safe(()=>window.openEwidencjaDnia(info.date)); },
+            select(info){ safe(()=>window.openEwidencjaDniaRange(info.start, info.end)); },
+            eventDataTransform(event){
+                if(event?.title){
+                    event.title = event.title.replace(/^Ewidencja dnia\s*[:•-]?\s*/i,'');
                 }
                 return event;
             },
-            eventDidMount(info) {
+            eventDidMount(info){
                 const p = info.event.extendedProps || {};
                 if (p.typ === 'LEAVE') {
                     const host = info.el.closest('.fc-daygrid-day')?.querySelector('.fc-daygrid-day-frame');
                     if (host) {
                         host.style.position = 'relative';
                         host.querySelectorAll('.leave-badge').forEach(node => node.remove());
-                        const map = { URL: '🌿', L4: '🩺', SWIETO: '🏳️' };
                         const badge = document.createElement('span');
                         badge.className = 'leave-badge';
-                        badge.textContent = map[p.leaveKind] || '•';
+                        badge.textContent = ({ URL: '🌿', L4: '🩺', SWIETO: '🏳️' })[p.leaveKind] || '•';
                         badge.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;padding:6px 10px;border-radius:12px;background:rgba(0,0,0,.18);color:#fff;pointer-events:none;z-index:6;';
                         host.appendChild(badge);
                     }
                 }
-                refreshDayMetricsForEvent(info.event);
-            },
-            eventOrder: 'extendedProps.order,start,-duration',
+            }
         });
         window.calendar = calendar;
         calendar.render();
-        calendar.on('datesSet', () => window.recalcMonthStats());
+
+        calendar.on('datesSet', () => safe(() => window.recalcMonthStats()));
+        calendar.on('eventsSet', () => safe(() => window.recalcMonthStats()));
         calendar.on('datesSet', refreshAllHeaders);
-        calendar.on('eventsSet', () => window.recalcMonthStats());
-        calendar.on('eventsSet', refreshAllDayMetrics);
         calendar.on('eventsSet', refreshAllHeaders);
-        calendar.on('eventAdd',   ({event}) => {
-            refreshDayMetricsForEvent(event);
-            if(event?.start) upsertHeaderForDay( ymd(event.start) );
-        });
-        calendar.on('eventChange',({event}) => {
-            refreshDayMetricsForEvent(event);
-            if(event?.start) upsertHeaderForDay( ymd(event.start) );
-        });
-        calendar.on('eventRemove',({event}) => {
-            refreshDayMetricsForEvent(event);
-            upsertHeaderForDay( ymd(event?.start || new Date()) );
-        });
+        calendar.on('eventAdd',   ({event}) => { if(event?.start) upsertHeaderForDay( ymd(event.start) ); });
+        calendar.on('eventChange',({event}) => { if(event?.start) upsertHeaderForDay( ymd(event.start) ); });
+        calendar.on('eventRemove',({event}) => { upsertHeaderForDay( ymd(event?.start || new Date()) ); });
+
+        refreshAllHeaders();
     }
 
     async function otworzModalGodzin(data) {
@@ -3185,7 +3131,7 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
-    inicjalizujKalendarz();
+    inicjalizujKalendarz().catch(showPanic);
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();
