@@ -1604,12 +1604,6 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   align-items:start;
 }
 
-.leave-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.leave-legend{display:flex;gap:8px;margin:6px 0 12px}
-.chip.leave{padding:4px 8px;border-radius:9999px;border:1px solid rgba(255,255,255,.15);font-size:.85rem}
-.chip.leave.wolne {background:#0d402e;color:#8ff0c6}
-.chip.leave.l4    {background:#40220d;color:#ffd5a8}
-.chip.leave.swieto{background:#30343a;color:#d7dde5}
 .fc .fc-bg-event { opacity:.30; }
 .fc .fc-bg-event.wolne  { background:#16a34a !important; }
 .fc .fc-bg-event.l4     { background:#d97706 !important; }
@@ -1825,47 +1819,44 @@ main,
 }
 
 .leave-pop{
-  position: absolute;
-  z-index: 9999;
-  background: #111827;
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.35);
-  padding: 8px;
-  display: grid;
-  gap: 6px;
-  min-width: 180px;
+  position:absolute;
+  z-index:9999;
+  background:#111827;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  padding:8px;
+  display:grid;
+  gap:6px;
+  min-width:200px;
 }
 .leave-pop h4{
-  margin: 0 0 4px;
-  font-size: .9rem;
-  opacity: .9;
-}
-.leave-pop button{
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.04);
-  color: #fff;
-  cursor: pointer;
-}
-.leave-pop button:hover{
-  background: rgba(255,255,255,.08);
+  margin:0 0 4px;
+  font-size:.9rem;
+  opacity:.9;
 }
 .leave-pop .row{
-  display: flex;
-  gap: 6px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
 }
-.leave-pop .small{
-  font-size: .8rem;
-  opacity: .75;
+.leave-pop button{
+  width:100%;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  color:#fff;
+  cursor:pointer;
+}
+.leave-pop button:hover{
+  background:rgba(255,255,255,.08);
 }
 .leave-pop .close{
-  text-align: right;
-  font-size: .8rem;
-  opacity: .6;
-  cursor: pointer;
+  text-align:right;
+  font-size:.8rem;
+  opacity:.7;
+  cursor:pointer;
 }
 
 .fc .fc-bg-event{ opacity: .30; }

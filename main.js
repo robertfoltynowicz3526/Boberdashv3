@@ -126,11 +126,6 @@ function initializeApp() {
     const LEAVE_TITLE_MAP = { WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Dzień wolny od pracy' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     const ONE_DAY_MS = 86400000;
-    const LEAVE_KIND_OPTIONS = [
-        { kind: 'WOLNE', label: 'Wolne' },
-        { kind: 'L4', label: 'L4' },
-        { kind: 'SWIETO', label: 'Dzień wolny' }
-    ];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -162,9 +157,6 @@ function initializeApp() {
     window.calendar = null;
     let workEvents = [];
     let leaveEvents = [];
-    let leavePopoverEl = null;
-    let leavePopoverOutsideHandler = null;
-    let leavePopoverEscHandler = null;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let multiZlecenia = [];
@@ -233,10 +225,6 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
-    const leaveKindSelect = document.getElementById('leave-kind');
-    const leaveFromInput = document.getElementById('leave-from');
-    const leaveToInput = document.getElementById('leave-to');
-    const leaveAddButton = document.getElementById('leave-add');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -299,194 +287,119 @@ function initializeApp() {
     const magazynTab = document.getElementById('magazyn');
     const magazynSummaryBox = document.getElementById('magazyn-summary');
 
-    const normalizeAllDayDate = (value) => {
-        if (!value) return null;
+    const sameDay = (a, b) => {
+        const first = new Date(a);
+        const second = new Date(b);
+        if (Number.isNaN(first.getTime()) || Number.isNaN(second.getTime())) return false;
+        return first.getFullYear() === second.getFullYear()
+            && first.getMonth() === second.getMonth()
+            && first.getDate() === second.getDate();
+    };
+
+    const isoYMD = (value) => {
         const date = value instanceof Date ? value : new Date(value);
-        if (Number.isNaN(date.getTime())) return null;
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toISOString().slice(0, 10);
     };
 
-    const formatDateForStorage = (date) => {
-        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+    const fmtYMD = (value) => {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString();
     };
 
-    const addDaysToDate = (date, days) => {
-        if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
-        const clone = new Date(date.getTime());
-        clone.setDate(clone.getDate() + days);
-        return clone;
-    };
-
-    const formatLeaveRangeLabel = (startDate, endDate) => {
-        if (!(startDate instanceof Date) || !(endDate instanceof Date)) return '';
-        const formatter = (d) => d.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        const sameDay = startDate.getTime() === endDate.getTime();
-        const diffDays = Math.max(1, Math.floor((endDate - startDate) / ONE_DAY_MS) + 1);
-        const daysLabel = diffDays === 1 ? '1 dzień' : `${diffDays} dni`;
-        const dateLabel = sameDay ? formatter(startDate) : `${formatter(startDate)} – ${formatter(endDate)}`;
-        return `${dateLabel} • ${daysLabel}`;
-    };
-
-    const getLeavePopoverAnchor = (jsEvent) => {
-        if (jsEvent && typeof jsEvent.pageX === 'number' && typeof jsEvent.pageY === 'number') {
-            return { x: jsEvent.pageX, y: jsEvent.pageY };
-        }
-        if (jsEvent?.target?.getBoundingClientRect) {
-            const rect = jsEvent.target.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        if (kalendarzContainer?.getBoundingClientRect) {
-            const rect = kalendarzContainer.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 + window.scrollX,
-                y: rect.top + rect.height / 2 + window.scrollY
-            };
-        }
-        return {
-            x: window.scrollX + window.innerWidth / 2,
-            y: window.scrollY + window.innerHeight / 2
-        };
-    };
-
-    const positionLeavePopoverElement = (popover, coords) => {
-        if (!popover || !coords) return;
-        const { x, y } = coords;
-        popover.style.left = '0px';
-        popover.style.top = '0px';
-        const rect = popover.getBoundingClientRect();
-        const viewportWidth = document.documentElement.clientWidth;
-        const viewportHeight = document.documentElement.clientHeight;
-        let left = x + 12;
-        if (left + rect.width > window.scrollX + viewportWidth) {
-            left = x - rect.width - 12;
-        }
-        if (left < window.scrollX + 8) {
-            left = window.scrollX + 8;
-        }
-        let top = y + 12;
-        if (top + rect.height > window.scrollY + viewportHeight) {
-            top = y - rect.height - 12;
-        }
-        if (top < window.scrollY + 8) {
-            top = window.scrollY + 8;
-        }
-        popover.style.left = `${left}px`;
-        popover.style.top = `${top}px`;
-    };
-
-    function closeLeavePopover(options = {}) {
-        const { skipUnselect = false } = options;
-        if (leavePopoverEl?.parentNode) {
-            leavePopoverEl.parentNode.removeChild(leavePopoverEl);
-        }
-        leavePopoverEl = null;
-        if (leavePopoverOutsideHandler) {
-            document.removeEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.removeEventListener('touchstart', leavePopoverOutsideHandler, true);
-            leavePopoverOutsideHandler = null;
-        }
-        if (leavePopoverEscHandler) {
-            document.removeEventListener('keydown', leavePopoverEscHandler, true);
-            leavePopoverEscHandler = null;
-        }
-        if (!skipUnselect && calendar && typeof calendar.unselect === 'function') {
+    function closeActionPopover() {
+        document.querySelector('.leave-pop')?.remove();
+        if (calendar && typeof calendar.unselect === 'function') {
             calendar.unselect();
         }
     }
 
-    async function zapiszUrlopDoBazy(kind, startDate, endDate) {
-        const normalizedKind = (kind || '').toUpperCase();
-        const normalizedStart = normalizeAllDayDate(startDate);
-        const normalizedEnd = normalizeAllDayDate(endDate);
-        if (!normalizedKind || !normalizedStart || !normalizedEnd) {
-            throw new Error('Brak zakresu dat lub typu urlopu.');
-        }
-        const payload = {
+    async function addLeaveEvent(kind, fromYMD, toYMD) {
+        if (!kind || !fromYMD || !toYMD) return;
+        const normalizedKind = String(kind).toUpperCase();
+        const startDate = new Date(fromYMD);
+        const endDate = new Date(toYMD);
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return;
+        const endExclusive = new Date(endDate);
+        endExclusive.setDate(endExclusive.getDate() + 1);
+        const leaveDoc = {
             title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
-            start: formatDateForStorage(normalizedStart),
-            end: formatDateForStorage(addDaysToDate(normalizedEnd, 1)),
+            start: isoYMD(startDate),
+            end: isoYMD(endExclusive),
             allDay: true,
             display: 'background',
             extendedProps: { typ: 'LEAVE', leaveKind: normalizedKind }
         };
-        const docRef = await addDoc(collection(db, 'events'), payload);
-        leaveEvents = [...leaveEvents.filter(event => event.id !== docRef.id), { id: docRef.id, ...payload }];
-        przerysujZdarzeniaKalendarza({ skipSummary: true });
-        return { id: docRef.id, ...payload };
+        try {
+            const docRef = await addDoc(collection(db, 'events'), leaveDoc);
+            const storedEvent = { id: docRef.id, ...leaveDoc };
+            leaveEvents = [...leaveEvents.filter(event => event.id !== docRef.id), storedEvent];
+            try { calendar?.addEvent(storedEvent); } catch (_) { }
+            przerysujZdarzeniaKalendarza({ skipSummary: true });
+        } catch (error) {
+            console.error('Nie udało się dodać urlopu:', error);
+            alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
+        }
     }
 
-    function openLeavePopover({ start, end, jsEvent }) {
-        const rawStart = normalizeAllDayDate(start);
-        const rawEnd = normalizeAllDayDate(end);
-        if (!rawStart || !rawEnd) return;
-        let startDate = rawStart;
-        let endDate = rawEnd;
-        if (endDate < startDate) {
-            [startDate, endDate] = [endDate, startDate];
-        }
-        closeLeavePopover({ skipUnselect: true });
-        const popover = document.createElement('div');
-        popover.className = 'leave-pop';
-        const closeBtn = document.createElement('div');
-        closeBtn.className = 'close';
-        closeBtn.textContent = '×';
-        closeBtn.addEventListener('click', () => closeLeavePopover());
-        const heading = document.createElement('h4');
-        heading.textContent = 'Dodaj urlop';
-        const rangeInfo = document.createElement('div');
-        rangeInfo.className = 'small';
-        rangeInfo.textContent = formatLeaveRangeLabel(startDate, endDate);
-        const hint = document.createElement('div');
-        hint.className = 'small';
-        hint.textContent = 'Wybierz rodzaj urlopu:';
-        popover.append(closeBtn, heading, rangeInfo, hint);
-        const handleLeaveSelection = async (kind) => {
-            if (!kind) return;
-            const buttons = popover.querySelectorAll('button[data-kind]');
-            buttons.forEach(btn => { btn.disabled = true; });
-            try {
-                await zapiszUrlopDoBazy(kind, startDate, endDate);
-                closeLeavePopover();
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-                buttons.forEach(btn => { btn.disabled = false; });
+    function openActionPopover({ start, end, jsEvent }) {
+        closeActionPopover();
+        const startDate = start instanceof Date ? start : new Date(start);
+        const endDate = end instanceof Date ? end : new Date(end || start);
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return;
+        const rect = jsEvent?.target?.getBoundingClientRect?.() || {
+            left: window.innerWidth / 2,
+            top: window.innerHeight / 2
+        };
+        const pop = document.createElement('div');
+        pop.className = 'leave-pop';
+        pop.innerHTML = `
+    <div class="close" data-act="close">✕</div>
+    <h4>Nowy wpis: ${fmtYMD(startDate)}${sameDay(startDate, endDate) ? '' : ' – ' + fmtYMD(endDate)}</h4>
+    <div class="row">
+      <button data-act="add-order">➕ Dodaj zlecenie</button>
+    </div>
+    <div class="row">
+      <button data-kind="WOLNE">🌿 Dodaj Wolne</button>
+      <button data-kind="L4">🩺 Dodaj L4</button>
+      <button data-kind="SWIETO">🏳️ Dodaj dzień wolny</button>
+    </div>
+  `;
+        document.body.appendChild(pop);
+        pop.style.left = (rect.left + window.scrollX + 8) + 'px';
+        pop.style.top = (rect.top + window.scrollY + 28) + 'px';
+
+        pop.addEventListener('click', async (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            if (target.dataset.act === 'close') {
+                closeActionPopover();
+                return;
             }
-        };
-        for (let i = 0; i < LEAVE_KIND_OPTIONS.length; i += 2) {
-            const row = document.createElement('div');
-            row.className = 'row';
-            LEAVE_KIND_OPTIONS.slice(i, i + 2).forEach(option => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.dataset.kind = option.kind;
-                button.textContent = option.label;
-                button.addEventListener('click', () => handleLeaveSelection(option.kind));
-                row.appendChild(button);
-            });
-            popover.appendChild(row);
-        }
-        document.body.appendChild(popover);
-        leavePopoverEl = popover;
-        positionLeavePopoverElement(popover, getLeavePopoverAnchor(jsEvent));
-        leavePopoverOutsideHandler = (event) => {
-            if (!leavePopoverEl || leavePopoverEl.contains(event.target)) return;
-            closeLeavePopover();
-        };
-        leavePopoverEscHandler = (event) => {
-            if (event.key === 'Escape') closeLeavePopover();
-        };
+            if (target.dataset.act === 'add-order') {
+                closeActionPopover();
+                if (typeof openCreateOrderModal === 'function') {
+                    openCreateOrderModal(startDate, endDate);
+                } else {
+                    document.querySelector('[data-tab="dodaj-zlecenie"]')?.click();
+                }
+                return;
+            }
+            const kind = target.dataset.kind;
+            if (kind) {
+                await addLeaveEvent(kind, isoYMD(startDate), isoYMD(endDate));
+                closeActionPopover();
+            }
+        });
+
         setTimeout(() => {
-            document.addEventListener('mousedown', leavePopoverOutsideHandler, true);
-            document.addEventListener('touchstart', leavePopoverOutsideHandler, true);
-            document.addEventListener('keydown', leavePopoverEscHandler, true);
+            document.addEventListener('click', function outsideCloser(ev) {
+                const targetNode = ev.target instanceof Node ? ev.target : null;
+                if (!targetNode || !pop.contains(targetNode)) {
+                    closeActionPopover();
+                }
+            }, { capture: true, once: true });
         }, 0);
     }
 
@@ -607,7 +520,7 @@ function initializeApp() {
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
         const initialView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
-        calendar = new FullCalendar.Calendar(kalendarzContainer, {
+        const baseOptions = {
             initialView,
             locale: 'pl',
             headerToolbar: getCalendarHeaderToolbar(),
@@ -707,19 +620,28 @@ function initializeApp() {
                 } catch (_) { }
             },
             dateClick(info) {
-                openLeavePopover({ start: info.date, end: info.date, jsEvent: info.jsEvent });
+                const targetDate = isoYMD(info.date) || (info.dateStr ? info.dateStr.slice(0, 10) : '');
+                if (targetDate) otworzModalGodzin(targetDate);
             },
             select(info) {
-                const endDate = info.end ? new Date(info.end.getTime() - ONE_DAY_MS) : info.start;
-                openLeavePopover({ start: info.start, end: endDate, jsEvent: info.jsEvent });
+                const targetDate = isoYMD(info.start) || (info.startStr ? info.startStr.slice(0, 10) : '');
+                if (targetDate) otworzModalGodzin(targetDate);
             },
             datesSet: (viewInfo) => {
                 const { currentStart, currentEnd } = viewInfo.view;
                 obliczSumeGodzinZKalendarza(currentStart, currentEnd);
             }
-        });
+        };
+        calendar = new FullCalendar.Calendar(kalendarzContainer, baseOptions);
         window.calendar = calendar;
         calendar.render();
+        calendar.on('dateClick', (info) => {
+            openActionPopover({ start: info.date, end: info.date, jsEvent: info.jsEvent });
+        });
+        calendar.on('select', (info) => {
+            const endDate = info.end ? new Date(info.end.getTime() - ONE_DAY_MS) : info.start;
+            openActionPopover({ start: info.start, end: endDate, jsEvent: info.jsEvent });
+        });
     }
 
     async function otworzModalGodzin(data) {
@@ -1054,37 +976,6 @@ function initializeApp() {
         } catch (error) {
             console.error('Nie udało się pobrać urlopów:', error);
         }
-    }
-
-    function inicjalizujLeaveBar() {
-        if (!leaveAddButton) return;
-        leaveAddButton.addEventListener('click', async () => {
-            const kind = (leaveKindSelect?.value || '').toUpperCase();
-            const from = leaveFromInput?.value;
-            const to = leaveToInput?.value;
-            if (!kind || !from || !to) {
-                alert('Wybierz typ oraz zakres dat.');
-                return;
-            }
-            const start = new Date(from);
-            const end = new Date(to);
-            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-                alert('Niepoprawny zakres dat.');
-                return;
-            }
-            if (end < start) {
-                alert('Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.');
-                return;
-            }
-            try {
-                await zapiszUrlopDoBazy(kind, start, end);
-                if (leaveFromInput) leaveFromInput.value = '';
-                if (leaveToInput) leaveToInput.value = '';
-            } catch (error) {
-                console.error('Nie udało się dodać urlopu:', error);
-                alert('Nie udało się dodać urlopu. Spróbuj ponownie.');
-            }
-        });
     }
 
     function obliczSumeGodzinZKalendarza(start, end) {
@@ -3174,7 +3065,6 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     inicjalizujKalendarz();
-    inicjalizujLeaveBar();
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();

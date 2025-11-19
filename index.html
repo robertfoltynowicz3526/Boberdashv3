@@ -25,7 +25,7 @@
             <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
             <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
             <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
-            <button class="tab-button" onclick="openTab(event, 'dodaj-zlecenie')">Dodaj Zlecenie</button>
+            <button class="tab-button" data-tab="dodaj-zlecenie" onclick="openTab(event, 'dodaj-zlecenie')">Dodaj Zlecenie</button>
             <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
             <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Podsumowanie</button>
         </nav>
@@ -41,22 +41,6 @@
         <div id="pulpit" class="tab-content">
             <h2>Pulpit i Ewidencja Czasu Pracy</h2>
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
-            <div id="leave-bar" class="leave-bar card">
-              <label>Dodaj:</label>
-              <select id="leave-kind">
-                <option value="WOLNE">Wolne</option>
-                <option value="L4">L4</option>
-                <option value="SWIETO">Dzień wolny od pracy</option>
-              </select>
-              <input id="leave-from" type="date">
-              <input id="leave-to" type="date">
-              <button id="leave-add" type="button">Dodaj</button>
-            </div>
-            <div id="leave-legend" class="leave-legend">
-              <span class="chip leave wolne">Wolne</span>
-              <span class="chip leave l4">L4</span>
-              <span class="chip leave swieto">Dzień wolny</span>
-            </div>
             <div id="kalendarz" class="calendar-container"></div>
         </div>
         <div id="klienci" class="tab-content">
