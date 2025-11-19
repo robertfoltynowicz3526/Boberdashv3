@@ -397,9 +397,21 @@ function initializeApp() {
 
     function ymd(value) {
         if (!value) return '';
-        const x = new Date(value);
+
+        if (typeof value === 'string') {
+            const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (match) {
+                return match[1];
+            }
+        }
+
+        const x = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(x.getTime())) return '';
-        return x.toISOString().slice(0, 10);
+
+        const year = x.getFullYear();
+        const month = String(x.getMonth() + 1).padStart(2, '0');
+        const day = String(x.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     function eventTouchesDay(event, dayStr) {
