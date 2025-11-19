@@ -126,7 +126,7 @@ function initializeApp() {
         L4: 'L4',
         SWIETO: 'Dzień wolny od pracy'
     };
-    const LEAVE_ICON = { URL: '🌿', WOLNE: '🌿', L4: '🩺', SWIETO: '🏳️' };
+    const LEAVE_ICON = { URL: '🌿', L4: '🩺', SWIETO: '🏳️' };
     const BAZA_MIESIECZNA_GODZIN = 168;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
@@ -346,50 +346,48 @@ function initializeApp() {
         return normalized === DAY_LEAVE_NONE ? null : normalized;
     };
 
+    const getLeaveKindClass = (value) => {
+        const lower = (value || '').toLowerCase();
+        return lower === 'url' ? 'wolne' : lower;
+    };
+
     function addLeaveBadgeToCell(info) {
-        if (!info?.event) return;
-        const baseCell = info.el?.closest?.('.fc-daygrid-day') || info.cellEl;
-        if (!baseCell) return;
-        const rawKind = info.event.extendedProps?.leaveKind || '';
-        const icon = LEAVE_ICON[rawKind.toUpperCase()] || '';
-        if (!icon) return;
-        baseCell.querySelectorAll('.leave-badge').forEach(node => node.remove());
-        const topBar = baseCell.querySelector('.fc-daygrid-day-top') || baseCell;
-        if (!topBar) return;
-        if (typeof window !== 'undefined' && window.getComputedStyle && window.getComputedStyle(topBar).position === 'static') {
-            topBar.style.position = 'relative';
-        } else if (!topBar.style.position || topBar.style.position === 'static') {
-            topBar.style.position = 'relative';
+        if (!info?.event || !info.el) return;
+        const iconKey = info.event.extendedProps?.leaveKind;
+        if (!iconKey) return;
+        const kind = getLeaveKindClass(iconKey);
+        const icon = LEAVE_ICON[String(iconKey).toUpperCase()] || '•';
+
+        let host = info.el.closest('.fc-daygrid-day');
+        let frameSelector = '.fc-daygrid-day-frame';
+        if (!host) {
+            host = info.el.closest('.fc-timegrid-col');
+            frameSelector = '.fc-timegrid-col-frame';
         }
+        if (!host) return;
+
+        const frame = host.querySelector(frameSelector) || host;
+        frame.style.position = 'relative';
+        frame.querySelectorAll('.leave-badge').forEach(node => node.remove());
+
         const badge = document.createElement('span');
-        badge.className = `leave-badge ${(rawKind || '').toLowerCase()}`;
+        badge.className = `leave-badge ${kind}`;
         badge.textContent = icon;
-        topBar.appendChild(badge);
+        frame.appendChild(badge);
     }
 
-    function applyLeaveBadges() {
+    function ensureLeaveBadgesForBackgroundEvents() {
         if (!calendar) return;
-        const run = () => {
-            document.querySelectorAll('.fc .leave-badge').forEach(node => node.remove());
-            calendar.getEvents().forEach(event => {
-                if (event.extendedProps?.typ !== 'LEAVE') return;
-                const startDate = normalizeAllDayDate(event.start);
-                const exclusiveEnd = event.end ? normalizeAllDayDate(event.end) : addDaysToDate(startDate, 1);
-                if (!startDate || !exclusiveEnd) return;
-                const cursor = new Date(startDate.getTime());
-                while (cursor < exclusiveEnd) {
-                    const dateStr = formatDateForStorage(cursor);
-                    const cell = document.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`);
-                    if (cell) addLeaveBadgeToCell({ event, cellEl: cell });
-                    cursor.setDate(cursor.getDate() + 1);
-                }
-            });
-        };
-        if (typeof window !== 'undefined' && window.requestAnimationFrame) {
-            window.requestAnimationFrame(run);
-        } else {
-            setTimeout(run, 0);
-        }
+        document.querySelectorAll('.fc .leave-badge').forEach(node => node.remove());
+        calendar.getEvents().forEach(event => {
+            if (event.extendedProps?.typ !== 'LEAVE') return;
+            const selector = `.fc-daygrid-day[data-date="${event.startStr}"] .fc-daygrid-day-frame`;
+            const timeSelector = `.fc-timegrid-col[data-date="${event.startStr}"] .fc-timegrid-col-frame`;
+            const cell = document.querySelector(selector) || document.querySelector(timeSelector);
+            if (cell) {
+                addLeaveBadgeToCell({ el: cell, event });
+            }
+        });
     }
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -605,7 +603,7 @@ function initializeApp() {
             eventDidMount(info) {
                 const p = info.event.extendedProps || {};
                 if (p.typ === 'LEAVE') {
-                    const k = (p.leaveKind || '').toLowerCase();
+                    const k = getLeaveKindClass(p.leaveKind);
                     if (k) info.el.classList.add(k);
                     addLeaveBadgeToCell(info);
                     return;
@@ -677,15 +675,15 @@ function initializeApp() {
                 if (calendar && typeof calendar.unselect === 'function') {
                     calendar.unselect();
                 }
-            },
-            datesSet: (viewInfo) => {
-                const { currentStart, currentEnd } = viewInfo.view;
-                obliczSumeGodzinZKalendarza(currentStart, currentEnd);
-                applyLeaveBadges();
             }
         });
         window.calendar = calendar;
         calendar.render();
+        calendar.on('datesSet', (viewInfo) => {
+            const { currentStart, currentEnd } = viewInfo.view;
+            obliczSumeGodzinZKalendarza(currentStart, currentEnd);
+            ensureLeaveBadgesForBackgroundEvents();
+        });
     }
 
     async function otworzModalGodzin(data) {
@@ -924,7 +922,7 @@ function initializeApp() {
         if (!skipSummary && calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
-        applyLeaveBadges();
+        ensureLeaveBadgesForBackgroundEvents();
     }
 
     function wyswietlWpisyKalendarza() {

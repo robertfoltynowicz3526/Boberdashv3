@@ -1629,26 +1629,28 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 .fc .leave-badge{
   position:absolute;
-  top:4px;
-  right:4px;
-  z-index:5;
-  font-size:14px;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:6;
+  font-size:24px;
   line-height:1;
-  background:rgba(0,0,0,0.35);
-  color:#fff;
-  border-radius:8px;
-  padding:2px 6px;
+  padding:6px 10px;
+  border-radius:12px;
+  pointer-events:none;
   backdrop-filter:blur(2px);
+  background:rgba(0,0,0,.18);
+  color:#fff;
 }
 .fc .leave-badge.url,
-.fc .leave-badge.wolne{ background:rgba(22,163,74,0.35); }
-.fc .leave-badge.l4{ background:rgba(217,119,6,0.35); }
-.fc .leave-badge.swieto{ background:rgba(100,116,139,0.35); }
-.fc .fc-bg-event { opacity:.28; }
+.fc .leave-badge.wolne  { background: rgba(22,163,74,.18); }
+.fc .leave-badge.l4     { background: rgba(217,119,6,.18); }
+.fc .leave-badge.swieto { background: rgba(100,116,139,.18); }
+.fc .fc-bg-event{ opacity:.25; }
 .fc .fc-bg-event.url,
-.fc .fc-bg-event.wolne  { background:#16a34a !important; }
-.fc .fc-bg-event.l4     { background:#d97706 !important; }
-.fc .fc-bg-event.swieto { background:#64748b !important; }
+.fc .fc-bg-event.wolne{  background:#16a34a !important; }
+.fc .fc-bg-event.l4{     background:#d97706 !important; }
+.fc .fc-bg-event.swieto{ background:#64748b !important; }
 .fc .fc-daygrid-day-frame{overflow:hidden}
 .fc .fc-daygrid-event{white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.2;padding:2px 6px;border-radius:8px;overflow:hidden}
 .fc .fc-daygrid-event .fc-event-main{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
