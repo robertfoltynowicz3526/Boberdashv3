@@ -113,6 +113,20 @@ body > * {
   z-index: 1;
 }
 
+/* nic nie może przykrywać głównej treści */
+#leave-bar,#leave-toolbar,.leave-pop,.leave-legend,.daily-fh-badge,.fh-badge,.hours-badge{
+  display:none !important;
+}
+.app, main, [data-section]{
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+body *{ cursor: default; }
+
+/* domyślnie pokaż pierwszą sekcję, resztę ukryj JS-em po starcie */
+[data-section]{ display:none; }
+
 header {
   position: sticky;
   top: 0;
