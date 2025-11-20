@@ -1929,3 +1929,10 @@ main,
 .hours-badge{ display:none !important; }
 .leave-badge{ pointer-events:none !important; }
 
+/* Header event styling */
+.fc-event.hdr-event{
+  font-size:12px;
+  line-height:1.15;
+  font-weight:600;
+}
+

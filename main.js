@@ -1,9 +1,8 @@
-// === PANIC SAFETY (nie psuje UI, pokaże błąd gdyby coś jeszcze było nie tak) ===
-const noop=()=>{};
+// ===== PANIC SAFETY (widoczny błąd zamiast „czarnego ekranu”) =====
+const noop = ()=>{};
 window.openEwidencjaDnia      = window.openEwidencjaDnia      || noop;
 window.openEwidencjaDniaRange = window.openEwidencjaDniaRange || noop;
-window.recalcMonthStats       = window.recalcMonthStats       || noop;
-function safe(fn){ try{ return fn&&fn(); } catch(e){ console.error(e); showPanic(e); } }
+
 function showPanic(err){
   if(document.getElementById('__panic')) return;
   const pre=document.createElement('pre');
@@ -12,8 +11,98 @@ function showPanic(err){
   pre.textContent='Runtime error:\n'+(err?.stack||err?.message||String(err));
   document.body.appendChild(pre);
 }
-window.addEventListener('error',e=>showPanic(e.error||e.message));
-window.addEventListener('unhandledrejection',e=>showPanic(e.reason||e));
+function safe(fn){ try{ return fn&&fn(); } catch(e){ console.error('[SAFE]',e); showPanic(e); } }
+window.addEventListener('error', e=>showPanic(e.error||e.message));
+window.addEventListener('unhandledrejection', e=>showPanic(e.reason||e));
+
+/* WYŁĄCZ WSZYSTKO co mogło przykrywać UI:
+   - paski/overlays/legendy wolnego (createLeaveBar/renderLeaveLegend/openLeavePopover/openActionPopover)
+   - bąble godzin i „nagłówki dnia” rysowane jako overlay
+   - dodatkowe hooki datesSet/viewDidMount do tych elementów
+   Usuń ich definicje i wywołania.
+*/
+
+// Router zakładek – jeden delegat:
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest?.('[data-tab]');
+  if(!btn) return;
+  e.preventDefault();
+  const id = btn.getAttribute('data-tab');
+  document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active', x===btn));
+  document.querySelectorAll('[data-section]').forEach(sec=>{
+    sec.style.display = (sec.getAttribute('data-section')===id)?'block':'none';
+  });
+  if(id==='magazyn' && typeof window.ensureMagazynSummaryPlacement==='function'){
+    window.ensureMagazynSummaryPlacement();
+  }
+});
+
+// Sprzątanie potencjalnych overlayów w DOM:
+(function killOverlays(){
+  const sel=['#leave-bar','#leave-toolbar','.leave-pop','.leave-legend','.daily-fh-badge','.fh-badge','.hours-badge'];
+  sel.forEach(s=>document.querySelectorAll(s).forEach(n=>n.remove()));
+  const st=document.createElement('style');
+  st.textContent='#leave-bar,#leave-toolbar,.leave-pop,.leave-legend,.daily-fh-badge,.fh-badge,.hours-badge{display:none!important}.leave-badge{pointer-events:none!important}';
+  document.head.appendChild(st);
+})();
+
+//// ==== FullCalendar: stabilna inicjalizacja + nagłówek dnia jako EVENT ==== ////
+
+function ymd(d){ const x=new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); }
+function eventTouchesDay(ev, dayStr){
+  const s=ymd(ev.start);
+  const e=ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
+  return dayStr>=s && dayStr<=e;
+}
+function sumsForDay(dayStr){
+  let work=0, drive=0, invoiced=0;
+  (window.calendar?.getEvents?.()||[]).forEach(ev=>{
+    const p=ev.extendedProps||{};
+    if(p.typ==='LEAVE') return;                         // NIE liczymy wolnego/L4/święta
+    if(!eventTouchesDay(ev, dayStr)) return;
+    work     += Number(p.workHours ?? p.praca ?? 0);
+    drive    += Number(p.driveHours ?? p.jazda ?? 0);
+    invoiced += Number(p.fh ?? p.fakturowane ?? p.invoicedHours ?? 0);
+  });
+  return {work, drive, invoiced};
+}
+function fmtH(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2)+'h'; }
+function removeHeaderForDay(dayStr){
+  (window.calendar?.getEvents?.()||[]).forEach(e=>{
+    if(e.extendedProps?.typ==='HEADER' && e.startStr===dayStr) e.remove();
+  });
+}
+function upsertHeaderForDay(dayStr){
+  const {work, drive, invoiced} = sumsForDay(dayStr);
+  // Header TYLKO jeśli cokolwiek > 0:
+  if((work||0)===0 && (drive||0)===0 && (invoiced||0)===0){ removeHeaderForDay(dayStr); return; }
+
+  removeHeaderForDay(dayStr);
+  const end=new Date(dayStr); end.setDate(end.getDate()+1);
+  const title=`• Praca: ${fmtH(work)} •\nJazda: ${fmtH(drive)} •\nFakturowane: ${fmtH(invoiced)}`;
+
+  window.calendar?.addEvent({
+    id:`HDR-${dayStr}`,
+    start:dayStr,
+    end:end.toISOString().slice(0,10),
+    allDay:true,
+    title,
+    classNames:['hdr-event'],                   // wygląd jak niebieskie eventy
+    extendedProps:{ typ:'HEADER', order:-1000 } // zawsze nad zleceniami
+  });
+}
+function refreshAllHeaders(){
+  document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
+    upsertHeaderForDay(cell.getAttribute('data-date'));
+  });
+}
+
+// start po DOMContentLoaded
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', ()=>safe(()=>window.bootCalendar?.()), {once:true});
+}else{
+  safe(()=>window.bootCalendar?.());
+}
 
 import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
@@ -21,6 +110,7 @@ import Papa from 'papaparse';
 
 const FULLCALENDAR_SRC = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js';
 let fullCalendarPromise = null;
+let calendarBootStarted = false;
 function ensureFullCalendar(){
     if (window.FullCalendar?.Calendar) return Promise.resolve(window.FullCalendar);
     if (!fullCalendarPromise) {
@@ -34,53 +124,6 @@ function ensureFullCalendar(){
         });
     }
     return fullCalendarPromise;
-}
-
-//// helpers ////
-function ymd(d){ const x=new Date(d); x.setHours(0,0,0,0); return x.toISOString().slice(0,10); }
-function eventTouchesDay(ev, dayStr){
-    const s=ymd(ev.start);
-    const e=ev.end ? ymd(new Date(ev.end.getTime()-1)) : s;
-    return dayStr>=s && dayStr<=e;
-}
-function sumsForDay(dayStr){
-    let work=0, drive=0, invoiced=0;
-    (window.calendar?.getEvents?.()||[]).forEach(ev=>{
-        const p=ev.extendedProps||{};
-        if(p.typ==='LEAVE' || p.typ==='HEADER') return;
-        if(!eventTouchesDay(ev, dayStr)) return;
-        work     += Number(p.workHours ?? p.praca ?? 0);
-        drive    += Number(p.driveHours ?? p.jazda ?? 0);
-        invoiced += Number(p.fh ?? p.fakturowane ?? p.invoicedHours ?? 0);
-    });
-    return {work, drive, invoiced};
-}
-function fmtH(n){ return (Math.round(Number(n||0)*100)/100).toFixed(2)+'h'; }
-function removeHeaderForDay(dayStr){
-    (window.calendar?.getEvents?.()||[]).forEach(e=>{
-        if(e.extendedProps?.typ==='HEADER' && e.startStr===dayStr) e.remove();
-    });
-}
-function upsertHeaderForDay(dayStr){
-    const {work, drive, invoiced}=sumsForDay(dayStr);
-    if((work||0)===0 && (drive||0)===0 && (invoiced||0)===0){ removeHeaderForDay(dayStr); return; }
-    removeHeaderForDay(dayStr);
-    const end=new Date(dayStr); end.setDate(end.getDate()+1);
-    const title=`• Praca: ${fmtH(work)} •\nJazda: ${fmtH(drive)} •\nFakturowane: ${fmtH(invoiced)}`;
-    window.calendar?.addEvent({
-        id:`HDR-${dayStr}`,
-        start:dayStr,
-        end:end.toISOString().slice(0,10),
-        allDay:true,
-        title,
-        classNames:['hdr-event'],
-        extendedProps:{ typ:'HEADER', order:-1000 }
-    });
-}
-function refreshAllHeaders(){
-    document.querySelectorAll('.fc-daygrid-day[data-date]').forEach(cell=>{
-        upsertHeaderForDay(cell.getAttribute('data-date'));
-    });
 }
 
 // Uruchom dopiero po załadowaniu DOM:
@@ -486,6 +529,7 @@ function initializeApp() {
             magazynTab.insertBefore(magazynSummaryBox, magazynTab.firstChild);
         }
     };
+    window.ensureMagazynSummaryPlacement = ensureMagazynSummaryPlacement;
 
     function moveOrdersSearchBetweenSections() {
         const search = document.querySelector('#orders-search');
@@ -566,10 +610,9 @@ function initializeApp() {
     ensureMagazynSummaryPlacement();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    const activateTab = (btn) => {
-        if (!btn) return;
-        const id = btn.getAttribute('data-tab');
-        if (!id) return;
+    const syncInitialTab = () => {
+        const btn = document.querySelector('[data-tab].active') || document.querySelector('[data-tab]');
+        const id = btn?.getAttribute('data-tab');
         document.querySelectorAll('[data-tab]').forEach(el => {
             el.classList.toggle('active', el === btn);
         });
@@ -580,19 +623,7 @@ function initializeApp() {
             ensureMagazynSummaryPlacement();
         }
     };
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest?.('[data-tab]');
-        if (!btn) return;
-        e.preventDefault();
-        activateTab(btn);
-    });
-    const initialTab = document.querySelector('[data-tab].active') || document.querySelector('[data-tab]');
-    if (initialTab) {
-        activateTab(initialTab);
-    } else {
-        const firstSection = document.querySelector('[data-section]');
-        if (firstSection) firstSection.style.display = 'block';
-    }
+    syncInitialTab();
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
@@ -660,6 +691,12 @@ function initializeApp() {
 
         refreshAllHeaders();
     }
+
+    window.bootCalendar = async () => {
+        if (calendarBootStarted) return;
+        calendarBootStarted = true;
+        await inicjalizujKalendarz();
+    };
 
     async function otworzModalGodzin(data) {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
@@ -3131,7 +3168,7 @@ async function obslugaZakonczeniaZlecenia(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
-    inicjalizujKalendarz().catch(showPanic);
+    window.bootCalendar?.().catch?.(showPanic);
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();
