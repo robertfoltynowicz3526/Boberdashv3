@@ -1,3 +1,4 @@
+import './style.css';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { db } from './firebase-config.js';
 
