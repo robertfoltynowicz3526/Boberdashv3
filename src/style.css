@@ -1669,25 +1669,28 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   align-items:start;
 }
 
+:root{
+  /* skaluje się z szerokością okna: min 56px, max 96px */
+  --leave-icon-size: clamp(56px, 7vw, 96px);
+  --leave-icon-glow: 0 6px 18px rgba(0,0,0,.35);
+}
 .fc .leave-badge{
   position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  z-index:6;
-  font-size:24px;
-  line-height:1;
-  padding:6px 10px;
-  border-radius:12px;
-  pointer-events:none;
-  backdrop-filter:blur(2px);
-  background:rgba(0,0,0,.18);
-  color:#fff;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none; /* klik nadal łapie komórkę dnia */
 }
-.fc .leave-badge.url,
-.fc .leave-badge.wolne  { background: rgba(22,163,74,.18); }
-.fc .leave-badge.l4     { background: rgba(217,119,6,.18); }
-.fc .leave-badge.swieto { background: rgba(100,116,139,.18); }
+.fc .leave-badge svg{
+  width:var(--leave-icon-size);
+  height:var(--leave-icon-size);
+  filter: drop-shadow(var(--leave-icon-glow));
+  opacity:.95;
+}
+.fc .leave-badge--l4 svg     { color:#ff4d4f; }
+.fc .leave-badge--wolne svg  { color:#63d471; }
+.fc .leave-badge--swieto svg { color:#ffd54a; }
 .fc .fc-bg-event{ opacity:.25; }
 .fc .fc-bg-event.url,
 .fc .fc-bg-event.wolne{  background:#16a34a !important; }
