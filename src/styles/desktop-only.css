@@ -1,0 +1,68 @@
+/* ===== DESKTOP-ONLY (ładuj NA KOŃCU) ===== */
+html, body, #app { width: 100vw !important; height: 100%; overflow-x: hidden; }
+body { min-width: 1366px !important; }  /* wymuś szerokość dla PC */
+
+.app-shell, .content, .page, .page-section, [data-section] {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Siatka z lewym menu: prawa kolumna = pełna szerokość */
+.main-grid { grid-template-columns: 280px 1fr !important; }
+.main-grid > .main, .main, .content-inner { grid-column: 2 / -1 !important; width: 100% !important; }
+
+/* Sidebar – sztywna szerokość, by łatwo wyliczyć main */
+aside, .sidebar { width: 280px !important; min-width: 280px !important; }
+
+/* Karta z kalendarzem – pełna szerokość prawej kolumny */
+.calendar-card, [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
+  width: calc(100vw - 280px) !important;   /* viewport minus sidebar */
+  max-width: calc(100vw - 280px) !important;
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+/* Kalendarz – rozciągnięcie w dół i większe kratki */
+#kalendarz { min-height: calc(100vh - 220px) !important; }
+.fc-view-harness { min-height: calc(100vh - 250px) !important; }
+.fc-daygrid-day-frame { min-height: 180px !important; }          /* 180–200px na desktop */
+@media (min-width: 1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
+
+/* Pop-over „+X więcej” – zostaje */
+.fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
+.fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
+
+/* Chippy godzin oraz ikony wolnego/L4/święta */
+.ab-chip{
+  position:absolute; left:6px; right:6px; bottom:6px;
+  background:rgba(49,128,83,.96); color:#eaffea;
+  border-radius:10px; padding:6px 8px; font-size:12px; line-height:1.25;
+  border:1px solid rgba(255,255,255,.12)
+}
+.leave-flag{ position:absolute; inset:0; display:grid; place-items:center;
+  font-size:32px; opacity:.9; pointer-events:none; }
+
+/* ===== SCROLLE W LISTACH ===== */
+/* Zakończone zlecenia / Maszyny / Klienci – przewijanie pionowe listy */
+[data-section="zlecenia"] .closed-list,
+[data-section="zlecenia"] .list-panel,
+[data-section="maszyny"] .items,
+[data-section="klienci"] .items,
+.list-scroll, .list-panel {
+  max-height: calc(100vh - 260px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* Nagłówki list „przyklejone”, żeby zawsze było widać filtr/sumę */
+.list-panel .list-header, .closed-list .list-header, .items .list-header {
+  position: sticky; top: 0; z-index: 2;
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(4px);
+}
+
+/* Ubicie typowych mobilnych reguł zawężających */
+@media (max-width: 1200px){
+  body { min-width: 1366px !important; }
+  .main, .content, .page, .page-section { width: calc(100vw - 280px) !important; }
+}
