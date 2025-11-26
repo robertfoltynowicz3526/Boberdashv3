@@ -621,8 +621,9 @@ function initializeApp() {
             plugins: calendarPlugins,
             initialView: 'dayGridMonth',
             headerToolbar: false,
-            height: '100%',          // wypełnij kartę i nie wychodź poza nią
-            expandRows: true,
+            height: 'auto',          // dopasuj się do zawartości karty
+            aspectRatio: 1.7,        // większe ratio = niższy widok miesiąca
+            expandRows: false,
             dayMaxEventRows: true,
             moreLinkClick: 'popover',
             handleWindowResize: true,

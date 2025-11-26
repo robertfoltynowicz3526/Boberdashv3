@@ -682,13 +682,13 @@ select {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  height: calc(100vh - 260px);
-  min-height: 520px;
+  height: auto;
+  min-height: auto;
 }
 
 #calendar-shell #kalendarz {
-  height: 100%;
-  min-height: inherit;
+  height: auto;
+  min-height: auto;
   overflow: clip;
 }
 
@@ -699,7 +699,7 @@ select {
 #calendar-shell .fc-scrollgrid,
 #calendar-shell .fc-daygrid-body,
 #calendar-shell .fc-daygrid-body-unbalanced {
-  height: 100% !important;
+  height: auto !important;
 }
 
 .fc .day-summary {
@@ -1979,7 +1979,7 @@ main,
   max-width: 1280px;
   margin: 0 auto;
 }
-#kalendarz { height: 100%; min-height: 520px; }
+#kalendarz { height: auto; min-height: auto; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
 .fc-daygrid-day { position: relative; overflow: hidden; }
 /* Opisy dnia (Praca/Jazda/Fakturowane) – widoczne bez popoutów */
@@ -2014,8 +2014,8 @@ main,
 .calendar-card { grid-column: 1 / -1; width: 100%; max-width: 1280px; margin: 0 auto; }
 
 #kalendarz {
-  height: 100%;
-  min-height: 520px;
+  height: auto;
+  min-height: auto;
   padding: 8px;
 }
 
@@ -2111,7 +2111,7 @@ main,
 .page-section, .card { padding: 12px; }
 
 /* === Kalendarz – pełna wysokość karty === */
-#kalendarz { height: 100%; min-height: 520px; }
+#kalendarz { height: auto; min-height: auto; }
 
 /* Kratki dnia wysokość automatyczna */
 .fc-daygrid-day-frame { min-height: auto; }
@@ -2172,8 +2172,8 @@ main,
 /* Mniej powietrza nad/po bokach; w dół – dynamiczna wysokość względem okna */
 [data-section="pulpit"] .card.kalendarz { padding: 12px; }
 #kalendarz {
-  height: 100%;
-  min-height: 520px;
+  height: auto;
+  min-height: auto;
 }
 
 /* Kratki dnia wyższe – poprawa czytelności */
