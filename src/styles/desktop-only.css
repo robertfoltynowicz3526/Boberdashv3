@@ -124,3 +124,49 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 [data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"] {
   overflow: visible !important;
 }
+
+/* === KALENDARZ NA CAŁĄ SZEROKOŚĆ PRAWEJ KOLUMNY === */
+aside, .sidebar { width: 280px !important; min-width: 280px !important; }
+.main-grid { grid-template-columns: 280px 1fr !important; }
+.main-grid > .main, .main, .content, .content-inner, .page, .page-container {
+  grid-column: 2 / -1 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+
+/* Karta z kalendarzem = viewport - sidebar */
+#calendar-wrapper, .calendar-wrapper,
+[data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
+  width: calc(100vw - 280px) !important;
+  max-width: calc(100vw - 280px) !important;
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+/* FullCalendar niech zawsze bierze 100% szerokości rodzica */
+#kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid { width: 100% !important; }
+
+/* Wysokość w dół (kratki większe), ale bez zielonych chipów */
+.fc-view-harness { min-height: calc(100vh - 250px) !important; }
+.fc-daygrid-day-frame { min-height: 180px !important; }
+@media (min-width:1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
+
+/* Usuń style zielonych „chipów” (gdyby istniały) */
+.ab-chip, .leave-flag { display: none !important; }
+
+/* === SCROLL W DŁUGICH LISTACH === */
+#closed-orders, .closed-orders,          /* zakończone zlecenia */
+#machines-list, .machines-list,          /* maszyny */
+#clients-list, .clients-list {           /* klienci */
+  max-height: calc(100vh - 260px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* upewnij się, że rodzice nie blokują scrolla */
+[data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"],
+.page, .page-container, .content, .main { overflow: visible !important; }
+
+/* Sticky nagłówki w panelach list (jeśli są) */
+.list-header { position: sticky; top: 0; z-index: 2; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); }
