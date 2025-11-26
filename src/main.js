@@ -634,10 +634,9 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
-    const calendarPlugins = [
-        (window.dayGrid && window.dayGrid.default) || (FullCalendar?.dayGridPlugin),
-        (window.interaction && window.interaction.default) || (FullCalendar?.interactionPlugin)
-    ].filter(Boolean);
+    const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
+    const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
+    const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
 
     const openEwidencja = (dateStr) => {
         const normalized = dateStr || '';
@@ -2079,35 +2078,38 @@ async function obslugaListyKlientow(event) {
             );
             const querySnapshot = await getDocs(qMasz);
 
-            let historiaHtml = '';
-            if (querySnapshot.empty) {
-                historiaHtml = '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
-            } else {
+
+            let rowsHtml = '';
+            if (!querySnapshot.empty) {
                 querySnapshot.forEach((d) => {
                     const zlecenie = d.data();
                     const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0
                         ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
                         : '';
-                    const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';                        
+                    const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
                     const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
-                    historiaHtml += `
-                        <li data-id="${d.id}">
-                            <span>
-                                <strong>Nr: ${zlecenie.nrZlecenia}</strong> (Ukończono: ${zlecenie.dataUkonczenia || 'b.d.'})<br>
-                                <em>Opis: ${zlecenie.opis || 'Brak'}</em><br>
-                                Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
-                                ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}
-                            </span>
-                            <div>
+                    const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
+                    rowsHtml += `
+                        <tr data-id="${d.id}">
+                            <td>${zlecenie.dataUkonczenia || 'b.d.'}</td>
+                            <td>${zlecenie.nrZlecenia || '—'}</td>
+                            <td>
+                                <div><em>${zlecenie.opis || 'Brak'}</em></div>
+                                <div>Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}</div>
+                            </td>
+                            <td>${motoHoursVal.toFixed(1)} h</td>
+                            <td class="actions">
                                 <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${d.id}">Szczegóły</button>
                                 <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${d.id}">Edytuj</button>
-                            </div>
-                        </li>`;
+                            </td>
+                        </tr>`;
                 });
-                historiaHtml = `<ul>${historiaHtml}</ul>`;
             }
 
-            machineHistoryList.innerHTML = historiaHtml;
+            machineHistoryList.innerHTML = rowsHtml
+                ? `<table class="table machine-history-table"><thead><tr><th>Data</th><th>Nr zlecenia</th><th>Opis</th><th>Motogodziny</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`
+                : '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
+
 
         } catch (error) {
             console.error("Błąd podczas pobierania historii serwisowej:", error);
@@ -2117,8 +2119,8 @@ async function obslugaListyKlientow(event) {
 
     function obslugaListyZlecenWModaluHistorii(event) {
         const target = event.target;
-        const li = target.closest('li');
-        const docId = target.dataset.id || li?.dataset.id;
+        const row = target.closest('tr') || target.closest('li');
+        const docId = target.dataset.id || row?.dataset.id;
         if (!docId) return;
         if (target.classList.contains('details-zlecenie-btn')) {
             handleDetailsButtonClick(docId, event);
@@ -2517,7 +2519,7 @@ function wyswietlZlecenia() {
             const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
             const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
-            const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="moto">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
+            const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="meta">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
             ukonczoneElements.push(createZlecenieListItem(
                 zlecenie,
                 `
@@ -2613,6 +2615,7 @@ async function dodajZlecenie(event) {
             status: 'nieprzypisane',
             nrZlecenia: zlecenieForm['nr-zlecenia'].value,
             opis: zlecenieForm['opis-usterki'].value,
+            motoHours: 0,
             startAt: startAtFieldValue,
             endAt: null,
             historia,
@@ -2630,6 +2633,7 @@ async function dodajZlecenie(event) {
             typMaszyny: maszyna.typMaszyny, model: maszyna.model, status: 'aktywne',
             nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value,
             motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
+            motoHours: Number(zlecenieForm.motogodziny.value) || 0,
             startAt: startAtFieldValue,
             endAt: null,
             historia,
@@ -2901,6 +2905,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
         infoDiv.innerHTML += `
             <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
+            <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
             <div class="details-group"><strong>Użyte Części:</strong> <p>${uzyteCzesciOpis}</p></div>
             ${wzHtml}${notatkaHtml}
@@ -3091,72 +3096,91 @@ async function obslugaListyCzesci(event) {
         try {
             const zlecenieStartSnap = await getDoc(zlecenieRef);
             if (!zlecenieStartSnap.exists()) {
-            alert("Nie znaleziono zlecenia do zakończenia.");
+                alert("Nie znaleziono zlecenia do zakończenia.");
+                return;
+            }
+            const startAtDate = toDateSafe(zlecenieStartSnap.data().startAt);
+            if (!walidujPrzedzialCzasu(startAtDate, manualEndAt, { allowEndBeforeStart: true })) {
+                return;
+            }
+        } catch (error) {
+            console.error("Błąd walidacji czasu zakończenia:", error);
+            alert("Nie udało się zweryfikować czasu zakończenia. Spróbuj ponownie.");
             return;
         }
-        const startAtDate = toDateSafe(zlecenieStartSnap.data().startAt);
-        if (!walidujPrzedzialCzasu(startAtDate, manualEndAt, { allowEndBeforeStart: true })) {
-            return;
-        }
-    } catch (error) {
-        console.error("Błąd walidacji czasu zakończenia:", error);
-        alert("Nie udało się zweryfikować czasu zakończenia. Spróbuj ponownie.");
-        return;
-    }
 
         const fallbackEndAtDate = manualEndAt || new Date();
         const endAtValue = manualEndAt || serverTimestamp();
         const dane = {
             status: 'ukończone',
             wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
-            motoHours,
+            motoHours: Number(motoHours),
             typZlecenia: document.getElementById('typ-zlecenia').value,
             dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
             endAt: endAtValue,
+            closedAt: serverTimestamp(),
             uzyteCzesci: czesciDoZlecenia,
             zakonczenieNotatka: notatka || null,
-        zakonczenieNumerWZ: numerWzValue || null
-    };
-    try {
-        await runTransaction(db, async (t) => {
-            const zlecenieSnap = await t.get(zlecenieRef);
-            if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
-            const zlecenieData = zlecenieSnap.data();
-            let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours}h.`;
-            if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
-            if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
-            const nowaHistoria = [...(zlecenieData.historia || []), {
-                timestamp: new Date().toISOString(),
-                akcja: wpisHistorii
-               }];
-            dane.historia = nowaHistoria;
+            zakonczenieNumerWZ: numerWzValue || null
+        };
+        let zamykaneZlecenieData = null;
+        try {
+            await runTransaction(db, async (t) => {
+                const zlecenieSnap = await t.get(zlecenieRef);
+                if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
+                const zlecenieData = zlecenieSnap.data();
+                zamykaneZlecenieData = zlecenieData;
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h.`;
+                if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
+                if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
+                const nowaHistoria = [...(zlecenieData.historia || []), {
+                    timestamp: new Date().toISOString(),
+                    akcja: wpisHistorii
+                }];
+                dane.historia = nowaHistoria;
 
-            const partPromises = czesciDoZlecenia.map(czesc => t.get(doc(db, "magazyn", czesc.id)));
-            const partDocs = await Promise.all(partPromises);
-            t.update(zlecenieRef, dane);
-            for (let i = 0; i < czesciDoZlecenia.length; i++) {
-                const czesc = czesciDoZlecenia[i];
-                const produktDoc = partDocs[i];
-                if (!produktDoc.exists()) throw `Produkt ${czesc.nazwa} nie istnieje!`;
-                const produktMagazynData = produktDoc.data();
-                const aktualnaIlosc = Number(produktMagazynData.ilosc) || 0;
-                const isOilProdukt = Boolean(produktMagazynData.jestOlejem);
-                let nowaIlosc = aktualnaIlosc - czesc.ilosc;
-                if (isOilProdukt) {
-                    nowaIlosc = Number(nowaIlosc.toFixed(2));
+                const partPromises = czesciDoZlecenia.map(czesc => t.get(doc(db, "magazyn", czesc.id)));
+                const partDocs = await Promise.all(partPromises);
+                t.update(zlecenieRef, dane);
+                for (let i = 0; i < czesciDoZlecenia.length; i++) {
+                    const czesc = czesciDoZlecenia[i];
+                    const produktDoc = partDocs[i];
+                    if (!produktDoc.exists()) throw `Produkt ${czesc.nazwa} nie istnieje!`;
+                    const produktMagazynData = produktDoc.data();
+                    const aktualnaIlosc = Number(produktMagazynData.ilosc) || 0;
+                    const isOilProdukt = Boolean(produktMagazynData.jestOlejem);
+                    let nowaIlosc = aktualnaIlosc - czesc.ilosc;
+                    if (isOilProdukt) {
+                        nowaIlosc = Number(nowaIlosc.toFixed(2));
+                    }
+                    if (nowaIlosc < 0) throw `Za mało produktu ${czesc.nazwa} na stanie!`;
+                    t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
                 }
-                if (nowaIlosc < 0) throw `Za mało produktu ${czesc.nazwa} na stanie!`;
-                t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
+            });
+            if (zamykaneZlecenieData) {
+                const historiaPayload = {
+                    orderId: docId,
+                    clientId: zamykaneZlecenieData.klientId || null,
+                    machineId: zamykaneZlecenieData.maszynaId || null,
+                    orderNo: zamykaneZlecenieData.nrZlecenia || '',
+                    description: zamykaneZlecenieData.opis || '',
+                    motoHours: Number(motoHours),
+                    closedAt: serverTimestamp()
+                };
+                try {
+                    await addDoc(collection(db, 'orders_history'), historiaPayload);
+                } catch (historyErr) {
+                    console.warn('Nie udało się zapisać historii zlecenia:', historyErr);
+                }
             }
-        });
-        alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
-        hideModal(completeModal);
-        completeModalForm.reset();
-    } catch (error) {
-        console.error("BŁĄD TRANSAKCJI: ", error);
-        alert(`Wystąpił błąd: ${error.message || error}`);
+            alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
+            hideModal(completeModal);
+            completeModalForm.reset();
+        } catch (error) {
+            console.error("BŁĄD TRANSAKCJI: ", error);
+            alert(`Wystąpił błąd: ${error.message || error}`);
+        }
     }
-}
 
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
     async function dodajProduktDoMagazynu(event) {

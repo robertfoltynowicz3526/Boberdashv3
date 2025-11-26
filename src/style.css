@@ -2097,3 +2097,52 @@ main,
 .fc-daygrid-dot-event .fc-event-title,
 .fc-daygrid-event .fc-event-title { font-size: 12px; line-height: 1.2; }
 .fc-daygrid-event { padding: 2px 4px; }
+
+/* === Shell: usuń sztuczne ramy i max-widthy kontenera treści === */
+.app-shell, .content, .page, .page-section, [data-section="pulpit"] {
+  max-width: none !important;
+  width: 100% !important;
+}
+.app-container, .content-inner, .page {
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Jeśli jest siatka z lewym menu: kalendarz ma zajmować całą prawą kolumnę */
+.main-grid { grid-template-columns: 280px 1fr !important; } /* dostosuj do szerokości menu */
+.main-grid > .main { grid-column: 2 / -1 !important; }
+
+/* Karta z kalendarzem – rozciągnij do brzegów */
+[data-section="pulpit"] .card.kalendarz,
+[data-section="kalendarz"] .card,
+.calendar-card {
+  width: calc(100vw - 320px);   /* (szerokosc okna - szerokość sidebaru ~280 + odstępy) */
+  max-width: 100vw;
+  margin: 0 auto;
+}
+
+/* Mniej powietrza nad/po bokach; w dół – dynamiczna wysokość względem okna */
+[data-section="pulpit"] .card.kalendarz { padding: 12px; }
+#kalendarz {
+  min-height: calc(100vh - 220px);  /* rozciągnięcie w dół */
+}
+
+/* Kratki dnia wyższe – poprawa czytelności */
+.fc-view-harness { min-height: calc(100vh - 260px); }
+.fc-daygrid-day-frame { min-height: 170px; }         /* 170–190px na desktop */
+@media (min-width: 1600px){ .fc-daygrid-day-frame { min-height: 190px; } }
+
+/* Zostają chipy i ikony (jak wcześniej) */
+.ab-chip{
+  position:absolute; left:6px; right:6px; bottom:6px;
+  background:rgba(49,128,83,.96); color:#eaffea;
+  border-radius:10px; padding:6px 8px; font-size:12px; line-height:1.25;
+  border:1px solid rgba(255,255,255,.12)
+}
+.leave-flag{ position:absolute; inset:0; display:grid; place-items:center;
+  font-size:32px; opacity:.9; pointer-events:none; }
+
+/* Popover „+X więcej” – zachowany i czytelny */
+.fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
+.fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
