@@ -661,6 +661,13 @@ function initializeApp() {
                 else if (rawType === 'LEAVE_FREE') leaveType = 'WOLNE';
                 else if (rawType === 'LEAVE_HOLIDAY') leaveType = 'SWIETO';
 
+                if (!leaveType && typeof ext.leaveType === 'string') {
+                    const v = ext.leaveType.toUpperCase();
+                    if (v === 'L4' || v === 'WOLNE' || v === 'ŚWIĘTO' || v === 'SWIETO') {
+                        leaveType = v === 'ŚWIĘTO' ? 'SWIETO' : v;
+                    }
+                }
+
                 if (!leaveType && typeof ext.leaveKind === 'string') {
                     const kind = ext.leaveKind.toUpperCase();
                     if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
@@ -679,12 +686,29 @@ function initializeApp() {
                     if (frame && !frame.querySelector('.leave-badge')) {
                         frame.classList.add('has-leave-label');
                         const badge = document.createElement('div');
-                        badge.className = 'leave-badge ' + (leaveType === 'L4'
-                            ? 'leave-badge--l4'
-                            : leaveType === 'WOLNE'
-                                ? 'leave-badge--wolne'
-                                : 'leave-badge--swieto');
-                        badge.textContent = leaveType === 'L4' ? '🏥' : leaveType === 'WOLNE' ? '🌿' : '🎌';
+                        badge.className = 'leave-badge ' + (
+                            leaveType === 'L4' ? 'leave-badge--l4' :
+                            leaveType === 'WOLNE' ? 'leave-badge--wolne' :
+                            'leave-badge--swieto'
+                        );
+
+                        const svgL4 = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="L4">
+                            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                            <path d="M12 7v10M7 12h10"></path>
+                          </svg>`;
+                        const svgLeaf = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Wolne">
+                            <path d="M3 21c7-1 12-6 12-13 3 0 6 3 6 6 0 6-6 10-12 10-2 0-4-1-6-3z"></path>
+                            <path d="M9 15c1-3 3-5 6-6"></path>
+                          </svg>`;
+                        const svgFlag = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Święto">
+                            <path d="M4 22V4"></path>
+                            <path d="M4 4h10l-2 3 2 3H4"></path>
+                          </svg>`;
+
+                        badge.innerHTML = leaveType === 'L4' ? svgL4 : (leaveType === 'WOLNE' ? svgLeaf : svgFlag);
                         frame.appendChild(badge);
                     }
 
