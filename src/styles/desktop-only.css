@@ -66,3 +66,61 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   body { min-width: 1366px !important; }
   .main, .content, .page, .page-section { width: calc(100vw - 280px) !important; }
 }
+
+/* === WYŁĄCZ CENTROWANIE I MAX-WIDTH KONTENERÓW === */
+.container, .wrapper, .app-content, .app-shell, .content, .content-inner,
+.page, .page-container, .page-section, [data-section] {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Układ z lewym menu: sidebar 280px, reszta = 1fr */
+aside, .sidebar { width: 280px !important; min-width: 280px !important; }
+.main-grid { grid-template-columns: 280px 1fr !important; }
+.main-grid > .main, .main, .content-inner { grid-column: 2 / -1 !important; }
+
+/* === KARTA KALENDARZA – PEŁNA SZEROKOŚĆ PRAWEJ KOLUMNY === */
+.calendar-card,
+[data-section="pulpit"] .card.kalendarz,
+[data-section="kalendarz"] .card,
+#calendar-wrapper, .calendar-wrapper {
+  width: calc(100vw - 280px) !important;   /* viewport – sidebar */
+  max-width: calc(100vw - 280px) !important;
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+/* FullCalendar niech używa 100% rodzica */
+#kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid {
+  width: 100% !important;
+}
+
+/* W dół – większe kratki i wysoki harness */
+#kalendarz { min-height: calc(100vh - 220px) !important; }
+.fc-view-harness { min-height: calc(100vh - 250px) !important; }
+.fc-daygrid-day-frame { min-height: 180px !important; }
+@media (min-width:1600px){ .fc-daygrid-day-frame{ min-height:200px !important; } }
+
+/* === LISTY – PRZEWIJANIE (ZAKOŃCZONE, MASZYNY, KLIENCI) === */
+[data-section="zlecenia"] .closed-list,
+[data-section="zlecenia"] .list-panel,
+#closed-orders, .closed-orders,
+[data-section="maszyny"] .items, #machines-list,
+[data-section="klienci"] .items, #clients-list {
+  max-height: calc(100vh - 260px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* Przyklejony nagłówek listy (jeśli jest) */
+.list-header, .closed-list .list-header {
+  position: sticky; top: 0; z-index: 2;
+  background: rgba(0,0,0,.35); backdrop-filter: blur(4px);
+}
+
+/* Upewnij się, że żaden rodzic NIE utnie przewijania */
+[data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"] {
+  overflow: visible !important;
+}
