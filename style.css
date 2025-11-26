@@ -2050,3 +2050,50 @@ main,
 }
 .mini-bar .bar{flex:1;height:0;background:#3fa36a;border-radius:6px;position:relative}
 .mini-bar .bar span{position:absolute;left:50%;transform:translateX(-50%);bottom:-18px;font-size:12px;opacity:.85;color:#e9ffe9}
+
+/* === Kontener sekcji pulpitu/kalendarza na pełną szerokość === */
+[data-section="pulpit"] .card,
+[data-section="kalendarz"] .card {
+  width: 100%;
+  max-width: unset;
+}
+
+/* Mniej powietrza nad/po bokach */
+.page-section, .card { padding: 12px; }
+
+/* === Kalendarz – większa wysokość całości i kratek === */
+#kalendarz { min-height: 1100px; }
+@media (min-width: 1440px){ #kalendarz { min-height: 1240px; } }
+
+/* Kratki dnia wyższe na desktopie */
+.fc-daygrid-day-frame { min-height: 160px; }           /* <= główny trick na „ściśnięcie” */
+@media (max-width: 1100px){ .fc-daygrid-day-frame { min-height: 120px; } }
+
+/* Nie obcinaj nakładek */
+.fc-daygrid-day { position: relative; overflow: hidden; }
+
+/* Chips z godzinami – nisko, czytelny */
+.ab-chip{
+  position:absolute; left:6px; right:6px; bottom:6px;
+  background:rgba(49,128,83,.96); color:#eaffea;
+  border-radius:10px; padding:6px 8px; font-size:12px; line-height:1.25;
+  border:1px solid rgba(255,255,255,.12)
+}
+
+/* Ikony wolnego/L4/święta – na środku i większe */
+.leave-flag{ position:absolute; inset:0; display:grid; place-items:center;
+  font-size:32px; opacity:.9; pointer-events:none; }
+
+/* Popover „+X more” – ciemny, kontrastowy */
+.fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1);
+  color:#e9ffe9; border-radius:12px; overflow:hidden; }
+.fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9;
+  border-bottom:1px solid rgba(255,255,255,.08); }
+
+/* Tytuł miesiąca większy */
+.fc .fc-toolbar-title { font-size: 1.4rem; }
+
+/* Kafelki eventów – mniejszy padding, by mieściły się bez scrolli */
+.fc-daygrid-dot-event .fc-event-title,
+.fc-daygrid-event .fc-event-title { font-size: 12px; line-height: 1.2; }
+.fc-daygrid-event { padding: 2px 4px; }
