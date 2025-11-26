@@ -126,8 +126,9 @@ function initializeApp() {
         L4: 'L4',
         SWIETO: 'Dzień wolny od pracy'
     };
-    const LEAVE_ICON = { URL: '🌿', L4: '🩺', SWIETO: '🏳️' };
+    const LEAVE_ICON = { URL: '🌿', L4: '🩺', SWIETO: '🏁' };
     const BAZA_MIESIECZNA_GODZIN = 168;
+    const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
     const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
@@ -143,6 +144,8 @@ function initializeApp() {
         nadgodziny: 0,
         jazda: 0,
         wyfakturowaneGodziny: 0,
+        l4Days: 0,
+        urlopDaysUsed: 0,
         brutto: 0,
         netto: 0,
         absorpcja: 0
@@ -153,8 +156,11 @@ function initializeApp() {
         miesiace: [],
         sumyRoczne: utworzPustyRekordMiesieczny(),
         sumyRocznePerRok: [],
-        lata: []
+        lata: [],
+        yearlyGrouped: {}
     };
+    let selectedSummaryYear = ymNow().y;
+    let selectedVacationYear = ymNow().y;
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
@@ -247,6 +253,19 @@ function initializeApp() {
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
     const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
     const annualSummaryContainer = document.getElementById('annual-summary');
+    const l4SummaryContainer = document.getElementById('l4-summary');
+    const summaryYearSelect = document.getElementById('summary-year-select');
+    const vacationYearSelect = document.getElementById('vacation-year');
+    const vacationAllowanceInput = document.getElementById('vacation-allowance-input');
+    const vacationAllowanceSaveBtn = document.getElementById('vacation-allowance-save');
+    const vacationUsedSpan = document.getElementById('vacation-used');
+    const vacationRemainingSpan = document.getElementById('vacation-remaining');
+    const vacationAdjustmentsTotalSpan = document.getElementById('vacation-adjustments-total');
+    const vacationAdjustmentForm = document.getElementById('vacation-adjustment-form');
+    const vacationAdjustmentDateInput = document.getElementById('vacation-adjustment-date');
+    const vacationAdjustmentDaysInput = document.getElementById('vacation-adjustment-days');
+    const vacationAdjustmentNoteInput = document.getElementById('vacation-adjustment-note');
+    const vacationAdjustmentsDiv = document.getElementById('vacation-adjustments');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
@@ -368,17 +387,17 @@ function initializeApp() {
 
         const frame = host.querySelector(frameSelector) || host;
         frame.style.position = 'relative';
-        frame.querySelectorAll('.leave-badge').forEach(node => node.remove());
+        frame.querySelectorAll('.leave-badge, .leave-flag').forEach(node => node.remove());
 
         const badge = document.createElement('span');
-        badge.className = `leave-badge ${kind}`;
+        badge.className = `leave-flag ${kind || ''}`;
         badge.textContent = icon;
         frame.appendChild(badge);
     }
 
     function ensureLeaveBadgesForBackgroundEvents() {
         if (!calendar) return;
-        document.querySelectorAll('.fc .leave-badge').forEach(node => node.remove());
+        document.querySelectorAll('.fc .leave-badge, .fc .leave-flag').forEach(node => node.remove());
         calendar.getEvents().forEach(event => {
             if (event.extendedProps?.typ !== 'LEAVE') return;
             const selector = `.fc-daygrid-day[data-date="${event.startStr}"] .fc-daygrid-day-frame`;
@@ -387,6 +406,70 @@ function initializeApp() {
             if (cell) {
                 addLeaveBadgeToCell({ el: cell, event });
             }
+        });
+    }
+
+    function paintDayBadges() {
+        if (!calendar || !kalendarzContainer) return;
+        kalendarzContainer.querySelectorAll('.fc-daygrid-day .ab-chip, .fc-daygrid-day .leave-flag').forEach(node => node.remove());
+        const dayMap = new Map();
+        const leaveDatesWithBadges = new Set();
+        (wszystkieWpisyKalendarza || []).forEach(day => {
+            const normalized = normalizeDayRecord(day.id || day.date, day);
+            const key = normalized.date || normalized.id;
+            if (key) {
+                dayMap.set(key, normalized);
+            }
+        });
+
+        dayMap.forEach((day, dateKey) => {
+            const cell = kalendarzContainer.querySelector(`.fc-daygrid-day[data-date="${dateKey}"]`);
+            if (!cell) return;
+            const frame = cell.querySelector('.fc-daygrid-day-frame') || cell;
+            if (frame) {
+                frame.style.position = 'relative';
+            }
+
+            const parts = [];
+            const workVal = Number(day.work) || 0;
+            const driveVal = Number(day.drive) || 0;
+            const billedVal = Number(day.billed) || 0;
+            if (workVal > 0) parts.push(`• Praca: ${formatujLiczbe(workVal)}h`);
+            if (driveVal > 0) parts.push(`• Jazda: ${formatujLiczbe(driveVal)}h`);
+            if (billedVal > 0) parts.push(`• Fakturowane: ${formatujLiczbe(billedVal)}h`);
+            if (parts.length && frame) {
+                const chip = document.createElement('div');
+                chip.className = 'ab-chip';
+                chip.textContent = parts.join(' ');
+                frame.appendChild(chip);
+            }
+
+            const flags = normalizeDayFlags(day.flags || {}, day.leaveKind);
+            let icon = null;
+            if (flags.urlop) icon = LEAVE_ICON.URL;
+            else if (flags.l4) icon = LEAVE_ICON.L4;
+            else if (flags.swieto) icon = LEAVE_ICON.SWIETO;
+            if (icon && frame) {
+                const badge = document.createElement('div');
+                badge.className = 'leave-flag';
+                badge.textContent = icon;
+                frame.appendChild(badge);
+                leaveDatesWithBadges.add(dateKey);
+            }
+        });
+
+        (leaveEvents || []).forEach(event => {
+            const dateKey = event.startStr;
+            if (leaveDatesWithBadges.has(dateKey)) return;
+            const cell = kalendarzContainer.querySelector(`.fc-daygrid-day[data-date="${dateKey}"]`);
+            if (!cell) return;
+            const frame = cell.querySelector('.fc-daygrid-day-frame') || cell;
+            const icon = LEAVE_ICON[String(event.extendedProps?.leaveKind || '').toUpperCase()] || null;
+            if (!icon) return;
+            const badge = document.createElement('div');
+            badge.className = 'leave-flag';
+            badge.textContent = icon;
+            frame.appendChild(badge);
         });
     }
 
@@ -564,10 +647,10 @@ function initializeApp() {
             headerToolbar: getCalendarHeaderToolbar(),
             height: 'auto',
             contentHeight: 'auto',
-            dayMaxEventRows: 3,
-            moreLinkClick: 'popover',
+            dayMaxEventRows: true,
             nowIndicator: true,
             expandRows: true,
+            moreLinkClick: 'day',
             selectable: true,
             selectMirror: true,
             unselectAuto: true,
@@ -575,6 +658,12 @@ function initializeApp() {
                 try {
                     calendar.updateSize();
                 } catch (_) { }
+            },
+            datesSet(viewInfo) {
+                const { currentStart, currentEnd } = viewInfo.view;
+                obliczSumeGodzinZKalendarza(currentStart, currentEnd);
+                ensureLeaveBadgesForBackgroundEvents();
+                paintDayBadges();
             },
             eventDataTransform(event) {
                 if (event && typeof event.title === 'string') {
@@ -679,11 +768,6 @@ function initializeApp() {
         });
         window.calendar = calendar;
         calendar.render();
-        calendar.on('datesSet', (viewInfo) => {
-            const { currentStart, currentEnd } = viewInfo.view;
-            obliczSumeGodzinZKalendarza(currentStart, currentEnd);
-            ensureLeaveBadgesForBackgroundEvents();
-        });
     }
 
     async function otworzModalGodzin(data) {
@@ -707,11 +791,12 @@ function initializeApp() {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
                 const dane = docSnap.data();
-                kalendarzForm['godziny-pracy'].value = dane.praca || 0;
+                const normalized = normalizeDayRecord(data, dane);
+                kalendarzForm['godziny-pracy'].value = normalized.work || 0;
                 kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
-                kalendarzForm['czas-jazdy'].value = dane.jazda || 0;
+                kalendarzForm['czas-jazdy'].value = normalized.drive || 0;
                 kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
-                manualFakturowaneValue = Number(dane.fakturowane) || 0;
+                manualFakturowaneValue = Number(dane.fakturowane ?? normalized.billed) || 0;
                 const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
                 multiZlecenia = powiazane;
                 if (maPowiazania) {
@@ -721,7 +806,8 @@ function initializeApp() {
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
                 }
-                setDayLeaveValue(dane.leaveKind || DAY_LEAVE_NONE);
+                const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : DAY_LEAVE_NONE);
+                setDayLeaveValue(leaveToSet || DAY_LEAVE_NONE);
             }
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
@@ -891,7 +977,16 @@ function initializeApp() {
         manualFakturowaneValue = fakturowaneDoZapisu;
 
         const selectedLeaveKind = getSelectedDayLeaveValue();
+        const flags = {
+            urlop: selectedLeaveKind === 'URL',
+            l4: selectedLeaveKind === 'L4',
+            swieto: selectedLeaveKind === 'SWIETO'
+        };
         const dane = {
+            date: data,
+            work: Number(kalendarzForm['godziny-pracy'].value) || 0,
+            drive: Number(kalendarzForm['czas-jazdy'].value) || 0,
+            billed: fakturowaneDoZapisu,
             praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
             fakturowane: fakturowaneDoZapisu,
             nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0,
@@ -900,12 +995,28 @@ function initializeApp() {
             zleceniaPowiazane: powiazane,
             zlecenieId: powiazane.length === 1 ? powiazane[0].zlecenieId : null,
             klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null,
-            leaveKind: selectedLeaveKind || null
+            leaveKind: selectedLeaveKind || null,
+            flags
         };
         try {
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
+            const localRecord = normalizeDayRecord(data, dane);
+            localRecord.fakturowane = fakturowaneDoZapisu;
+            localRecord.billed = fakturowaneDoZapisu;
+            localRecord.nadgodziny = Number(kalendarzForm['nadgodziny'].value) || 0;
+            const existingIndex = wszystkieWpisyKalendarza.findIndex(w => w.id === data);
+            if (existingIndex >= 0) {
+                wszystkieWpisyKalendarza[existingIndex] = { ...wszystkieWpisyKalendarza[existingIndex], ...localRecord };
+            } else {
+                wszystkieWpisyKalendarza.push(localRecord);
+            }
             hideModal(kalendarzModal);
+            paintDayBadges();
+            renderPulpit();
+            renderZlecenia();
+            odswiezPodsumowania();
+            renderPodsumowanie();
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
         }
@@ -923,6 +1034,7 @@ function initializeApp() {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
         ensureLeaveBadgesForBackgroundEvents();
+        paintDayBadges();
     }
 
     function wyswietlWpisyKalendarza() {
@@ -937,16 +1049,19 @@ function initializeApp() {
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
+                const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
+                const fakturowaneValue = powiazane.length > 0 ? suma : (Number(normalizedDay.billed) || 0);
                 const wpis = {
-                    id,
-                    ...dane,
-                    fakturowane: suma,
+                    ...normalizedDay,
+                    billed: fakturowaneValue,
+                    fakturowane: fakturowaneValue,
+                    nadgodziny: Number(dane?.nadgodziny) || 0,
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
                 if (leaveEventsReady) {
-                    const normalizedLeave = dane.leaveKind ? normalizeDayLeaveValue(dane.leaveKind) : null;
+                    const normalizedLeave = normalizedDay.leaveKind ? normalizeDayLeaveValue(normalizedDay.leaveKind) : null;
                     const leaveEventId = getLeaveEventDocId(id);
                     const existingLeaveEvent = leaveEvents.find(event => event.id === leaveEventId) || null;
                     const existingKind = existingLeaveEvent?.extendedProps?.leaveKind || existingLeaveEvent?.leaveKind || '';
@@ -965,10 +1080,13 @@ function initializeApp() {
                 }
 
                 const linie = [];
-                if (dane.praca > 0) linie.push(`Praca: ${formatujLiczbe(dane.praca)}h`);
-                if (dane.nadgodziny > 0) linie.push(`Nadgodziny: ${formatujLiczbe(dane.nadgodziny)}h`);
-                if (dane.jazda > 0) linie.push(`Jazda: ${formatujLiczbe(dane.jazda)}h`);
-                if (!powiazane.length && suma > 0) linie.push(`Fakturowane: ${formatujLiczbe(suma)}h`);
+                const pracaValue = Number(normalizedDay.work) || 0;
+                const nadgodzinyValue = Number(dane.nadgodziny) || 0;
+                const jazdaValue = Number(normalizedDay.drive) || 0;
+                if (pracaValue > 0) linie.push(`Praca: ${formatujLiczbe(pracaValue)}h`);
+                if (nadgodzinyValue > 0) linie.push(`Nadgodziny: ${formatujLiczbe(nadgodzinyValue)}h`);
+                if (jazdaValue > 0) linie.push(`Jazda: ${formatujLiczbe(jazdaValue)}h`);
+                if (!powiazane.length && fakturowaneValue > 0) linie.push(`Fakturowane: ${formatujLiczbe(fakturowaneValue)}h`);
 
                 if (powiazane.length) {
                     powiazane.forEach((powiazanie, index) => {
@@ -1001,7 +1119,7 @@ function initializeApp() {
                         extendedProps: {
                             client: 'Ewidencja dnia',
                             machineModel: linie.join(' • '),
-                            fh: (!powiazane.length && suma > 0) ? suma : null,
+                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
                             typ: null
                         }
                     });
@@ -1052,6 +1170,9 @@ function initializeApp() {
         });
         const sumyMies = wpisyZMiesiaca.reduce((acc, wpis) => {
             if (wpis?.leaveKind) {
+                return acc;
+            }
+            if (wpis?.flags?.urlop || wpis?.flags?.l4 || wpis?.flags?.swieto) {
                 return acc;
             }
             if (wpis?.typ === 'LEAVE' || wpis?.extendedProps?.typ === 'LEAVE') {
@@ -1184,68 +1305,132 @@ function initializeApp() {
     }
 
 
-    function formatujIloscMagazynu(ilosc) {
-        const wartosc = wartoscLiczbowa(ilosc);
-       return wartosc.toFixed(2);
+    const normalizeDayFlags = (flags = {}, leaveKind = null) => {
+        const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
+        return {
+            urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
+            l4: Boolean(flags.l4) || normalizedKind === 'L4',
+            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO'
+        };
+    };
+
+    function normalizeDayRecord(id, dane = {}) {
+        const leaveKindNormalized = normalizeDayLeaveValue(dane.leaveKind || dane.dayLeave || '');
+        const flags = normalizeDayFlags(dane.flags || {}, leaveKindNormalized);
+        return {
+            ...dane,
+            id,
+            date: dane.date || id || '',
+            work: Number(dane.work ?? dane.praca) || 0,
+            drive: Number(dane.drive ?? dane.jazda) || 0,
+            billed: Number(dane.billed ?? dane.fakturowane) || 0,
+            flags,
+            leaveKind: leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE ? leaveKindNormalized : null
+        };
     }
 
-    function obliczPodsumowaniaMiesieczne(wpisy, zlecenia) {
-        const mapa = {};
-        const pustyRekord = () => ({ praca: 0, nadgodziny: 0, jazda: 0, wyfakturowaneGodziny: 0, brutto: 0, netto: 0, absorpcja: 0 });
-        const pobierzRekord = (miesiac) => {
-            if (!mapa[miesiac]) {
-                mapa[miesiac] = pustyRekord();
-            }
-            return mapa[miesiac];
-        };
 
-        wpisy.forEach(wpis => {
-            if (!wpis?.id) return;
-            const miesiac = normalizujMiesiac(wpis.id);
-            if (!miesiac) return;
-            const rekord = pobierzRekord(miesiac);
-            rekord.praca += Number(wpis.praca) || 0;
-            rekord.nadgodziny += Number(wpis.nadgodziny) || 0;
-            rekord.jazda += Number(wpis.jazda) || 0;
-            rekord.wyfakturowaneGodziny += Number(wpis.fakturowane) || 0;
+    function formatujIloscMagazynu(ilosc) {
+        const wartosc = wartoscLiczbowa(ilosc);
+        return wartosc.toFixed(2);
+    }
+
+    function getAllDaysRange() {
+        const days = Array.isArray(wszystkieWpisyKalendarza) ? wszystkieWpisyKalendarza : [];
+        const dates = days
+            .map(day => toDateSafe(day.date || day.id))
+            .filter(Boolean)
+            .map(date => date.getTime());
+        if (!dates.length) {
+            return { days: [], minDate: null, maxDate: null };
+        }
+        const minDate = new Date(Math.min(...dates));
+        const maxDate = new Date(Math.max(...dates));
+        return { days: [...days], minDate, maxDate };
+    }
+
+    function groupByYearMonth(days) {
+        const grouped = {};
+        if (!Array.isArray(days)) return grouped;
+        days.forEach(day => {
+            const normalized = normalizeDayRecord(day.id || day.date, day);
+            const date = toDateSafe(normalized.date || normalized.id);
+            if (!date) return;
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            if (!grouped[year]) grouped[year] = {};
+            if (!grouped[year][month]) grouped[year][month] = [];
+            grouped[year][month].push(normalized);
         });
+        return grouped;
+    }
 
+    function monthStats(monthDays = []) {
+        const totals = monthDays.reduce((acc, day) => {
+            const normalized = normalizeDayRecord(day.id || day.date, day);
+            acc.work += Number(normalized.work) || 0;
+            acc.drive += Number(normalized.drive) || 0;
+            acc.billed += Number(normalized.billed) || 0;
+            acc.l4Days += normalized.flags?.l4 ? 1 : 0;
+            acc.urlopDaysUsed += normalized.flags?.urlop ? 1 : 0;
+            return acc;
+        }, { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDaysUsed: 0 });
+        totals.absorpcja = totals.billed ? Math.round((totals.billed / BAZA_MIESIECZNA_GODZIN) * 100) : 0;
+        return totals;
+    }
 
-        zlecenia.forEach(zlecenie => {
-            if (!zlecenie || zlecenie.status !== 'ukończone' || !zlecenie.dataUkonczenia) return;
-            const miesiac = normalizujMiesiac(zlecenie.dataUkonczenia);
-            if (!miesiac) return;
-            const rekord = pobierzRekord(miesiac);
-            const godziny = Number(zlecenie.wyfakturowaneGodziny) || 0;
-            const stawka = STAWKI[zlecenie.typZlecenia]?.stawka || 0;
-            const brutto = godziny * stawka;
-            rekord.brutto += brutto;
-            rekord.netto += brutto * 0.70;
-        });
+    function obliczPodsumowaniaMiesieczne(wpisy) {
+        const grouped = groupByYearMonth(wpisy || []);
+        const miesiace = [];
+        const sumyRocznePerRok = [];
+        const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        const globalTotals = utworzPustyRekordMiesieczny();
 
-        const miesiace = Object.keys(mapa)
-            .sort()
-            .map(miesiac => {
-                const rekord = mapa[miesiac];
-                return {
-                    miesiac,
-                    ...rekord,
-                    absorpcja: obliczAbsorpcja(rekord.wyfakturowaneGodziny)
-                };
+        lata.forEach(year => {
+            const months = grouped[year];
+            const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
+            const yearTotals = utworzPustyRekordMiesieczny();
+            let absorpcjaSuma = 0;
+
+            monthNumbers.forEach(month => {
+                const stats = monthStats(months[month]);
+                absorpcjaSuma += stats.absorpcja;
+                const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
+                miesiace.push({
+                    miesiac: miesiacKey,
+                    year,
+                    month,
+                    praca: stats.work,
+                    nadgodziny: 0,
+                    jazda: stats.drive,
+                    wyfakturowaneGodziny: stats.billed,
+                    l4Days: stats.l4Days,
+                    urlopDays: stats.urlopDaysUsed,
+                    brutto: 0,
+                    netto: 0,
+                    absorpcja: stats.absorpcja
+                });
+
+                yearTotals.praca += stats.work;
+                yearTotals.jazda += stats.drive;
+                yearTotals.wyfakturowaneGodziny += stats.billed;
+                yearTotals.l4Days += stats.l4Days;
+                yearTotals.urlopDaysUsed += stats.urlopDaysUsed;
             });
 
-        const sumyRoczne = miesiace.reduce((acc, rekord) => {
-            acc.praca += rekord.praca;
-            acc.nadgodziny += rekord.nadgodziny;
-            acc.jazda += rekord.jazda;
-            acc.wyfakturowaneGodziny += rekord.wyfakturowaneGodziny;
-            acc.brutto += rekord.brutto;
-            acc.netto += rekord.netto;
-            return acc;
-        }, pustyRekord());
-        sumyRoczne.absorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
+            yearTotals.absorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
+            sumyRocznePerRok.push({ rok: year, ...yearTotals, miesiace: monthNumbers.length });
 
-        return { miesiace, sumyRoczne };
+            globalTotals.praca += yearTotals.praca;
+            globalTotals.jazda += yearTotals.jazda;
+            globalTotals.wyfakturowaneGodziny += yearTotals.wyfakturowaneGodziny;
+            globalTotals.l4Days += yearTotals.l4Days;
+            globalTotals.urlopDaysUsed += yearTotals.urlopDaysUsed;
+        });
+
+        const sumyRoczne = { ...globalTotals, absorpcja: obliczAbsorpcja(globalTotals.wyfakturowaneGodziny) };
+
+        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped };
     }
 
     function formatujMiesiac(miesiac) {
@@ -1332,61 +1517,199 @@ function initializeApp() {
 
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
-        const { miesiace, sumyRoczne } = ostatnieZestawienieMiesieczne;
-        if (!miesiace.length) {
+        const grouped = ostatnieZestawienieMiesieczne.yearlyGrouped || {};
+        const years = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        if (!years.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
             return;
         }
 
-        const wiersze = miesiace.map(rekord => `
-            <tr class="summary-row">
-                <td class="label">${formatujMiesiac(rekord.miesiac)}</td>
-                <td class="num">${formatujLiczbe(rekord.praca)} h</td>
-                <td class="num">${formatujLiczbe(rekord.nadgodziny)} h</td>
-                <td class="num">${formatujLiczbe(rekord.jazda)} h</td>
-                <td class="num">${formatujLiczbe(rekord.wyfakturowaneGodziny)} h</td>
-                <td class="num">${formatujLiczbe(rekord.brutto)} zł</td>
-                <td class="num">${formatujLiczbe(rekord.netto)} zł</td>
-                <td class="num">${fmtPct(rekord.absorpcja)}</td>
-            </tr>
-        `).join('');
+        const tables = years.map(year => {
+            const months = grouped[year] || {};
+            const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
+            let totalWork = 0;
+            let totalDrive = 0;
+            let totalBilled = 0;
+            let totalL4 = 0;
+            let totalUrlop = 0;
+            let absorpcjaSuma = 0;
 
-        const sumaAbsorpcja = obliczAbsorpcja(sumyRoczne.wyfakturowaneGodziny);
-        const suma = `
-            <tr class="summary-row total total-row">
-                <td class="label">Razem</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.praca)} h</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.nadgodziny)} h</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.jazda)} h</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.wyfakturowaneGodziny)} h</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.brutto)} zł</td>
-                <td class="num">${formatujLiczbe(sumyRoczne.netto)} zł</td>
-                <td class="num">${fmtPct(sumaAbsorpcja)}</td>
-            </tr>`;
+            const rows = monthNumbers.map(month => {
+                const stats = monthStats(months[month]);
+                totalWork += stats.work;
+                totalDrive += stats.drive;
+                totalBilled += stats.billed;
+                totalL4 += stats.l4Days;
+                totalUrlop += stats.urlopDaysUsed;
+                absorpcjaSuma += stats.absorpcja;
+                const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
+                return `
+                    <tr class="summary-row">
+                        <td class="label">${formatujMiesiac(miesiacKey)}</td>
+                        <td class="num">${formatujLiczbe(stats.work)} h</td>
+                        <td class="num">${formatujLiczbe(stats.drive)} h</td>
+                        <td class="num">${formatujLiczbe(stats.billed)} h</td>
+                        <td class="num">${fmtPct(stats.absorpcja)}</td>
+                        <td class="num">${formatujLiczbe(stats.l4Days)}</td>
+                        <td class="num">${formatujLiczbe(stats.urlopDaysUsed)}</td>
+                    </tr>`;
+            }).join('');
 
-        annualSummaryContainer.innerHTML = `
+            const avgAbs = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
+            const totalRow = `
+                <tr class="summary-row total total-row">
+                    <td class="label">Razem</td>
+                    <td class="num">${formatujLiczbe(totalWork)} h</td>
+                    <td class="num">${formatujLiczbe(totalDrive)} h</td>
+                    <td class="num">${formatujLiczbe(totalBilled)} h</td>
+                    <td class="num">${fmtPct(avgAbs)}</td>
+                    <td class="num">${formatujLiczbe(totalL4)}</td>
+                    <td class="num">${formatujLiczbe(totalUrlop)}</td>
+                </tr>`;
+
+            return `
+                <div class="table-responsive">
+                    <h3 class="year-heading">${year}</h3>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>Miesiąc</th>
+                                <th>Godziny pracy</th>
+                                <th>Czas jazdy</th>
+                                <th>Wyfakturowane</th>
+                                <th>Absorpcja</th>
+                                <th>L4 (dni)</th>
+                                <th>Urlop (dni)</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot>${totalRow}</tfoot>
+                    </table>
+                </div>`;
+        }).join('');
+
+        annualSummaryContainer.innerHTML = tables;
+    }
+
+    const calcVacationRemaining = (allowance, usedFromCalendar, adjustmentsSum) => {
+        return (Number(allowance) || 0) - (Number(usedFromCalendar) || 0) + (Number(adjustmentsSum) || 0);
+    };
+
+    function updateYearSelectOptions(selectEl, years, selectedValue) {
+        if (!selectEl) return;
+        const uniqueYears = [...new Set(years)].sort((a, b) => a - b);
+        selectEl.innerHTML = uniqueYears.map(y => `<option value="${y}">${y}</option>`).join('');
+        if (uniqueYears.length && (selectedValue == null || !uniqueYears.includes(Number(selectedValue)))) {
+            selectEl.value = uniqueYears[uniqueYears.length - 1];
+        } else if (selectedValue != null) {
+            selectEl.value = String(selectedValue);
+        }
+    }
+
+    function getYearTotals(year) {
+        return (ostatnieZestawienieMiesieczne.sumyRocznePerRok || []).find(r => Number(r.rok) === Number(year)) || null;
+    }
+
+    function renderL4Summary() {
+        if (!l4SummaryContainer) return;
+        const months = (ostatnieZestawienieMiesieczne.yearlyGrouped || {})[selectedSummaryYear] || {};
+        const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
+        if (!monthNumbers.length) {
+            l4SummaryContainer.innerHTML = '<p>Brak danych dla wybranego roku.</p>';
+            return;
+        }
+        let total = 0;
+        const rows = monthNumbers.map(month => {
+            const stats = monthStats(months[month]);
+            total += stats.l4Days;
+            const miesiacKey = `${selectedSummaryYear}-${String(month).padStart(2, '0')}`;
+            return `<tr><td>${formatujMiesiac(miesiacKey)}</td><td class="num">${formatujLiczbe(stats.l4Days)}</td></tr>`;
+        }).join('');
+        l4SummaryContainer.innerHTML = `
             <div class="table-responsive">
                 <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>Miesiąc</th>
-                            <th>Godziny pracy</th>
-                            <th>Nadgodziny</th>
-                            <th>Czas jazdy</th>
-                            <th>Godziny wyfakturowane</th>
-                            <th>Brutto</th>
-                            <th>Netto</th>
-                            <th>Absorpcja</th>
-                        </tr>
-                    </thead>
-                    <tbody>${wiersze}</tbody>
-                    <tfoot>${suma}</tfoot>
+                    <thead><tr><th>Miesiąc</th><th>L4 (dni)</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot><tr class="total-row"><td>Suma roczna</td><td class="num">${formatujLiczbe(total)}</td></tr></tfoot>
                 </table>
             </div>`;
     }
 
-    function odswiezPodsumowania() {
-        ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza, _wszystkieZleceniaCache);
+    async function getVacationAllowance(year) {
+        const snap = await getDoc(doc(db, 'vacation_allowance', String(year)));
+        if (snap.exists()) {
+            return Number(snap.data()?.totalDays) || DEFAULT_VACATION_ALLOWANCE;
+        }
+        return DEFAULT_VACATION_ALLOWANCE;
+    }
+
+    async function setVacationAllowance(year, totalDays) {
+        await setDoc(doc(db, 'vacation_allowance', String(year)), { totalDays: Number(totalDays) || 0 });
+    }
+
+    const getVacationAdjustmentsCollection = (year) => collection(db, 'vacation_adjustments', String(year), 'items');
+
+    async function listVacationAdjustments(year) {
+        const snap = await getDocs(getVacationAdjustmentsCollection(year));
+        return snap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data(), days: Number(docSnap.data()?.days) || 0 }));
+    }
+
+    async function addAdjustment(year, adj) {
+        const payload = {
+            date: adj.date || null,
+            days: Number(adj.days) || 0,
+            note: adj.note || '',
+            createdAt: serverTimestamp()
+        };
+        const ref = await addDoc(getVacationAdjustmentsCollection(year), payload);
+        return { id: ref.id, ...payload };
+    }
+
+    async function removeAdjustment(id, year) {
+        await deleteDoc(doc(db, 'vacation_adjustments', String(year), 'items', id));
+    }
+
+    async function renderVacationSummary() {
+        if (!vacationAllowanceInput || !vacationUsedSpan || !vacationRemainingSpan || !vacationAdjustmentsDiv) return;
+        const allowance = await getVacationAllowance(selectedVacationYear);
+        vacationAllowanceInput.value = allowance;
+
+        const adjustments = await listVacationAdjustments(selectedVacationYear);
+        const adjustmentsSum = adjustments.reduce((acc, adj) => acc + (Number(adj.days) || 0), 0);
+        const yearTotals = getYearTotals(selectedVacationYear);
+        const usedFromCalendar = Number(yearTotals?.urlopDaysUsed) || 0;
+        const remaining = calcVacationRemaining(allowance, usedFromCalendar, adjustmentsSum);
+
+        vacationUsedSpan.textContent = formatujLiczbe(usedFromCalendar);
+        vacationAdjustmentsTotalSpan.textContent = formatujLiczbe(adjustmentsSum);
+        vacationRemainingSpan.textContent = formatujLiczbe(remaining);
+
+        vacationAdjustmentsDiv.innerHTML = adjustments.length
+            ? `<ul class="adjustments-list">${adjustments.map(adj => `
+                <li data-id="${adj.id}">
+                    <span>${adj.date || 'brak daty'} — ${formatujLiczbe(adj.days)} dni ${adj.note ? `(${adj.note})` : ''}</span>
+                    <button type="button" class="btn-remove adjustment-remove" data-id="${adj.id}">Usuń</button>
+                </li>`).join('')}</ul>`
+            : '<p>Brak korekt urlopu.</p>';
+    }
+
+    async function renderPodsumowanie() {
+        renderRocznePodsumowanie();
+        renderL4Summary();
+        await renderVacationSummary();
+    }
+
+    function renderPulpit() {
+        if (calendar?.view) {
+            obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
+        }
+        paintDayBadges();
+    }
+
+    function renderZlecenia() { wyswietlZlecenia(); }
+
+    async function odswiezPodsumowania() {
+        ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza);
         window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
         if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
             const miesiace = ostatnieZestawienieMiesieczne.miesiace;
@@ -1395,7 +1718,18 @@ function initializeApp() {
                 miesiacSummaryInput.value = miesiace[miesiace.length - 1].miesiac;
             }
         }
-        renderRocznePodsumowanie();
+        const lata = ostatnieZestawienieMiesieczne.lata.length ? ostatnieZestawienieMiesieczne.lata : [ymNow().y];
+        if (!lata.includes(selectedSummaryYear)) {
+            selectedSummaryYear = lata[lata.length - 1];
+        }
+        if (!lata.includes(selectedVacationYear)) {
+            selectedVacationYear = lata[lata.length - 1];
+        }
+        updateYearSelectOptions(summaryYearSelect, lata, selectedSummaryYear);
+        updateYearSelectOptions(vacationYearSelect, lata, selectedVacationYear);
+        if (summaryYearSelect) summaryYearSelect.value = String(selectedSummaryYear);
+        if (vacationYearSelect) vacationYearSelect.value = String(selectedVacationYear);
+        await renderPodsumowanie();
         obliczIPokazPodsumowanieFinansowe();
     }
 
@@ -2176,6 +2510,8 @@ function wyswietlZlecenia() {
             const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
             const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
             const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
+            const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
+            const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="moto">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
             ukonczoneElements.push(createZlecenieListItem(
                 zlecenie,
                 `
@@ -2183,6 +2519,7 @@ function wyswietlZlecenia() {
                     <em>Ukończono (${zlecenie.dataUkonczenia || 'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
                     ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
+                    ${motoHtml}
                 `,
                 `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
@@ -2728,20 +3065,26 @@ async function obslugaListyCzesci(event) {
     }
 }
 
-async function obslugaZakonczeniaZlecenia(event) {
-    if (!completeModalForm || !completeModal) return;
-    event.preventDefault();
-    const docId = document.getElementById('complete-zlecenie-id').value;
-    const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
-    const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
-    const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
-    const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
-    const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
-    const zlecenieRef = doc(db, "zlecenia", docId);
+    async function obslugaZakonczeniaZlecenia(event) {
+        if (!completeModalForm || !completeModal) return;
+        event.preventDefault();
+        const docId = document.getElementById('complete-zlecenie-id').value;
+        const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
+        const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
+        const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
+        const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
+        const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
+        const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
+        if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
+            alert('Motogodziny muszą być liczbą większą lub równą 0.');
+            return;
+        }
+        const motoHours = Number.isFinite(motoHoursRaw) ? motoHoursRaw : 0;
+        const zlecenieRef = doc(db, "zlecenia", docId);
 
-    try {
-        const zlecenieStartSnap = await getDoc(zlecenieRef);
-        if (!zlecenieStartSnap.exists()) {
+        try {
+            const zlecenieStartSnap = await getDoc(zlecenieRef);
+            if (!zlecenieStartSnap.exists()) {
             alert("Nie znaleziono zlecenia do zakończenia.");
             return;
         }
@@ -2755,16 +3098,17 @@ async function obslugaZakonczeniaZlecenia(event) {
         return;
     }
 
-    const fallbackEndAtDate = manualEndAt || new Date();
-    const endAtValue = manualEndAt || serverTimestamp();
-    const dane = {
-        status: 'ukończone',
-        wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
-        typZlecenia: document.getElementById('typ-zlecenia').value,
-        dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
-        endAt: endAtValue,
-        uzyteCzesci: czesciDoZlecenia,
-        zakonczenieNotatka: notatka || null,
+        const fallbackEndAtDate = manualEndAt || new Date();
+        const endAtValue = manualEndAt || serverTimestamp();
+        const dane = {
+            status: 'ukończone',
+            wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
+            motoHours,
+            typZlecenia: document.getElementById('typ-zlecenia').value,
+            dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
+            endAt: endAtValue,
+            uzyteCzesci: czesciDoZlecenia,
+            zakonczenieNotatka: notatka || null,
         zakonczenieNumerWZ: numerWzValue || null
     };
     try {
@@ -2772,9 +3116,9 @@ async function obslugaZakonczeniaZlecenia(event) {
             const zlecenieSnap = await t.get(zlecenieRef);
             if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
             const zlecenieData = zlecenieSnap.data();
-            let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}.`;
+            let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours}h.`;
             if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
-            if (notatka) wpisHistorii += ` Notatka: ${notatka}`;            
+            if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
             const nowaHistoria = [...(zlecenieData.historia || []), {
                 timestamp: new Date().toISOString(),
                 akcja: wpisHistorii
@@ -3072,6 +3416,52 @@ async function obslugaZakonczeniaZlecenia(event) {
     if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
     if (stockModalCloseButton && stockModal) {
         stockModalCloseButton.onclick = () => { hideModal(stockModal); };
+    }
+
+    if (summaryYearSelect) {
+        summaryYearSelect.addEventListener('change', () => {
+            selectedSummaryYear = Number(summaryYearSelect.value) || ymNow().y;
+            renderL4Summary();
+        });
+    }
+
+    if (vacationYearSelect) {
+        vacationYearSelect.addEventListener('change', () => {
+            selectedVacationYear = Number(vacationYearSelect.value) || ymNow().y;
+            renderVacationSummary();
+        });
+    }
+
+    if (vacationAllowanceSaveBtn) {
+        vacationAllowanceSaveBtn.addEventListener('click', async () => {
+            const totalDays = Number(vacationAllowanceInput?.value) || DEFAULT_VACATION_ALLOWANCE;
+            await setVacationAllowance(selectedVacationYear, totalDays);
+            await renderVacationSummary();
+        });
+    }
+
+    if (vacationAdjustmentForm) {
+        vacationAdjustmentForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const days = Number(vacationAdjustmentDaysInput?.value);
+            if (!Number.isFinite(days) || days === 0) { alert('Podaj liczbę dni (może być dodatnia lub ujemna).'); return; }
+            await addAdjustment(selectedVacationYear, {
+                date: vacationAdjustmentDateInput?.value || null,
+                days,
+                note: vacationAdjustmentNoteInput?.value || ''
+            });
+            vacationAdjustmentForm.reset();
+            await renderVacationSummary();
+        });
+    }
+
+    if (vacationAdjustmentsDiv) {
+        vacationAdjustmentsDiv.addEventListener('click', async (event) => {
+            const target = event.target.closest('.adjustment-remove');
+            if (!target?.dataset?.id) return;
+            await removeAdjustment(target.dataset.id, selectedVacationYear);
+            await renderVacationSummary();
+        });
     }
 
     if (addOilBtn) addOilBtn.addEventListener('click', dodajOlej);

@@ -38,7 +38,7 @@
         </div>
     </header>
     <main>
-        <div id="pulpit" class="tab-content">
+        <div id="pulpit" class="tab-content" data-section="kalendarz">
             <h2>Pulpit i Ewidencja Czasu Pracy</h2>
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
             <div id="kalendarz" class="calendar-container"></div>
@@ -172,10 +172,59 @@
                 </div>
             </div>
         </div>
-        <div id="podsumowanie" class="tab-content">
-            <h2>Podsumowanie Roczne</h2>
-            <p class="summary-info">Poniżej znajdziesz zestawienie wszystkich miesięcy z ewidencji czasu pracy oraz zakończonych zleceń.</p>
-            <div id="annual-summary"></div>
+        <div id="podsumowanie" class="tab-content" data-section="podsumowanie">
+            <div class="summary-grid">
+                <div class="card">
+                    <h2>Podsumowanie Roczne</h2>
+                    <p class="summary-info">Zestawienie miesięcy z ewidencji czasu pracy, widoczne dla wszystkich dostępnych lat.</p>
+                    <div id="annual-summary"></div>
+                </div>
+                <div class="card">
+                    <div class="card-head">
+                        <h2>L4 – zestawienie</h2>
+                        <div class="summary-controls">
+                            <label for="summary-year-select">Rok:</label>
+                            <select id="summary-year-select"></select>
+                        </div>
+                    </div>
+                    <div id="l4-summary"></div>
+                </div>
+                <div class="card">
+                    <div class="card-head">
+                        <h2>Urlop – plan i wykorzystanie</h2>
+                        <div class="summary-controls">
+                            <label for="vacation-year">Rok:</label>
+                            <select id="vacation-year"></select>
+                        </div>
+                    </div>
+                    <div class="vacation-block">
+                        <div class="vacation-allowance">
+                            <label for="vacation-allowance-input">Pula urlopu (dni) na rok</label>
+                            <div class="vacation-allowance-row">
+                                <input type="number" id="vacation-allowance-input" min="0" step="1" value="26" inputmode="numeric">
+                                <button type="button" id="vacation-allowance-save">Zapisz pulę</button>
+                            </div>
+                        </div>
+                        <div class="vacation-stats">
+                            <p>Wykorzystano z kalendarza: <strong id="vacation-used">0</strong> dni</p>
+                            <p>Korekty ręczne: <strong id="vacation-adjustments-total">0</strong> dni</p>
+                            <p>Pozostało: <strong id="vacation-remaining">0</strong> dni</p>
+                        </div>
+                        <form id="vacation-adjustment-form" class="vacation-adjustment-form">
+                            <div class="form-inline">
+                                <label for="vacation-adjustment-date">Data</label>
+                                <input type="date" id="vacation-adjustment-date">
+                                <label for="vacation-adjustment-days">Dni (+/-)</label>
+                                <input type="number" id="vacation-adjustment-days" step="0.5" inputmode="decimal">
+                                <label for="vacation-adjustment-note">Notatka</label>
+                                <input type="text" id="vacation-adjustment-note" placeholder="Powód korekty">
+                                <button type="submit">Dodaj korektę</button>
+                            </div>
+                        </form>
+                        <div id="vacation-adjustments" class="vacation-adjustments"></div>
+                    </div>
+                </div>
+            </div>
         </div>
         </main>
 
@@ -215,7 +264,7 @@
         </div>
     </div>
     <div id="complete-zlecenie-modal" class="modal">
-        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form" class="modal-body"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p><div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny:</label><input type="number" step="0.1" id="wyfakturowane-godziny" required inputmode="decimal"></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia:</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div>
+        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form" class="modal-body"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p><div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny:</label><input type="number" step="0.1" id="wyfakturowane-godziny" required inputmode="decimal"></div><div class="form-group"><label for="moto-hours">Motogodziny:</label><input type="number" step="0.1" id="moto-hours" min="0" inputmode="decimal"></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia:</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div>
             <div class="form-group">
               <label for="zakonczenie-wz">Numer WZ (opcjonalnie):</label>
               <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024">
