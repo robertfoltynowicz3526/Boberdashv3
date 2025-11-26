@@ -1,6 +1,7 @@
 import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
+import './styles/desktop-only.css';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -764,6 +765,12 @@ function initializeApp() {
         });
         window.calendar = calendar;
         calendar.render();
+        setTimeout(() => {
+            calendar.updateSize();
+            calendar.updateDates();
+            window.dispatchEvent(new Event('resize'));
+        }, 0);
+        window.addEventListener('resize', () => { calendar.updateSize(); });
     }
 
     async function otworzModalGodzin(data) {
