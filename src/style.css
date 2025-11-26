@@ -812,25 +812,8 @@ select {
 }
 
 #ukonczone-zlecenia-lista {
-  overflow: hidden;
-  max-height: 2000px;
-  transition: max-height 0.4s ease;
-}
-
-#ukonczone-zlecenia-lista ul {
-  transition: opacity 0.2s ease;
-}
-
-#ukonczone-zlecenia-lista.collapsed {
-  max-height: 0;
-}
-
-#ukonczone-zlecenia-lista.collapsed ul {
-  opacity: 0;
-}
-
-#ukonczone-zlecenia-lista:not(.collapsed) ul {
-  opacity: 1;
+  overflow: visible;
+  max-height: none;
 }
 
 

@@ -2,6 +2,7 @@ import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles/desktop-only.css';
+import './styles/calendar-fixes.css';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -579,60 +580,13 @@ function initializeApp() {
                 return event;
             },
             eventContent: ({ event }) => {
-                if (event.extendedProps?.typ === 'LEAVE') {
-                    return { domNodes: [] };
-                }
-                const t = event.extendedProps;
-                const lines = [];
-                if (t?.workH)  lines.push(`• Praca: ${t.workH}h`);
-                if (t?.driveH) lines.push(`• Jazda: ${t.driveH}h`);
-                if (t?.billedH) lines.push(`• Fakturowane: ${t.billedH}h`);
-                if (event.title) lines.push(event.title);
-                return { html: `<div class="fc-event-title fc-sticky">${lines.join(' • ')}</div>` };
-            },
-            eventDidMount(info) {
-                const p = info.event.extendedProps || {};
-                if (p.typ === 'LEAVE') {
-                    return;
-                }
-                const t = p.typ;
-                const map = { S: '#16a34a', W: '#2563eb', G: '#f59e0b', Z: '#64748b', P: '#94a3b8' };
-                if (map[t]) {
-                    info.el.style.background = map[t];
-                    info.el.style.borderColor = map[t];
-                    info.el.style.color = '#fff';
-                }
-                const sanitizedTitle = stripEwidencjaPrefix(info.event.title || '');
-                const sanitizedClient = stripEwidencjaPrefix(info.event.extendedProps?.client || '');
-                const titleNode = info.el.querySelector('.fc-event-title');
-                if (titleNode) {
-                    titleNode.textContent = sanitizedTitle;
-                }
-                const listTitleNode = info.el.querySelector('.fc-list-event-title');
-                if (listTitleNode) {
-                    listTitleNode.textContent = sanitizedTitle;
-                }
-                const fhValue = Number(info.event.extendedProps?.fh);
-                info.el.title = [
-                    sanitizedTitle,
-                    sanitizedClient && `Klient: ${sanitizedClient}`,
-                    Number.isFinite(fhValue) && fhValue > 0 ? `Fakturowane: ${fhValue.toFixed(1)}h` : null
-                ].filter(Boolean).join(' • ');
-            },
-            dayCellDidMount(info) {
-                const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-                const sum = info.view.calendar.getEvents()
-                    .filter(e => e.start && same(e.start, info.date))
-                    .reduce((s, e) => {
-                        return s + fhOf(e);
-                    }, 0);
-                if (sum > 0) {
-                    const badge = document.createElement('span');
-                    badge.className = 'fc-day-badge';
-                    const formatted = Number.isInteger(sum) ? sum : Number(sum.toFixed(1));
-                    badge.textContent = `${formatted}h`;
-                    info.el.querySelector('.fc-daygrid-day-top')?.appendChild(badge);
-                }
+                const t = event.extendedProps || {};
+                const parts = [];
+                if (t.workH != null) parts.push(`• Praca: ${t.workH}h`);
+                if (t.driveH != null) parts.push(`• Jazda: ${t.driveH}h`);
+                if (t.billedH != null) parts.push(`• Fakturowane: ${t.billedH}h`);
+                if (event.title) parts.push(event.title);
+                return { html: `<div class="fc-event-title fc-sticky">${parts.join(' • ')}</div>` };
             },
             windowResize() {
                 try {

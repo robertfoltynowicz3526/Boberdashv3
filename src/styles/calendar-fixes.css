@@ -1,0 +1,61 @@
+/* --- Rama aplikacji bez sztucznych ograniczeń szerokości --- */
+html, body, #app { width: 100%; height: 100%; overflow-x: hidden; }
+.container, .page, .page-container, .content, .main, .content-inner {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Sidebar stały, prawa kolumna wypełnia resztę */
+.app-grid, .main-grid {
+  display: grid !important;
+  grid-template-columns: 280px 1fr !important;
+  gap: 0 !important;
+}
+aside, .sidebar { width: 280px !important; min-width: 280px !important; }
+
+/* --- Kalendarz na całą szerokość prawej kolumny --- */
+#calendar-wrapper, .calendar-wrapper,
+[data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
+  grid-column: 2 / -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 8px 12px !important;
+}
+#kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid { width: 100% !important; }
+
+/* Większe kratki (czytelne) */
+.fc-view-harness { min-height: calc(100vh - 220px) !important; }
+.fc-daygrid-day-frame { min-height: 180px !important; }
+@media (min-width:1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
+
+/* Look & feel FullCalendar */
+.fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,.08) !important; }
+.fc-daygrid-day-number { color: #d9d66a !important; font-weight: 600; }
+.fc .fc-toolbar-title { color: #e9f0e0 !important; }
+
+/* Eventy – tylko niebieskie karty, bez zielonych „chipów dnia” */
+.ab-chip, .leave-flag, .day-summary, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
+.fc-event { background:#3b82f6 !important; border:0 !important; border-radius:8px !important; }
+.fc-event .fc-event-title { color:#fff !important; font-size:12px !important; line-height:1.25; white-space:normal !important; }
+
+/* --- Listy przewijane do końca (zakończone/klienci/maszyny) --- */
+#closed-orders, .closed-orders,
+#machines-list, .machines-list,
+#clients-list, .clients-list {
+  max-height: calc(100vh - 220px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+[data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"],
+.page, .page-container, .content, .main { overflow: visible !important; }
+
+/* Ładniejszy scrollbar */
+#closed-orders::-webkit-scrollbar, .closed-orders::-webkit-scrollbar,
+#machines-list::-webkit-scrollbar, .machines-list::-webkit-scrollbar,
+#clients-list::-webkit-scrollbar, .clients-list::-webkit-scrollbar { width: 8px; }
+#closed-orders::-webkit-scrollbar-thumb, .closed-orders::-webkit-scrollbar-thumb,
+#machines-list::-webkit-scrollbar-thumb, .machines-list::-webkit-scrollbar-thumb,
+#clients-list::-webkit-scrollbar-thumb, .clients-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.2); border-radius: 8px;
+}
