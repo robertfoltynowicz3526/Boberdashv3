@@ -552,7 +552,8 @@ function initializeApp() {
     const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
 
     function fmt(n) {
-        return (Math.round(n * 10) / 10).toFixed(1);
+        const v = Math.round((n ?? 0) * 10) / 10;
+        return v.toFixed(1);
     }
 
     function normalizeDayKey(value) {
@@ -567,20 +568,30 @@ function initializeApp() {
         baseEvents.forEach(ev => {
             const dayKey = normalizeDayKey(ev?.start || ev?.date);
             if (!dayKey) return;
-            if (!byDay[dayKey]) byDay[dayKey] = { work: 0, drive: 0, billed: 0 };
-            byDay[dayKey].work += ev?.extendedProps?.workHours ?? 0;
-            byDay[dayKey].drive += ev?.extendedProps?.driveHours ?? 0;
-            byDay[dayKey].billed += ev?.extendedProps?.billedHours ?? 0;
+            const t = ev?.extendedProps?.type || ev?.extendedProps?.typ;
+            if (t === 'LEAVE_L4' || t === 'LEAVE_FREE' || t === 'LEAVE_HOLIDAY') {
+                return;
+            }
+            if (!byDay[dayKey]) byDay[dayKey] = { work: 0, drive: 0, billed: 0, hasAny: false };
+            const workHours = Number(ev?.extendedProps?.workHours ?? 0);
+            const driveHours = Number(ev?.extendedProps?.driveHours ?? 0);
+            const billedHours = Number(ev?.extendedProps?.billedHours ?? 0);
+            byDay[dayKey].work += workHours;
+            byDay[dayKey].drive += driveHours;
+            byDay[dayKey].billed += billedHours;
+            byDay[dayKey].hasAny = byDay[dayKey].hasAny || Boolean(workHours || driveHours || billedHours);
         });
 
-        const summaryEvents = Object.entries(byDay).map(([day, tot]) => ({
-            id: `sum-${day}`,
-            start: day,
-            allDay: true,
-            display: 'block',
-            className: ['day-summary'],
-            title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`
-        }));
+        const summaryEvents = Object.entries(byDay)
+            .filter(([, tot]) => tot.hasAny)
+            .map(([day, tot]) => ({
+                id: `sum-${day}`,
+                start: day,
+                allDay: true,
+                display: 'block',
+                className: ['day-summary'],
+                title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`
+            }));
 
         return [...baseEvents, ...summaryEvents];
     }
