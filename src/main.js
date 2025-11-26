@@ -747,6 +747,34 @@ function initializeApp() {
         });
         window.calendar = calendar;
         calendar.render();
+        const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
+        if (calendarShell) {
+            const applySize = () => handleCalendarResize();
+            applySize();
+            // Bezpieczne tworzenie obserwatora (bez optional chaining po 'new')
+            const RO = (typeof window !== 'undefined' && window.ResizeObserver) ? window.ResizeObserver : null;
+            let ro = null;
+            if (RO) {
+                ro = new RO(() => applySize());
+                ro.observe(calendarShell);
+            } else {
+                // Fallback dla starszych przeglądarek/środowisk: nasłuchuj resize
+                const onResize = () => applySize();
+                window.addEventListener('resize', onResize);
+                // sprzątanie przy odmontowaniu komórki
+                const observer = new MutationObserver((mutations) => {
+                    for (const m of mutations) {
+                        m.removedNodes && m.removedNodes.forEach((n) => {
+                            if (n === calendarShell || (n.contains && n.contains(calendarShell))) {
+                                window.removeEventListener('resize', onResize);
+                                observer.disconnect();
+                            }
+                        });
+                    }
+                });
+                observer.observe(calendarShell.parentNode || document.body, { childList: true });
+            }
+        }
         setTimeout(() => {
             calendar.updateSize();
             calendar.updateDates();
