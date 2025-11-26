@@ -677,21 +677,16 @@ select {
   background: rgba(255, 222, 0, 0.15);
 }
 
-/* Kalendarz ma wypełniać dostępną przestrzeń na desktopie */
+/* Kalendarz wyśrodkowany bez wymuszania pełnej wysokości */
 #calendar-shell {
   width: 100%;
-  min-height: calc(100vh - 240px);
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: auto;
 }
 
 #calendar-shell #kalendarz {
-  height: 100%;
-}
-
-@media (min-width: 1100px) {
-  #calendar-shell {
-    width: calc(100vw - 320px);
-    min-height: calc(100vh - 210px);
-  }
+  height: auto;
 }
 
 #calendar-shell .fc,
@@ -700,7 +695,7 @@ select {
 #calendar-shell .fc-scroller,
 #calendar-shell .fc-daygrid-body,
 #calendar-shell .fc-daygrid-body-unbalanced {
-  height: 100% !important;
+  height: auto !important;
 }
 
 .fc .day-summary {
@@ -1970,12 +1965,14 @@ main,
 .leave-pop,
 .leave-legend{ display:none !important; }
 
-/* Kalendarz pełnej szerokości i większej wysokości */
-.calendar-card, [data-section="kalendarz"] .card { grid-column: 1 / -1; }
-#kalendarz { min-height: 880px; }
-@media (min-width: 1440px){
-  #kalendarz { min-height: 980px; }
+/* Kalendarz wyśrodkowany na desktopie */
+.calendar-card, [data-section="kalendarz"] .card {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
 }
+#kalendarz { height: auto; min-height: auto; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
 .fc-daygrid-day { position: relative; overflow: hidden; }
 /* Opisy dnia (Praca/Jazda/Fakturowane) – widoczne bez popoutów */
@@ -2007,15 +2004,12 @@ main,
 
 /* ==== Kalendarz – większy i czytelny ==== */
 [data-section="kalendarz"] .card,
-.calendar-card { grid-column: 1 / -1; width: 100%; }
+.calendar-card { grid-column: 1 / -1; width: 100%; max-width: 1280px; margin: 0 auto; }
 
 #kalendarz {
-  min-height: 920px;              /* realnie większy */
+  height: auto;
+  min-height: auto;
   padding: 8px;
-}
-
-@media (min-width: 1440px){
-  #kalendarz { min-height: 1040px; }
 }
 
 /* komórki kalendarza nie obcinają nakładek */
@@ -2102,19 +2096,18 @@ main,
 [data-section="pulpit"] .card,
 [data-section="kalendarz"] .card {
   width: 100%;
-  max-width: unset;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 /* Mniej powietrza nad/po bokach */
 .page-section, .card { padding: 12px; }
 
-/* === Kalendarz – większa wysokość całości i kratek === */
-#kalendarz { min-height: 1100px; }
-@media (min-width: 1440px){ #kalendarz { min-height: 1240px; } }
+/* === Kalendarz – auto height === */
+#kalendarz { height: auto; min-height: auto; }
 
-/* Kratki dnia wyższe na desktopie */
-.fc-daygrid-day-frame { min-height: 160px; }           /* <= główny trick na „ściśnięcie” */
-@media (max-width: 1100px){ .fc-daygrid-day-frame { min-height: 120px; } }
+/* Kratki dnia wysokość automatyczna */
+.fc-daygrid-day-frame { min-height: auto; }
 
 /* Nie obcinaj nakładek */
 .fc-daygrid-day { position: relative; overflow: hidden; }
@@ -2164,21 +2157,21 @@ main,
 [data-section="pulpit"] .card.kalendarz,
 [data-section="kalendarz"] .card,
 .calendar-card {
-  width: calc(100vw - 320px);   /* (szerokosc okna - szerokość sidebaru ~280 + odstępy) */
-  max-width: 100vw;
+  width: 100%;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
 /* Mniej powietrza nad/po bokach; w dół – dynamiczna wysokość względem okna */
 [data-section="pulpit"] .card.kalendarz { padding: 12px; }
 #kalendarz {
-  min-height: calc(100vh - 220px);  /* rozciągnięcie w dół */
+  height: auto;
+  min-height: auto;
 }
 
 /* Kratki dnia wyższe – poprawa czytelności */
-.fc-view-harness { min-height: calc(100vh - 260px); }
-.fc-daygrid-day-frame { min-height: 170px; }         /* 170–190px na desktop */
-@media (min-width: 1600px){ .fc-daygrid-day-frame { min-height: 190px; } }
+.fc-view-harness { min-height: auto; }
+.fc-daygrid-day-frame { min-height: auto; }
 
 /* Zostają chipy i ikony (jak wcześniej) */
 .ab-chip{
