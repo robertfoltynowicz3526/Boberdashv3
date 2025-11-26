@@ -565,7 +565,14 @@ function initializeApp() {
 
     function buildEventSourceWithDailySummaries(baseEvents = []) {
         const byDay = {};
-        baseEvents.forEach(ev => {
+        const cleanEvents = baseEvents.filter(ev => {
+            const classNames = ev?.className || ev?.classNames || [];
+            if (Array.isArray(classNames) && classNames.includes('day-summary')) return false;
+            if ((ev?.extendedProps?.kind || ev?.kind) === 'SUMMARY') return false;
+            return true;
+        });
+
+        cleanEvents.forEach(ev => {
             const dayKey = normalizeDayKey(ev?.start || ev?.date);
             if (!dayKey) return;
             const t = ev?.extendedProps?.type || ev?.extendedProps?.typ;
@@ -590,10 +597,11 @@ function initializeApp() {
                 allDay: true,
                 display: 'block',
                 className: ['day-summary'],
-                title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`
+                title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`,
+                extendedProps: { kind: 'SUMMARY' }
             }));
 
-        return [...baseEvents, ...summaryEvents];
+        return [...cleanEvents, ...summaryEvents];
     }
 
     const openEwidencja = (dateStr) => {
@@ -613,10 +621,10 @@ function initializeApp() {
             plugins: calendarPlugins,
             initialView: 'dayGridMonth',
             headerToolbar: false,
-            height: 'auto',
+            height: '100%',
             contentHeight: 'auto',
             expandRows: true,
-            dayMaxEventRows: 3,
+            dayMaxEventRows: 4,
             moreLinkClick: 'popover',
             handleWindowResize: true,
             firstDay: 1,
@@ -632,6 +640,10 @@ function initializeApp() {
                 return [];
             },
             eventContent: (arg) => {
+                const isSummary = arg.event.classNames?.includes('day-summary') || arg.event.extendedProps?.kind === 'SUMMARY';
+                if (isSummary) {
+                    return { html: `<div class="fc-event-title">${arg.event.title}</div>` };
+                }
                 const t = arg.event.extendedProps?.type;
                 if (t?.startsWith('LEAVE_')) {
                     const icon = t === 'LEAVE_L4' ? '🩺' : (t === 'LEAVE_HOLIDAY' ? '🏳️' : '🌿');

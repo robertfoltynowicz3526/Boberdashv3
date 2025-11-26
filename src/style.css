@@ -296,6 +296,15 @@ main {
   gap: 1.75rem;
 }
 
+/* --- Desktop: daj pełną szerokość i miejsce na szeroki kalendarz --- */
+@media (min-width: 1100px) {
+  main {
+    max-width: none;
+    width: 100%;
+    padding-right: 3rem;
+  }
+}
+
 @media (max-width: 768px) {
   header {
     width: 200px;
@@ -666,6 +675,61 @@ select {
 
 .fc .fc-highlight {
   background: rgba(255, 222, 0, 0.15);
+}
+
+/* Kalendarz ma wypełniać dostępną przestrzeń na desktopie */
+#calendar-shell {
+  width: 100%;
+  min-height: calc(100vh - 240px);
+}
+
+#calendar-shell #kalendarz {
+  height: 100%;
+}
+
+@media (min-width: 1100px) {
+  #calendar-shell {
+    width: calc(100vw - 320px);
+    min-height: calc(100vh - 210px);
+  }
+}
+
+#calendar-shell .fc,
+#calendar-shell .fc-view-harness,
+#calendar-shell .fc-view-harness-active,
+#calendar-shell .fc-scroller,
+#calendar-shell .fc-daygrid-body,
+#calendar-shell .fc-daygrid-body-unbalanced {
+  height: 100% !important;
+}
+
+.fc .day-summary {
+  background: #3b82f6 !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.fc .day-summary .fc-event-title {
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.fc-event.leave-event {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.fc-event.leave-event .leave-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  width: 100%;
+  padding: 6px 0;
 }
 
 .event-actions {
@@ -2129,3 +2193,14 @@ main,
 /* Popover „+X więcej” – zachowany i czytelny */
 .fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
 .fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
+
+/* Listy (klienci/maszyny/zakończone) przewijają się w pionie */
+#closed-orders, .closed-orders,
+#clients-list, .clients-list,
+#machines-list, .machines-list,
+.scroll-panel {
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
