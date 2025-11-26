@@ -124,6 +124,23 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   display: none !important;
 }
 
+/* === Odznaka „leave” na środku kratki dnia === */
+.leave-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 30px;
+  opacity: .9;
+}
+.leave-badge--l4,
+.leave-badge--wolne,
+.leave-badge--swieto {
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+}
+
 /* Opcjonalny panel scrollowalny do list */
 .scroll-panel {
   max-height: calc(100vh - 240px);

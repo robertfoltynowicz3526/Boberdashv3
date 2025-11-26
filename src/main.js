@@ -651,6 +651,46 @@ function initializeApp() {
                 }
                 return { html: `<div class="evt">${arg.event.title}</div>` };
             },
+            eventDidMount(info) {
+                const ext = info.event.extendedProps || {};
+                const rawType = (ext.type || ext.typ || '').toString().toUpperCase();
+                const title = (info.event.title || '').toLowerCase();
+                let leaveType = null;
+
+                if (rawType === 'LEAVE_L4') leaveType = 'L4';
+                else if (rawType === 'LEAVE_FREE') leaveType = 'WOLNE';
+                else if (rawType === 'LEAVE_HOLIDAY') leaveType = 'SWIETO';
+
+                if (!leaveType && typeof ext.leaveKind === 'string') {
+                    const kind = ext.leaveKind.toUpperCase();
+                    if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
+                        leaveType = kind === 'ŚWIĘTO' ? 'SWIETO' : kind;
+                    }
+                }
+
+                if (!leaveType) {
+                    if (title.includes('l4')) leaveType = 'L4';
+                    else if (title.includes('wolny') || title.includes('wolne')) leaveType = 'WOLNE';
+                    else if (title.includes('święto') || title.includes('swieto')) leaveType = 'SWIETO';
+                }
+
+                if (leaveType) {
+                    const frame = info.el.closest('.fc-daygrid-day-frame');
+                    if (frame && !frame.querySelector('.leave-badge')) {
+                        frame.classList.add('has-leave-label');
+                        const badge = document.createElement('div');
+                        badge.className = 'leave-badge ' + (leaveType === 'L4'
+                            ? 'leave-badge--l4'
+                            : leaveType === 'WOLNE'
+                                ? 'leave-badge--wolne'
+                                : 'leave-badge--swieto');
+                        badge.textContent = leaveType === 'L4' ? '🏥' : leaveType === 'WOLNE' ? '🌿' : '🎌';
+                        frame.appendChild(badge);
+                    }
+
+                    info.el.style.display = 'none';
+                }
+            },
             events: buildEventSourceWithDailySummaries([...workEvents, ...leaveEvents]),
             datesSet(viewInfo) {
                 if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
