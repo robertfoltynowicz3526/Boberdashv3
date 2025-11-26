@@ -63,7 +63,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* --- Kalendarz na pełną wysokość i szerokość prawej kolumny --- */
 .calendar-shell {
   width: calc(100vw - 340px);
-  height: calc(100vh - 210px);
+  height: auto;
   margin-left: 320px;
   margin-top: 16px;
 }
@@ -73,12 +73,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .calendar-shell .fc-scrollgrid,
 .calendar-shell .fc-view-harness,
 .calendar-shell .fc-view-harness-active {
-  height: 100% !important;
+  height: auto !important;
 }
 
 .calendar-shell .fc-daygrid-body,
 .calendar-shell .fc-daygrid-body-unbalanced {
-  height: 100% !important;
+  height: auto !important;
 }
 
 .calendar-shell .day-summary {
