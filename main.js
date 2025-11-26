@@ -145,6 +145,7 @@ function initializeApp() {
         jazda: 0,
         wyfakturowaneGodziny: 0,
         l4Days: 0,
+        urlopDays: 0,
         urlopDaysUsed: 0,
         brutto: 0,
         netto: 0,
@@ -657,8 +658,10 @@ function initializeApp() {
             height: 'auto',
             contentHeight: 'auto',
             expandRows: true,
-            dayMaxEventRows: 3,             // pokazywać "more"
+            handleWindowResize: true,
+            dayMaxEventRows: 4,             // pokazywać "more"
             moreLinkClick: 'popover',       // zachować POP-OUT (popover)
+            moreLinkText: (n) => `+${n} więcej`,
             firstDay: 1,
             locale: 'pl',
             headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,dayGridWeek' },
@@ -1360,17 +1363,30 @@ function initializeApp() {
     }
 
     function monthStats(monthDays = []) {
-        const totals = monthDays.reduce((acc, day) => {
+        const uniqByDate = new Map();
+        let work = 0, drive = 0, billed = 0, l4Days = 0, urlopDays = 0;
+
+        (monthDays || []).forEach(day => {
             const normalized = normalizeDayRecord(day.id || day.date, day);
-            acc.work += Number(normalized.work) || 0;
-            acc.drive += Number(normalized.drive) || 0;
-            acc.billed += Number(normalized.billed) || 0;
-            acc.l4Days += normalized.flags?.l4 ? 1 : 0;
-            acc.urlopDaysUsed += normalized.flags?.urlop ? 1 : 0;
-            return acc;
-        }, { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDaysUsed: 0 });
-        totals.absorpcja = totals.billed ? Math.round((totals.billed / BAZA_MIESIECZNA_GODZIN) * 100) : 0;
-        return totals;
+            work += Number(normalized.work) || 0;
+            drive += Number(normalized.drive) || 0;
+            billed += Number(normalized.billed) || 0;
+
+            const key = normalized.date;
+            if (!key) return;
+            if (!uniqByDate.has(key)) uniqByDate.set(key, { l4: false, urlop: false });
+            const agg = uniqByDate.get(key);
+            if (normalized.flags?.l4) agg.l4 = true;
+            if (normalized.flags?.urlop) agg.urlop = true;
+        });
+
+        for (const v of uniqByDate.values()) {
+            if (v.l4) l4Days++;
+            if (v.urlop) urlopDays++;
+        }
+
+        const absorpcja = billed ? Math.round((billed / BAZA_MIESIECZNA_GODZIN) * 100) : 0;
+        return { work, drive, billed, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja };
     }
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
@@ -1403,12 +1419,12 @@ function initializeApp() {
                     drive: stats.drive,
                     billed: stats.billed,
                     l4Days: stats.l4Days,
-                    urlopDays: stats.urlopDaysUsed,
+                    urlopDays: stats.urlopDays,
                     absorpcja: stats.absorpcja,
                     wyfakturowaneGodziny: stats.billed,
                     praca: stats.work,
                     jazda: stats.drive,
-                    urlopDaysUsed: stats.urlopDaysUsed
+                    urlopDaysUsed: stats.urlopDays
                 };
                 miesiace.push(monthRecord);
                 yearMonths.push(monthRecord);
@@ -1417,7 +1433,7 @@ function initializeApp() {
                 yearSum.drive += stats.drive;
                 yearSum.billed += stats.billed;
                 yearSum.l4Days += stats.l4Days;
-                yearSum.urlopDays += stats.urlopDaysUsed;
+                yearSum.urlopDays += stats.urlopDays;
             });
 
             const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
