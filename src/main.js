@@ -373,109 +373,6 @@ function initializeApp() {
         return lower === 'url' ? 'wolne' : lower;
     };
 
-    function addLeaveBadgeToCell(info) {
-        if (!info?.event || !info.el) return;
-        const iconKey = info.event.extendedProps?.leaveKind;
-        if (!iconKey) return;
-        const kind = getLeaveKindClass(iconKey);
-        const icon = LEAVE_ICON[String(iconKey).toUpperCase()] || '•';
-
-        let host = info.el.closest('.fc-daygrid-day');
-        let frameSelector = '.fc-daygrid-day-frame';
-        if (!host) {
-            host = info.el.closest('.fc-timegrid-col');
-            frameSelector = '.fc-timegrid-col-frame';
-        }
-        if (!host) return;
-
-        const frame = host.querySelector(frameSelector) || host;
-        frame.style.position = 'relative';
-        frame.querySelectorAll('.leave-badge, .leave-flag').forEach(node => node.remove());
-
-        const badge = document.createElement('span');
-        badge.className = `leave-flag ${kind || ''}`;
-        badge.textContent = icon;
-        frame.appendChild(badge);
-    }
-
-    function ensureLeaveBadgesForBackgroundEvents() {
-        if (!calendar) return;
-        document.querySelectorAll('.fc .leave-badge, .fc .leave-flag').forEach(node => node.remove());
-        calendar.getEvents().forEach(event => {
-            if (event.extendedProps?.typ !== 'LEAVE') return;
-            const selector = `.fc-daygrid-day[data-date="${event.startStr}"] .fc-daygrid-day-frame`;
-            const timeSelector = `.fc-timegrid-col[data-date="${event.startStr}"] .fc-timegrid-col-frame`;
-            const cell = document.querySelector(selector) || document.querySelector(timeSelector);
-            if (cell) {
-                addLeaveBadgeToCell({ el: cell, event });
-            }
-        });
-    }
-
-    function paintDayBadges() {
-        if (!calendar || !kalendarzContainer) return;
-        kalendarzContainer.querySelectorAll('.ab-chip, .leave-flag').forEach(node => node.remove());
-        const dayMap = new Map();
-        const leaveDatesWithBadges = new Set();
-        (wszystkieWpisyKalendarza || []).forEach(day => {
-            const normalized = normalizeDayRecord(day.id || day.date, day);
-            const key = normalized.date || normalized.id;
-            if (key) {
-                dayMap.set(key, normalized);
-            }
-        });
-
-        dayMap.forEach((day, dateKey) => {
-            const cell = kalendarzContainer.querySelector(`.fc-daygrid-day[data-date="${dateKey}"]`);
-            if (!cell) return;
-            const frame = cell.querySelector('.fc-daygrid-day-frame') || cell;
-            if (frame) {
-                frame.style.position = 'relative';
-            }
-
-            const parts = [];
-            const workVal = Number(day.work) || 0;
-            const driveVal = Number(day.drive) || 0;
-            const billedVal = Number(day.billed) || 0;
-            if (workVal > 0) parts.push(`• Praca: ${formatujLiczbe(workVal)}h`);
-            if (driveVal > 0) parts.push(`• Jazda: ${formatujLiczbe(driveVal)}h`);
-            if (billedVal > 0) parts.push(`• Fakturowane: ${formatujLiczbe(billedVal)}h`);
-            if (frame && (workVal > 0 || driveVal > 0 || billedVal > 0)) {
-                const chip = document.createElement('div');
-                chip.className = 'ab-chip';
-                chip.textContent = parts.join(' ');
-                frame.appendChild(chip);
-            }
-
-            const flags = normalizeDayFlags(day.flags || {}, day.leaveKind);
-            let icon = null;
-            if (flags.urlop) icon = LEAVE_ICON.URL;
-            else if (flags.l4) icon = LEAVE_ICON.L4;
-            else if (flags.swieto) icon = LEAVE_ICON.SWIETO;
-            if (icon && frame) {
-                const badge = document.createElement('div');
-                badge.className = 'leave-flag';
-                badge.textContent = icon;
-                frame.appendChild(badge);
-                leaveDatesWithBadges.add(dateKey);
-            }
-        });
-
-        (leaveEvents || []).forEach(event => {
-            const dateKey = event.startStr;
-            if (leaveDatesWithBadges.has(dateKey)) return;
-            const cell = kalendarzContainer.querySelector(`.fc-daygrid-day[data-date="${dateKey}"]`);
-            if (!cell) return;
-            const frame = cell.querySelector('.fc-daygrid-day-frame') || cell;
-            const icon = LEAVE_ICON[String(event.extendedProps?.leaveKind || '').toUpperCase()] || null;
-            if (!icon) return;
-            const badge = document.createElement('div');
-            badge.className = 'leave-flag';
-            badge.textContent = icon;
-            frame.appendChild(badge);
-        });
-    }
-
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
 
     async function syncLeaveEventForDay(dateKey, leaveKind) {
@@ -655,8 +552,6 @@ function initializeApp() {
         calendar = new FullCalendar.Calendar(kalendarzContainer, {
             plugins: calendarPlugins,
             initialView: 'dayGridMonth',
-            height: 'auto',
-            contentHeight: 'auto',
             expandRows: true,
             handleWindowResize: true,
             dayMaxEventRows: 4,             // pokazywać "more"
@@ -670,7 +565,6 @@ function initializeApp() {
             selectMirror: true,
             unselectAuto: true,
             datesSet(viewInfo) {
-                paintDayBadges();
                 if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
                     obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                 }
@@ -684,27 +578,21 @@ function initializeApp() {
                 }
                 return event;
             },
-            eventContent(arg) {
-                const p = arg.event.extendedProps || {};
-                if (p.typ === 'LEAVE') {
+            eventContent: ({ event }) => {
+                if (event.extendedProps?.typ === 'LEAVE') {
                     return { domNodes: [] };
                 }
-                const rawTitle = arg.event.title || '';
-                const cleanTitle = stripEwidencjaPrefix(rawTitle);
-                const client = stripEwidencjaPrefix(p.client || '') || cleanTitle || rawTitle;
-                const model = p.machineModel ? ` • ${p.machineModel}` : '';
-                const fh = p.fh ? `<span class="ev-meta">${Number(p.fh).toFixed(1)}h</span>` : '';
-                const el = document.createElement('div');
-                el.className = 'ev-chip';
-                el.innerHTML = `<span class="ev-client">${client}${model}</span>${fh}`;
-                return { domNodes: [el] };
+                const t = event.extendedProps;
+                const lines = [];
+                if (t?.workH)  lines.push(`• Praca: ${t.workH}h`);
+                if (t?.driveH) lines.push(`• Jazda: ${t.driveH}h`);
+                if (t?.billedH) lines.push(`• Fakturowane: ${t.billedH}h`);
+                if (event.title) lines.push(event.title);
+                return { html: `<div class="fc-event-title fc-sticky">${lines.join(' • ')}</div>` };
             },
             eventDidMount(info) {
                 const p = info.event.extendedProps || {};
                 if (p.typ === 'LEAVE') {
-                    const k = getLeaveKindClass(p.leaveKind);
-                    if (k) info.el.classList.add(k);
-                    addLeaveBadgeToCell(info);
                     return;
                 }
                 const t = p.typ;
@@ -1016,7 +904,6 @@ function initializeApp() {
             }
             hideModal(kalendarzModal);
             await odswiezPodsumowania({ skipRender: true });
-            paintDayBadges();
             renderPulpit();
             renderZlecenia();
             renderPodsumowanie();
@@ -1036,8 +923,6 @@ function initializeApp() {
         if (!skipSummary && calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
-        ensureLeaveBadgesForBackgroundEvents();
-        paintDayBadges();
     }
 
     function wyswietlWpisyKalendarza() {
@@ -1055,6 +940,13 @@ function initializeApp() {
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
                 const fakturowaneValue = powiazane.length > 0 ? suma : (Number(normalizedDay.billed) || 0);
+                const workValue = Number(normalizedDay.work) || 0;
+                const driveValue = Number(normalizedDay.drive) || 0;
+                const hoursProps = {
+                    workH: workValue > 0 ? formatujLiczbe(workValue) : null,
+                    driveH: driveValue > 0 ? formatujLiczbe(driveValue) : null,
+                    billedH: fakturowaneValue > 0 ? formatujLiczbe(fakturowaneValue) : null
+                };
                 const wpis = {
                     ...normalizedDay,
                     billed: fakturowaneValue,
@@ -1098,6 +990,11 @@ function initializeApp() {
                         const machineModel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (zlecenie?.maszynaModel || '');
                         const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
                         const typZlecenia = zlecenie?.typZlecenia || null;
+                        const billedForEvent = Number(powiazanie.fakturowane) || 0;
+                        const perEventProps = {
+                            ...hoursProps,
+                            billedH: billedForEvent > 0 ? formatujLiczbe(billedForEvent) : hoursProps.billedH
+                        };
                         events.push({
                             id: `powiazane_${id}_${powiazanie.zlecenieId || 'brak'}_${index}`,
                             title: klientLabel,
@@ -1107,7 +1004,8 @@ function initializeApp() {
                                 client: klientLabel,
                                 machineModel,
                                 fh: Number(powiazanie.fakturowane) || 0,
-                                typ: typZlecenia
+                                typ: typZlecenia,
+                                ...perEventProps
                             }
                         });
                     });
@@ -1123,7 +1021,8 @@ function initializeApp() {
                             client: 'Ewidencja dnia',
                             machineModel: linie.join(' • '),
                             fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                            typ: null
+                            typ: null,
+                            ...hoursProps
                         }
                     });
                 }
@@ -1712,7 +1611,6 @@ function initializeApp() {
         if (calendar?.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
-        paintDayBadges();
     }
 
     function renderZlecenia() { wyswietlZlecenia(); }
