@@ -34,7 +34,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .fc .fc-toolbar-title { color: #e9f0e0 !important; }
 
 /* Eventy – tylko niebieskie karty, bez zielonych „chipów dnia” */
-.ab-chip, .leave-flag, .day-summary, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
+.ab-chip, .leave-flag, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
 .fc-event { background:#3b82f6 !important; border:0 !important; border-radius:8px !important; }
 .fc-event .fc-event-title { color:#fff !important; font-size:12px !important; line-height:1.25; white-space:normal !important; }
 
@@ -58,4 +58,74 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #machines-list::-webkit-scrollbar-thumb, .machines-list::-webkit-scrollbar-thumb,
 #clients-list::-webkit-scrollbar-thumb, .clients-list::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,.2); border-radius: 8px;
+}
+
+/* --- Kalendarz na pełną wysokość i szerokość prawej kolumny --- */
+.calendar-shell {
+  width: calc(100vw - 280px);
+  height: calc(100vh - 180px);
+  margin-left: 280px;
+  margin-top: 12px;
+}
+
+.calendar-shell #kalendarz,
+.calendar-shell .fc,
+.calendar-shell .fc-scrollgrid,
+.calendar-shell .fc-view-harness,
+.calendar-shell .fc-view-harness-active {
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.calendar-shell .fc-daygrid-body,
+.calendar-shell .fc-daygrid-body-unbalanced {
+  height: 100% !important;
+}
+
+.calendar-shell .day-summary {
+  background: rgba(80,140,255,0.14);
+  border: 1px solid rgba(80,140,255,0.35);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-weight: 600;
+  margin: 2px 4px;
+}
+
+.calendar-shell .day-summary .fc-event-title {
+  white-space: normal;
+  line-height: 1.2;
+  font-size: 12px;
+}
+
+.calendar-shell .leave-event {
+  background: rgba(0,0,0,0) !important;
+  border: 0 !important;
+}
+
+.calendar-shell .leave-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  line-height: 28px;
+  width: 42px;
+  height: 42px;
+  margin: 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+}
+
+.calendar-shell .leave-l4 .leave-icon,
+.calendar-shell .leave-free .leave-icon,
+.calendar-shell .leave-holiday .leave-icon {
+  font-size: 30px;
+}
+
+.calendar-shell .fc-daygrid-event.strip-summary {
+  display: none !important;
+}
+
+/* Opcjonalny panel scrollowalny do list */
+.scroll-panel {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
 }
