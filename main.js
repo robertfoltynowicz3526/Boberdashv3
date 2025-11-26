@@ -157,7 +157,8 @@ function initializeApp() {
         sumyRoczne: utworzPustyRekordMiesieczny(),
         sumyRocznePerRok: [],
         lata: [],
-        yearlyGrouped: {}
+        yearlyGrouped: {},
+        years: []
     };
     let selectedSummaryYear = ymNow().y;
     let selectedVacationYear = ymNow().y;
@@ -411,7 +412,7 @@ function initializeApp() {
 
     function paintDayBadges() {
         if (!calendar || !kalendarzContainer) return;
-        kalendarzContainer.querySelectorAll('.fc-daygrid-day .ab-chip, .fc-daygrid-day .leave-flag').forEach(node => node.remove());
+        kalendarzContainer.querySelectorAll('.ab-chip, .leave-flag').forEach(node => node.remove());
         const dayMap = new Map();
         const leaveDatesWithBadges = new Set();
         (wszystkieWpisyKalendarza || []).forEach(day => {
@@ -437,7 +438,7 @@ function initializeApp() {
             if (workVal > 0) parts.push(`• Praca: ${formatujLiczbe(workVal)}h`);
             if (driveVal > 0) parts.push(`• Jazda: ${formatujLiczbe(driveVal)}h`);
             if (billedVal > 0) parts.push(`• Fakturowane: ${formatujLiczbe(billedVal)}h`);
-            if (parts.length && frame) {
+            if (frame && (workVal > 0 || driveVal > 0 || billedVal > 0)) {
                 const chip = document.createElement('div');
                 chip.className = 'ab-chip';
                 chip.textContent = parts.join(' ');
@@ -632,38 +633,44 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
-    const isMobileCalendarView = () => window.matchMedia('(max-width: 640px)').matches;
-    const getCalendarHeaderToolbar = () => (isMobileCalendarView()
-        ? { left: 'prev,next', center: 'title', right: 'listWeek,dayGridMonth' }
-        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,listWeek' });
+    const calendarPlugins = [
+        (window.dayGrid && window.dayGrid.default) || (FullCalendar?.dayGridPlugin),
+        (window.interaction && window.interaction.default) || (FullCalendar?.interactionPlugin)
+    ].filter(Boolean);
+
+    const openEwidencja = (dateStr) => {
+        const normalized = dateStr || '';
+        if (normalized) {
+            otworzModalGodzin(normalized);
+            if (calendar && typeof calendar.unselect === 'function') {
+                calendar.unselect();
+            }
+        }
+    };
 
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
-        const initialView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
         calendar = new FullCalendar.Calendar(kalendarzContainer, {
-            initialView,
-            locale: 'pl',
-            headerToolbar: getCalendarHeaderToolbar(),
+            plugins: calendarPlugins,
+            initialView: 'dayGridMonth',
             height: 'auto',
             contentHeight: 'auto',
-            dayMaxEventRows: true,
-            nowIndicator: true,
             expandRows: true,
-            moreLinkClick: 'day',
+            dayMaxEventRows: 3,             // pokazywać "more"
+            moreLinkClick: 'popover',       // zachować POP-OUT (popover)
+            firstDay: 1,
+            locale: 'pl',
+            headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,dayGridWeek' },
+            nowIndicator: true,
             selectable: true,
             selectMirror: true,
             unselectAuto: true,
-            windowResize() {
-                try {
-                    calendar.updateSize();
-                } catch (_) { }
-            },
             datesSet(viewInfo) {
-                const { currentStart, currentEnd } = viewInfo.view;
-                obliczSumeGodzinZKalendarza(currentStart, currentEnd);
-                ensureLeaveBadgesForBackgroundEvents();
                 paintDayBadges();
+                if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
+                    obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
+                }
             },
             eventDataTransform(event) {
                 if (event && typeof event.title === 'string') {
@@ -740,21 +747,8 @@ function initializeApp() {
                 try {
                     calendar.updateSize();
                 } catch (_) { }
-                try {
-                    const nextView = isMobileCalendarView() ? 'listWeek' : 'dayGridMonth';
-                    calendar.changeView(nextView);
-                    calendar.setOption('headerToolbar', getCalendarHeaderToolbar());
-                } catch (_) { }
             },
-            dateClick(info) {
-                const normalized = info?.dateStr || formatDateForStorage(normalizeAllDayDate(info?.date));
-                if (normalized) {
-                    otworzModalGodzin(normalized);
-                }
-                if (calendar && typeof calendar.unselect === 'function') {
-                    calendar.unselect();
-                }
-            },
+            dateClick: (info) => openEwidencja(info.dateStr),
             select(info) {
                 const startDate = normalizeAllDayDate(info?.start);
                 const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
@@ -1012,10 +1006,10 @@ function initializeApp() {
                 wszystkieWpisyKalendarza.push(localRecord);
             }
             hideModal(kalendarzModal);
+            await odswiezPodsumowania({ skipRender: true });
             paintDayBadges();
             renderPulpit();
             renderZlecenia();
-            odswiezPodsumowania();
             renderPodsumowanie();
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
@@ -1384,53 +1378,86 @@ function initializeApp() {
         const miesiace = [];
         const sumyRocznePerRok = [];
         const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
-        const globalTotals = utworzPustyRekordMiesieczny();
+        const globalTotals = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
+        const yearsDetailed = [];
 
         lata.forEach(year => {
             const months = grouped[year];
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-            const yearTotals = utworzPustyRekordMiesieczny();
+            const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
             let absorpcjaSuma = 0;
+            const yearMonths = [];
 
             monthNumbers.forEach(month => {
                 const stats = monthStats(months[month]);
                 absorpcjaSuma += stats.absorpcja;
                 const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
-                miesiace.push({
+                const label = formatujMiesiac(miesiacKey);
+                const monthRecord = {
                     miesiac: miesiacKey,
                     year,
                     month,
-                    praca: stats.work,
-                    nadgodziny: 0,
-                    jazda: stats.drive,
-                    wyfakturowaneGodziny: stats.billed,
+                    mm: month,
+                    label,
+                    work: stats.work,
+                    drive: stats.drive,
+                    billed: stats.billed,
                     l4Days: stats.l4Days,
                     urlopDays: stats.urlopDaysUsed,
-                    brutto: 0,
-                    netto: 0,
-                    absorpcja: stats.absorpcja
-                });
+                    absorpcja: stats.absorpcja,
+                    wyfakturowaneGodziny: stats.billed,
+                    praca: stats.work,
+                    jazda: stats.drive,
+                    urlopDaysUsed: stats.urlopDaysUsed
+                };
+                miesiace.push(monthRecord);
+                yearMonths.push(monthRecord);
 
-                yearTotals.praca += stats.work;
-                yearTotals.jazda += stats.drive;
-                yearTotals.wyfakturowaneGodziny += stats.billed;
-                yearTotals.l4Days += stats.l4Days;
-                yearTotals.urlopDaysUsed += stats.urlopDaysUsed;
+                yearSum.work += stats.work;
+                yearSum.drive += stats.drive;
+                yearSum.billed += stats.billed;
+                yearSum.l4Days += stats.l4Days;
+                yearSum.urlopDays += stats.urlopDaysUsed;
             });
 
-            yearTotals.absorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
-            sumyRocznePerRok.push({ rok: year, ...yearTotals, miesiace: monthNumbers.length });
+            const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
+            sumyRocznePerRok.push({
+                rok: year,
+                praca: yearSum.work,
+                jazda: yearSum.drive,
+                wyfakturowaneGodziny: yearSum.billed,
+                l4Days: yearSum.l4Days,
+                urlopDaysUsed: yearSum.urlopDays,
+                work: yearSum.work,
+                drive: yearSum.drive,
+                billed: yearSum.billed,
+                urlopDays: yearSum.urlopDays,
+                miesiace: monthNumbers.length,
+                absorpcja: avgAbsorpcja
+            });
+            yearsDetailed.push({ year, months: yearMonths, sum: { ...yearSum, absorpcja: avgAbsorpcja } });
 
-            globalTotals.praca += yearTotals.praca;
-            globalTotals.jazda += yearTotals.jazda;
-            globalTotals.wyfakturowaneGodziny += yearTotals.wyfakturowaneGodziny;
-            globalTotals.l4Days += yearTotals.l4Days;
-            globalTotals.urlopDaysUsed += yearTotals.urlopDaysUsed;
+            globalTotals.work += yearSum.work;
+            globalTotals.drive += yearSum.drive;
+            globalTotals.billed += yearSum.billed;
+            globalTotals.l4Days += yearSum.l4Days;
+            globalTotals.urlopDays += yearSum.urlopDays;
         });
 
-        const sumyRoczne = { ...globalTotals, absorpcja: obliczAbsorpcja(globalTotals.wyfakturowaneGodziny) };
+        const sumyRoczne = {
+            work: globalTotals.work,
+            drive: globalTotals.drive,
+            billed: globalTotals.billed,
+            l4Days: globalTotals.l4Days,
+            urlopDays: globalTotals.urlopDays,
+            praca: globalTotals.work,
+            jazda: globalTotals.drive,
+            wyfakturowaneGodziny: globalTotals.billed,
+            urlopDaysUsed: globalTotals.urlopDays,
+            absorpcja: obliczAbsorpcja(globalTotals.billed)
+        };
 
-        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped };
+        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
     }
 
     function formatujMiesiac(miesiac) {
@@ -1517,78 +1544,46 @@ function initializeApp() {
 
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
-        const grouped = ostatnieZestawienieMiesieczne.yearlyGrouped || {};
-        const years = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
         if (!years.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
             return;
         }
 
-        const tables = years.map(year => {
-            const months = grouped[year] || {};
-            const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-            let totalWork = 0;
-            let totalDrive = 0;
-            let totalBilled = 0;
-            let totalL4 = 0;
-            let totalUrlop = 0;
-            let absorpcjaSuma = 0;
-
-            const rows = monthNumbers.map(month => {
-                const stats = monthStats(months[month]);
-                totalWork += stats.work;
-                totalDrive += stats.drive;
-                totalBilled += stats.billed;
-                totalL4 += stats.l4Days;
-                totalUrlop += stats.urlopDaysUsed;
-                absorpcjaSuma += stats.absorpcja;
-                const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
-                return `
-                    <tr class="summary-row">
-                        <td class="label">${formatujMiesiac(miesiacKey)}</td>
-                        <td class="num">${formatujLiczbe(stats.work)} h</td>
-                        <td class="num">${formatujLiczbe(stats.drive)} h</td>
-                        <td class="num">${formatujLiczbe(stats.billed)} h</td>
-                        <td class="num">${fmtPct(stats.absorpcja)}</td>
-                        <td class="num">${formatujLiczbe(stats.l4Days)}</td>
-                        <td class="num">${formatujLiczbe(stats.urlopDaysUsed)}</td>
-                    </tr>`;
-            }).join('');
-
-            const avgAbs = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
-            const totalRow = `
-                <tr class="summary-row total total-row">
-                    <td class="label">Razem</td>
-                    <td class="num">${formatujLiczbe(totalWork)} h</td>
-                    <td class="num">${formatujLiczbe(totalDrive)} h</td>
-                    <td class="num">${formatujLiczbe(totalBilled)} h</td>
-                    <td class="num">${fmtPct(avgAbs)}</td>
-                    <td class="num">${formatujLiczbe(totalL4)}</td>
-                    <td class="num">${formatujLiczbe(totalUrlop)}</td>
-                </tr>`;
-
-            return `
-                <div class="table-responsive">
-                    <h3 class="year-heading">${year}</h3>
-                    <table class="summary-table">
-                        <thead>
-                            <tr>
-                                <th>Miesiąc</th>
-                                <th>Godziny pracy</th>
-                                <th>Czas jazdy</th>
-                                <th>Wyfakturowane</th>
-                                <th>Absorpcja</th>
-                                <th>L4 (dni)</th>
-                                <th>Urlop (dni)</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                        <tfoot>${totalRow}</tfoot>
-                    </table>
-                </div>`;
-        }).join('');
-
-        annualSummaryContainer.innerHTML = tables;
+        annualSummaryContainer.innerHTML = years.map(y => `
+  <div class="year-section">
+    <div class="year-title">Rok ${y.year}</div>
+    <table class="tbl">
+      <thead><tr>
+        <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
+        <th>Wyfakturowane</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+      </tr></thead>
+      <tbody>
+        ${y.months.map(m=>`
+          <tr>
+            <td>${m.label}</td>
+            <td>${m.work.toFixed(2)} h</td>
+            <td>${m.drive.toFixed(2)} h</td>
+            <td>${m.billed.toFixed(2)} h</td>
+            <td><span class="badge-value">${Math.round(m.billed/168*100)}%</span></td>
+            <td>${m.l4Days}</td>
+            <td>${m.urlopDays}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Razem</td>
+          <td>${y.sum.work.toFixed(2)} h</td>
+          <td>${y.sum.drive.toFixed(2)} h</td>
+          <td>${y.sum.billed.toFixed(2)} h</td>
+          <td><span class="badge-value">${Math.round(y.sum.billed/(168*12)*100)}%</span></td>
+          <td>${y.sum.l4Days}</td>
+          <td>${y.sum.urlopDays}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+`).join('');
     }
 
     const calcVacationRemaining = (allowance, usedFromCalendar, adjustmentsSum) => {
@@ -1612,27 +1607,19 @@ function initializeApp() {
 
     function renderL4Summary() {
         if (!l4SummaryContainer) return;
-        const months = (ostatnieZestawienieMiesieczne.yearlyGrouped || {})[selectedSummaryYear] || {};
-        const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-        if (!monthNumbers.length) {
+        const yearData = (ostatnieZestawienieMiesieczne.years || []).find(y => Number(y.year) === Number(selectedSummaryYear)) || null;
+        if (!yearData || !yearData.months.length) {
             l4SummaryContainer.innerHTML = '<p>Brak danych dla wybranego roku.</p>';
             return;
         }
-        let total = 0;
-        const rows = monthNumbers.map(month => {
-            const stats = monthStats(months[month]);
-            total += stats.l4Days;
-            const miesiacKey = `${selectedSummaryYear}-${String(month).padStart(2, '0')}`;
-            return `<tr><td>${formatujMiesiac(miesiacKey)}</td><td class="num">${formatujLiczbe(stats.l4Days)}</td></tr>`;
-        }).join('');
+        const total = yearData.sum.l4Days;
+        const rows = yearData.months.map(m => `<tr><td>${m.label}</td><td class="num">${m.l4Days}</td></tr>`).join('');
         l4SummaryContainer.innerHTML = `
-            <div class="table-responsive">
-                <table class="summary-table">
-                    <thead><tr><th>Miesiąc</th><th>L4 (dni)</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                    <tfoot><tr class="total-row"><td>Suma roczna</td><td class="num">${formatujLiczbe(total)}</td></tr></tfoot>
-                </table>
-            </div>`;
+            <table class="tbl">
+                <thead><tr><th>Miesiąc</th><th>L4 (dni)</th></tr></thead>
+                <tbody>${rows}</tbody>
+                <tfoot><tr><td>Suma roczna</td><td class="num">${total}</td></tr></tfoot>
+            </table>`;
     }
 
     async function getVacationAllowance(year) {
@@ -1708,7 +1695,8 @@ function initializeApp() {
 
     function renderZlecenia() { wyswietlZlecenia(); }
 
-    async function odswiezPodsumowania() {
+    async function odswiezPodsumowania(options = {}) {
+        const { skipRender = false } = options;
         ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza);
         window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
         if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
@@ -1729,7 +1717,9 @@ function initializeApp() {
         updateYearSelectOptions(vacationYearSelect, lata, selectedVacationYear);
         if (summaryYearSelect) summaryYearSelect.value = String(selectedSummaryYear);
         if (vacationYearSelect) vacationYearSelect.value = String(selectedVacationYear);
-        await renderPodsumowanie();
+        if (!skipRender) {
+            await renderPodsumowanie();
+        }
         obliczIPokazPodsumowanieFinansowe();
     }
 
