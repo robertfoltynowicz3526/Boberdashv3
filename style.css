@@ -113,18 +113,6 @@ body > * {
   z-index: 1;
 }
 
-/* nic nie może przykrywać głównej treści */
-#leave-bar,#leave-toolbar,.leave-pop,.leave-legend,.daily-fh-badge,.fh-badge,.hours-badge{display:none!important}
-[data-section]{display:none}
-.leave-badge{pointer-events:none!important}
-.fc-event.hdr-event{font-size:12px;line-height:1.15;font-weight:600}
-.app, main, [data-section]{
-  position: relative;
-  z-index: 1;
-  pointer-events: auto;
-}
-body *{ cursor: default; }
-
 header {
   position: sticky;
   top: 0;
@@ -1622,8 +1610,6 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .ev-client{ font-weight:600; }
 .ev-meta{ font-size:.85em; opacity:.9; }
 .fc .fc-daygrid-day-frame{ overflow:hidden; }
-.fc-daygrid-day-frame{ position:relative; }
-.fc-event.hdr-event{ font-size:12px; line-height:1.15; font-weight:600; }
 .fc .fc-daygrid-event{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; line-height:1.2; padding:2px 6px; border-radius:8px; overflow:hidden; }
 .fc .fc-daygrid-event .fc-event-main{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .fc .fc-daygrid-day-events{ margin-top:2px; }
@@ -1932,3 +1918,7 @@ main,
   table.responsive td{ padding:12px 12px; }
 }
 
+#leave-bar,
+#leave-toolbar,
+.leave-pop,
+.leave-legend{ display:none !important; }
