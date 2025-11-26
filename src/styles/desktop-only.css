@@ -14,19 +14,18 @@ body { min-width: 1366px !important; }  /* wymuś szerokość dla PC */
 /* Sidebar – sztywna szerokość, by łatwo wyliczyć main */
 aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
-/* Karta z kalendarzem – pełna szerokość prawej kolumny */
+/* Karta z kalendarzem – wyśrodkowana, bez rozciągania na boki */
 .calendar-card, [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
-  width: calc(100vw - 280px) !important;   /* viewport minus sidebar */
-  max-width: calc(100vw - 280px) !important;
-  margin: 0 !important;
+  width: 100% !important;
+  max-width: 1280px !important;
+  margin: 0 auto !important;
   padding: 12px !important;
 }
 
-/* Kalendarz – rozciągnięcie w dół i większe kratki */
-#kalendarz { min-height: calc(100vh - 220px) !important; }
-.fc-view-harness { min-height: calc(100vh - 250px) !important; }
-.fc-daygrid-day-frame { min-height: 180px !important; }          /* 180–200px na desktop */
-@media (min-width: 1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
+/* Kalendarz – auto height, bez wymuszonych min-height */
+#kalendarz { height: auto !important; min-height: auto !important; }
+.fc-view-harness { min-height: auto !important; }
+.fc-daygrid-day-frame { min-height: auto !important; }
 
 /* Pop-over „+X więcej” – zostaje */
 .fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
@@ -86,9 +85,9 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 [data-section="pulpit"] .card.kalendarz,
 [data-section="kalendarz"] .card,
 #calendar-wrapper, .calendar-wrapper {
-  width: calc(100vw - 280px) !important;   /* viewport – sidebar */
-  max-width: calc(100vw - 280px) !important;
-  margin: 0 !important;
+  width: 100% !important;
+  max-width: 1280px !important;
+  margin: 0 auto !important;
   padding: 12px !important;
 }
 
@@ -98,10 +97,9 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 /* W dół – większe kratki i wysoki harness */
-#kalendarz { min-height: calc(100vh - 220px) !important; }
-.fc-view-harness { min-height: calc(100vh - 250px) !important; }
-.fc-daygrid-day-frame { min-height: 180px !important; }
-@media (min-width:1600px){ .fc-daygrid-day-frame{ min-height:200px !important; } }
+#kalendarz { height: auto !important; min-height: auto !important; }
+.fc-view-harness { min-height: auto !important; }
+.fc-daygrid-day-frame { min-height: auto !important; }
 
 /* === LISTY – PRZEWIJANIE (ZAKOŃCZONE, MASZYNY, KLIENCI) === */
 [data-section="zlecenia"] .closed-list,
@@ -138,22 +136,19 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* Karta z kalendarzem = viewport - sidebar */
 #calendar-wrapper, .calendar-wrapper,
 [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
-  width: calc(100vw - 280px) !important;
-  max-width: calc(100vw - 280px) !important;
-  margin: 0 !important;
+  width: 100% !important;
+  max-width: 1280px !important;
+  margin: 0 auto !important;
   padding: 12px !important;
 }
 
 /* FullCalendar niech zawsze bierze 100% szerokości rodzica */
 #kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid { width: 100% !important; }
 
-/* Wysokość w dół (kratki większe), ale bez zielonych chipów */
-.fc-view-harness { min-height: calc(100vh - 250px) !important; }
-.fc-daygrid-day-frame { min-height: 180px !important; }
-@media (min-width:1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
-
-/* Usuń style zielonych „chipów” (gdyby istniały) */
-.ab-chip, .leave-flag { display: none !important; }
+/* Wysokość automatyczna – bez wymuszania wysokich kratek */
+#kalendarz { height: auto !important; min-height: auto !important; }
+.fc-view-harness { min-height: auto !important; }
+.fc-daygrid-day-frame { min-height: auto !important; }
 
 /* === SCROLL W DŁUGICH LISTACH === */
 #closed-orders, .closed-orders,          /* zakończone zlecenia */

@@ -621,9 +621,9 @@ function initializeApp() {
             plugins: calendarPlugins,
             initialView: 'dayGridMonth',
             headerToolbar: false,
-            height: '100%',
+            height: 'auto',          // nie rozciągaj kalendarza na boki/wysokość
             contentHeight: 'auto',
-            expandRows: true,
+            expandRows: false,
             dayMaxEventRows: 4,
             moreLinkClick: 'popover',
             handleWindowResize: true,
