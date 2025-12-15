@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "offdays",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "start", "order": "ASCENDING" },
+        { "fieldPath": "end", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "jobs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "start", "order": "ASCENDING" },
+        { "fieldPath": "end", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
