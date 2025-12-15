@@ -62,10 +62,10 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
 /* --- Kalendarz na pełną wysokość i szerokość prawej kolumny --- */
 .calendar-shell {
-  width: calc(100vw - 340px);
+  width: 100%;
   height: auto;
-  margin-left: 320px;
-  margin-top: 16px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .calendar-shell #kalendarz,

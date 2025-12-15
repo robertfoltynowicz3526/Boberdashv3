@@ -9,6 +9,7 @@
     <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css'>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <link rel='stylesheet' href='/src/style.css'>
+    <link rel='stylesheet' href='/src/styles.css'>
     <link rel='stylesheet' href='/src/styles/desktop-only.css'>
     <script type='module' src='/src/main.js' defer></script>
   </head>
@@ -39,14 +40,14 @@
         </div>
     </header>
     <main>
-        <div id="pulpit" class="tab-content" data-section="kalendarz">
+        <div id="pulpit" class="tab-content page-wide" data-section="kalendarz">
             <h2>Pulpit i Ewidencja Czasu Pracy</h2>
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
             <div id="calendar-shell" class="calendar-wrap">
                 <div id="kalendarz" class="calendar-container"></div>
             </div>
         </div>
-        <div id="klienci" class="tab-content">
+        <div id="klienci" class="tab-content page-wide">
             <h2>Baza Klientów</h2>
             <div class="section-grid">
                 <div class="side">
@@ -71,7 +72,7 @@
                     <div class="table-section">
                         <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
                         <div id="lista-klientow-content" class="collapsible-content">
-                            <div id="clients-list" class="clients-list section-scroll">
+                            <div id="clients-list" class="clients-list section-scroll scroll-y">
                                 <div id="lista-klientow"></div>
                             </div>
                         </div>
@@ -79,7 +80,7 @@
                 </div>
             </div>
         </div>
-        <div id="maszyny" class="tab-content">
+        <div id="maszyny" class="tab-content page-wide">
             <h2>Baza Maszyn</h2>
             <div class="section-grid">
                 <div class="side">
@@ -106,7 +107,7 @@
                     <div class="table-section">
                         <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
                         <div id="lista-maszyn-content" class="collapsible-content">
-                            <div id="machines-list" class="machines-list section-scroll">
+                            <div id="machines-list" class="machines-list section-scroll scroll-y">
                                 <div id="lista-maszyn"></div>
                             </div>
                         </div>
@@ -114,7 +115,7 @@
                 </div>
             </div>
         </div>
-        <div id="zlecenia" class="tab-content orders-page">
+        <div id="zlecenia" class="tab-content orders-page page-wide">
             <h2>Zlecenia</h2>
             <div class="orders-grid">
                 <div class="side">
@@ -140,7 +141,7 @@
                                 <button id="export-zlecenia-btn" class="btn-edit">Eksportuj</button>
                             </div>
                             <div id="summary-container" class="orders-summary summary-container-subtle summary-total"></div>
-                            <div id="closed-orders" class="closed-orders section-scroll">
+                            <div id="closed-orders" class="closed-orders section-scroll scroll-y">
                                 <div id="ukonczone-zlecenia-lista"></div>
                             </div>
                         </div>
@@ -357,6 +358,9 @@
                 <hr>
                 <h3>Powiązane Wpisy z Kalendarza (Ewidencja Czasu)</h3>
                 <div id="details-zlecenie-kalendarz"></div>
+                <hr>
+                <h3>Opis (szczegóły na zakończenie)</h3>
+                <div id="details-zlecenie-opis"></div>
             </div>
         </div>
     </div>
