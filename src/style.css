@@ -629,6 +629,7 @@ select {
   max-height: 0;
 }
 
+#calendar,
 #kalendarz {
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -638,6 +639,7 @@ select {
 }
 
 #pulpit .calendar-container,
+#pulpit #calendar,
 #pulpit #kalendarz {
   width: 100%;
   max-width: none;
@@ -696,6 +698,7 @@ select {
   min-height: auto;
 }
 
+#calendar-shell #calendar,
 #calendar-shell #kalendarz {
   height: auto;
   min-height: auto;
@@ -1901,6 +1904,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   width:100%;
   max-width:none !important;
 }
+#calendar,
 #kalendarz{ width:100%; }
 .fc{ font-size:0.95rem; }
 @media (min-width:1200px){
@@ -1984,6 +1988,7 @@ main,
   max-width: 1280px;
   margin: 0 auto;
 }
+#calendar,
 #kalendarz { height: auto; min-height: auto; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
 .fc-daygrid-day { position: relative; overflow: hidden; }
@@ -2018,6 +2023,7 @@ main,
 [data-section="kalendarz"] .card,
 .calendar-card { grid-column: 1 / -1; width: 100%; max-width: 1280px; margin: 0 auto; }
 
+#calendar,
 #kalendarz {
   height: auto;
   min-height: auto;

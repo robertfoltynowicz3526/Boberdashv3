@@ -1,11 +1,15 @@
 .calendar-wrap{
   width: min(1400px, 96vw);
   margin: 0 auto;
-  padding: 0 var(--jd-gap);
+  padding: 8px 12px;
   overflow-x: hidden;
 }
 
 #calendar, #kalendarz{ width:100%; }
+
+#calendar {
+  min-height: 70vh;
+}
 
 /* Karty zleceń – czytelne, nie nachodzą */
 .fc .job-event {
@@ -82,6 +86,9 @@
 /* Ogólne poprawki wyglądu kalendarza */
 .fc{--fc-border-color: var(--jd-border); --fc-page-bg-color: transparent}
 .fc .fc-daygrid-day-number{font-weight:600;}
-.fc-theme-standard td,.fc-theme-standard th{border-color: rgba(255,255,255,.12)}
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard td,
+.fc-theme-standard th{border-color: rgba(255,255,255,.08)}
+.fc .fc-daygrid-day { background: rgba(255,255,255,.02); }
 .fc .fc-scroller-harness,.fc .fc-scroller{overflow: hidden auto}
 .fc .fc-daygrid-event{border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,.25)}

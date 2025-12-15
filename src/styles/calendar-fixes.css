@@ -68,6 +68,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   padding: 0;
 }
 
+.calendar-shell #calendar,
 .calendar-shell #kalendarz,
 .calendar-shell .fc,
 .calendar-shell .fc-scrollgrid,

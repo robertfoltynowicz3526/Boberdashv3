@@ -1,3 +1,7 @@
+// KRYTYCZNE style FullCalendar (v6):
+import '@fullcalendar/core/index.css'
+import '@fullcalendar/daygrid/index.css'
+
 import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
@@ -5,7 +9,7 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
+import { bootCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { setCalendarEvents, setDailyEntries, setDayFlags } from './data/dailyTotals.js';
 
 // Uruchom dopiero po załadowaniu DOM:
@@ -178,11 +182,6 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
-    const handleCalendarResize = () => {
-        try {
-            calendar?.updateSize();
-        } catch (_) { }
-    };
     let workEvents = [];
     let leaveEvents = [];
     let leaveEventsReady = false;
@@ -248,7 +247,7 @@ function initializeApp() {
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
-    const kalendarzContainer = document.getElementById('kalendarz');
+    const kalendarzContainer = document.getElementById('calendar') || document.getElementById('kalendarz');
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
@@ -588,9 +587,6 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
-    const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
-    const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
-    const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
     function normalizeDayKey(value) {
         if (!value) return null;
         if (typeof value === 'string') return value.slice(0, 10);
@@ -645,75 +641,39 @@ function initializeApp() {
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
-        calendar = initCalendar(
-            kalendarzContainer,
-            {
-                plugins: calendarPlugins,
-                timeZone: 'local',
-                firstDay: 1,
-                selectable: true,
-                selectMirror: true,
-                unselectAuto: true,
-                eventDataTransform(event) {
-                    if (event && typeof event.title === 'string') {
-                        event.title = stripEwidencjaPrefix(event.title);
-                    }
-                    if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
-                        event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
-                    }
-                    return event;
-                },
-                dateClick: (info) => openEwidencja(info.dateStr),
-                select(info) {
-                    const startDate = normalizeAllDayDate(info?.start);
-                    const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
-                    if (normalized) {
-                        otworzModalGodzin(normalized);
-                    }
-                    if (calendar && typeof calendar.unselect === 'function') {
-                        calendar.unselect();
-                    }
-                },
-                onDatesSet(viewInfo) {
-                    if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
-                        obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                    }
+        calendar = bootCalendar({
+            timeZone: 'local',
+            firstDay: 1,
+            selectable: true,
+            selectMirror: true,
+            unselectAuto: true,
+            eventDataTransform(event) {
+                if (event && typeof event.title === 'string') {
+                    event.title = stripEwidencjaPrefix(event.title);
+                }
+                if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
+                    event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
+                }
+                return event;
+            },
+            dateClick: (info) => openEwidencja(info.dateStr),
+            select(info) {
+                const startDate = normalizeAllDayDate(info?.start);
+                const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
+                if (normalized) {
+                    otworzModalGodzin(normalized);
+                }
+                if (calendar && typeof calendar.unselect === 'function') {
+                    calendar.unselect();
+                }
+            },
+            onDatesSet(viewInfo) {
+                if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
+                    obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                 }
             }
-        );
+        });
         window.calendar = calendar;
-        const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
-        if (calendarShell) {
-            const applySize = () => handleCalendarResize();
-            applySize();
-            let ro = null;
-            if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
-                ro = new window.ResizeObserver(() => applySize());
-                ro.observe(calendarShell);
-            } else {
-                // Fallback dla starszych przeglądarek/środowisk: nasłuchuj resize
-                const onResize = () => applySize();
-                window.addEventListener('resize', onResize);
-                // sprzątanie przy odmontowaniu komórki
-                const observer = new MutationObserver((mutations) => {
-                    for (const m of mutations) {
-                        m.removedNodes && m.removedNodes.forEach((n) => {
-                            if (n === calendarShell || (n.contains && n.contains(calendarShell))) {
-                                window.removeEventListener('resize', onResize);
-                                observer.disconnect();
-                            }
-                        });
-                    }
-                });
-                observer.observe(calendarShell.parentNode || document.body, { childList: true });
-            }
-        }
-        setTimeout(() => {
-            calendar.updateSize();
-            calendar.updateDates();
-            window.dispatchEvent(new Event('resize'));
-        }, 0);
-        window.addEventListener('resize', handleCalendarResize);
     }
 
     async function otworzModalGodzin(data) {
