@@ -2,7 +2,7 @@
   width: min(1400px, 96vw);
   margin: 0 auto;
   padding: 8px 12px;
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 #calendar, #kalendarz{ width:100%; }

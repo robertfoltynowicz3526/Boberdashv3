@@ -1881,6 +1881,11 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   display:block;
 }
 
+.orders-finished{
+  max-width:min(1480px, 96vw);
+  margin:0 auto;
+}
+
 .orders-active,
 .orders-finished,
 .orders-finished .list{
@@ -2206,11 +2211,24 @@ main,
 .fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
 
 /* Listy (klienci/maszyny/zakończone) przewijają się w pionie */
-#closed-orders, .closed-orders,
-#clients-list, .clients-list,
+#clients-list, .clients-list {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+
+#inventory-list, .inventory-list,
 #machines-list, .machines-list,
 .scroll-panel {
-  max-height: calc(100vh - 240px);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+
+#closed-orders, .closed-orders {
+  max-height: calc(100vh - 280px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 6px;
