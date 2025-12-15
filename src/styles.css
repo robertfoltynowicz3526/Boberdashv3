@@ -1,4 +1,8 @@
 :root {
+  --jd-green: #1b4d2a;
+  --jd-green-2: #224f2d;
+  --jd-yellow: #ffd600;
+  --jd-blue: #4f86ff;
   --jd-green-900: #0e1a0f;
   --jd-green-800: #152417;
   --jd-green-700: #1b2e1e;
@@ -89,7 +93,7 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* Szerokość treści (zlecenia/klienci/maszyny) */
 .page-wide,.orders-page .container,.clients-page .container,.machines-page .container{
-  max-width:1600px;margin:0 auto;width:100%;
+  max-width:none;margin:0;width:100%;
 }
 
 /* Scroll dla list długich */
@@ -135,5 +139,115 @@ input::placeholder{color:var(--jd-text-500)}
 .day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
 
 /* Kalendarz zawsze w ramie – nic nie wystaje */
-.calendar-wrap{width:100%;max-width:1400px;margin:0 auto}
+.calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:hidden}
 .fc{width:100%}
+
+/* Layout aplikacji – pełna szerokość kontentu */
+.app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+}
+
+.main,
+.main-content,
+.page-content,
+#content,
+.content-wrap {
+  width: 100%;
+  max-width: none !important;
+  margin: 0;
+  padding: 24px;
+}
+
+.orders-page,
+.orders-section,
+#ordersRoot {
+  width: 100%;
+}
+
+.orders-page .card,
+.orders-section .card,
+.orders-list,
+.orders-summary,
+#ordersRoot .card {
+  width: 100%;
+}
+
+.orders-grid {
+  display: block;
+}
+
+.container,
+.container-lg,
+.container-xl {
+  max-width: none !important;
+}
+
+/* FullCalendar – brak wychodzenia i nakładania */
+#calendar,
+.calendar-wrap,
+.fc {
+  width: 100%;
+  overflow: hidden;
+}
+
+.fc .fc-daygrid-body,
+.fc .fc-daygrid-day-frame {
+  overflow: visible;
+}
+
+.fc .fc-daygrid-event {
+  border-radius: 8px;
+  padding: 2px 6px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.12);
+  z-index: 2;
+  background: var(--jd-blue);
+  color: #08131b;
+}
+
+.fc .fc-bg-event,
+.fc .fc-daygrid-bg-harness,
+.fc .fc-highlight {
+  z-index: 0 !important;
+  pointer-events: none;
+  opacity: .22;
+}
+
+.fc .absence-icon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  opacity: .8;
+}
+
+.fc-theme-standard .fc-scrollgrid,
+.card,
+.panel,
+.kpi {
+  background: #0f1a14;
+  border-color: rgba(255,255,255,.08);
+}
+
+.fc .fc-toolbar-title,
+.section-title {
+  color: #e8ffde;
+}
+
+.fc .fc-button-primary,
+.btn-primary {
+  background: var(--jd-yellow);
+  color: #1a1a1a;
+  border: none;
+}
+
+.fc .fc-button-primary:disabled {
+  opacity: .6;
+}
+
+.fc-daygrid .fc-daygrid-event-harness { z-index: 2; }
+.fc-daygrid .fc-daygrid-bg-harness,
+.fc .fc-bg-event { z-index: 0 !important; }
+.fc-popover { z-index: 50; }
