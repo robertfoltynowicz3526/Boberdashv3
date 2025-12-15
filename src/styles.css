@@ -1,0 +1,139 @@
+:root {
+  --jd-green-900: #0e1a0f;
+  --jd-green-800: #152417;
+  --jd-green-700: #1b2e1e;
+  --jd-green-600: #24561d;
+  --jd-green-500: #367c2b;    /* John Deere green */
+  --jd-green-400: #47a23c;
+
+  --jd-yellow-500: #fcd116;   /* John Deere yellow */
+  --jd-yellow-600: #c9a300;
+
+  --jd-blue-300:  #73a7ff;    /* linki (opcjonalnie) */
+
+  --jd-text-100:  #ffffff;
+  --jd-text-300:  #e7f2e9;
+  --jd-text-500:  #cfe4d6;
+  --jd-line-600:  #28422c;
+
+  --bg-app:   var(--jd-green-900);
+  --bg-panel: radial-gradient(1000px 600px at 70% 0%, #1a2c1d 0%, var(--jd-green-900) 70%);
+  --surface:  var(--jd-green-800);
+  --card:     var(--jd-green-700);
+
+  --brand:        var(--jd-green-500);
+  --brand-strong: var(--jd-green-600);
+  --brand-soft:   rgba(54,124,43,0.18);
+  --accent:       var(--jd-yellow-500);
+  --accent-strong:var(--jd-yellow-600);
+
+  --shadow-1: 0 6px 20px rgba(0,0,0,0.35);
+  --shadow-2: 0 10px 28px rgba(0,0,0,0.45);
+}
+
+html, body {
+  background: var(--bg-app);
+  color: var(--jd-text-100);
+}
+
+/* Rama aplikacji / panele */
+.app-shell,.main-panel{background:var(--bg-panel)}
+.card,.panel,.box{
+  background:var(--card);
+  border:1px solid var(--jd-line-600);
+  box-shadow:var(--shadow-1);
+  color:var(--jd-text-100);
+  border-radius:14px;
+}
+
+/* Sidebar */
+.sidebar{background:var(--surface);border-right:1px solid var(--jd-line-600)}
+.sidebar .item{color:var(--jd-text-300)}
+.sidebar .item.active{
+  background:linear-gradient(180deg,var(--brand-soft),transparent);
+  color:var(--jd-text-100);
+  border-left:3px solid var(--accent);
+}
+
+/* Nagłówki */
+h1,h2,h3{color:var(--jd-text-100)}
+
+/* Przyciski */
+.btn{border-radius:12px;border:1px solid transparent;padding:10px 16px;font-weight:600}
+.btn-primary{background:var(--brand);color:#0b1a0b;border-color:var(--brand-strong)}
+.btn-primary:hover{background:var(--brand-strong)}
+.btn-warning{background:var(--accent);color:#222;border-color:var(--accent-strong)}
+.btn-warning:hover{background:var(--accent-strong)}
+.btn-ghost{background:transparent;color:var(--jd-text-100);border-color:var(--jd-line-600)}
+.btn-ghost:hover{background:var(--brand-soft)}
+
+/* KPI/chipy */
+.kpi-chip{background:var(--surface);border:1px solid var(--jd-line-600);color:var(--jd-text-100)}
+.kpi-chip .value{color:var(--accent)}
+
+/* Listy / wiersze */
+.list-row{background:var(--card);border:1px solid var(--jd-line-600)}
+.list-row:hover{background:linear-gradient(180deg,rgba(54,124,43,0.08),transparent)}
+
+/* Modal szczegółów */
+.modal{background:var(--surface);border:1px solid var(--jd-line-600);box-shadow:var(--shadow-2)}
+
+/* Linki */
+a{color:var(--jd-blue-300)} a:hover{color:#9bc0ff}
+
+/* Inputy */
+input,select,textarea{
+  background:var(--card);color:var(--jd-text-100);
+  border:1px solid var(--jd-line-600);border-radius:10px}
+input::placeholder{color:var(--jd-text-500)}
+
+/* Szerokość treści (zlecenia/klienci/maszyny) */
+.page-wide,.orders-page .container,.clients-page .container,.machines-page .container{
+  max-width:1600px;margin:0 auto;width:100%;
+}
+
+/* Scroll dla list długich */
+.scroll-y{
+  max-height:calc(100vh - 280px);
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+
+/* ───── FullCalendar: JD skin ───── */
+.fc .fc-toolbar-title{color:var(--jd-text-100)}
+.fc .fc-button{
+  background:var(--brand);border:1px solid var(--brand-strong);
+  color:#0b1a0b;border-radius:10px}
+.fc .fc-button:hover{background:var(--brand-strong)}
+.fc-theme-standard .fc-scrollgrid{border-color:var(--jd-line-600);background:var(--surface)}
+.fc-theme-standard td,.fc-theme-standard th{border-color:var(--jd-line-600)}
+.fc .fc-daygrid-day-number{color:var(--jd-text-500)}
+
+/* Eventy -> zielone JD */
+.fc-event,.fc .fc-daygrid-event{
+  background:linear-gradient(180deg,var(--brand) 0%,var(--brand-strong) 100%);
+  border:1px solid rgba(0,0,0,0.25);
+  color:#0b1a0b;border-radius:10px;padding:2px 6px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.35)
+}
+
+/* Podsumowanie dnia (jeden blok na komórkę) */
+.day-summary{
+  background:linear-gradient(180deg,rgba(54,124,43,0.22),rgba(36,86,29,0.22));
+  border:1px dashed var(--brand-strong);
+  color:var(--jd-text-100);
+  border-radius:12px;padding:6px 8px;margin-top:4px;font-size:12px
+}
+
+/* Ikony L4/Święto/Urlop – centralnie, większe */
+.day-flag{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.day-flag .pill{
+  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
+  box-shadow:0 4px 12px rgba(0,0,0,0.35)}
+.day-flag--urlop .pill{background:rgba(252,209,22,0.18);border:2px solid var(--accent)}
+.day-flag--wolne .pill{background:rgba(71,162,60,0.18);border:2px solid var(--jd-green-400)}
+.day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
+
+/* Kalendarz zawsze w ramie – nic nie wystaje */
+.calendar-wrap{width:100%;max-width:1400px;margin:0 auto}
+.fc{width:100%}
