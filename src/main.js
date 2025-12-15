@@ -3,6 +3,7 @@ import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getD
 import Papa from 'papaparse';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
+import './styles/calendar.css';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -596,13 +597,30 @@ function initializeApp() {
                 start: day,
                 allDay: true,
                 display: 'block',
-                className: ['day-summary'],
+                className: ['day-summary', 'jd-summary'],
                 title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`,
                 extendedProps: { kind: 'SUMMARY' }
             }));
 
         return [...cleanEvents, ...summaryEvents];
     }
+
+    const iconForDay = (type) => {
+        const map = { l4: '➕', urlop: '⚑', swieto: '🍃' };
+        return map[type] || '';
+    };
+
+    const getDayMeta = (date) => {
+        const dayKey = normalizeDayKey(date);
+        if (!dayKey) return null;
+        const leaveEvent = leaveEvents.find(ev => normalizeDayKey(ev.start) === dayKey);
+        if (!leaveEvent) return null;
+        const rawType = (leaveEvent.extendedProps?.type || leaveEvent.extendedProps?.typ || '').toUpperCase();
+        if (rawType === 'LEAVE_L4') return { type: 'l4' };
+        if (rawType === 'LEAVE_FREE' || rawType === 'LEAVE_URL') return { type: 'urlop' };
+        if (rawType === 'LEAVE_HOLIDAY') return { type: 'swieto' };
+        return null;
+    };
 
     const openEwidencja = (dateStr) => {
         const normalized = dateStr || '';
@@ -620,7 +638,8 @@ function initializeApp() {
         calendar = new FullCalendar.Calendar(kalendarzContainer, {
             plugins: calendarPlugins,
             initialView: 'dayGridMonth',
-            headerToolbar: false,
+            headerToolbar: { left: 'prev,today,next', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+            timeZone: 'local',
             height: 'auto',          // dopasuj się do zawartości karty
             aspectRatio: 1.7,        // większe ratio = niższy widok miesiąca
             expandRows: false,
@@ -715,6 +734,14 @@ function initializeApp() {
                     info.el.style.display = 'none';
                 }
             },
+            dayCellDidMount: (arg) => {
+                const meta = getDayMeta(arg.date);
+                if (!meta?.type) return;
+                const badge = document.createElement('div');
+                badge.className = 'jd-day-icon';
+                badge.textContent = iconForDay(meta.type);
+                arg.el.querySelector('.fc-daygrid-day-frame')?.appendChild(badge);
+            },
             events: buildEventSourceWithDailySummaries([...workEvents, ...leaveEvents]),
             datesSet(viewInfo) {
                 if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
@@ -751,11 +778,9 @@ function initializeApp() {
         if (calendarShell) {
             const applySize = () => handleCalendarResize();
             applySize();
-            // Bezpieczne tworzenie obserwatora (bez optional chaining po 'new')
-            const RO = (typeof window !== 'undefined' && window.ResizeObserver) ? window.ResizeObserver : null;
             let ro = null;
-            if (RO) {
-                ro = new RO(() => applySize());
+            if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+                ro = new ResizeObserver(() => applySize());
                 ro.observe(calendarShell);
             } else {
                 // Fallback dla starszych przeglądarek/środowisk: nasłuchuj resize
