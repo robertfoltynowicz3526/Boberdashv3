@@ -41,11 +41,36 @@
     </header>
     <main>
         <div id="pulpit" class="tab-content page-wide" data-section="kalendarz">
-            <h2>Pulpit i Ewidencja Czasu Pracy</h2>
-            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
-            <div id="calendar-shell" class="calendar-wrap">
-                <div id="calendar" class="calendar-container"></div>
-            </div>
+            <section class="dashboard">
+              <h1 class="page-title">Pulpit i Ewidencja Czasu Pracy</h1>
+
+              <!-- Pasek metryk -->
+              <div class="metrics">
+                <div class="metric"><div>Praca w miesiącu</div><strong id="m-work">0.0 h</strong></div>
+                <div class="metric"><div>Fakturowane</div><strong id="m-billed">0.0 h</strong></div>
+                <div class="metric"><div>Nadgodziny</div><strong id="m-ot">0.0 h</strong></div>
+                <div class="metric"><div>Czas jazdy</div><strong id="m-drive">0.0 h</strong></div>
+                <div class="metric"><div>Absorpcja</div><strong id="m-abs">0.0%</strong></div>
+
+                <div class="metric chart">
+                  <div>Wyfakturowane – ostatnie 3 mies.</div>
+                  <div id="m-chart" class="tiny-bars"></div>
+                </div>
+              </div>
+
+              <!-- Kontrolki kalendarza -->
+              <div class="cal-toolbar">
+                <button id="btnPrev" class="btn">&lt;</button>
+                <button id="btnToday" class="btn">today</button>
+                <button id="btnNext" class="btn">&gt;</button>
+                <span id="calTitle" class="cal-title"></span>
+              </div>
+
+              <!-- Kalendarz -->
+              <div class="calendar-wrap">
+                <div id="calendar"></div>
+              </div>
+            </section>
         </div>
         <div id="klienci" class="tab-content page-wide">
             <h2>Baza Klientów</h2>

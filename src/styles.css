@@ -142,7 +142,7 @@ input::placeholder{color:var(--jd-text-500)}
 .day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
 
 /* Kalendarz zawsze w ramie – nic nie wystaje */
-.calendar-wrap{width:min(1400px,96vw);max-width:100%;margin:0 auto;overflow:hidden}
+.calendar-wrap{width:min(1400px,96vw);max-width:100%;margin:0 auto;}
 .fc{width:100%}
 
 /* Layout aplikacji – pełna szerokość kontentu */
@@ -192,7 +192,7 @@ input::placeholder{color:var(--jd-text-500)}
 .calendar-wrap,
 .fc {
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fc .fc-daygrid-body,

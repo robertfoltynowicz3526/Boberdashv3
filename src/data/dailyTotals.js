@@ -57,21 +57,31 @@ export function getDayFlagsSync(date) {
 }
 
 export async function getDailyTotals(date) {
-  const key = typeof date === 'string' ? date : dateKeyFromDate(date);
-  if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false };
-  const flags = normalizeFlags(dayFlags.get(key) || dailyEntries.get(key)?.flags || {});
-  if (flags.l4 || flags.urlop || flags.swieto) {
-    return { work: 0, drive: 0, billed: 0, ...flags };
+  try {
+    const key = typeof date === 'string' ? date : dateKeyFromDate(date);
+    if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false };
+    const flags = normalizeFlags(dayFlags.get(key) || dailyEntries.get(key)?.flags || {});
+    if (flags.l4 || flags.urlop || flags.swieto) {
+      return { work: 0, drive: 0, billed: 0, ...flags };
+    }
+    const day = dailyEntries.get(key);
+    return {
+      work: day?.work || 0,
+      drive: day?.drive || 0,
+      billed: day?.billed || 0,
+      ...flags,
+    };
+  } catch (e) {
+    console.error('getDailyTotals failed:', e);
+    return null;
   }
-  const day = dailyEntries.get(key);
-  return {
-    work: day?.work || 0,
-    drive: day?.drive || 0,
-    billed: day?.billed || 0,
-    ...flags,
-  };
 }
 
-export async function loadEventsFromDb() {
-  return cachedEvents || [];
+export async function loadEventsFromDb(start, end) {
+  try {
+    return cachedEvents || [];
+  } catch (e) {
+    console.error('loadEventsFromDb failed:', e);
+    return [];
+  }
 }

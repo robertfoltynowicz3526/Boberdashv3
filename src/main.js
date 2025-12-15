@@ -9,7 +9,8 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import { bootCalendar, updateCalendarData } from './calendar/initCalendar.js';
+import './styles/dashboard.css';
+import { bootCalendar, updateCalendarData } from './calendar.js';
 import { setCalendarEvents, setDailyEntries, setDayFlags } from './data/dailyTotals.js';
 
 // Uruchom dopiero po załadowaniu DOM:
@@ -252,7 +253,12 @@ function initializeApp() {
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
-    const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const metricWorkEl = document.getElementById('m-work');
+    const metricBilledEl = document.getElementById('m-billed');
+    const metricOtEl = document.getElementById('m-ot');
+    const metricDriveEl = document.getElementById('m-drive');
+    const metricAbsEl = document.getElementById('m-abs');
+    const metricChartEl = document.getElementById('m-chart');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -1106,22 +1112,28 @@ function initializeApp() {
             return acc;
         }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
         const absorpcja = obliczAbsorpcja(sumyMies.wyfakturowaneGodziny);
+        if (metricWorkEl) metricWorkEl.textContent = `${(sumyMies.praca || 0).toFixed(1)} h`;
+        if (metricBilledEl) metricBilledEl.textContent = `${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h`;
+        if (metricOtEl) metricOtEl.textContent = `${(sumyMies.nadgodziny || 0).toFixed(1)} h`;
+        if (metricDriveEl) metricDriveEl.textContent = `${(sumyMies.jazda || 0).toFixed(1)} h`;
+        if (metricAbsEl) metricAbsEl.textContent = fmtPct(absorpcja);
 
-        if (!kalendarzPodsumowanieDiv) return;
-        const metricsHTML = `
-  <div class="metric"><div class="label">Praca w miesiącu</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Fakturowane</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Nadgodziny</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(obliczAbsorpcja(sumyMies.wyfakturowaneGodziny))}</div></div>
-`;
-        kalendarzPodsumowanieDiv.innerHTML = `
-  <div class="metrics-row">
-    <div class="metrics-left"><div class="metrics-grid">${metricsHTML}</div></div>
-    <div class="metrics-right"><div id="fh3m-pulpit"></div></div>
-  </div>`;
-        const { y, m } = ymFromMonthInput();
-        renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
+        if (metricChartEl) {
+            const { y, m } = ymFromMonthInput();
+            const months = lastMonthsInclusive(y, m, 4);
+            const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
+            const max = Math.max(...vals, 1);
+
+            metricChartEl.innerHTML = '';
+            months.forEach(({ y, m }, idx) => {
+                const bar = document.createElement('div');
+                const heightPct = (vals[idx] / max) * 100;
+                bar.style.height = `${heightPct}%`;
+                bar.title = `${String(m).padStart(2, '0')}.${String(y).slice(-2)}: ${vals[idx].toFixed(1)} h`;
+                if (idx < months.length - 1) bar.classList.add('dim');
+                metricChartEl.appendChild(bar);
+            });
+        }
     }
 
     async function obslugaKalendarza(event) {
