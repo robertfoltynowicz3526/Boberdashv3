@@ -82,8 +82,14 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     height: 'auto',
     contentHeight: 'auto',
     handleWindowResize: true,
-    dayMaxEventRows: 3,
+    fixedWeekCount: false,
+    dayMaxEvents: 3,
     moreLinkClick: 'popover',
+    eventOrder: 'allDay,start,-duration,title',
+    eventOverlap: (stillEvent, movingEvent) => {
+      return stillEvent.allDay && movingEvent.allDay ? true : false;
+    },
+    eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
     eventContent: buildEventContent,
@@ -97,10 +103,26 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 
   const calendar = new FullCalendar.Calendar(container, options);
   const baseDatesSet = options.datesSet;
+  const baseEventDidMount = options.eventDidMount;
   calendar.setOption('datesSet', (info) => {
     if (typeof baseDatesSet === 'function') baseDatesSet(info);
     if (typeof extraOptions.onDatesSet === 'function') extraOptions.onDatesSet(info);
     renderDaySummaries(calendar);
+    requestAnimationFrame(() => calendar.updateSize());
+  });
+  calendar.setOption('eventDidMount', (info) => {
+    if (typeof baseEventDidMount === 'function') baseEventDidMount(info);
+    if (typeof extraOptions.eventDidMount === 'function') extraOptions.eventDidMount(info);
+    if (info.el.classList.contains('absence-icon-holder')) {
+      const span = document.createElement('span');
+      span.className = 'absence-icon';
+      if (info.el.classList.contains('absence-l4')) span.textContent = '➕';
+      else if (info.el.classList.contains('absence-url')) span.textContent = '🏁';
+      else if (info.el.classList.contains('absence-urlop')) span.textContent = '🏁';
+      else if (info.el.classList.contains('absence-święto') || info.el.classList.contains('absence-swieto')) span.textContent = '🍃';
+      else span.textContent = '🌿';
+      info.el.appendChild(span);
+    }
   });
   calendar.render();
   window.addEventListener('resize', () => {

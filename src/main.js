@@ -388,6 +388,48 @@ function initializeApp() {
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
 
+    const isLeaveEventForId = (event, leaveId) => {
+        if (!event || !leaveId) return false;
+        if (event.id === leaveId) return true;
+        return typeof event.id === 'string' && event.id.startsWith(`${leaveId}::`);
+    };
+
+    const mapLeavePayloadToEvents = (leaveId, payload) => {
+        if (!leaveId || !payload || !payload.start) return [];
+        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
+        const className = `absence-${leaveKind || 'other'}`;
+        const start = payload.start;
+        const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
+        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
+        return [
+            {
+                id: `${leaveId}::bg`,
+                start,
+                end,
+                allDay: true,
+                display: 'background',
+                classNames: ['absence-bg', className],
+                overlap: false,
+                title: payload.title || '',
+                extendedProps
+            },
+            {
+                id: `${leaveId}::icon`,
+                start,
+                end,
+                allDay: true,
+                display: 'background',
+                classNames: ['absence-icon-holder', className],
+                overlap: false,
+                title: payload.title || '',
+                extendedProps
+            }
+        ];
+    };
+
+    const removeLeaveEventsForId = (leaveId) => leaveEvents.filter(event => !isLeaveEventForId(event, leaveId));
+    const findLeaveEventById = (leaveId) => leaveEvents.find(event => isLeaveEventForId(event, leaveId)) || null;
+
     async function syncLeaveEventForDay(dateKey, leaveKind) {
         if (!dateKey) return;
         const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
@@ -397,7 +439,7 @@ function initializeApp() {
             try {
                 await deleteDoc(leaveDocRef);
             } catch (_) { /* brak wpisu – pomijamy */ }
-            const nextEvents = leaveEvents.filter(event => event.id !== leaveDocId);
+            const nextEvents = removeLeaveEventsForId(leaveDocId);
             if (nextEvents.length !== leaveEvents.length) {
                 leaveEvents = nextEvents;
                 przerysujZdarzeniaKalendarza();
@@ -420,8 +462,9 @@ function initializeApp() {
             extendedProps: { typ: type, type, leaveKind: normalizedKind }
         };
         await setDoc(leaveDocRef, payload);
-        const withoutCurrent = leaveEvents.filter(event => event.id !== leaveDocId);
-        leaveEvents = [...withoutCurrent, { id: leaveDocId, ...payload }];
+        const withoutCurrent = removeLeaveEventsForId(leaveDocId);
+        const mapped = mapLeavePayloadToEvents(leaveDocId, payload);
+        leaveEvents = [...withoutCurrent, ...mapped];
         przerysujZdarzeniaKalendarza();
     }
 
@@ -584,6 +627,7 @@ function initializeApp() {
         });
 
         leaveEvents.forEach((ev) => {
+            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
             const key = normalizeDayKey(ev?.start || ev?.date);
             if (!key || byDate.has(key)) return;
             const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
@@ -978,7 +1022,7 @@ function initializeApp() {
                 if (leaveEventsReady) {
                     const normalizedLeave = normalizedDay.leaveKind ? normalizeDayLeaveValue(normalizedDay.leaveKind) : null;
                     const leaveEventId = getLeaveEventDocId(id);
-                    const existingLeaveEvent = leaveEvents.find(event => event.id === leaveEventId) || null;
+                    const existingLeaveEvent = findLeaveEventById(leaveEventId);
                     const existingKind = existingLeaveEvent?.extendedProps?.leaveKind || existingLeaveEvent?.leaveKind || '';
                     const normalizedExisting = existingKind ? normalizeDayLeaveValue(existingKind) : null;
                     if (normalizedLeave) {
@@ -1045,7 +1089,7 @@ function initializeApp() {
     function nasluchujNaUrlopy() {
         try {
             onSnapshot(collection(db, 'events'), (snapshot) => {
-                leaveEvents = snapshot.docs.map(docSnap => {
+                leaveEvents = snapshot.docs.flatMap(docSnap => {
                     const data = docSnap.data() || {};
                     const baseProps = data.extendedProps || {};
                     const rawKind = baseProps.leaveKind || data.leaveKind || '';
@@ -1055,20 +1099,21 @@ function initializeApp() {
                         ? String(rawType)
                         : (normalizedKind ? (normalizedKind === 'L4' ? 'LEAVE_L4' : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE')) : null);
                     const isLeave = Boolean(normalizedType);
-                    if (!isLeave || !data.start || !data.end) return null;
-                    return {
+                    if (!isLeave || !data.start) return [];
+                    const payload = {
                         id: docSnap.id,
                         title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
                         start: data.start,
-                        end: data.end,
+                        end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
                         allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
-                        display: data.display || 'block',
+                        display: 'background',
                         extendedProps: {
                             typ: normalizedType,
                             type: normalizedType,
                             leaveKind: normalizedKind || ''
                         }
                     };
+                    return mapLeavePayloadToEvents(docSnap.id, payload);
                 }).filter(Boolean);
                 przerysujZdarzeniaKalendarza();
                 leaveEventsReady = true;
