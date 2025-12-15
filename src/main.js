@@ -5,7 +5,8 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
+import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
+import { setCalendarEvents, setDailyEntries, setDayFlags } from './data/dailyTotals.js';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -396,11 +397,15 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
+        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toUpperCase();
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
         const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
+        const type = leaveKind === 'L4' ? 'L4' : (leaveKind === 'SWIETO' ? 'SWIETO' : 'URLOP');
+        const classNames = [
+            'fc-offday',
+            leaveKind === 'L4' ? 'is-l4' : (leaveKind === 'SWIETO' ? 'is-swieto' : 'is-urlop')
+        ];
         return [
             {
                 id: `${leaveId}::bg`,
@@ -408,21 +413,11 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'background',
-                classNames: ['absence-bg', className],
+                classNames,
                 overlap: false,
                 title: payload.title || '',
-                extendedProps
-            },
-            {
-                id: `${leaveId}::icon`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
+                type,
+                extendedProps: { ...extendedProps, leaveKind, type }
             }
         ];
     };
@@ -605,10 +600,10 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'urlop';
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO') return 'wolne';
+        if (normalized === 'SWIETO') return 'swieto';
         if (normalized === 'URL') return 'urlop';
         return null;
     };
@@ -621,16 +616,15 @@ function initializeApp() {
             let type = null;
             if (wpis?.flags?.l4) type = 'l4';
             else if (wpis?.flags?.urlop) type = 'urlop';
-            else if (wpis?.flags?.swieto) type = 'wolne';
+            else if (wpis?.flags?.swieto) type = 'swieto';
             else type = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
             if (type) byDate.set(key, type);
         });
 
         leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
             const key = normalizeDayKey(ev?.start || ev?.date);
             if (!key || byDate.has(key)) return;
-            const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
+            const kind = ev?.type || ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
             const type = mapLeaveToFlag(kind);
             if (type) byDate.set(key, type);
         });
@@ -653,8 +647,6 @@ function initializeApp() {
         if (!kalendarzContainer) return;
         calendar = initCalendar(
             kalendarzContainer,
-            [...workEvents, ...leaveEvents],
-            buildCalendarFlags(),
             {
                 plugins: calendarPlugins,
                 timeZone: 'local',
@@ -690,7 +682,6 @@ function initializeApp() {
             }
         );
         window.calendar = calendar;
-        renderDaySummaries(calendar);
         const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
         if (calendarShell) {
             const applySize = () => handleCalendarResize();
@@ -987,6 +978,9 @@ function initializeApp() {
 
     function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
+            setDailyEntries([]);
+            setDayFlags([]);
+            setCalendarEvents([]);
             if (calendar) calendar.removeAllEvents();
             return;
         }
@@ -1061,25 +1055,31 @@ function initializeApp() {
                                 workH: 0,
                                 driveH: 0,
                                 billH: Number(powiazanie.fakturowane) || 0
-                            }
+                            },
+                            classNames: ['job-event']
                         });
                     });
                 }
-                events.push({
-                    id: `godziny_${id}`,
-                    title: 'Ewidencja dnia',
-                    start: id,
-                    allDay: true,
-                    className: ['strip-summary'],
-                    extendedProps: {
-                        client: 'Ewidencja dnia',
-                        machineModel: null,
-                        fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                        typ: null,
-                        ...baseHoursProps
-                    }
-                });
+                if (!powiazane.length && (workValue || driveValue || billedHoursForSummary || dane.notatka)) {
+                    events.push({
+                        id: `godziny_${id}`,
+                        title: stripEwidencjaPrefix(dane.notatka || 'Ewidencja dnia'),
+                        start: id,
+                        allDay: true,
+                        classNames: ['job-event'],
+                        extendedProps: {
+                            client: 'Ewidencja dnia',
+                            machineModel: null,
+                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
+                            typ: null,
+                            ...baseHoursProps
+                        }
+                    });
+                }
             });
+            setDailyEntries(wszystkieWpisyKalendarza);
+            setDayFlags(buildCalendarFlags());
+            setCalendarEvents([...events, ...leaveEvents]);
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();

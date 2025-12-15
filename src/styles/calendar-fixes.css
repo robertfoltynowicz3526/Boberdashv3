@@ -82,12 +82,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .calendar-shell .day-summary {
-  background: rgba(68,117,255,0.14);
-  border: 1px solid rgba(68,117,255,0.35);
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-weight: 600;
-  margin: 2px 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-weight: 400;
+  margin: 0;
 }
 
 .calendar-shell .day-summary .fc-event-title {

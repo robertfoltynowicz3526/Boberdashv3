@@ -690,7 +690,7 @@ select {
 /* Kalendarz wypełnia kartę i nie wychodzi poza nią */
 #calendar-shell {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
   height: auto;
   min-height: auto;
@@ -713,16 +713,11 @@ select {
 }
 
 .fc .day-summary {
-  background: #3b82f6 !important;
+  background: transparent !important;
   border: none !important;
-  color: #fff !important;
-  font-weight: 700;
-  border-radius: 10px;
-}
-
-.fc .day-summary .fc-event-title {
-  white-space: normal;
-  line-height: 1.2;
+  color: #cfe2ff !important;
+  font-weight: 400;
+  border-radius: 0;
 }
 
 .fc-event.leave-event {

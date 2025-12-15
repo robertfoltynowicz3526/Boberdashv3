@@ -123,10 +123,13 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* Podsumowanie dnia (jeden blok na komórkę) */
 .day-summary{
-  background:linear-gradient(180deg,rgba(54,124,43,0.22),rgba(36,86,29,0.22));
-  border:1px dashed var(--brand-strong);
-  color:var(--jd-text-100);
-  border-radius:12px;padding:6px 8px;margin-top:4px;font-size:12px
+  background: transparent;
+  border: 0;
+  color: #cfe2ff;
+  border-radius: 0;
+  padding: 4px 4px 2px;
+  margin-top: 6px;
+  font-size: 11px
 }
 
 /* Ikony L4/Święto/Urlop – centralnie, większe */
@@ -139,7 +142,7 @@ input::placeholder{color:var(--jd-text-500)}
 .day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
 
 /* Kalendarz zawsze w ramie – nic nie wystaje */
-.calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:hidden}
+.calendar-wrap{width:min(1400px,96vw);max-width:100%;margin:0 auto;overflow:hidden}
 .fc{width:100%}
 
 /* Layout aplikacji – pełna szerokość kontentu */
