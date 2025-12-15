@@ -23,6 +23,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 /* Kalendarz – auto height, bez wymuszonych min-height */
+#calendar,
 #kalendarz { height: auto !important; min-height: auto !important; }
 .fc-view-harness { min-height: auto !important; }
 .fc-daygrid-day-frame { min-height: auto !important; }
@@ -92,11 +93,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 /* FullCalendar niech używa 100% rodzica */
-#kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid {
+#calendar, #kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid {
   width: 100% !important;
 }
 
 /* W dół – większe kratki i wysoki harness */
+#calendar,
 #kalendarz { height: auto !important; min-height: auto !important; }
 .fc-view-harness { min-height: auto !important; }
 .fc-daygrid-day-frame { min-height: auto !important; }

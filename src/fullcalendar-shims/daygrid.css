@@ -1,0 +1,39 @@
+/* Minimal fallback styles for FullCalendar day grid */
+.fc-daygrid-body,
+.fc-daygrid-body table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.fc-daygrid-day {
+  vertical-align: top;
+}
+
+.fc-daygrid-day-frame {
+  min-height: 110px;
+  padding: 6px;
+  position: relative;
+}
+
+.fc-daygrid-day-top {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 4px;
+  font-weight: 600;
+}
+
+.fc-daygrid-day-number {
+  text-decoration: none;
+}
+
+.fc-daygrid-day-events {
+  margin-top: 4px;
+}
+
+.fc-daygrid-event {
+  display: block;
+  padding: 2px 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
