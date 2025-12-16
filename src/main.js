@@ -140,7 +140,7 @@ function initializeApp() {
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
-    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO', 'DAY_OFF'];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -354,6 +354,7 @@ function initializeApp() {
         const upper = (value ?? '').toString().trim().toUpperCase();
         if (!upper) return DAY_LEAVE_NONE;
         if (upper === 'WOLNE') return 'URL';
+        if (upper === 'DAY_OFF') return 'DAY_OFF';
         return DAY_LEAVE_VALUES.includes(upper) ? upper : DAY_LEAVE_NONE;
     };
 
@@ -396,30 +397,31 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
+        const leaveKindRaw = (payload.extendedProps?.leaveKind || payload.leaveKind || payload.type || payload.typ || '').toString();
+        const leaveKindUpper = leaveKindRaw.toUpperCase();
+        const leaveKind = leaveKindRaw.toLowerCase();
+        const offClass =
+            leaveKindUpper.includes('L4') ? 'l4'
+                : (leaveKindUpper.includes('URL') ? 'urlop'
+                    : (leaveKindUpper.includes('SWIETO') || leaveKindUpper.includes('HOLIDAY') ? 'swieto'
+                        : (leaveKindUpper.includes('DAY_OFF') ? 'day_off' : 'wolne')));
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
+        const extendedProps = {
+            ...(payload.extendedProps || {}),
+            leaveKind: payload.extendedProps?.leaveKind || payload.leaveKind || payload.type || payload.typ || '',
+            type: payload.type || payload.typ || payload.extendedProps?.type || '',
+            typ: payload.typ || payload.type || payload.extendedProps?.typ || '',
+            kind: 'off'
+        };
         return [
             {
-                id: `${leaveId}::bg`,
+                id: `${leaveId}::off`,
                 start,
-                end,
+                end: end || start,
                 allDay: true,
                 display: 'background',
-                classNames: ['absence-bg', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            },
-            {
-                id: `${leaveId}::icon`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
+                classNames: ['off-day', offClass || leaveKind || 'wolne'],
                 overlap: false,
                 title: payload.title || '',
                 extendedProps
@@ -605,11 +607,17 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE' || raw === 'DAY_OFF') return 'wolne';
+        if (raw.startsWith('LEAVE_')) {
+            const kind = raw.replace('LEAVE_', '');
+            if (kind === 'L4') return 'l4';
+            if (kind === 'HOLIDAY' || kind === 'FREE' || kind === 'DAY_OFF') return 'wolne';
+        }
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
         if (normalized === 'SWIETO') return 'wolne';
         if (normalized === 'URL') return 'urlop';
+        if (normalized === 'DAY_OFF') return 'wolne';
         return null;
     };
 
@@ -627,11 +635,11 @@ function initializeApp() {
         });
 
         leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
+            if (ev?.extendedProps?.kind !== 'off') return;
             const key = normalizeDayKey(ev?.start || ev?.date);
             if (!key || byDate.has(key)) return;
-            const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
-            const type = mapLeaveToFlag(kind);
+            const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind || ev?.classNames?.find?.(cls => cls && cls !== 'off-day');
+            const type = mapLeaveToFlag(kind || '');
             if (type) byDate.set(key, type);
         });
 
@@ -1038,7 +1046,9 @@ function initializeApp() {
                     }
                 }
 
-                if (powiazane.length) {
+                const isOffDay = Boolean(normalizedDay.leaveKind || normalizedDay.flags?.urlop || normalizedDay.flags?.l4 || normalizedDay.flags?.swieto);
+
+                if (powiazane.length && !isOffDay) {
                     powiazane.forEach((powiazanie, index) => {
                         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
                         const maszyna = zlecenie?.maszynaId ? _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId) : null;
@@ -1065,20 +1075,22 @@ function initializeApp() {
                         });
                     });
                 }
-                events.push({
-                    id: `godziny_${id}`,
-                    title: 'Ewidencja dnia',
-                    start: id,
-                    allDay: true,
-                    className: ['strip-summary'],
-                    extendedProps: {
-                        client: 'Ewidencja dnia',
-                        machineModel: null,
-                        fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                        typ: null,
-                        ...baseHoursProps
-                    }
-                });
+                if (!isOffDay) {
+                    events.push({
+                        id: `godziny_${id}`,
+                        title: 'Ewidencja dnia',
+                        start: id,
+                        allDay: true,
+                        className: ['strip-summary'],
+                        extendedProps: {
+                            client: 'Ewidencja dnia',
+                            machineModel: null,
+                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
+                            typ: null,
+                            ...baseHoursProps
+                        }
+                    });
+                }
             });
             workEvents = events;
             przerysujZdarzeniaKalendarza();
