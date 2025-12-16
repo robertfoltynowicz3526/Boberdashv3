@@ -16,6 +16,25 @@ function addDaysISO(isoDate, days = 1) {
     return `${y}-${m}-${day}`;
 }
 
+// helper: klucz dnia w lokalnej strefie (bez UTC dryfu)
+const dayKey = (dLike) => {
+    const d = new Date(dLike);
+    if (Number.isNaN(d.getTime())) return '';
+    d.setHours(0, 0, 0, 0);
+    // YYYY-MM-DD
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// helper: zakres dnia (start/end) w lokalnej strefie
+const dayRange = (dLike) => {
+    const start = new Date(dLike);
+    if (Number.isNaN(start.getTime())) return { start: null, end: null };
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dLike);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+};
+
 const markerToClass = { L4: 'marker-sick', Urlop: 'marker-vacation', 'Święto': 'marker-holiday' };
 
 function buildDayMarkers(markers) {
@@ -206,6 +225,7 @@ function initializeApp() {
     };
     let workEvents = [];
     let leaveEvents = [];
+    let calendarFlagMap = new Map();
     let markerDateSet = new Set();
     let markerRecords = [];
     let leaveEventsReady = false;
@@ -606,13 +626,6 @@ function initializeApp() {
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
     const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
     const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
-    function normalizeDayKey(value) {
-        if (!value) return null;
-        if (typeof value === 'string') return value.slice(0, 10);
-        if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
-        return null;
-    }
-
     const mapLeaveToFlag = (leaveKind) => {
         const rawStr = (leaveKind || '').toString().trim();
         const rawUpper = rawStr.toUpperCase();
@@ -631,23 +644,90 @@ function initializeApp() {
     const buildCalendarFlags = () => {
         const byDate = new Map();
         wszystkieWpisyKalendarza.forEach((wpis) => {
-            const key = normalizeDayKey(wpis?.id || wpis?.date);
+            const key = dayKey(wpis?.id || wpis?.date);
             if (!key) return;
+            const normalizedFlags = normalizeDayFlags(wpis.flags || {}, wpis.leaveKind);
             let type = null;
-            if (wpis?.flags?.l4) type = 'l4';
-            else if (wpis?.flags?.urlop) type = 'urlop';
-            else if (wpis?.flags?.swieto) type = 'wolne';
-            else type = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
-            if (type) byDate.set(key, type);
+            if (normalizedFlags.l4) type = 'L4';
+            else if (normalizedFlags.urlop) type = 'URLOP';
+            else if (normalizedFlags.swieto) type = 'SWIETO';
+            else {
+                const mapped = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
+                if (mapped === 'l4') type = 'L4';
+                else if (mapped === 'urlop') type = 'URLOP';
+                else if (mapped === 'wolne') type = 'SWIETO';
+            }
+            if (type) {
+                byDate.set(key, {
+                    type,
+                    label: type === 'L4' ? 'L4' : type === 'URLOP' ? 'Urlop' : 'Święto'
+                });
+            }
         });
 
         markerRecords.forEach(({ date, type }) => {
-            if (!date || byDate.has(date)) return;
-            const mapped = mapLeaveToFlag(type);
-            if (mapped) byDate.set(date, mapped);
+            const key = dayKey(date);
+            if (!key || byDate.has(key)) return;
+            const raw = (type || '').toString().trim().toUpperCase();
+            let normalizedType = null;
+            if (raw === 'L4') normalizedType = 'L4';
+            else if (raw === 'URL' || raw === 'URLOP') normalizedType = 'URLOP';
+            else if (raw === 'ŚWIĘTO' || raw === 'SWIETO' || raw === 'SWIĘTO') normalizedType = 'SWIETO';
+            if (normalizedType) {
+                byDate.set(key, {
+                    type: normalizedType,
+                    label: normalizedType === 'L4' ? 'L4' : normalizedType === 'URLOP' ? 'Urlop' : 'Święto'
+                });
+            }
         });
 
-        return Array.from(byDate.entries()).map(([date, type]) => ({ date, type }));
+        calendarFlagMap = byDate;
+
+        return Array.from(byDate.entries()).map(([date, value]) => ({
+            date,
+            type: (value?.type || '').toLowerCase(),
+            label: value?.label || ''
+        }));
+    };
+
+    const applyFlagDecorations = (events = [], flagMap = new Map()) => {
+        const filtered = (events || []).filter((evt) => {
+            const k = dayKey(evt?.start || evt?.startStr || evt?.date);
+            if (!k) return true;
+            if (!flagMap.has(k)) return true;
+            const classNames = [
+                ...(Array.isArray(evt?.classNames) ? evt.classNames : []),
+                ...(Array.isArray(evt?.className) ? evt.className : []),
+                ...(typeof evt?.className === 'string' ? evt.className.split(' ') : [])
+            ];
+            const isSummary = classNames.includes('strip-summary') || classNames.includes('ev-summary');
+            const isBackground = evt.display === 'background';
+            if (isSummary) return false;
+            if (isBackground) return false;
+            return true;
+        });
+
+        flagMap.forEach((flag, key) => {
+            const { start, end } = dayRange(key);
+            if (!start || !end) return;
+            filtered.push({
+                id: `bg-${key}`,
+                start,
+                end,
+                display: 'background',
+                classNames: ['bg-flag', `bg-${(flag.type || '').toLowerCase()}`]
+            });
+            filtered.push({
+                id: `flag-${key}`,
+                start,
+                allDay: true,
+                title: flag.label || '',
+                classNames: ['flag-label'],
+                display: 'block'
+            });
+        });
+
+        return filtered;
     };
 
     const openEwidencja = (dateStr) => {
@@ -992,12 +1072,14 @@ function initializeApp() {
         if (!calendar) return;
         const filteredWorkEvents = markerDateSet.size
             ? workEvents.filter((evt) => {
-                const day = normalizeDayKey(evt?.start || evt?.startStr || evt?.date);
+                const day = dayKey(evt?.start || evt?.startStr || evt?.date);
                 return day ? !markerDateSet.has(day) : true;
             })
             : workEvents;
         const combined = [...filteredWorkEvents, ...leaveEvents];
-        updateCalendarData(calendar, combined, buildCalendarFlags());
+        const customFlags = buildCalendarFlags();
+        const enriched = applyFlagDecorations(combined, calendarFlagMap);
+        updateCalendarData(calendar, enriched, customFlags);
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
@@ -1088,7 +1170,8 @@ function initializeApp() {
                     title: 'Ewidencja dnia',
                     start: id,
                     allDay: true,
-                    className: ['strip-summary'],
+                    display: 'block',
+                    className: ['strip-summary', 'ev-summary'],
                     extendedProps: {
                         client: 'Ewidencja dnia',
                         machineModel: null,
@@ -1123,7 +1206,10 @@ function initializeApp() {
                     return { id: docSnap.id, date, type: markerType };
                 }).filter(Boolean);
 
-                markerRecords = markersFromDb.map(({ id, date, type }) => ({ id, date, type }));
+                markerRecords = markersFromDb.map(({ id, date, type }) => {
+                    const normalizedDate = dayKey(date);
+                    return { id, date: normalizedDate, type };
+                });
                 markerDateSet = new Set(markerRecords.map((m) => m.date));
                 leaveEvents = markersFromDb.flatMap((marker) =>
                     buildDayMarkers([{ date: marker.date, type: marker.type }]).map((evt, idx) => ({

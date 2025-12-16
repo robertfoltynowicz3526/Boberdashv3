@@ -1,3 +1,22 @@
+// helper: klucz dnia w lokalnej strefie (bez UTC dryfu)
+const dayKey = (dLike) => {
+  const d = new Date(dLike);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setHours(0, 0, 0, 0);
+  // YYYY-MM-DD
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// helper: zakres dnia (start/end) w lokalnej strefie
+const dayRange = (dLike) => {
+  const start = new Date(dLike);
+  if (Number.isNaN(start.getTime())) return { start: null, end: null };
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(dLike);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
 function formatDateKey(calendar, date) {
   const FullCalendar = calendar; // passed instance of constructor
   try {
@@ -41,16 +60,19 @@ function mountDayFlag(calendar, info) {
 export function renderDaySummaries(calendarInstance) {
   if (!calendarInstance) return;
   calendarInstance.el.querySelectorAll('.day-summary').forEach((node) => node.remove());
+  const flags = calendarInstance.getOption('customFlags') || [];
+  const flagSet = new Set((flags || []).map((f) => dayKey(f?.date)));
   const events = calendarInstance.getEvents();
   const byDate = new Map();
   events.forEach((evt) => {
-    const dateKey = evt.startStr?.slice(0, 10);
+    const dateKey = dayKey(evt.start || evt.startStr || evt.date);
     if (!dateKey) return;
     if (!byDate.has(dateKey)) byDate.set(dateKey, []);
     byDate.get(dateKey).push(evt);
   });
 
   byDate.forEach((arr, dateKey) => {
+    if (flagSet.has(dateKey)) return;
     let work = 0;
     let drive = 0;
     let bill = 0;
