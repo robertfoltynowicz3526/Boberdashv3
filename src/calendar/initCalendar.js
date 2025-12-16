@@ -1,7 +1,83 @@
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { getDailyTotals, loadEventsFromDb, getDayFlagsSync, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
+import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
+
+const normalizeDateKey = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  return '';
+};
+
+const normalizeLeaveKind = (value) => {
+  const raw = (value ?? '').toString().trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.startsWith('leave_')) return normalizeLeaveKind(raw.replace('leave_', ''));
+  if (raw === 'l4') return 'l4';
+  if (raw === 'swieto' || raw === 'święto' || raw === 'holiday') return 'wolne';
+  if (raw === 'wolne' || raw === 'free' || raw === 'leave_free') return 'wolne';
+  if (raw === 'urlop' || raw === 'url' || raw === 'leave_url' || raw === 'leave') return 'urlop';
+  return null;
+};
+
+const getLeaveFlagForDate = (calendar, date) => {
+  const key = normalizeDateKey(date);
+  if (!key || !calendar) return null;
+  const flags = calendar.getOption('customFlags') || [];
+  const match = (flags || []).find((flag) => normalizeDateKey(flag?.date || flag?.start) === key);
+  const type = normalizeLeaveKind(match?.type || match?.kind || match?.leaveKind);
+  return type ? { type } : null;
+};
+
+function renderDaySummaries(calendar) {
+  if (!calendar?.el) return;
+  calendar.el.querySelectorAll('.day-summary').forEach((n) => n.remove());
+  const toNum = (value) => (value == null ? 0 : Number(value) || 0);
+  const events = calendar.getEvents().filter((e) => !['l4', 'urlop', 'wolne'].includes(normalizeLeaveKind(e.extendedProps?.kind)));
+  const by = new Map();
+  events.forEach((e) => {
+    const key = (e.startStr || '').slice(0, 10);
+    if (!key) return;
+    const x = e.extendedProps || {};
+    const acc = by.get(key) || { w: 0, d: 0, b: 0 };
+    acc.w += toNum(x.workH ?? x.workHours);
+    acc.d += toNum(x.driveH ?? x.driveHours);
+    acc.b += toNum(x.billH ?? x.billedHours);
+    by.set(key, acc);
+  });
+  by.forEach((v, key) => {
+    const cell = calendar.el.querySelector(`[data-date="${key}"] .fc-daygrid-day-frame`);
+    if (!cell) return;
+    const el = document.createElement('div');
+    el.className = 'day-summary';
+    el.textContent = `• Praca: ${v.w.toFixed(1)}h • Jazda: ${v.d.toFixed(1)}h • Fakturowane: ${v.b.toFixed(1)}h`;
+    cell.appendChild(el);
+  });
+}
+
+function applyFlagToCell(calendar, el, date) {
+  if (!el || !calendar) return;
+  const existing = el.querySelector('.day-flag');
+  if (existing) existing.remove();
+  const flag = getLeaveFlagForDate(calendar, date);
+  if (!flag) return;
+  el.style.position = 'relative';
+  const wrap = document.createElement('div');
+  wrap.className = `day-flag day-flag--${flag.type}`;
+  wrap.innerHTML = `<div class="pill">${flag.type === 'urlop' ? '🏁' : flag.type === 'l4' ? '➕' : '🌿'}</div>`;
+  el.appendChild(wrap);
+}
+
+function refreshDayFlags(calendar) {
+  if (!calendar?.el) return;
+  const cells = calendar.el.querySelectorAll('.fc-daygrid-day-frame');
+  cells.forEach((cell) => {
+    const parent = cell.closest('[data-date]');
+    const date = parent?.getAttribute('data-date') || '';
+    applyFlagToCell(calendar, cell, date);
+  });
+}
 
 export function bootCalendar(extraOptions = {}) {
   const el = document.getElementById('calendar') || document.getElementById('kalendarz');
@@ -16,7 +92,12 @@ export function bootCalendar(extraOptions = {}) {
   const calendar = new Calendar(el, {
     plugins,
     initialView: 'dayGridMonth',
-    headerToolbar: false,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+    navLinks: true,
+    expandRows: true,
+    height: 'auto',
+    contentHeight: 'auto',
+    handleWindowResize: true,
     fixedWeekCount: false,
     showNonCurrentDates: true,
     dayMaxEventRows: 3,
@@ -25,61 +106,34 @@ export function bootCalendar(extraOptions = {}) {
     slotEventOverlap: false,
     eventDisplay: 'block',
     eventOrder: 'start,-duration,title',
-    dayCellDidMount: (arg) => {
-      (async () => {
-        try {
-          const existing = arg.el.querySelector('.day-summary');
-          if (existing) existing.remove();
-
-          if (typeof getDailyTotals !== 'function') return;
-          const totals = await getDailyTotals(arg.date);
-          if (totals?.l4 || totals?.urlop || totals?.swieto) return;
-          const allZero = !totals?.work && !totals?.drive && !totals?.billed;
-          if (allZero) return;
-
-          const frame = arg.el.querySelector('.fc-daygrid-day-frame');
-          if (!frame) return;
-          const footer = document.createElement('div');
-          footer.className = 'day-summary';
-          footer.innerHTML = `
-            <div class="day-summary-row">
-              <span>• Praca: <b>${(totals.work ?? 0).toFixed(1)}h</b></span>
-              <span>• Jazda: <b>${(totals.drive ?? 0).toFixed(1)}h</b></span>
-              <span>• Fakturowane: <b>${(totals.billed ?? 0).toFixed(1)}h</b></span>
-            </div>`;
-          frame.appendChild(footer);
-        } catch (e) {
-          console.error('dayCellDidMount error:', e);
-        }
-      })();
+    dayCellDidMount: (info) => {
+      const frame = info.el.querySelector('.fc-daygrid-day-frame') || info.el;
+      applyFlagToCell(calendar, frame, info.date);
     },
     events: async (info, success) => {
       try {
-        if (typeof loadEventsFromDb !== 'function') {
-          success([]);
-          return;
-        }
         const raw = await loadEventsFromDb(info.start, info.end);
         const mapped = (raw || []).map((e) => {
-          if (['L4', 'URLOP', 'SWIETO'].includes(e.type)) {
+          const kind = normalizeLeaveKind(e?.extendedProps?.kind || e?.kind || e?.type);
+          if (kind) {
+            const start = e.start || e.date;
+            const end = e.end || start;
             return {
-              start: e.start,
-              end: e.end,
-              allDay: true,
+              ...e,
+              start,
+              end,
+              allDay: e.allDay ?? true,
               display: 'background',
-              classNames: [
-                'fc-offday',
-                e.type === 'L4' ? 'is-l4' : (e.type === 'URLOP' ? 'is-urlop' : 'is-swieto'),
-              ],
+              classNames: ['ev-leave', `ev-leave--${kind}`],
+              extendedProps: { ...(e.extendedProps || {}), kind },
             };
           }
+          const extendedProps = { ...(e.extendedProps || {}) };
+          if (!extendedProps.kind && e.kind) extendedProps.kind = e.kind;
           return {
-            id: e.id,
-            title: e.title,
-            start: e.start,
-            end: e.end,
-            allDay: false,
-            classNames: Array.isArray(e.classNames) ? e.classNames : ['job-event'],
+            ...e,
+            title: e.title || e.extendedProps?.client || '',
+            extendedProps,
           };
         });
         success(mapped);
@@ -90,8 +144,8 @@ export function bootCalendar(extraOptions = {}) {
     },
     selectAllow: (selection) => {
       try {
-        const flags = getDayFlagsSync(selection?.start);
-        return !(flags?.l4 || flags?.urlop || flags?.swieto);
+        const flag = getLeaveFlagForDate(calendar, selection?.start);
+        return !flag;
       } catch (e) {
         console.error('selectAllow error:', e);
         return true;
@@ -101,16 +155,28 @@ export function bootCalendar(extraOptions = {}) {
   });
 
   calendar.render();
+  renderDaySummaries(calendar);
+  refreshDayFlags(calendar);
+  calendar.on('datesSet', () => {
+    renderDaySummaries(calendar);
+    refreshDayFlags(calendar);
+  });
+  calendar.on('eventsSet', () => {
+    renderDaySummaries(calendar);
+    refreshDayFlags(calendar);
+  });
 
+  let ro = null;
   try {
     if ('ResizeObserver' in window) {
-      const ro = new window.ResizeObserver(() => calendar.updateSize());
+      ro = new window.ResizeObserver(() => calendar.updateSize());
       ro.observe(el);
-    } else {
-      window.addEventListener('resize', () => calendar.updateSize());
     }
   } catch (e) {
     console.warn('ResizeObserver fallback:', e);
+  }
+  if (!ro) {
+    window.addEventListener('resize', () => calendar.updateSize());
   }
 
   document.getElementById('btnPrev')?.addEventListener('click', () => calendar.prev());
@@ -126,4 +192,6 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   setDayFlags(flags);
   calendar.setOption('customFlags', flags || []);
   calendar.refetchEvents();
+  renderDaySummaries(calendar);
+  refreshDayFlags(calendar);
 }

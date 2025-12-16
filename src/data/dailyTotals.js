@@ -12,7 +12,19 @@ const normalizeFlags = (flags = {}) => ({
   l4: Boolean(flags.l4),
   urlop: Boolean(flags.urlop),
   swieto: Boolean(flags.swieto),
+  wolne: Boolean(flags.wolne),
+  kind: flags.kind || null,
 });
+
+const normalizeFlagType = (value) => {
+  const raw = (value ?? '').toString().trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.startsWith('leave_')) return normalizeFlagType(raw.replace('leave_', ''));
+  if (raw === 'l4') return 'l4';
+  if (raw === 'urlop' || raw === 'url' || raw === 'leave') return 'urlop';
+  if (raw === 'wolne' || raw === 'free' || raw === 'holiday' || raw === 'swieto' || raw === 'święto') return 'wolne';
+  return null;
+};
 
 let dailyEntries = new Map();
 let dayFlags = new Map();
@@ -37,11 +49,14 @@ export function setDayFlags(flags = []) {
   (flags || []).forEach((flag) => {
     const key = flag?.date ? String(flag.date) : dateKeyFromDate(flag?.start);
     if (!key) return;
-    const type = String(flag.type || '').toLowerCase();
+    const type = normalizeFlagType(flag?.type || flag?.kind || flag?.leaveKind);
+    if (!type) return;
     dayFlags.set(key, {
       l4: type === 'l4',
       urlop: type === 'urlop' || type === 'wolne',
-      swieto: type === 'swieto' || type === 'święto' || type === 'holiday',
+      swieto: type === 'swieto' || type === 'święto' || type === 'holiday' || type === 'wolne',
+      wolne: type === 'wolne',
+      kind: type,
     });
   });
 }
