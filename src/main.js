@@ -7,6 +7,28 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
 
+function addDaysISO(isoDate, days = 1) {
+    const d = new Date(`${isoDate}T00:00:00`);
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+const markerToClass = { L4: 'marker-sick', Urlop: 'marker-vacation', 'Święto': 'marker-holiday' };
+
+function buildDayMarkers(markers) {
+    return markers.map(m => ({
+        start: m.date,
+        end: addDaysISO(m.date, 1),
+        allDay: true,
+        display: 'background',
+        classNames: ['day-marker', markerToClass[m.type]],
+        extendedProps: { isBackgroundMarker: true, markerType: m.type }
+    }));
+}
+
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -184,6 +206,8 @@ function initializeApp() {
     };
     let workEvents = [];
     let leaveEvents = [];
+    let markerDateSet = new Set();
+    let markerRecords = [];
     let leaveEventsReady = false;
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
@@ -396,35 +420,16 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
-        const start = payload.start;
-        const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
-        return [
-            {
-                id: `${leaveId}::bg`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-bg', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            },
-            {
-                id: `${leaveId}::icon`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            }
-        ];
+        const normalizedKind = normalizeDayLeaveValue(payload.extendedProps?.leaveKind || payload.leaveKind || payload.type || payload.typ);
+        const markerType = normalizedKind === 'L4'
+            ? 'L4'
+            : (normalizedKind === 'SWIETO' ? 'Święto' : (normalizedKind === 'URL' ? 'Urlop' : null));
+        const start = payload.start instanceof Date
+            ? formatDateForStorage(payload.start)
+            : (typeof payload.start === 'string' ? payload.start.slice(0, 10) : '');
+        if (!markerType || !start) return [];
+        const markers = buildDayMarkers([{ date: start, type: markerType }]);
+        return markers.map((marker, index) => ({ ...marker, id: `${leaveId}::marker${index}` }));
     };
 
     const removeLeaveEventsForId = (leaveId) => leaveEvents.filter(event => !isLeaveEventForId(event, leaveId));
@@ -442,6 +447,8 @@ function initializeApp() {
             const nextEvents = removeLeaveEventsForId(leaveDocId);
             if (nextEvents.length !== leaveEvents.length) {
                 leaveEvents = nextEvents;
+                markerRecords = markerRecords.filter((m) => m.id !== leaveDocId);
+                markerDateSet = new Set(markerRecords.map((m) => m.date));
                 przerysujZdarzeniaKalendarza();
             }
             return;
@@ -456,7 +463,7 @@ function initializeApp() {
             start: formatDateForStorage(startDate),
             end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
-            display: 'block',
+            display: 'background',
             typ: type,
             type,
             extendedProps: { typ: type, type, leaveKind: normalizedKind }
@@ -465,6 +472,9 @@ function initializeApp() {
         const withoutCurrent = removeLeaveEventsForId(leaveDocId);
         const mapped = mapLeavePayloadToEvents(leaveDocId, payload);
         leaveEvents = [...withoutCurrent, ...mapped];
+        const markerType = normalizedKind === 'L4' ? 'L4' : (normalizedKind === 'SWIETO' ? 'Święto' : 'Urlop');
+        markerRecords = [...markerRecords.filter((m) => m.id !== leaveDocId), { id: leaveDocId, date: formatDateForStorage(startDate), type: markerType }];
+        markerDateSet = new Set(markerRecords.map((m) => m.date));
         przerysujZdarzeniaKalendarza();
     }
 
@@ -604,8 +614,13 @@ function initializeApp() {
     }
 
     const mapLeaveToFlag = (leaveKind) => {
-        const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        const rawStr = (leaveKind || '').toString().trim();
+        const rawUpper = rawStr.toUpperCase();
+        const rawLower = rawStr.toLowerCase();
+        if (rawUpper === 'WOLNE' || rawUpper === 'FREE' || rawUpper === 'LEAVE_FREE') return 'wolne';
+        if (rawLower === 'święto' || rawUpper === 'SWIETO') return 'wolne';
+        if (rawLower === 'urlop' || rawUpper === 'URL') return 'urlop';
+        if (rawUpper === 'L4') return 'l4';
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
         if (normalized === 'SWIETO') return 'wolne';
@@ -626,13 +641,10 @@ function initializeApp() {
             if (type) byDate.set(key, type);
         });
 
-        leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
-            const key = normalizeDayKey(ev?.start || ev?.date);
-            if (!key || byDate.has(key)) return;
-            const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
-            const type = mapLeaveToFlag(kind);
-            if (type) byDate.set(key, type);
+        markerRecords.forEach(({ date, type }) => {
+            if (!date || byDate.has(date)) return;
+            const mapped = mapLeaveToFlag(type);
+            if (mapped) byDate.set(date, mapped);
         });
 
         return Array.from(byDate.entries()).map(([date, type]) => ({ date, type }));
@@ -978,7 +990,13 @@ function initializeApp() {
 
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
+        const filteredWorkEvents = markerDateSet.size
+            ? workEvents.filter((evt) => {
+                const day = normalizeDayKey(evt?.start || evt?.startStr || evt?.date);
+                return day ? !markerDateSet.has(day) : true;
+            })
+            : workEvents;
+        const combined = [...filteredWorkEvents, ...leaveEvents];
         updateCalendarData(calendar, combined, buildCalendarFlags());
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
@@ -1089,32 +1107,30 @@ function initializeApp() {
     function nasluchujNaUrlopy() {
         try {
             onSnapshot(collection(db, 'events'), (snapshot) => {
-                leaveEvents = snapshot.docs.flatMap(docSnap => {
+                const markersFromDb = snapshot.docs.map(docSnap => {
                     const data = docSnap.data() || {};
                     const baseProps = data.extendedProps || {};
-                    const rawKind = baseProps.leaveKind || data.leaveKind || '';
-                    const normalizedKind = rawKind ? String(rawKind).toUpperCase() : '';
-                    const rawType = baseProps.type || data.type || baseProps.typ || data.typ;
-                    const normalizedType = rawType && String(rawType).startsWith('LEAVE')
-                        ? String(rawType)
-                        : (normalizedKind ? (normalizedKind === 'L4' ? 'LEAVE_L4' : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE')) : null);
-                    const isLeave = Boolean(normalizedType);
-                    if (!isLeave || !data.start) return [];
-                    const payload = {
-                        id: docSnap.id,
-                        title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
-                        start: data.start,
-                        end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
-                        allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
-                        display: 'background',
-                        extendedProps: {
-                            typ: normalizedType,
-                            type: normalizedType,
-                            leaveKind: normalizedKind || ''
-                        }
-                    };
-                    return mapLeavePayloadToEvents(docSnap.id, payload);
+                    const rawKind = baseProps.leaveKind || data.leaveKind || data.type || data.typ || '';
+                    const normalizedKind = normalizeDayLeaveValue(rawKind || '');
+                    const markerType = normalizedKind === 'L4'
+                        ? 'L4'
+                        : (normalizedKind === 'SWIETO' ? 'Święto' : (normalizedKind === 'URL' ? 'Urlop' : null));
+                    const startValue = data.start?.toDate ? data.start.toDate() : data.start;
+                    const date = startValue instanceof Date
+                        ? formatDateForStorage(startValue)
+                        : (typeof startValue === 'string' ? startValue.slice(0, 10) : '');
+                    if (!markerType || !date) return null;
+                    return { id: docSnap.id, date, type: markerType };
                 }).filter(Boolean);
+
+                markerRecords = markersFromDb.map(({ id, date, type }) => ({ id, date, type }));
+                markerDateSet = new Set(markerRecords.map((m) => m.date));
+                leaveEvents = markersFromDb.flatMap((marker) =>
+                    buildDayMarkers([{ date: marker.date, type: marker.type }]).map((evt, idx) => ({
+                        ...evt,
+                        id: `${marker.id}::marker${idx}`
+                    }))
+                );
                 przerysujZdarzeniaKalendarza();
                 leaveEventsReady = true;
             });

@@ -84,15 +84,19 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: 3,
+    dayMaxEventRows: true,
     moreLinkClick: 'popover',
-    eventOrder: 'allDay,start,-duration,title',
-    eventOverlap: (stillEvent, movingEvent) => {
-      return stillEvent.allDay && movingEvent.allDay ? true : false;
-    },
+    eventOrder: 'start,-duration,title',
+    eventOverlap: false,
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
     eventContent: buildEventContent,
+    eventDidMount: (info) => {
+      if (info.el?.style) {
+        info.el.style.marginTop = '6px';
+      }
+    },
     dayCellDidMount(info) {
       mountDayFlag(FullCalendar, info);
     },
