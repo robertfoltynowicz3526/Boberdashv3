@@ -251,3 +251,29 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid .fc-daygrid-bg-harness,
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
+
+/* Odstęp listy eventów od nagłówka dnia */
+.fc .fc-daygrid-day-frame .fc-daygrid-day-events { margin-top: 8px; }
+/* Stały pionowy gap między kafelkami */
+.fc .fc-daygrid-event { margin-top: 4px !important; }
+/* Pierwszy „podsumowujący” kafelek dnia – większy oddech */
+.fc .fc-daygrid-event.is-daily-summary { margin-top: 8px !important; }
+/* Lekki bufor komórki, żeby nic nie „wchodziło” pod header */
+.fc .fc-daygrid-day { padding-top: 2px; }
+
+/* Tła dni dla L4/Urlop/Święto – nie blokują klikalności eventów */
+.fc .fc-daygrid-day-bg .day-marker { pointer-events: none; opacity: 0.18; }
+/* Ikona w tle – wyśrodkowana, większa */
+.fc .fc-daygrid-day-bg .day-marker::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-repeat: no-repeat; background-position: center;
+  background-size: 54px 54px; opacity: 0.6;
+}
+/* Podmień ścieżki na swoje SVG/PNG z repo */
+.fc .fc-daygrid-day-bg .day-marker.marker-sick::before { background-image: url("/icons/health-cross.svg"); }
+.fc .fc-daygrid-day-bg .day-marker.marker-vacation::before { background-image: url("/icons/flag.svg"); }
+.fc .fc-daygrid-day-bg .day-marker.marker-holiday::before { background-image: url("/icons/leaf.svg"); }
+/* (Opcjonalny fallback emoji – jeśli nie masz ikon, odkomentuj i usuń background-image):
+   .fc .fc-daygrid-day-bg .day-marker.marker-sick::before { content:"➕"; font-size:48px; text-align:center; }
+*/

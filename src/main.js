@@ -5,7 +5,7 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
+import { buildDayMarkers, initCalendar, renderDaySummaries, updateCalendarData } from './views/CalendarView.js';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -605,11 +605,11 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'Święto';
         const normalized = normalizeDayLeaveValue(leaveKind || '');
-        if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO') return 'wolne';
-        if (normalized === 'URL') return 'urlop';
+        if (normalized === 'L4') return 'L4';
+        if (normalized === 'SWIETO') return 'Święto';
+        if (normalized === 'URL') return 'Urlop';
         return null;
     };
 
@@ -619,9 +619,9 @@ function initializeApp() {
             const key = normalizeDayKey(wpis?.id || wpis?.date);
             if (!key) return;
             let type = null;
-            if (wpis?.flags?.l4) type = 'l4';
-            else if (wpis?.flags?.urlop) type = 'urlop';
-            else if (wpis?.flags?.swieto) type = 'wolne';
+            if (wpis?.flags?.l4) type = 'L4';
+            else if (wpis?.flags?.urlop) type = 'Urlop';
+            else if (wpis?.flags?.swieto) type = 'Święto';
             else type = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
             if (type) byDate.set(key, type);
         });
@@ -651,10 +651,12 @@ function initializeApp() {
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
+        const markers = buildCalendarFlags();
+        const combinedEvents = [...workEvents, ...leaveEvents, ...buildDayMarkers(markers)];
         calendar = initCalendar(
             kalendarzContainer,
-            [...workEvents, ...leaveEvents],
-            buildCalendarFlags(),
+            combinedEvents,
+            [],
             {
                 plugins: calendarPlugins,
                 timeZone: 'local',
@@ -978,8 +980,9 @@ function initializeApp() {
 
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
-        updateCalendarData(calendar, combined, buildCalendarFlags());
+        const markers = buildCalendarFlags();
+        const combined = [...workEvents, ...leaveEvents, ...buildDayMarkers(markers)];
+        updateCalendarData(calendar, combined, []);
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
@@ -1076,6 +1079,7 @@ function initializeApp() {
                         machineModel: null,
                         fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
                         typ: null,
+                        isDailySummary: true,
                         ...baseHoursProps
                     }
                 });
