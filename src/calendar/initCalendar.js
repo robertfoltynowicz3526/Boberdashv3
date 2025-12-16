@@ -44,6 +44,7 @@ export function renderDaySummaries(calendarInstance) {
   const events = calendarInstance.getEvents();
   const byDate = new Map();
   events.forEach((evt) => {
+    if (evt?.extendedProps?.kind === 'off') return;
     const dateKey = evt.startStr?.slice(0, 10);
     if (!dateKey) return;
     if (!byDate.has(dateKey)) byDate.set(dateKey, []);
@@ -51,6 +52,8 @@ export function renderDaySummaries(calendarInstance) {
   });
 
   byDate.forEach((arr, dateKey) => {
+    const hasOff = arr.some((evt) => evt?.extendedProps?.kind === 'off');
+    if (hasOff) return;
     let work = 0;
     let drive = 0;
     let bill = 0;
@@ -83,12 +86,12 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     contentHeight: 'auto',
     handleWindowResize: true,
     fixedWeekCount: false,
-    dayMaxEvents: 3,
+    dayMaxEvents: true,
+    dayMaxEventRows: true,
     moreLinkClick: 'popover',
-    eventOrder: 'allDay,start,-duration,title',
-    eventOverlap: (stillEvent, movingEvent) => {
-      return stillEvent.allDay && movingEvent.allDay ? true : false;
-    },
+    eventDisplay: 'block',
+    eventOrder: 'start,-allDay,title',
+    eventOverlap: false,
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
@@ -113,16 +116,6 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
   calendar.setOption('eventDidMount', (info) => {
     if (typeof baseEventDidMount === 'function') baseEventDidMount(info);
     if (typeof extraOptions.eventDidMount === 'function') extraOptions.eventDidMount(info);
-    if (info.el.classList.contains('absence-icon-holder')) {
-      const span = document.createElement('span');
-      span.className = 'absence-icon';
-      if (info.el.classList.contains('absence-l4')) span.textContent = '➕';
-      else if (info.el.classList.contains('absence-url')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-urlop')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-święto') || info.el.classList.contains('absence-swieto')) span.textContent = '🍃';
-      else span.textContent = '🌿';
-      info.el.appendChild(span);
-    }
   });
   calendar.render();
   window.addEventListener('resize', () => {
