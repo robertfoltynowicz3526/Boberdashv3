@@ -1,17 +1,9 @@
-// KRYTYCZNE style FullCalendar (v6):
-import '@fullcalendar/core/index.css'
-import '@fullcalendar/daygrid/index.css'
-
-import { db } from './lib/firebase.js';
+import { db } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
-import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import './styles/dashboard.css';
-import { bootCalendar, updateCalendarData } from './calendar.js';
-import { setCalendarEvents, setDailyEntries, setDayFlags } from './data/dailyTotals.js';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -146,7 +138,7 @@ function initializeApp() {
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
-    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO', 'WOLNE'];
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -183,7 +175,11 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
-    let wszystkieFlagiDni = [];
+    const handleCalendarResize = () => {
+        try {
+            calendar?.updateSize();
+        } catch (_) { }
+    };
     let workEvents = [];
     let leaveEvents = [];
     let leaveEventsReady = false;
@@ -249,17 +245,12 @@ function initializeApp() {
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
-    const kalendarzContainer = document.getElementById('calendar') || document.getElementById('kalendarz');
+    const kalendarzContainer = document.getElementById('kalendarz');
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
-    const metricWorkEl = document.getElementById('m-work');
-    const metricBilledEl = document.getElementById('m-billed');
-    const metricOtEl = document.getElementById('m-ot');
-    const metricDriveEl = document.getElementById('m-drive');
-    const metricAbsEl = document.getElementById('m-abs');
-    const metricChartEl = document.getElementById('m-chart');
+    const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -358,10 +349,9 @@ function initializeApp() {
     };
 
     const normalizeDayLeaveValue = (value) => {
-        const upperRaw = (value ?? '').toString().trim().toUpperCase();
-        const upper = upperRaw.startsWith('LEAVE_') ? upperRaw.replace('LEAVE_', '') : upperRaw;
+        const upper = (value ?? '').toString().trim().toUpperCase();
         if (!upper) return DAY_LEAVE_NONE;
-        if (upper === 'WOLNE' || upper === 'FREE') return 'WOLNE';
+        if (upper === 'WOLNE') return 'URL';
         return DAY_LEAVE_VALUES.includes(upper) ? upper : DAY_LEAVE_NONE;
     };
 
@@ -390,49 +380,11 @@ function initializeApp() {
     };
 
     const getLeaveKindClass = (value) => {
-        const raw = (value ?? '').toString().trim();
-        const normalized = normalizeDayLeaveValue(raw.replace(/^LEAVE_/i, ''));
-        if (normalized === 'URL') return 'urlop';
-        if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO' || normalized === 'WOLNE') return 'wolne';
-        const lower = raw.toLowerCase().replace(/^leave_/, '');
-        if (lower === 'wolne' || lower === 'free') return 'wolne';
-        return lower || 'urlop';
+        const lower = (value || '').toLowerCase();
+        return lower === 'url' ? 'wolne' : lower;
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
-
-    const isLeaveEventForId = (event, leaveId) => {
-        if (!event || !leaveId) return false;
-        if (event.id === leaveId) return true;
-        return typeof event.id === 'string' && event.id.startsWith(`${leaveId}::`);
-    };
-
-    const mapLeavePayloadToEvents = (leaveId, payload) => {
-        if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toUpperCase();
-        const start = payload.start;
-        const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
-        const classType = getLeaveKindClass(leaveKind);
-        return [
-            {
-                id: `${leaveId}::bg`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['ev-leave', `ev-leave--${classType}`],
-                overlap: false,
-                title: payload.title || '',
-                type: classType,
-                extendedProps: { ...extendedProps, leaveKind, type: classType, kind: classType }
-            }
-        ];
-    };
-
-    const removeLeaveEventsForId = (leaveId) => leaveEvents.filter(event => !isLeaveEventForId(event, leaveId));
-    const findLeaveEventById = (leaveId) => leaveEvents.find(event => isLeaveEventForId(event, leaveId)) || null;
 
     async function syncLeaveEventForDay(dateKey, leaveKind) {
         if (!dateKey) return;
@@ -443,7 +395,7 @@ function initializeApp() {
             try {
                 await deleteDoc(leaveDocRef);
             } catch (_) { /* brak wpisu – pomijamy */ }
-            const nextEvents = removeLeaveEventsForId(leaveDocId);
+            const nextEvents = leaveEvents.filter(event => event.id !== leaveDocId);
             if (nextEvents.length !== leaveEvents.length) {
                 leaveEvents = nextEvents;
                 przerysujZdarzeniaKalendarza();
@@ -455,21 +407,19 @@ function initializeApp() {
         const type = normalizedKind === 'L4'
             ? 'LEAVE_L4'
             : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE');
-        const flagClass = getLeaveKindClass(normalizedKind);
         const payload = {
             title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
             start: formatDateForStorage(startDate),
             end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
-            display: 'background',
+            display: 'block',
             typ: type,
             type,
-            extendedProps: { typ: type, type, leaveKind: normalizedKind, kind: flagClass }
+            extendedProps: { typ: type, type, leaveKind: normalizedKind }
         };
         await setDoc(leaveDocRef, payload);
-        const withoutCurrent = removeLeaveEventsForId(leaveDocId);
-        const mapped = mapLeavePayloadToEvents(leaveDocId, payload);
-        leaveEvents = [...withoutCurrent, ...mapped];
+        const withoutCurrent = leaveEvents.filter(event => event.id !== leaveDocId);
+        leaveEvents = [...withoutCurrent, { id: leaveDocId, ...payload }];
         przerysujZdarzeniaKalendarza();
     }
 
@@ -598,6 +548,15 @@ function initializeApp() {
     }
     odswiezSelectKlientaDoZlecenia();
 
+    const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
+    const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
+    const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
+
+    function fmt(n) {
+        const v = Math.round((n ?? 0) * 10) / 10;
+        return v.toFixed(1);
+    }
+
     function normalizeDayKey(value) {
         if (!value) return null;
         if (typeof value === 'string') return value.slice(0, 10);
@@ -605,39 +564,62 @@ function initializeApp() {
         return null;
     }
 
-    const mapLeaveToFlag = (leaveKind) => {
-        const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
-        const normalized = normalizeDayLeaveValue(leaveKind || '');
-        if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO') return 'wolne';
-        if (normalized === 'WOLNE') return 'wolne';
-        if (normalized === 'URL') return 'urlop';
-        return null;
+    function buildEventSourceWithDailySummaries(baseEvents = []) {
+        const byDay = {};
+        const cleanEvents = baseEvents.filter(ev => {
+            const classNames = ev?.className || ev?.classNames || [];
+            if (Array.isArray(classNames) && classNames.includes('day-summary')) return false;
+            if ((ev?.extendedProps?.kind || ev?.kind) === 'SUMMARY') return false;
+            return true;
+        });
+
+        cleanEvents.forEach(ev => {
+            const dayKey = normalizeDayKey(ev?.start || ev?.date);
+            if (!dayKey) return;
+            const t = ev?.extendedProps?.type || ev?.extendedProps?.typ;
+            if (t === 'LEAVE_L4' || t === 'LEAVE_FREE' || t === 'LEAVE_HOLIDAY') {
+                return;
+            }
+            if (!byDay[dayKey]) byDay[dayKey] = { work: 0, drive: 0, billed: 0, hasAny: false };
+            const workHours = Number(ev?.extendedProps?.workHours ?? 0);
+            const driveHours = Number(ev?.extendedProps?.driveHours ?? 0);
+            const billedHours = Number(ev?.extendedProps?.billedHours ?? 0);
+            byDay[dayKey].work += workHours;
+            byDay[dayKey].drive += driveHours;
+            byDay[dayKey].billed += billedHours;
+            byDay[dayKey].hasAny = byDay[dayKey].hasAny || Boolean(workHours || driveHours || billedHours);
+        });
+
+        const summaryEvents = Object.entries(byDay)
+            .filter(([, tot]) => tot.hasAny)
+            .map(([day, tot]) => ({
+                id: `sum-${day}`,
+                start: day,
+                allDay: true,
+                display: 'block',
+                className: ['day-summary', 'jd-summary'],
+                title: `• Praca: ${fmt(tot.work)}h • Jazda: ${fmt(tot.drive)}h • Fakturowane: ${fmt(tot.billed)}h`,
+                extendedProps: { kind: 'SUMMARY' }
+            }));
+
+        return [...cleanEvents, ...summaryEvents];
+    }
+
+    const iconForDay = (type) => {
+        const map = { l4: '➕', urlop: '⚑', swieto: '🍃' };
+        return map[type] || '';
     };
 
-    const buildCalendarFlags = () => {
-        const byDate = new Map();
-        wszystkieWpisyKalendarza.forEach((wpis) => {
-            const key = normalizeDayKey(wpis?.id || wpis?.date);
-            if (!key) return;
-            let type = null;
-            if (wpis?.flags?.l4) type = 'l4';
-            else if (wpis?.flags?.urlop) type = 'urlop';
-            else if (wpis?.flags?.swieto) type = 'swieto';
-            else type = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
-            if (type) byDate.set(key, type);
-        });
-
-        leaveEvents.forEach((ev) => {
-            const key = normalizeDayKey(ev?.start || ev?.date);
-            if (!key || byDate.has(key)) return;
-            const kind = ev?.type || ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
-            const type = mapLeaveToFlag(kind);
-            if (type) byDate.set(key, type);
-        });
-
-        return Array.from(byDate.entries()).map(([date, type]) => ({ date, type }));
+    const getDayMeta = (date) => {
+        const dayKey = normalizeDayKey(date);
+        if (!dayKey) return null;
+        const leaveEvent = leaveEvents.find(ev => normalizeDayKey(ev.start) === dayKey);
+        if (!leaveEvent) return null;
+        const rawType = (leaveEvent.extendedProps?.type || leaveEvent.extendedProps?.typ || '').toUpperCase();
+        if (rawType === 'LEAVE_L4') return { type: 'l4' };
+        if (rawType === 'LEAVE_FREE' || rawType === 'LEAVE_URL') return { type: 'urlop' };
+        if (rawType === 'LEAVE_HOLIDAY') return { type: 'swieto' };
+        return null;
     };
 
     const openEwidencja = (dateStr) => {
@@ -653,12 +635,119 @@ function initializeApp() {
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
-        calendar = bootCalendar({
+        calendar = new FullCalendar.Calendar(kalendarzContainer, {
+            plugins: calendarPlugins,
+            initialView: 'dayGridMonth',
+            headerToolbar: { left: 'prev,today,next', center: 'title', right: 'dayGridMonth,dayGridWeek' },
             timeZone: 'local',
+            height: 'auto',          // dopasuj się do zawartości karty
+            aspectRatio: 1.7,        // większe ratio = niższy widok miesiąca
+            expandRows: false,
+            dayMaxEventRows: true,
+            moreLinkClick: 'popover',
+            handleWindowResize: true,
             firstDay: 1,
+            locale: 'pl',
             selectable: true,
             selectMirror: true,
             unselectAuto: true,
+            eventClassNames: (arg) => {
+                const t = arg.event.extendedProps?.type;
+                if (t === 'LEAVE_L4') return ['leave-event', 'leave-l4'];
+                if (t === 'LEAVE_FREE') return ['leave-event', 'leave-free'];
+                if (t === 'LEAVE_HOLIDAY') return ['leave-event', 'leave-holiday'];
+                return [];
+            },
+            eventContent: (arg) => {
+                const isSummary = arg.event.classNames?.includes('day-summary') || arg.event.extendedProps?.kind === 'SUMMARY';
+                if (isSummary) {
+                    return { html: `<div class="fc-event-title">${arg.event.title}</div>` };
+                }
+                const t = arg.event.extendedProps?.type;
+                if (t?.startsWith('LEAVE_')) {
+                    const icon = t === 'LEAVE_L4' ? '🩺' : (t === 'LEAVE_HOLIDAY' ? '🏳️' : '🌿');
+                    return { html: `<div class="leave-icon">${icon}</div>` };
+                }
+                return { html: `<div class="evt">${arg.event.title}</div>` };
+            },
+            eventDidMount(info) {
+                const ext = info.event.extendedProps || {};
+                const rawType = (ext.type || ext.typ || '').toString().toUpperCase();
+                const title = (info.event.title || '').toLowerCase();
+                let leaveType = null;
+
+                if (rawType === 'LEAVE_L4') leaveType = 'L4';
+                else if (rawType === 'LEAVE_FREE') leaveType = 'WOLNE';
+                else if (rawType === 'LEAVE_HOLIDAY') leaveType = 'SWIETO';
+
+                if (!leaveType && typeof ext.leaveType === 'string') {
+                    const v = ext.leaveType.toUpperCase();
+                    if (v === 'L4' || v === 'WOLNE' || v === 'ŚWIĘTO' || v === 'SWIETO') {
+                        leaveType = v === 'ŚWIĘTO' ? 'SWIETO' : v;
+                    }
+                }
+
+                if (!leaveType && typeof ext.leaveKind === 'string') {
+                    const kind = ext.leaveKind.toUpperCase();
+                    if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
+                        leaveType = kind === 'ŚWIĘTO' ? 'SWIETO' : kind;
+                    }
+                }
+
+                if (!leaveType) {
+                    if (title.includes('l4')) leaveType = 'L4';
+                    else if (title.includes('wolny') || title.includes('wolne')) leaveType = 'WOLNE';
+                    else if (title.includes('święto') || title.includes('swieto')) leaveType = 'SWIETO';
+                }
+
+                if (leaveType) {
+                    const frame = info.el.closest('.fc-daygrid-day-frame');
+                    if (frame && !frame.querySelector('.leave-badge')) {
+                        frame.classList.add('has-leave-label');
+                        const badge = document.createElement('div');
+                        badge.className = 'leave-badge ' + (
+                            leaveType === 'L4' ? 'leave-badge--l4' :
+                            leaveType === 'WOLNE' ? 'leave-badge--wolne' :
+                            'leave-badge--swieto'
+                        );
+
+                        const svgL4 = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="L4">
+                            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                            <path d="M12 7v10M7 12h10"></path>
+                          </svg>`;
+                        const svgLeaf = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Wolne">
+                            <path d="M3 21c7-1 12-6 12-13 3 0 6 3 6 6 0 6-6 10-12 10-2 0-4-1-6-3z"></path>
+                            <path d="M9 15c1-3 3-5 6-6"></path>
+                          </svg>`;
+                        const svgFlag = `
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Święto">
+                            <path d="M4 22V4"></path>
+                            <path d="M4 4h10l-2 3 2 3H4"></path>
+                          </svg>`;
+
+                        badge.innerHTML = leaveType === 'L4' ? svgL4 : (leaveType === 'WOLNE' ? svgLeaf : svgFlag);
+                        frame.appendChild(badge);
+                    }
+
+                    info.el.style.display = 'none';
+                }
+            },
+            dayCellDidMount: (arg) => {
+                const meta = getDayMeta(arg.date);
+                if (!meta?.type) return;
+                const badge = document.createElement('div');
+                badge.className = 'jd-day-icon';
+                badge.textContent = iconForDay(meta.type);
+                arg.el.querySelector('.fc-daygrid-day-frame')?.appendChild(badge);
+            },
+            events: buildEventSourceWithDailySummaries([...workEvents, ...leaveEvents]),
+            datesSet(viewInfo) {
+                if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
+                    obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
+                }
+            },
             eventDataTransform(event) {
                 if (event && typeof event.title === 'string') {
                     event.title = stripEwidencjaPrefix(event.title);
@@ -667,6 +756,9 @@ function initializeApp() {
                     event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
                 }
                 return event;
+            },
+            windowResize() {
+                handleCalendarResize();
             },
             dateClick: (info) => openEwidencja(info.dateStr),
             select(info) {
@@ -678,14 +770,42 @@ function initializeApp() {
                 if (calendar && typeof calendar.unselect === 'function') {
                     calendar.unselect();
                 }
-            },
-            onDatesSet(viewInfo) {
-                if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
-                    obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                }
             }
         });
         window.calendar = calendar;
+        calendar.render();
+        const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
+        if (calendarShell) {
+            const applySize = () => handleCalendarResize();
+            applySize();
+            let ro = null;
+            if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+                ro = new ResizeObserver(() => applySize());
+                ro.observe(calendarShell);
+            } else {
+                // Fallback dla starszych przeglądarek/środowisk: nasłuchuj resize
+                const onResize = () => applySize();
+                window.addEventListener('resize', onResize);
+                // sprzątanie przy odmontowaniu komórki
+                const observer = new MutationObserver((mutations) => {
+                    for (const m of mutations) {
+                        m.removedNodes && m.removedNodes.forEach((n) => {
+                            if (n === calendarShell || (n.contains && n.contains(calendarShell))) {
+                                window.removeEventListener('resize', onResize);
+                                observer.disconnect();
+                            }
+                        });
+                    }
+                });
+                observer.observe(calendarShell.parentNode || document.body, { childList: true });
+            }
+        }
+        setTimeout(() => {
+            calendar.updateSize();
+            calendar.updateDates();
+            window.dispatchEvent(new Event('resize'));
+        }, 0);
+        window.addEventListener('resize', handleCalendarResize);
     }
 
     async function otworzModalGodzin(data) {
@@ -939,21 +1059,21 @@ function initializeApp() {
         }
     }
 
-    function przerysujZdarzeniaKalendarza() {
+    function przerysujZdarzeniaKalendarza(options = {}) {
+        const { skipSummary = false } = options;
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
-        wszystkieFlagiDni = buildCalendarFlags();
-        updateCalendarData(calendar, combined, wszystkieFlagiDni);
-        if (calendar.view) {
+        const combined = skipSummary ? [...workEvents, ...leaveEvents] : buildEventSourceWithDailySummaries([...workEvents, ...leaveEvents]);
+        calendar.removeAllEvents();
+        if (combined.length) {
+            calendar.addEventSource(combined);
+        }
+        if (!skipSummary && calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
     }
 
     function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
-            setDailyEntries([]);
-            setDayFlags([]);
-            setCalendarEvents([]);
             if (calendar) calendar.removeAllEvents();
             return;
         }
@@ -973,10 +1093,7 @@ function initializeApp() {
                 const baseHoursProps = {
                     workHours: workValue,
                     driveHours: driveValue,
-                    billedHours: billedHoursForSummary,
-                    workH: workValue,
-                    driveH: driveValue,
-                    billH: billedHoursForSummary
+                    billedHours: billedHoursForSummary
                 };
                 const wpis = {
                     ...normalizedDay,
@@ -989,7 +1106,7 @@ function initializeApp() {
                 if (leaveEventsReady) {
                     const normalizedLeave = normalizedDay.leaveKind ? normalizeDayLeaveValue(normalizedDay.leaveKind) : null;
                     const leaveEventId = getLeaveEventDocId(id);
-                    const existingLeaveEvent = findLeaveEventById(leaveEventId);
+                    const existingLeaveEvent = leaveEvents.find(event => event.id === leaveEventId) || null;
                     const existingKind = existingLeaveEvent?.extendedProps?.leaveKind || existingLeaveEvent?.leaveKind || '';
                     const normalizedExisting = existingKind ? normalizeDayLeaveValue(existingKind) : null;
                     if (normalizedLeave) {
@@ -1024,36 +1141,26 @@ function initializeApp() {
                                 typ: typZlecenia,
                                 workHours: 0,
                                 driveHours: 0,
-                                billedHours: Number(powiazanie.fakturowane) || 0,
-                                workH: 0,
-                                driveH: 0,
-                                billH: Number(powiazanie.fakturowane) || 0
-                            },
-                            classNames: ['job-event']
+                                billedHours: Number(powiazanie.fakturowane) || 0
+                            }
                         });
                     });
                 }
-                if (!powiazane.length && (workValue || driveValue || billedHoursForSummary || dane.notatka)) {
-                    events.push({
-                        id: `godziny_${id}`,
-                        title: stripEwidencjaPrefix(dane.notatka || 'Ewidencja dnia'),
-                        start: id,
-                        allDay: true,
-                        classNames: ['job-event'],
-                        extendedProps: {
-                            client: 'Ewidencja dnia',
-                            machineModel: null,
-                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                            typ: null,
-                            ...baseHoursProps
-                        }
-                    });
-                }
+                events.push({
+                    id: `godziny_${id}`,
+                    title: 'Ewidencja dnia',
+                    start: id,
+                    allDay: true,
+                    className: ['strip-summary'],
+                    extendedProps: {
+                        client: 'Ewidencja dnia',
+                        machineModel: null,
+                        fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
+                        typ: null,
+                        ...baseHoursProps
+                    }
+                });
             });
-            setDailyEntries(wszystkieWpisyKalendarza);
-            wszystkieFlagiDni = buildCalendarFlags();
-            setDayFlags(wszystkieFlagiDni);
-            setCalendarEvents([...events, ...leaveEvents]);
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
@@ -1063,7 +1170,7 @@ function initializeApp() {
     function nasluchujNaUrlopy() {
         try {
             onSnapshot(collection(db, 'events'), (snapshot) => {
-                leaveEvents = snapshot.docs.flatMap(docSnap => {
+                leaveEvents = snapshot.docs.map(docSnap => {
                     const data = docSnap.data() || {};
                     const baseProps = data.extendedProps || {};
                     const rawKind = baseProps.leaveKind || data.leaveKind || '';
@@ -1073,21 +1180,20 @@ function initializeApp() {
                         ? String(rawType)
                         : (normalizedKind ? (normalizedKind === 'L4' ? 'LEAVE_L4' : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE')) : null);
                     const isLeave = Boolean(normalizedType);
-                    if (!isLeave || !data.start) return [];
-                    const payload = {
+                    if (!isLeave || !data.start || !data.end) return null;
+                    return {
                         id: docSnap.id,
                         title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
                         start: data.start,
-                        end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
+                        end: data.end,
                         allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
-                        display: 'background',
+                        display: data.display || 'block',
                         extendedProps: {
                             typ: normalizedType,
                             type: normalizedType,
                             leaveKind: normalizedKind || ''
                         }
                     };
-                    return mapLeavePayloadToEvents(docSnap.id, payload);
                 }).filter(Boolean);
                 przerysujZdarzeniaKalendarza();
                 leaveEventsReady = true;
@@ -1120,28 +1226,22 @@ function initializeApp() {
             return acc;
         }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
         const absorpcja = obliczAbsorpcja(sumyMies.wyfakturowaneGodziny);
-        if (metricWorkEl) metricWorkEl.textContent = `${(sumyMies.praca || 0).toFixed(1)} h`;
-        if (metricBilledEl) metricBilledEl.textContent = `${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h`;
-        if (metricOtEl) metricOtEl.textContent = `${(sumyMies.nadgodziny || 0).toFixed(1)} h`;
-        if (metricDriveEl) metricDriveEl.textContent = `${(sumyMies.jazda || 0).toFixed(1)} h`;
-        if (metricAbsEl) metricAbsEl.textContent = fmtPct(absorpcja);
 
-        if (metricChartEl) {
-            const { y, m } = ymFromMonthInput();
-            const months = lastMonthsInclusive(y, m, 4);
-            const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
-            const max = Math.max(...vals, 1);
-
-            metricChartEl.innerHTML = '';
-            months.forEach(({ y, m }, idx) => {
-                const bar = document.createElement('div');
-                const heightPct = (vals[idx] / max) * 100;
-                bar.style.height = `${heightPct}%`;
-                bar.title = `${String(m).padStart(2, '0')}.${String(y).slice(-2)}: ${vals[idx].toFixed(1)} h`;
-                if (idx < months.length - 1) bar.classList.add('dim');
-                metricChartEl.appendChild(bar);
-            });
-        }
+        if (!kalendarzPodsumowanieDiv) return;
+        const metricsHTML = `
+  <div class="metric"><div class="label">Praca w miesiącu</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Fakturowane</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Nadgodziny</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(obliczAbsorpcja(sumyMies.wyfakturowaneGodziny))}</div></div>
+`;
+        kalendarzPodsumowanieDiv.innerHTML = `
+  <div class="metrics-row">
+    <div class="metrics-left"><div class="metrics-grid">${metricsHTML}</div></div>
+    <div class="metrics-right"><div id="fh3m-pulpit"></div></div>
+  </div>`;
+        const { y, m } = ymFromMonthInput();
+        renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
     }
 
     async function obslugaKalendarza(event) {
@@ -1248,14 +1348,10 @@ function initializeApp() {
 
     const normalizeDayFlags = (flags = {}, leaveKind = null) => {
         const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
-        const flagKind = (flags?.kind || '').toString().toUpperCase();
-        const wolneKind = normalizedKind === 'WOLNE';
-        const wolneFlag = Boolean(flags.wolne) || flagKind === 'WOLNE' || wolneKind;
         return {
-            urlop: Boolean(flags.urlop) || normalizedKind === 'URL' || wolneFlag,
+            urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
             l4: Boolean(flags.l4) || normalizedKind === 'L4',
-            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO' || Boolean(flags.swieto && !flags.urlop),
-            wolne: wolneFlag
+            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO'
         };
     };
 
@@ -1293,45 +1389,6 @@ function initializeApp() {
         const maxDate = new Date(Math.max(...dates));
         return { days: [...days], minDate, maxDate };
     }
-
-    const mergeEntriesWithFlags = (entries = [], flags = []) => {
-        const byDate = new Map();
-        (entries || []).forEach((day) => {
-            const normalized = normalizeDayRecord(day.id || day.date, day);
-            const key = normalized.date;
-            if (!key) return;
-            byDate.set(key, normalized);
-        });
-        (flags || []).forEach((flag) => {
-            const key = normalizeDayKey(flag?.date || flag?.start);
-            if (!key) return;
-            const type = mapLeaveToFlag(flag?.type || flag?.kind || flag?.leaveKind || flag);
-            if (!type) return;
-            const existing = byDate.get(key);
-            const mergedFlags = {
-                ...(existing?.flags || {}),
-                l4: type === 'l4' || existing?.flags?.l4,
-                urlop: type === 'urlop' || existing?.flags?.urlop,
-                swieto: type === 'swieto' || type === 'wolne' || existing?.flags?.swieto,
-                wolne: type === 'wolne' || existing?.flags?.wolne,
-                kind: type
-            };
-            if (existing) {
-                byDate.set(key, { ...existing, flags: normalizeDayFlags(mergedFlags, existing.leaveKind) });
-            } else {
-                byDate.set(key, {
-                    id: key,
-                    date: key,
-                    work: 0,
-                    drive: 0,
-                    billed: 0,
-                    flags: normalizeDayFlags(mergedFlags, null),
-                    leaveKind: null
-                });
-            }
-        });
-        return Array.from(byDate.values());
-    };
 
     function groupByYearMonth(days) {
         const grouped = {};
@@ -1377,17 +1434,15 @@ function initializeApp() {
     }
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
-        const mergedEntries = mergeEntriesWithFlags(wpisy || [], wszystkieFlagiDni || []);
-        const grouped = groupByYearMonth(mergedEntries);
+        const grouped = groupByYearMonth(wpisy || []);
         const miesiace = [];
         const sumyRocznePerRok = [];
-        const currentYear = ymNow().y;
-        const lata = Array.from(new Set([...Object.keys(grouped).map(Number), currentYear, currentYear + 1])).sort((a, b) => a - b);
+        const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
         const globalTotals = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
         const yearsDetailed = [];
 
         lata.forEach(year => {
-            const months = grouped[year] || {};
+            const months = grouped[year];
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
             const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
             let absorpcjaSuma = 0;
@@ -2863,8 +2918,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     const infoDiv = document.getElementById('details-zlecenie-info');
     const historiaDiv = document.getElementById('details-zlecenie-historia');
     const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
-    const opisDiv = document.getElementById('details-zlecenie-opis');
-    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv || !opisDiv) return;
+    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv) return;
     closeAllModals(detailsZlecenieModal);
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
     const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
@@ -2886,6 +2940,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
         <div class="details-group"><strong>Start:</strong> <p>${formatDateTimeLabel(zlecenie.startAt)}</p></div>
         <div class="details-group"><strong>Koniec:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
+        <div class="details-group"><strong>Opis:</strong> <p>${zlecenie.opis || 'Brak opisu'}</p></div>
     `;
 
     if (zlecenie.status === 'ukończone') {
@@ -2941,37 +2996,6 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
-    opisDiv.innerHTML = '';
-    const opisContent = document.createElement('div');
-    opisContent.className = 'details-opis-content';
-    opisContent.textContent = zlecenie.opis || 'Brak opisu.';
-    opisDiv.appendChild(opisContent);
-
-    const applyOpisClamp = () => {
-        let toggle = opisDiv.querySelector('.opis-toggle');
-        const needsToggle = Boolean(zlecenie.opis) && opisContent.scrollHeight > 280;
-        if (!needsToggle) {
-            if (toggle) toggle.remove();
-            opisContent.classList.remove('collapsed', 'expanded');
-            return;
-        }
-        if (!toggle) {
-            toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.className = 'opis-toggle btn-ghost';
-            toggle.addEventListener('click', () => {
-                const isExpanded = opisContent.classList.toggle('expanded');
-                opisContent.classList.toggle('collapsed', !isExpanded);
-                toggle.textContent = isExpanded ? 'Pokaż mniej' : 'Pokaż więcej';
-            });
-            opisDiv.appendChild(toggle);
-        }
-        opisContent.classList.add('collapsed');
-        opisContent.classList.remove('expanded');
-        toggle.textContent = 'Pokaż więcej';
-    };
-    applyOpisClamp();
-    requestAnimationFrame(applyOpisClamp);
 
     if (!skipOpen) {
         openModal(detailsZlecenieModal);

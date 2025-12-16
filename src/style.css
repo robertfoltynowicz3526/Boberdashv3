@@ -629,7 +629,6 @@ select {
   max-height: 0;
 }
 
-#calendar,
 #kalendarz {
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -639,7 +638,6 @@ select {
 }
 
 #pulpit .calendar-container,
-#pulpit #calendar,
 #pulpit #kalendarz {
   width: 100%;
   max-width: none;
@@ -692,13 +690,12 @@ select {
 /* Kalendarz wypełnia kartę i nie wychodzi poza nią */
 #calendar-shell {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
   height: auto;
   min-height: auto;
 }
 
-#calendar-shell #calendar,
 #calendar-shell #kalendarz {
   height: auto;
   min-height: auto;
@@ -716,11 +713,16 @@ select {
 }
 
 .fc .day-summary {
-  background: transparent !important;
+  background: #3b82f6 !important;
   border: none !important;
-  color: #cfe2ff !important;
-  font-weight: 400;
-  border-radius: 0;
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.fc .day-summary .fc-event-title {
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .fc-event.leave-event {
@@ -1663,7 +1665,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .ev-chip{ display:flex; justify-content:space-between; gap:6px; align-items:center; }
 .ev-client{ font-weight:600; }
 .ev-meta{ font-size:.85em; opacity:.9; }
-.fc .fc-daygrid-day-frame{ overflow:visible; }
+.fc .fc-daygrid-day-frame{ overflow:hidden; }
 .fc .fc-daygrid-event{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; line-height:1.2; padding:2px 6px; border-radius:8px; overflow:hidden; }
 .fc .fc-daygrid-event .fc-event-main{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .fc .fc-daygrid-day-events{ margin-top:2px; }
@@ -1708,7 +1710,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .fc .fc-bg-event.wolne{  background:#16a34a !important; }
 .fc .fc-bg-event.l4{     background:#d97706 !important; }
 .fc .fc-bg-event.swieto{ background:#64748b !important; }
-.fc .fc-daygrid-day-frame{overflow:visible}
+.fc .fc-daygrid-day-frame{overflow:hidden}
 .fc .fc-daygrid-event{white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.2;padding:2px 6px;border-radius:8px;overflow:hidden}
 .fc .fc-daygrid-event .fc-event-main{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .section-grid .side{
@@ -1881,11 +1883,6 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   display:block;
 }
 
-.orders-finished{
-  max-width:min(1480px, 96vw);
-  margin:0 auto;
-}
-
 .orders-active,
 .orders-finished,
 .orders-finished .list{
@@ -1909,7 +1906,6 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   width:100%;
   max-width:none !important;
 }
-#calendar,
 #kalendarz{ width:100%; }
 .fc{ font-size:0.95rem; }
 @media (min-width:1200px){
@@ -1993,7 +1989,6 @@ main,
   max-width: 1280px;
   margin: 0 auto;
 }
-#calendar,
 #kalendarz { height: auto; min-height: auto; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
 .fc-daygrid-day { position: relative; overflow: hidden; }
@@ -2028,7 +2023,6 @@ main,
 [data-section="kalendarz"] .card,
 .calendar-card { grid-column: 1 / -1; width: 100%; max-width: 1280px; margin: 0 auto; }
 
-#calendar,
 #kalendarz {
   height: auto;
   min-height: auto;
@@ -2211,24 +2205,11 @@ main,
 .fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
 
 /* Listy (klienci/maszyny/zakończone) przewijają się w pionie */
-#clients-list, .clients-list {
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 6px;
-}
-
-#inventory-list, .inventory-list,
+#closed-orders, .closed-orders,
+#clients-list, .clients-list,
 #machines-list, .machines-list,
 .scroll-panel {
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 6px;
-}
-
-#closed-orders, .closed-orders {
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 240px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 6px;
