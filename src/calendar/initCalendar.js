@@ -84,10 +84,15 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: 3,
+    dayMaxEventRows: true,
     moreLinkClick: 'popover',
-    eventOrder: 'allDay,start,-duration,title',
-    eventOverlap: (stillEvent, movingEvent) => {
-      return stillEvent.allDay && movingEvent.allDay ? true : false;
+    eventOrder: 'start,-duration,title',
+    eventOverlap: false,
+    eventClassNames: (arg) => {
+      const out = [];
+      if (arg.event.extendedProps?.isDailySummary) out.push('is-daily-summary');
+      if (arg.event.extendedProps?.isBackgroundMarker) out.push('is-bg-marker');
+      return out;
     },
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,

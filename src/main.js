@@ -396,11 +396,11 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
+        const markerToClass = { L4: 'marker-sick', URL: 'marker-vacation', ŚWIĘTO: 'marker-holiday', SWIETO: 'marker-holiday' };
+        const markerType = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toUpperCase();
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
+        const extendedProps = { ...(payload.extendedProps || {}), isBackgroundMarker: true, markerType };
         return [
             {
                 id: `${leaveId}::bg`,
@@ -408,18 +408,7 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'background',
-                classNames: ['absence-bg', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            },
-            {
-                id: `${leaveId}::icon`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
+                classNames: ['day-marker', markerToClass[markerType]],
                 overlap: false,
                 title: payload.title || '',
                 extendedProps
@@ -993,11 +982,20 @@ function initializeApp() {
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
+            const markerSet = new Set(
+                leaveEvents
+                    .filter((ev) => ev?.extendedProps?.isBackgroundMarker)
+                    .map((ev) => normalizeDayKey(ev.start || ev.startStr))
+                    .filter(Boolean)
+            );
 
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
                 const normalizedDay = normalizeDayRecord(id, dane);
+                if (normalizedDay?.flags?.urlop || normalizedDay?.flags?.l4 || normalizedDay?.flags?.swieto) {
+                    markerSet.add(id);
+                }
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
                 const fakturowaneValue = powiazane.length > 0 ? suma : (Number(normalizedDay.billed) || 0);
                 const workValue = Number(normalizedDay.work) || 0;
@@ -1038,6 +1036,10 @@ function initializeApp() {
                     }
                 }
 
+                if (markerSet.has(id)) {
+                    return;
+                }
+
                 if (powiazane.length) {
                     powiazane.forEach((powiazanie, index) => {
                         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
@@ -1076,6 +1078,7 @@ function initializeApp() {
                         machineModel: null,
                         fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
                         typ: null,
+                        isDailySummary: true,
                         ...baseHoursProps
                     }
                 });
