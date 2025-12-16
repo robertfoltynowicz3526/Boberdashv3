@@ -1684,8 +1684,8 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 }
 
 :root{
-  /* skaluje się z szerokością okna: min 56px, max 96px */
-  --leave-icon-size: clamp(56px, 7vw, 96px);
+  /* domyślka – i tak nadpisujemy JS-em pod wymiar komórki */
+  --leave-icon-size: 64px;
   --leave-icon-glow: 0 6px 18px rgba(0,0,0,.35);
 }
 .fc .leave-badge{
@@ -1697,6 +1697,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   pointer-events:none; /* klik nadal łapie komórkę dnia */
 }
 .fc .leave-badge svg{
+  /* JS ustawia dokładny px; te wartości są tylko fallbackiem */
   width:var(--leave-icon-size);
   height:var(--leave-icon-size);
   filter: drop-shadow(var(--leave-icon-glow));

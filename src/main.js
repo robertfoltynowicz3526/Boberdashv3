@@ -702,8 +702,10 @@ function initializeApp() {
 
                 if (leaveType) {
                     const frame = info.el.closest('.fc-daygrid-day-frame');
-                    if (frame && !frame.querySelector('.leave-badge')) {
+                    if (frame) {
                         frame.classList.add('has-leave-label');
+                        frame.querySelectorAll('.leave-badge').forEach(n => n.remove());
+
                         const badge = document.createElement('div');
                         badge.className = 'leave-badge ' + (
                             leaveType === 'L4' ? 'leave-badge--l4' :
@@ -729,6 +731,21 @@ function initializeApp() {
 
                         badge.innerHTML = leaveType === 'L4' ? svgL4 : (leaveType === 'WOLNE' ? svgLeaf : svgFlag);
                         frame.appendChild(badge);
+
+                        const svgEl = badge.querySelector('svg');
+                        const applySize = () => {
+                            if (!svgEl) return;
+                            const r = frame.getBoundingClientRect();
+                            const padding = 16;
+                            const base = Math.max(0, Math.min(r.width, r.height) - padding);
+                            const size = Math.max(40, Math.min(120, Math.floor(base)));
+                            svgEl.style.width = `${size}px`;
+                            svgEl.style.height = `${size}px`;
+                        };
+                        applySize();
+
+                        const ro = new (window).ResizeObserver?.(() => applySize());
+                        if (ro) ro.observe(frame);
                     }
 
                     info.el.style.display = 'none';
