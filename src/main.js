@@ -146,7 +146,7 @@ function initializeApp() {
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
-    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO', 'WOLNE'];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -183,6 +183,7 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
+    let wszystkieFlagiDni = [];
     let workEvents = [];
     let leaveEvents = [];
     let leaveEventsReady = false;
@@ -357,9 +358,10 @@ function initializeApp() {
     };
 
     const normalizeDayLeaveValue = (value) => {
-        const upper = (value ?? '').toString().trim().toUpperCase();
+        const upperRaw = (value ?? '').toString().trim().toUpperCase();
+        const upper = upperRaw.startsWith('LEAVE_') ? upperRaw.replace('LEAVE_', '') : upperRaw;
         if (!upper) return DAY_LEAVE_NONE;
-        if (upper === 'WOLNE') return 'URL';
+        if (upper === 'WOLNE' || upper === 'FREE') return 'WOLNE';
         return DAY_LEAVE_VALUES.includes(upper) ? upper : DAY_LEAVE_NONE;
     };
 
@@ -388,8 +390,14 @@ function initializeApp() {
     };
 
     const getLeaveKindClass = (value) => {
-        const lower = (value || '').toLowerCase();
-        return lower === 'url' ? 'wolne' : lower;
+        const raw = (value ?? '').toString().trim();
+        const normalized = normalizeDayLeaveValue(raw.replace(/^LEAVE_/i, ''));
+        if (normalized === 'URL') return 'urlop';
+        if (normalized === 'L4') return 'l4';
+        if (normalized === 'SWIETO' || normalized === 'WOLNE') return 'wolne';
+        const lower = raw.toLowerCase().replace(/^leave_/, '');
+        if (lower === 'wolne' || lower === 'free') return 'wolne';
+        return lower || 'urlop';
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -406,11 +414,7 @@ function initializeApp() {
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
         const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
-        const type = leaveKind === 'L4' ? 'L4' : (leaveKind === 'SWIETO' ? 'SWIETO' : 'URLOP');
-        const classNames = [
-            'fc-offday',
-            leaveKind === 'L4' ? 'is-l4' : (leaveKind === 'SWIETO' ? 'is-swieto' : 'is-urlop')
-        ];
+        const classType = getLeaveKindClass(leaveKind);
         return [
             {
                 id: `${leaveId}::bg`,
@@ -418,11 +422,11 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'background',
-                classNames,
+                classNames: ['ev-leave', `ev-leave--${classType}`],
                 overlap: false,
                 title: payload.title || '',
-                type,
-                extendedProps: { ...extendedProps, leaveKind, type }
+                type: classType,
+                extendedProps: { ...extendedProps, leaveKind, type: classType, kind: classType }
             }
         ];
     };
@@ -451,15 +455,16 @@ function initializeApp() {
         const type = normalizedKind === 'L4'
             ? 'LEAVE_L4'
             : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE');
+        const flagClass = getLeaveKindClass(normalizedKind);
         const payload = {
             title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
             start: formatDateForStorage(startDate),
             end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
-            display: 'block',
+            display: 'background',
             typ: type,
             type,
-            extendedProps: { typ: type, type, leaveKind: normalizedKind }
+            extendedProps: { typ: type, type, leaveKind: normalizedKind, kind: flagClass }
         };
         await setDoc(leaveDocRef, payload);
         const withoutCurrent = removeLeaveEventsForId(leaveDocId);
@@ -602,10 +607,11 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'urlop';
+        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO') return 'swieto';
+        if (normalized === 'SWIETO') return 'wolne';
+        if (normalized === 'WOLNE') return 'wolne';
         if (normalized === 'URL') return 'urlop';
         return null;
     };
@@ -936,7 +942,8 @@ function initializeApp() {
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
         const combined = [...workEvents, ...leaveEvents];
-        updateCalendarData(calendar, combined, buildCalendarFlags());
+        wszystkieFlagiDni = buildCalendarFlags();
+        updateCalendarData(calendar, combined, wszystkieFlagiDni);
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
@@ -1044,7 +1051,8 @@ function initializeApp() {
                 }
             });
             setDailyEntries(wszystkieWpisyKalendarza);
-            setDayFlags(buildCalendarFlags());
+            wszystkieFlagiDni = buildCalendarFlags();
+            setDayFlags(wszystkieFlagiDni);
             setCalendarEvents([...events, ...leaveEvents]);
             workEvents = events;
             przerysujZdarzeniaKalendarza();
@@ -1240,10 +1248,14 @@ function initializeApp() {
 
     const normalizeDayFlags = (flags = {}, leaveKind = null) => {
         const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
+        const flagKind = (flags?.kind || '').toString().toUpperCase();
+        const wolneKind = normalizedKind === 'WOLNE';
+        const wolneFlag = Boolean(flags.wolne) || flagKind === 'WOLNE' || wolneKind;
         return {
-            urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
+            urlop: Boolean(flags.urlop) || normalizedKind === 'URL' || wolneFlag,
             l4: Boolean(flags.l4) || normalizedKind === 'L4',
-            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO'
+            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO' || Boolean(flags.swieto && !flags.urlop),
+            wolne: wolneFlag
         };
     };
 
@@ -1281,6 +1293,45 @@ function initializeApp() {
         const maxDate = new Date(Math.max(...dates));
         return { days: [...days], minDate, maxDate };
     }
+
+    const mergeEntriesWithFlags = (entries = [], flags = []) => {
+        const byDate = new Map();
+        (entries || []).forEach((day) => {
+            const normalized = normalizeDayRecord(day.id || day.date, day);
+            const key = normalized.date;
+            if (!key) return;
+            byDate.set(key, normalized);
+        });
+        (flags || []).forEach((flag) => {
+            const key = normalizeDayKey(flag?.date || flag?.start);
+            if (!key) return;
+            const type = mapLeaveToFlag(flag?.type || flag?.kind || flag?.leaveKind || flag);
+            if (!type) return;
+            const existing = byDate.get(key);
+            const mergedFlags = {
+                ...(existing?.flags || {}),
+                l4: type === 'l4' || existing?.flags?.l4,
+                urlop: type === 'urlop' || existing?.flags?.urlop,
+                swieto: type === 'swieto' || type === 'wolne' || existing?.flags?.swieto,
+                wolne: type === 'wolne' || existing?.flags?.wolne,
+                kind: type
+            };
+            if (existing) {
+                byDate.set(key, { ...existing, flags: normalizeDayFlags(mergedFlags, existing.leaveKind) });
+            } else {
+                byDate.set(key, {
+                    id: key,
+                    date: key,
+                    work: 0,
+                    drive: 0,
+                    billed: 0,
+                    flags: normalizeDayFlags(mergedFlags, null),
+                    leaveKind: null
+                });
+            }
+        });
+        return Array.from(byDate.values());
+    };
 
     function groupByYearMonth(days) {
         const grouped = {};
@@ -1326,15 +1377,17 @@ function initializeApp() {
     }
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
-        const grouped = groupByYearMonth(wpisy || []);
+        const mergedEntries = mergeEntriesWithFlags(wpisy || [], wszystkieFlagiDni || []);
+        const grouped = groupByYearMonth(mergedEntries);
         const miesiace = [];
         const sumyRocznePerRok = [];
-        const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+        const currentYear = ymNow().y;
+        const lata = Array.from(new Set([...Object.keys(grouped).map(Number), currentYear, currentYear + 1])).sort((a, b) => a - b);
         const globalTotals = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
         const yearsDetailed = [];
 
         lata.forEach(year => {
-            const months = grouped[year];
+            const months = grouped[year] || {};
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
             const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
             let absorpcjaSuma = 0;
@@ -2888,7 +2941,37 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
-    opisDiv.innerHTML = zlecenie.opis ? `<p>${zlecenie.opis}</p>` : '<p>Brak opisu.</p>';
+    opisDiv.innerHTML = '';
+    const opisContent = document.createElement('div');
+    opisContent.className = 'details-opis-content';
+    opisContent.textContent = zlecenie.opis || 'Brak opisu.';
+    opisDiv.appendChild(opisContent);
+
+    const applyOpisClamp = () => {
+        let toggle = opisDiv.querySelector('.opis-toggle');
+        const needsToggle = Boolean(zlecenie.opis) && opisContent.scrollHeight > 280;
+        if (!needsToggle) {
+            if (toggle) toggle.remove();
+            opisContent.classList.remove('collapsed', 'expanded');
+            return;
+        }
+        if (!toggle) {
+            toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'opis-toggle btn-ghost';
+            toggle.addEventListener('click', () => {
+                const isExpanded = opisContent.classList.toggle('expanded');
+                opisContent.classList.toggle('collapsed', !isExpanded);
+                toggle.textContent = isExpanded ? 'Pokaż mniej' : 'Pokaż więcej';
+            });
+            opisDiv.appendChild(toggle);
+        }
+        opisContent.classList.add('collapsed');
+        opisContent.classList.remove('expanded');
+        toggle.textContent = 'Pokaż więcej';
+    };
+    applyOpisClamp();
+    requestAnimationFrame(applyOpisClamp);
 
     if (!skipOpen) {
         openModal(detailsZlecenieModal);

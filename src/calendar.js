@@ -1,6 +1,2 @@
-export { bootCalendar } from './calendar/bootCalendar';
+export { bootCalendar, updateCalendarData } from './calendar/initCalendar.js';
 export { loadCalendarEvents, getDailyTotals } from './calendar/data';
-
-export function updateCalendarData() {
-  // placeholder to retain legacy API; bootCalendar now loads data directly from Firestore
-}
