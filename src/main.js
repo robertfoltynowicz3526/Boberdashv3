@@ -19,7 +19,7 @@ function addDaysISO(isoDate, days = 1) {
 const markerToClass = { L4: 'marker-sick', Urlop: 'marker-vacation', 'Święto': 'marker-holiday' };
 
 function buildDayMarkers(markers) {
-    return markers.map(m => ({
+    return (markers || []).map(m => ({
         start: m.date,
         end: addDaysISO(m.date, 1),
         allDay: true,

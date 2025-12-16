@@ -105,27 +105,44 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* ───── FullCalendar: JD skin ───── */
 .fc { --fc-daygrid-event-top: 6px; }
-.fc .fc-daygrid-day-frame .fc-daygrid-day-events { margin-top: 8px; }
+
+/* --- odstęp między nagłówkiem dnia a eventami --- */
+.fc .fc-daygrid-day-top { margin-bottom: 6px; }
+
+/* lekkie marginesy między kafelkami */
 .fc .fc-daygrid-event-harness { margin-top: 4px !important; }
-.fc .fc-daygrid-event { margin-top: 4px !important; }
+.fc .fc-daygrid-event        { margin-top: 4px !important; }
 .fc .fc-daygrid-event.is-daily-summary { margin-top: 8px !important; }
 
+/* upewnij się, że tło jest pod kafelkami, a kafelki nad tłem */
 .fc .fc-daygrid-day-bg { z-index: 1; }
 .fc .fc-daygrid-day-events { position: relative; z-index: 2; }
 
-.fc .fc-daygrid-day-bg .day-marker { pointer-events: none; opacity: 0.18; }
+/* PRAWIDŁOWY selektor dla background events */
+.fc .fc-bg-event.day-marker {
+  opacity: 0.18;
+  pointer-events: none;
+}
 
-.fc .fc-daygrid-day-bg .day-marker::before {
-  content: "";
+/* duża ikona w centrum komórki dnia – dodajemy ::before NA .fc-bg-event */
+.fc .fc-bg-event.day-marker::before {
+  content: "➕";
   position: absolute; inset: 0;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 54px 54px;
+  background-size: 54px 54px; /* możesz zwiększyć/zmniejszyć */
   opacity: 0.6;
+  font-size: 44px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
 }
-.fc .fc-daygrid-day-bg .day-marker.marker-sick::before     { background-image: url("/icons/health-cross.svg"); }
-.fc .fc-daygrid-day-bg .day-marker.marker-vacation::before { background-image: url("/icons/flag.svg"); }
-.fc .fc-daygrid-day-bg .day-marker.marker-holiday::before  { background-image: url("/icons/leaf.svg"); }
+.fc .fc-bg-event.day-marker.marker-vacation::before { content: "🚩"; }
+.fc .fc-bg-event.day-marker.marker-holiday::before  { content: "🍃"; }
+
+/* (opcjonalnie) delikatny odcień tła dnia z markerem, gdyby ikona była za mało widoczna */
+.fc .fc-bg-event.day-marker.marker-sick     { background-color: #ff7680; }
+.fc .fc-bg-event.day-marker.marker-vacation { background-color: #ffd15a; }
+.fc .fc-bg-event.day-marker.marker-holiday  { background-color: #7cd96f; }
 
 .fc .fc-toolbar-title{color:var(--jd-text-100)}
 .fc .fc-button{
