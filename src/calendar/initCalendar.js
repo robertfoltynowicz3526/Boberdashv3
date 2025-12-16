@@ -94,7 +94,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     eventContent: buildEventContent,
     eventDidMount: (info) => {
       if (info.el?.style) {
-        info.el.style.marginTop = '6px';
+        info.el.style.marginTop = info.el.style.marginTop || '4px';
       }
     },
     dayCellDidMount(info) {
