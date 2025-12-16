@@ -605,37 +605,60 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        if (raw === 'FREE' || raw === 'LEAVE_FREE') return 'swieto';
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
-        if (normalized === 'SWIETO') return 'wolne';
+        if (normalized === 'SWIETO') return 'swieto';
         if (normalized === 'URL') return 'urlop';
         return null;
     };
 
-    const buildCalendarFlags = () => {
-        const byDate = new Map();
+    const addDateToFlagSet = (sets, dateKey, type) => {
+        if (!sets || !dateKey || !type) return;
+        if (type === 'l4') sets.l4.add(dateKey);
+        else if (type === 'swieto') sets.swieto.add(dateKey);
+        else if (type === 'urlop') sets.urlop.add(dateKey);
+    };
+
+    const addRangeToFlagSet = (sets, start, end, type) => {
+        if (!start || !sets || !type) return;
+        const startDate = normalizeAllDayDate(start);
+        const endDate = normalizeAllDayDate(end) || startDate;
+        if (!startDate) return;
+        const cursor = new Date(startDate);
+        const stop = new Date(endDate);
+        if (stop <= cursor) {
+            const key = normalizeDayKey(cursor);
+            addDateToFlagSet(sets, key, type);
+            return;
+        }
+        while (cursor < stop) {
+            addDateToFlagSet(sets, normalizeDayKey(cursor), type);
+            cursor.setDate(cursor.getDate() + 1);
+        }
+    };
+
+    const buildLeaveDateSets = () => {
+        const sets = { l4: new Set(), swieto: new Set(), urlop: new Set() };
         wszystkieWpisyKalendarza.forEach((wpis) => {
             const key = normalizeDayKey(wpis?.id || wpis?.date);
             if (!key) return;
             let type = null;
             if (wpis?.flags?.l4) type = 'l4';
             else if (wpis?.flags?.urlop) type = 'urlop';
-            else if (wpis?.flags?.swieto) type = 'wolne';
+            else if (wpis?.flags?.swieto) type = 'swieto';
             else type = mapLeaveToFlag(wpis?.leaveKind || wpis?.dayLeave);
-            if (type) byDate.set(key, type);
+            addDateToFlagSet(sets, key, type);
         });
 
         leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
-            const key = normalizeDayKey(ev?.start || ev?.date);
-            if (!key || byDate.has(key)) return;
-            const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
-            const type = mapLeaveToFlag(kind);
-            if (type) byDate.set(key, type);
+            const kind = mapLeaveToFlag(ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind);
+            const start = ev?.start || ev?.startStr || ev?.date;
+            const end = ev?.end || ev?.endStr || ev?.date;
+            addRangeToFlagSet(sets, start, end, kind);
         });
 
-        return Array.from(byDate.entries()).map(([date, type]) => ({ date, type }));
+        return sets;
     };
 
     const openEwidencja = (dateStr) => {
@@ -653,8 +676,8 @@ function initializeApp() {
         if (!kalendarzContainer) return;
         calendar = initCalendar(
             kalendarzContainer,
-            [...workEvents, ...leaveEvents],
-            buildCalendarFlags(),
+            [...workEvents],
+            buildLeaveDateSets(),
             {
                 plugins: calendarPlugins,
                 timeZone: 'local',
@@ -978,8 +1001,8 @@ function initializeApp() {
 
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
-        updateCalendarData(calendar, combined, buildCalendarFlags());
+        const combined = [...workEvents];
+        updateCalendarData(calendar, combined, buildLeaveDateSets());
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
@@ -1016,9 +1039,14 @@ function initializeApp() {
                     billed: fakturowaneValue,
                     fakturowane: fakturowaneValue,
                     nadgodziny: Number(dane?.nadgodziny) || 0,
-                    zleceniaPowiazane: powiazane
+                    zleceniaPowiazane: powiazane,
+                    flags: dane?.flags || {}
                 };
                 wszystkieWpisyKalendarza.push(wpis);
+                const leaveTypeForDay = dane?.flags?.l4
+                    ? 'l4'
+                    : (dane?.flags?.urlop ? 'urlop' : (dane?.flags?.swieto ? 'swieto' : mapLeaveToFlag(normalizedDay.leaveKind || normalizedDay.dayLeave)));
+                const isLeaveDay = Boolean(leaveTypeForDay);
                 if (leaveEventsReady) {
                     const normalizedLeave = normalizedDay.leaveKind ? normalizeDayLeaveValue(normalizedDay.leaveKind) : null;
                     const leaveEventId = getLeaveEventDocId(id);
@@ -1036,6 +1064,10 @@ function initializeApp() {
                             console.warn('Nie udało się usunąć urlopu dla dnia', id, err);
                         });
                     }
+                }
+
+                if (isLeaveDay) {
+                    return;
                 }
 
                 if (powiazane.length) {

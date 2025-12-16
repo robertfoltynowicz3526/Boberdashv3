@@ -251,3 +251,56 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid .fc-daygrid-bg-harness,
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
+
+/* Lepsze „zakotwiczenie” zawartości dnia */
+.fc-daygrid-day-frame {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Kontener na karty – z zapasem od nagłówka dnia */
+.fc-daygrid-day-events {
+  margin-top: 6px;
+}
+
+/* Każda karta-zlecenie z oddechem i ładnym promieniem */
+.jd-event,
+.fc-daygrid-event {
+  margin-top: 4px !important;
+  border-radius: 8px !important;
+}
+
+/* Drobna korekta harnessów FC, które czasem „przyklejają” kartę do góry */
+.fc-daygrid-event-harness {
+  margin-top: 2px !important;
+}
+
+/* Wygaszone tło dla flag (L4/Święto/Urlop) */
+.jd-bg-flag,
+.fc .fc-bg-event {
+  background: rgba(255, 255, 255, 0.06) !important;
+  opacity: 1 !important;
+}
+
+/* Duża, centralna ikona flagi w środku komórki dnia */
+.jd-flag {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-size: 28px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
+  z-index: 2;
+}
+
+/* Kolory zgodne z John Deere (żółto-zielone akcenty) */
+.jd-flag--l4 { color: #ffcc33; }
+.jd-flag--swieto { color: #ffd84d; }
+.jd-flag--urlop { color: #7ac142; }
+
+/* Upewnij się, że same karty (zlecenia) siedzą nad tłem i ikoną */
+.fc-daygrid-event {
+  position: relative;
+  z-index: 3;
+}
