@@ -79,15 +79,19 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'month,week' },
     navLinks: true,
     expandRows: true,
+    dayMaxEventRows: true,
     height: 'auto',
     contentHeight: 'auto',
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: 3,
     moreLinkClick: 'popover',
-    eventOrder: 'allDay,start,-duration,title',
-    eventOverlap: (stillEvent, movingEvent) => {
-      return stillEvent.allDay && movingEvent.allDay ? true : false;
+    eventOrder: 'start,-duration,title',
+    eventOverlap: false,
+    eventClassNames: (arg) => {
+      const cls = [];
+      if (arg.event.extendedProps?.isDailySummary) cls.push('is-daily-summary');
+      return cls;
     },
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
