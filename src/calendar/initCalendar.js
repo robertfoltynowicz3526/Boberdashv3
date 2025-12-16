@@ -87,6 +87,8 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     dayMaxEventRows: true,
     moreLinkClick: 'popover',
     eventOrder: 'start,-duration,title',
+    eventOrderStrict: true,
+    eventDisplay: 'block',
     eventOverlap: false,
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,

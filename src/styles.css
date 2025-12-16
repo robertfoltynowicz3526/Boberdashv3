@@ -291,3 +291,34 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid .fc-daygrid-bg-harness,
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
+
+/* --- FullCalendar dayGrid spacing fix --- */
+:root{
+  /* sterowalne przerwy */
+  --fc-cell-top-gap: 8px;      /* odstęp pod numerem dnia */
+  --fc-event-top-gap: 6px;     /* odstęp między kafelkami */
+}
+
+/* bufor pod nagłówkiem dnia (numer + ikony) */
+.fc .fc-daygrid-day-top{
+  margin-bottom: var(--fc-cell-top-gap);
+}
+
+/* zero paddingu u góry ramki dnia, żeby nie znosiło marginesu */
+.fc .fc-daygrid-day-frame{
+  padding-top: 0 !important;
+}
+
+/* stały margines nad KAŻDYM eventem (również pierwszym) */
+.fc .fc-daygrid-event-harness{
+  margin-top: var(--fc-event-top-gap);
+}
+.fc .fc-daygrid-event{
+  margin-top: var(--fc-event-top-gap);
+  border-radius: 8px;              /* kosmetyka */
+}
+
+/* lekki padding numeru dnia, żeby wizualnie było równo */
+.fc .fc-daygrid-day-number{
+  padding: 4px 6px;
+}
