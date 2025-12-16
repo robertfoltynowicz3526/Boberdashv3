@@ -14,11 +14,62 @@ const normalizeLeaveKind = (value) => {
   const raw = (value ?? '').toString().trim().toLowerCase();
   if (!raw) return null;
   if (raw.startsWith('leave_')) return normalizeLeaveKind(raw.replace('leave_', ''));
+  if (raw === 'url0p') return 'urlop';
+  if (raw === 'day_off') return 'wolne';
   if (raw === 'l4') return 'l4';
   if (raw === 'swieto' || raw === 'święto' || raw === 'holiday') return 'wolne';
   if (raw === 'wolne' || raw === 'free' || raw === 'leave_free') return 'wolne';
   if (raw === 'urlop' || raw === 'url' || raw === 'leave_url' || raw === 'leave') return 'urlop';
   return null;
+};
+
+const isOffKind = (value) => {
+  const upper = (value ?? '').toString().trim().toUpperCase();
+  return ['L4', 'URLOP', 'URL0P', 'SWIETO', 'DAY_OFF', 'WOLNE'].includes(upper);
+};
+
+const mapDocToEvent = (doc) => {
+  const payload = typeof doc?.data === 'function' ? doc.data() : doc || {};
+  const extended = { ...(payload.extendedProps || {}) };
+  const kindRaw = payload.kind || payload.type || extended.kind || extended.type || extended.leaveKind;
+  const typeUpper = (kindRaw ?? '').toString().trim().toUpperCase();
+  const leaveFromType = typeUpper.startsWith('LEAVE_') ? typeUpper.replace('LEAVE_', '') : null;
+  const start = payload.start || payload.date;
+  const end = payload.end ?? start;
+  const normalizedLeave = normalizeLeaveKind(kindRaw || leaveFromType);
+  if (isOffKind(kindRaw) || isOffKind(leaveFromType) || normalizedLeave) {
+    const cls = (normalizedLeave || leaveFromType || kindRaw || 'wolne').toString().toLowerCase();
+    return {
+      title: payload.title || '',
+      start,
+      end: end ?? start,
+      allDay: true,
+      display: 'background',
+      classNames: ['off-day', cls],
+      extendedProps: { ...extended, kind: 'off', leaveKind: (normalizedLeave || leaveFromType || kindRaw || '').toUpperCase() },
+    };
+  }
+  const classNames = [];
+  if (Array.isArray(payload.classNames)) classNames.push(...payload.classNames);
+  else if (Array.isArray(payload.className)) classNames.push(...payload.className);
+  else if (typeof payload.className === 'string') classNames.push(payload.className);
+  else if (typeof payload.classNames === 'string') classNames.push(payload.classNames);
+  if (!classNames.includes('work-event')) classNames.push('work-event');
+  return {
+    title: payload.title || payload.client || extended.client || '',
+    start,
+    end,
+    allDay: payload.allDay ?? true,
+    display: payload.display || payload.eventDisplay || 'block',
+    classNames,
+    extendedProps: {
+      ...extended,
+      kind: extended.kind || payload.kind || 'work',
+      work: extended.work ?? payload.workHours ?? payload.workH,
+      drive: extended.drive ?? payload.driveHours ?? payload.driveH,
+      billed: extended.billed ?? payload.billedHours ?? payload.billH,
+    },
+  };
 };
 
 const getLeaveFlagForDate = (calendar, date) => {
@@ -34,7 +85,13 @@ function renderDaySummaries(calendar) {
   if (!calendar?.el) return;
   calendar.el.querySelectorAll('.day-summary').forEach((n) => n.remove());
   const toNum = (value) => (value == null ? 0 : Number(value) || 0);
-  const events = calendar.getEvents().filter((e) => !['l4', 'urlop', 'wolne'].includes(normalizeLeaveKind(e.extendedProps?.kind)));
+  const events = calendar.getEvents().filter((e) => {
+    const normalizedKind = normalizeLeaveKind(e.extendedProps?.kind || e.extendedProps?.leaveKind);
+    if (normalizedKind) return false;
+    if (e.extendedProps?.kind === 'off') return false;
+    if (e.display === 'background') return false;
+    return true;
+  });
   const by = new Map();
   events.forEach((e) => {
     const key = (e.startStr || '').slice(0, 10);
@@ -100,12 +157,13 @@ export function bootCalendar(extraOptions = {}) {
     handleWindowResize: true,
     fixedWeekCount: false,
     showNonCurrentDates: true,
-    dayMaxEventRows: 3,
+    dayMaxEventRows: true,
+    dayMaxEvents: true,
     moreLinkClick: 'popover',
     eventOverlap: false,
     slotEventOverlap: false,
     eventDisplay: 'block',
-    eventOrder: 'start,-duration,title',
+    eventOrder: 'start,-allDay,title',
     dayCellDidMount: (info) => {
       const frame = info.el.querySelector('.fc-daygrid-day-frame') || info.el;
       applyFlagToCell(calendar, frame, info.date);
@@ -113,29 +171,7 @@ export function bootCalendar(extraOptions = {}) {
     events: async (info, success) => {
       try {
         const raw = await loadEventsFromDb(info.start, info.end);
-        const mapped = (raw || []).map((e) => {
-          const kind = normalizeLeaveKind(e?.extendedProps?.kind || e?.kind || e?.type);
-          if (kind) {
-            const start = e.start || e.date;
-            const end = e.end || start;
-            return {
-              ...e,
-              start,
-              end,
-              allDay: e.allDay ?? true,
-              display: 'background',
-              classNames: ['ev-leave', `ev-leave--${kind}`],
-              extendedProps: { ...(e.extendedProps || {}), kind },
-            };
-          }
-          const extendedProps = { ...(e.extendedProps || {}) };
-          if (!extendedProps.kind && e.kind) extendedProps.kind = e.kind;
-          return {
-            ...e,
-            title: e.title || e.extendedProps?.client || '',
-            extendedProps,
-          };
-        });
+        const mapped = (raw || []).map((e) => mapDocToEvent(e));
         success(mapped);
       } catch (e) {
         console.error('events loader error:', e);
@@ -195,3 +231,6 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   renderDaySummaries(calendar);
   refreshDayFlags(calendar);
 }
+
+export const initCalendar = bootCalendar;
+export { renderDaySummaries };

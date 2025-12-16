@@ -396,35 +396,29 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
+        const leaveKindRaw = payload.extendedProps?.leaveKind || payload.leaveKind || payload.type || payload.typ || '';
+        const normalizedLeave = normalizeDayLeaveValue(leaveKindRaw || '');
+        const classNames = new Set(['off-day']);
+        if (leaveKindRaw) classNames.add(leaveKindRaw.toString().toLowerCase());
+        if (normalizedLeave && normalizedLeave !== DAY_LEAVE_NONE) classNames.add(normalizedLeave.toString().toLowerCase());
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
-        return [
-            {
-                id: `${leaveId}::bg`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-bg', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            },
-            {
-                id: `${leaveId}::icon`,
-                start,
-                end,
-                allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
-                overlap: false,
-                title: payload.title || '',
-                extendedProps
-            }
-        ];
+        const extendedProps = {
+            ...(payload.extendedProps || {}),
+            leaveKind: leaveKindRaw ? leaveKindRaw.toString().toUpperCase() : (normalizedLeave && normalizedLeave !== DAY_LEAVE_NONE ? normalizedLeave : ''),
+            kind: 'off'
+        };
+        return [{
+            id: `${leaveId}::off`,
+            start,
+            end,
+            allDay: true,
+            display: 'background',
+            classNames: Array.from(classNames),
+            overlap: false,
+            title: payload.title || '',
+            extendedProps
+        }];
     };
 
     const removeLeaveEventsForId = (leaveId) => leaveEvents.filter(event => !isLeaveEventForId(event, leaveId));
@@ -456,10 +450,11 @@ function initializeApp() {
             start: formatDateForStorage(startDate),
             end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
-            display: 'block',
+            display: 'background',
             typ: type,
             type,
-            extendedProps: { typ: type, type, leaveKind: normalizedKind }
+            classNames: ['off-day', normalizedKind.toLowerCase()],
+            extendedProps: { typ: type, type, leaveKind: normalizedKind, kind: 'off' }
         };
         await setDoc(leaveDocRef, payload);
         const withoutCurrent = removeLeaveEventsForId(leaveDocId);
@@ -605,7 +600,9 @@ function initializeApp() {
 
     const mapLeaveToFlag = (leaveKind) => {
         const raw = (leaveKind || '').toString().trim().toUpperCase();
-        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE') return 'wolne';
+        if (raw === 'WOLNE' || raw === 'FREE' || raw === 'LEAVE_FREE' || raw === 'DAY_OFF') return 'wolne';
+        if (raw === 'URL0P') return 'urlop';
+        if (raw.startsWith('LEAVE_')) return mapLeaveToFlag(raw.replace('LEAVE_', ''));
         const normalized = normalizeDayLeaveValue(leaveKind || '');
         if (normalized === 'L4') return 'l4';
         if (normalized === 'SWIETO') return 'wolne';
@@ -627,7 +624,7 @@ function initializeApp() {
         });
 
         leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
+            if (ev?.extendedProps?.kind !== 'off' && ev?.display !== 'background') return;
             const key = normalizeDayKey(ev?.start || ev?.date);
             if (!key || byDate.has(key)) return;
             const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
@@ -1098,19 +1095,23 @@ function initializeApp() {
                     const normalizedType = rawType && String(rawType).startsWith('LEAVE')
                         ? String(rawType)
                         : (normalizedKind ? (normalizedKind === 'L4' ? 'LEAVE_L4' : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE')) : null);
+                    const leaveKindFromType = normalizedType ? normalizedType.replace(/^LEAVE_/, '') : '';
+                    const leaveKind = normalizedKind || leaveKindFromType;
                     const isLeave = Boolean(normalizedType);
                     if (!isLeave || !data.start) return [];
                     const payload = {
                         id: docSnap.id,
-                        title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
+                        title: data.title || LEAVE_TITLE_MAP[leaveKind] || 'Urlop',
                         start: data.start,
                         end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
                         allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
                         display: 'background',
+                        classNames: ['off-day', (leaveKind || rawKind || 'wolne').toString().toLowerCase()],
                         extendedProps: {
                             typ: normalizedType,
                             type: normalizedType,
-                            leaveKind: normalizedKind || ''
+                            kind: 'off',
+                            leaveKind: leaveKind || leaveKindFromType || ''
                         }
                     };
                     return mapLeavePayloadToEvents(docSnap.id, payload);

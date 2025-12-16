@@ -206,6 +206,17 @@ input::placeholder{color:var(--jd-text-500)}
   color: #08131b;
 }
 
+/* delikatne odstępy między eventami w komórce */
+.fc-daygrid-event-harness { margin-top: 2px; }
+
+/* zawartość eventu nie może się 'wylać' */
+.fc-daygrid-block-event .fc-event-main {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.2;
+}
+
 .fc .fc-bg-event,
 .fc .fc-daygrid-bg-harness,
 .fc .fc-highlight {
@@ -213,6 +224,28 @@ input::placeholder{color:var(--jd-text-500)}
   pointer-events: none;
   opacity: .22;
 }
+
+/* tło dla dni wolnych/L4/świąt – bez zasłaniania eventów, z ikoną centralnie */
+.fc .fc-bg-event.off-day {
+  background-color: rgba(255, 255, 255, 0) !important;
+  opacity: 1 !important;
+}
+.fc .fc-bg-event.off-day::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0.9;
+  pointer-events: none;
+}
+/* różne ikony – podmień na swoje SVG/emoji/fonty */
+.fc .fc-bg-event.off-day.l4::after       { content: '➕'; font-size: 28px; color: #e05a5a; }
+.fc .fc-bg-event.off-day.url0p::after    { content: '🏁'; font-size: 28px; color: #e6c84f; }
+.fc .fc-bg-event.off-day.url::after      { content: '🏁'; font-size: 28px; color: #e6c84f; }
+.fc .fc-bg-event.off-day.swieto::after   { content: '🍃'; font-size: 28px; color: #5bc773; }
+.fc .fc-bg-event.off-day.day_off::after  { content: '🍃'; font-size: 28px; color: #5bc773; }
+.fc .fc-bg-event.off-day.wolne::after    { content: '🍃'; font-size: 28px; color: #5bc773; }
 
 .fc .absence-icon {
   position: absolute;
