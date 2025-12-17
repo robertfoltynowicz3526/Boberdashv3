@@ -1166,10 +1166,12 @@ function initializeApp() {
                         });
                     });
                 }
+                const { start, end } = dayRange(id);
                 events.push({
                     id: `godziny_${id}`,
                     title: 'Ewidencja dnia',
-                    start: id,
+                    start,
+                    end,
                     allDay: true,
                     display: 'block',
                     className: ['strip-summary', 'ev-summary'],

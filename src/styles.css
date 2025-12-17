@@ -357,7 +357,7 @@ input::placeholder{color:var(--jd-text-500)}
   padding-top: 4px;
 }
 .fc .fc-daygrid-day-events {
-  margin-top: 4px !important;
+  margin-top: 8px !important;
 }
 
 /* -- Warstwy: tło pod eventami, eventy nad tłem -- */

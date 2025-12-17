@@ -118,7 +118,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     eventContent: buildEventContent,
     eventDidMount: (info) => {
       if (info.el?.style) {
-        info.el.style.marginTop = info.el.style.marginTop || '4px';
+        info.el.style.marginTop = info.el.style.marginTop || '8px';
       }
     },
     dayCellDidMount(info) {
@@ -163,10 +163,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   calendar.setOption('customFlags', flags || []);
-  calendar.removeAllEvents();
-  if (Array.isArray(events) && events.length) {
-    calendar.addEventSource(events);
-  }
+  calendar.setOption('events', Array.isArray(events) ? events : []);
   calendar.rerenderDates();
   renderDaySummaries(calendar);
 }
