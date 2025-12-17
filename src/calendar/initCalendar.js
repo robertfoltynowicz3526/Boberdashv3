@@ -1,16 +1,13 @@
 // helper: klucz dnia w lokalnej strefie (bez UTC dryfu)
 const dayKey = (dLike) => {
   const d = new Date(dLike);
-  if (Number.isNaN(d.getTime())) return '';
   d.setHours(0, 0, 0, 0);
-  // YYYY-MM-DD
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 // helper: zakres dnia (start/end) w lokalnej strefie
 const dayRange = (dLike) => {
   const start = new Date(dLike);
-  if (Number.isNaN(start.getTime())) return { start: null, end: null };
   start.setHours(0, 0, 0, 0);
   const end = new Date(dLike);
   end.setHours(23, 59, 59, 999);
@@ -36,6 +33,7 @@ function formatDateKey(calendar, date) {
 }
 
 function buildEventContent(arg) {
+  if (arg.event?.display === 'background' && arg.event?.extendedProps?.flagType) return { domNodes: [] };
   const title = document.createElement('div');
   title.textContent = arg.event.title || '';
   return { domNodes: [title] };
@@ -96,6 +94,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
   if (!FullCalendar || !container) return null;
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
   const options = {
+    timeZone: 'local',
     locale: localeOption,
     initialView: 'dayGridMonth',
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'month,week' },
@@ -108,17 +107,18 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     dayMaxEvents: 3,
     dayMaxEventRows: true,
     moreLinkClick: 'popover',
-    eventOrder: 'start,-duration,title',
     eventOrderStrict: true,
-    eventDisplay: 'block',
-    eventOverlap: false,
+    eventOrder: '-display,start,-allDay,title',
+    eventOverlap: true,
+    eventDisplay: 'auto',
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
+    eventSources: [],
     eventContent: buildEventContent,
     eventDidMount: (info) => {
       if (info.el?.style) {
-        info.el.style.marginTop = info.el.style.marginTop || '4px';
+        info.el.style.marginTop = info.el.style.marginTop || '8px';
       }
     },
     dayCellDidMount(info) {
@@ -163,10 +163,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   calendar.setOption('customFlags', flags || []);
-  calendar.removeAllEvents();
-  if (Array.isArray(events) && events.length) {
-    calendar.addEventSource(events);
-  }
+  calendar.setOption('events', Array.isArray(events) ? events : []);
   calendar.rerenderDates();
   renderDaySummaries(calendar);
 }

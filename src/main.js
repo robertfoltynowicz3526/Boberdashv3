@@ -19,16 +19,13 @@ function addDaysISO(isoDate, days = 1) {
 // helper: klucz dnia w lokalnej strefie (bez UTC dryfu)
 const dayKey = (dLike) => {
     const d = new Date(dLike);
-    if (Number.isNaN(d.getTime())) return '';
     d.setHours(0, 0, 0, 0);
-    // YYYY-MM-DD
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 // helper: zakres dnia (start/end) w lokalnej strefie
 const dayRange = (dLike) => {
     const start = new Date(dLike);
-    if (Number.isNaN(start.getTime())) return { start: null, end: null };
     start.setHours(0, 0, 0, 0);
     const end = new Date(dLike);
     end.setHours(23, 59, 59, 999);
@@ -642,7 +639,7 @@ function initializeApp() {
     };
 
     const buildCalendarFlags = () => {
-        const byDate = new Map();
+        const flagMap = new Map();
         wszystkieWpisyKalendarza.forEach((wpis) => {
             const key = dayKey(wpis?.id || wpis?.date);
             if (!key) return;
@@ -658,64 +655,67 @@ function initializeApp() {
                 else if (mapped === 'wolne') type = 'SWIETO';
             }
             if (type) {
-                byDate.set(key, {
+                flagMap.set(key, {
                     type,
-                    label: type === 'L4' ? 'L4' : type === 'URLOP' ? 'Urlop' : 'Święto'
+                    label: wpis?.flags?.label || (type === 'L4' ? 'L4' : type === 'URLOP' ? 'Urlop' : 'Święto')
                 });
             }
         });
 
-        markerRecords.forEach(({ date, type }) => {
+        markerRecords.forEach(({ date, type, label }) => {
             const key = dayKey(date);
-            if (!key || byDate.has(key)) return;
             const raw = (type || '').toString().trim().toUpperCase();
             let normalizedType = null;
             if (raw === 'L4') normalizedType = 'L4';
             else if (raw === 'URL' || raw === 'URLOP') normalizedType = 'URLOP';
             else if (raw === 'ŚWIĘTO' || raw === 'SWIETO' || raw === 'SWIĘTO') normalizedType = 'SWIETO';
-            if (normalizedType) {
-                byDate.set(key, {
-                    type: normalizedType,
-                    label: normalizedType === 'L4' ? 'L4' : normalizedType === 'URLOP' ? 'Urlop' : 'Święto'
-                });
-            }
+            if (!key || !normalizedType) return;
+            flagMap.set(key, {
+                type: normalizedType,
+                label: label || (normalizedType === 'L4' ? 'L4' : normalizedType === 'URLOP' ? 'Urlop' : 'Święto')
+            });
         });
 
-        calendarFlagMap = byDate;
+        calendarFlagMap = flagMap;
 
-        return Array.from(byDate.entries()).map(([date, value]) => ({
+        return Array.from(flagMap.entries()).map(([date, value]) => ({
             date,
             type: (value?.type || '').toLowerCase(),
-            label: value?.label || ''
+            label: value?.label || (value?.type === 'L4' ? 'L4' : value?.type === 'URLOP' ? 'Urlop' : 'Święto')
         }));
     };
 
     const applyFlagDecorations = (events = [], flagMap = new Map()) => {
-        const filtered = (events || []).filter((evt) => {
+        const flaggedDays = new Set(flagMap.keys());
+        const filtered = [];
+
+        (events || []).forEach((evt) => {
             const k = dayKey(evt?.start || evt?.startStr || evt?.date);
-            if (!k) return true;
-            if (!flagMap.has(k)) return true;
+            const isFlaggedDay = k && flaggedDays.has(k);
             const classNames = [
                 ...(Array.isArray(evt?.classNames) ? evt.classNames : []),
                 ...(Array.isArray(evt?.className) ? evt.className : []),
                 ...(typeof evt?.className === 'string' ? evt.className.split(' ') : [])
             ];
             const isSummary = classNames.includes('strip-summary') || classNames.includes('ev-summary');
-            const isBackground = evt.display === 'background';
-            if (isSummary) return false;
-            if (isBackground) return false;
-            return true;
+            if (isFlaggedDay && isSummary) return;
+            if (evt?.display === 'background' && evt?.extendedProps?.flagType) return;
+            filtered.push(evt);
         });
 
-        flagMap.forEach((flag, key) => {
-            const { start, end } = dayRange(key);
-            if (!start || !end) return;
+        flaggedDays.forEach((key) => {
+            const flag = flagMap.get(key);
+            if (!flag) return;
+            const date = new Date(key);
+            const { start, end } = dayRange(date);
             filtered.push({
                 id: `bg-${key}`,
                 start,
                 end,
+                allDay: true,
                 display: 'background',
-                classNames: ['bg-flag', `bg-${(flag.type || '').toLowerCase()}`]
+                classNames: ['bg-flag', `bg-${(flag.type || '').toLowerCase()}`],
+                extendedProps: { flagType: flag.type }
             });
             filtered.push({
                 id: `flag-${key}`,
@@ -723,7 +723,8 @@ function initializeApp() {
                 allDay: true,
                 title: flag.label || '',
                 classNames: ['flag-label'],
-                display: 'block'
+                display: 'block',
+                extendedProps: { flagType: flag.type }
             });
         });
 
@@ -1165,10 +1166,12 @@ function initializeApp() {
                         });
                     });
                 }
+                const { start, end } = dayRange(id);
                 events.push({
                     id: `godziny_${id}`,
                     title: 'Ewidencja dnia',
-                    start: id,
+                    start,
+                    end,
                     allDay: true,
                     display: 'block',
                     className: ['strip-summary', 'ev-summary'],
