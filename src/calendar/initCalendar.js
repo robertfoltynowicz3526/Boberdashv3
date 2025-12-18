@@ -89,6 +89,17 @@ export function renderDaySummaries(calendarInstance) {
 export function initCalendar(container, events = [], flags = [], extraOptions = {}) {
   const FullCalendar = window.FullCalendar;
   if (!FullCalendar || !container) return null;
+  const rawEvents = Array.isArray(events) ? events : [];
+  const preparedEvents = rawEvents
+    .filter((e) => (e?.title ?? '').trim() !== '')
+    .filter((e) => !e?.extendedProps?.isSummary);
+  const leaveByDay = new Set();
+  preparedEvents.forEach((evt) => {
+    const leaveKind = (evt?.extendedProps?.leaveKind || evt?.extendedProps?.type || '').toUpperCase();
+    if (!isLeaveKind(leaveKind)) return;
+    const dateKey = formatDateKey(FullCalendar, evt.start || evt.startStr || evt.date || evt.startDate);
+    if (dateKey) leaveByDay.add(dateKey);
+  });
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
   const options = {
     locale: localeOption,
@@ -101,20 +112,34 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: 3,
+    dayMaxEventRows: 4,
     moreLinkClick: 'popover',
-    eventOrder: 'allDay,start,-duration,title',
+    eventOrder: (a, b) => ((a.extendedProps?.sort ?? 0) - (b.extendedProps?.sort ?? 0)),
     eventOverlap: (stillEvent, movingEvent) => {
       return stillEvent.allDay && movingEvent.allDay ? true : false;
     },
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
-    eventContent: buildEventContent,
+    eventContent(arg) {
+      const kind = (arg.event.extendedProps?.leaveKind || '').toUpperCase();
+      if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
+        const span = document.createElement('span');
+        span.className = `day-flag ${kind === 'L4' ? 'l4' : kind === 'WOLNE' ? 'off' : 'holiday'}`;
+        return { domNodes: [span] }; // brak standardowego chipa
+      }
+      // zwykłe zlecenia – użyj default renderu
+      return true;
+    },
     dayCellDidMount(info) {
       mountDayFlag(FullCalendar, info);
+      const iso = formatDateKey(FullCalendar, info.date);
+      if (leaveByDay.has(iso)) {
+        info.el.setAttribute('data-has-leave', 'true');
+      }
     },
     datesSet() {},
-    events,
+    events: preparedEvents,
     ...extraOptions,
   };
 
@@ -153,8 +178,12 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   calendar.setOption('customFlags', flags || []);
   calendar.removeAllEvents();
-  if (Array.isArray(events) && events.length) {
-    calendar.addEventSource(events);
+  const rawEvents = Array.isArray(events) ? events : [];
+  const preparedEvents = rawEvents
+    .filter((e) => (e?.title ?? '').trim() !== '')
+    .filter((e) => !e?.extendedProps?.isSummary);
+  if (preparedEvents.length) {
+    calendar.addEventSource(preparedEvents);
   }
   calendar.rerenderDates();
   renderDaySummaries(calendar);

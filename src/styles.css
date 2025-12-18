@@ -267,3 +267,68 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* safety: jeśli coś wpadnie w dzień z flagą, ukryj chipy */
 .fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness { display:none !important; }
+
+/* --- Odstęp od góry dla chipów, żeby nie „przyklejały się” do krawędzi --- */
+.fc .fc-daygrid-day-frame { padding-top: 8px; }
+.fc-daygrid-day-events { margin-top: 8px; }
+.fc-daygrid-event-harness { margin-top: 8px !important; }
+.fc .fc-daygrid-block-event .fc-event-main { line-height: 1.2; }
+
+/* --- Ukryj nietreściwe/puste eventy, które mogłyby robić „pasek” --- */
+.fc-event:has(.fc-event-title:empty),
+.fc-h-event .fc-event-main:empty {
+  display: none !important;
+}
+
+/* --- Dni z flagą (L4 / Wolne / Święto) – wyśrodkowana większa ikona, bez chipów --- */
+.day-flag {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; margin: 12px auto 4px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.28);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.25) inset, 0 1px 0 rgba(255,255,255,0.08);
+}
+.day-flag.l4::before { content: "🏥"; font-size: 28px; }
+.day-flag.off::before { content: "🏁"; font-size: 28px; }
+.day-flag.holiday::before { content: "🌾"; font-size: 28px; }
+
+/* Jeśli dzień ma flagę – ukryj wszelkie chipy wewnątrz komórki */
+.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness { display: none !important; }
+
+/* --- Delikatne porządki kolorystyczne (John Deere vibe) --- */
+:root{
+  --jd-surface: #0e1a12;
+  --jd-panel:   #162717;
+  --jd-border:  #244024;
+  --jd-green:   #1b5e20;
+  --jd-green-2: #2e7d32;
+  --jd-yellow:  #d8a900;
+  --jd-blue:    #4b7cf7;
+  --jd-text:    #e8f3e8;
+  --jd-muted:   #98b19a;
+}
+
+/* Tła sekcji / paneli (jeśli są klasy, dopasuj nazwę kontenera) */
+body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -100px, #233a24 0%, #0b140d 50%, #08110a 100%); }
+.card, .panel, .fc-theme-standard .fc-scrollgrid { background: var(--jd-panel); border-color: var(--jd-border); }
+
+/* Event chip – bardziej spójny niebieski + brak ramki */
+.fc .fc-h-event {
+  background: var(--jd-blue); border: 0; color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+
+/* Dzień „dzisiaj” – lekki akcent żółty */
+.fc .fc-daygrid-day.fc-day-today {
+  background: rgba(216,169,0,.07);
+}
+
+/* Przyciski kalendarza – zieleń JD + akcent na :hover */
+.fc .fc-button {
+  background: var(--jd-green); border: 1px solid var(--jd-green-2); color:#fff;
+}
+.fc .fc-button:hover { filter: brightness(1.06); }
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: var(--jd-green-2); border-color: var(--jd-green-2);
+}
