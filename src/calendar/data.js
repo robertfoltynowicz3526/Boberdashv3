@@ -1,4 +1,4 @@
-import { db } from '../lib/firebase';
+import { db } from '../lib/firebase.js';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 
 export async function loadCalendarEvents(start, end) {

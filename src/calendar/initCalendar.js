@@ -1,7 +1,4 @@
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import plLocale from '@fullcalendar/core/locales/pl';
+import { Calendar, dayGridPlugin, interactionPlugin, plLocale } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
 const normalizeDateKey = (value) => {

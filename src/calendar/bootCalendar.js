@@ -1,7 +1,5 @@
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import { loadCalendarEvents, getDailyTotals } from './data';
+import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
+import { loadCalendarEvents, getDailyTotals } from './data.js';
 
 export function bootCalendar() {
   const host = document.getElementById('calendar');
