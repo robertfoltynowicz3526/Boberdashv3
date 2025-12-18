@@ -1,86 +1,74 @@
-import { db } from '../lib/firebase.js';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
+import { getFirebase, onAuthReady } from '../services/firebase.js';
 
-export async function loadCalendarEvents(start, end) {
-  const events = [];
+const dayKey = (dLike) => {
+  const d = new Date(dLike);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+};
 
-  // JOB (zlecenia)
-  const qJobs = query(
-    collection(db, 'jobs'),
-    where('start', '>=', start),
-    where('start', '<=', end),
-    orderBy('start', 'asc')
-  );
-  const jobs = await getDocs(qJobs);
-  jobs.forEach(d => {
-    const e = d.data();
-    events.push({
-      id: d.id,
-      title: e.title ?? e.client ?? 'Zlecenie',
-      start: e.start?.toDate?.() ?? e.start,
-      end: e.end?.toDate?.() ?? e.end,
-      allDay: !!e.allDay,
-      classNames: ['job-event'],
+export async function loadCalendarEvents() {
+  const { db } = getFirebase();
+  await onAuthReady();
+
+  const ordersSnap = await getDocs(collection(db, 'orders'));
+  const leavesSnap = await getDocs(collection(db, 'leaves'));
+
+  const orders = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const leaves = leavesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const leaveByDay = new Map();
+  leaves.forEach((l) => {
+    const kindRaw = (l.type || l.kind || '').toString().toUpperCase();
+    if (!kindRaw) return;
+    leaveByDay.set(dayKey(l.date || l.day || l.start), { kind: kindRaw });
+  });
+
+  const workEvents = [];
+  orders.forEach((o) => {
+    const st = o.start || o.date;
+    if (!st) return;
+    const k = dayKey(st);
+    if (leaveByDay.has(k)) return;
+    const ttl = o.title || o.clientName || 'Zlecenie';
+    workEvents.push({
+      id: o.id,
+      title: ttl,
+      start: st,
+      end: o.end || st,
+      allDay: true,
+      classNames: ['ev-summary'],
+      extendedProps: { type: 'work' }
     });
   });
 
-  // OFF-DAYS (L4/URLOP/SWIETO) – tylko tło
-  const offCols = ['offdays']; // kolekcja z dokumentami: {type:'L4'|'URLOP'|'SWIETO', start, end}
-  for (const col of offCols) {
-    const qOff = query(
-      collection(db, col),
-      where('start', '<=', end),
-      where('end', '>=', start),
-      orderBy('start', 'asc')
-    );
-    const offs = await getDocs(qOff);
-    offs.forEach(d => {
-      const e = d.data();
-      const cls = e.type === 'L4' ? 'is-l4' : (e.type === 'URLOP' ? 'is-urlop' : 'is-swieto');
-      events.push({
-        start: e.start?.toDate?.() ?? e.start,
-        end: e.end?.toDate?.() ?? e.end,
-        display: 'background',
-        allDay: true,
-        classNames: ['fc-offday', cls],
-      });
+  const leaveEvents = [];
+  leaveByDay.forEach((v, k) => {
+    leaveEvents.push({
+      id: `leave-${k}`,
+      title: '',
+      start: k,
+      allDay: true,
+      extendedProps: { type: 'leave', leaveKind: v.kind }
     });
-  }
+  });
 
-  return events;
+  return { events: [...workEvents, ...leaveEvents], leaveByDay };
 }
 
 export async function getDailyTotals(date) {
-  // Zsumuj tylko JOB dla danego dnia (work/drive/billed). Zaznacz off-day.
-  const midnight = new Date(date); midnight.setHours(0,0,0,0);
-  const end = new Date(midnight); end.setDate(end.getDate()+1);
-
-  let work = 0, drive = 0, billed = 0, l4=false, urlop=false, swieto=false;
-
-  // offday check
-  const offQ = query(
-    collection(db, 'offdays'),
-    where('start', '<', end),
-    where('end', '>', midnight)
-  );
-  (await getDocs(offQ)).forEach(d=>{
-    const t = d.data()?.type;
-    if (t==='L4') l4=true; else if (t==='URLOP') urlop=true; else if (t==='SWIETO') swieto=true;
-  });
-  if (l4||urlop||swieto) return { work, drive, billed, l4, urlop, swieto };
-
-  // jobs for day
-  const jobsQ = query(
-    collection(db, 'jobs'),
-    where('start', '>=', midnight),
-    where('start', '<', end)
-  );
-  (await getDocs(jobsQ)).forEach(d=>{
-    const j = d.data();
-    work   += Number(j.workHours ?? 0);
-    drive  += Number(j.driveHours ?? 0);
-    billed += Number(j.billedHours ?? 0);
-  });
-
-  return { work, drive, billed, l4, urlop, swieto };
+  const key = dayKey(date);
+  if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false };
+  const { leaveByDay, events } = await loadCalendarEvents();
+  const hasLeave = leaveByDay.has(key);
+  const totals = events.filter((ev) => dayKey(ev.start) === key);
+  return {
+    work: totals.length,
+    drive: 0,
+    billed: 0,
+    l4: hasLeave && (leaveByDay.get(key)?.kind || '').toUpperCase() === 'L4',
+    urlop: hasLeave && (leaveByDay.get(key)?.kind || '').toUpperCase() === 'WOLNE',
+    swieto: hasLeave && ['ŚWIĘTO', 'SWIETO'].includes((leaveByDay.get(key)?.kind || '').toUpperCase())
+  };
 }

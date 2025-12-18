@@ -303,3 +303,19 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid-day[data-has-leave=\"true\"] .fc-daygrid-event-harness {
   display: none !important;
 }
+
+/* Odstęp dla chipów, żeby nie były „przyklejone” do góry */
+.fc .fc-daygrid-day-frame { padding-top: 6px; }
+.fc-daygrid-day-events { margin-top: 6px; }
+.fc-daygrid-event-harness { margin-top: 8px !important; }
+
+/* Ikony L4/WOLNE/ŚWIĘTO wyśrodkowane, większe */
+.leave-icon{ display:flex; justify-content:center; align-items:center; margin:10px auto 2px; }
+.leave-badge{ width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.35); box-shadow: inset 0 0 0 2px rgba(255,255,255,.06); }
+.leave-glyph::before{ content:"🌿"; font-size:22px; line-height:1; }
+.icon-l4::before{ content:"➕"; }
+.icon-wolne::before{ content:"🏁"; }
+.icon-swieto::before{ content:"🌿"; }
+
+/* Asekuracyjnie ukryj chipy w dzień z flagą (gdyby coś przeszło) */
+.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness{ display:none !important; }
