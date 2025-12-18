@@ -1,5 +1,5 @@
-import { db } from './lib/firebase.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { getFirebase, onAuthReady } from './services/firebase.js';
 import Papa from 'papaparse';
 import './styles.css';
 import './styles/desktop-only.css';
@@ -8,10 +8,10 @@ import './styles/calendar.css';
 import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
 
 // Uruchom dopiero po załadowaniu DOM:
-window.addEventListener('DOMContentLoaded', initializeApp);
+window.addEventListener('DOMContentLoaded', () => initializeApp());
 
 
-function initializeApp() {
+async function initializeApp() {
     // --- STAŁE I ZMIENNE GLOBALNE ---
     const STAWKI = {
         S: { nazwa: "Wyjazdowe", stawka: 45 },
@@ -190,6 +190,30 @@ function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+
+    const messageBox = document.getElementById('app-messages');
+    const showFirebaseError = () => {
+        if (messageBox) {
+            messageBox.style.display = 'block';
+            messageBox.textContent = 'Nie udało się połączyć z Firebase. Sprawdź zmienne VITE_FB_* w Vercel oraz reguły Firestore.';
+        }
+    };
+
+    (function removeDebug() {
+        const el = document.getElementById('node-overdrive') || document.querySelector('.node-overdrive, .debug-banner');
+        if (el) el.remove();
+    })();
+
+    let db;
+    try {
+        const firebase = getFirebase();
+        db = firebase.db;
+        await onAuthReady();
+    } catch (err) {
+        console.error(err);
+        showFirebaseError();
+        return;
+    }
 
     const toDateSafe = (value) => {
         if (!value) return null;
