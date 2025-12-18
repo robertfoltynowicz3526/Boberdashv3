@@ -1,64 +1,107 @@
-function isoFromEvent(event) {
-  const iso =
-    (event?.startStr || event?.start || event?.dateStr || event?.date)?.toISOString?.()?.slice(0, 10) ??
-    event?.start?.slice?.(0, 10);
-  return iso || null;
+function dayFromEvent(event) {
+  const direct = event?.startStr || event?.dateStr || event?.date;
+  if (typeof direct === 'string') return direct.slice(0, 10);
+  const start = event?.start;
+  if (typeof start === 'string') return start.slice(0, 10);
+  if (start?.toISOString) return start.toISOString().slice(0, 10);
+  return null;
 }
 
 function prepareCalendarEvents(rawEvents = []) {
   const events = Array.isArray(rawEvents) ? rawEvents : [];
+  const jobsByDay = new Map();
+  const leavesByDay = new Map();
+  const emittedIds = new Set();
   const prepared = [];
+  let fallbackId = 0;
 
-  const sums = new Map();
-  for (const e of events) {
-    const iso = isoFromEvent(e);
-    if (!iso) continue;
-    const k = e.extendedProps || {};
-    const work = Number(k.workHours ?? k.work ?? 0);
-    const drive = Number(k.driveHours ?? k.drive ?? 0);
-    const bill = Number(k.billHours ?? k.bill ?? k.invoiceHours ?? 0);
-    if (!sums.has(iso)) sums.set(iso, { work: 0, drive: 0, bill: 0, hasOrders: false });
-    const s = sums.get(iso);
-    if ((e.title ?? '').trim() !== '' && !k.leaveKind) s.hasOrders = true;
-    s.work += Number.isFinite(work) ? work : 0;
-    s.drive += Number.isFinite(drive) ? drive : 0;
-    s.bill += Number.isFinite(bill) ? bill : 0;
+  function pushEvent(event) {
+    if (!event?.id || emittedIds.has(event.id)) return;
+    emittedIds.add(event.id);
+    prepared.push(event);
   }
 
-  const leaveByDay = new Set();
   for (const e of events) {
-    const kind = (e.extendedProps?.leaveKind || '').toUpperCase();
-    if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
-      const iso = (e.startStr || e.start)?.toISOString?.()?.slice(0, 10) ?? e.start?.slice?.(0, 10);
-      if (iso) leaveByDay.add(iso);
+    const day = dayFromEvent(e);
+    if (!day) continue;
+
+    const props = e.extendedProps || {};
+    const leaveKind = (props.leaveKind || props.kind || '').toUpperCase();
+    const isLeave = leaveKind === 'L4' || leaveKind === 'WOLNE' || leaveKind === 'ŚWIĘTO' || leaveKind === 'SWIETO';
+    if (isLeave) {
+      leavesByDay.set(day, leaveKind || 'LEAVE');
+      const leaveId = e.id || props.id || `leave-${day}-${fallbackId++}`;
+      pushEvent({
+        id: `leave-${leaveId}`,
+        title: '',
+        start: day,
+        allDay: true,
+        extendedProps: { ...props, kind: 'leave', leaveKind },
+      });
+      continue;
     }
-  }
 
-  for (const e of events) {
+    if (props.kind === 'summary' || props.isSummary || props.isDaySummary) continue;
+
     const title = (e?.title ?? '').trim();
-    if (title === '') continue;
-    if (e?.extendedProps?.isSummary) continue;
-    const iso = isoFromEvent(e);
-    if (iso && leaveByDay.has(iso)) continue;
-    prepared.push(e);
-  }
+    const work = Number(props.workHours ?? props.work ?? 0);
+    const drive = Number(props.driveHours ?? props.drive ?? 0);
+    const bill = Number(props.billHours ?? props.bill ?? props.invoiceHours ?? 0);
+    const hasHours = (Number.isFinite(work) && work !== 0) || (Number.isFinite(drive) && drive !== 0) || (Number.isFinite(bill) && bill !== 0);
+    if (title === '' && !hasHours) continue;
 
-  for (const [iso, s] of sums.entries()) {
-    if (leaveByDay.has(iso)) continue;
-    if (!s.hasOrders) continue;
-    prepared.push({
-      title: `• Praca: ${s.work.toFixed(1)}h • Jazda: ${s.drive.toFixed(1)}h • Fakturowane: ${s.bill.toFixed(1)}h`,
-      start: iso,
+    if (!jobsByDay.has(day)) jobsByDay.set(day, []);
+    jobsByDay.get(day).push({
+      id: e.id || props.id || `job-${day}-${fallbackId++}`,
+      start: day,
       allDay: true,
-      extendedProps: { isDaySummary: true, sort: 9999 },
+      title: title || props.name || ' ',
+      extendedProps: {
+        ...props,
+        kind: 'job',
+        workHours: Number.isFinite(work) ? work : 0,
+        driveHours: Number.isFinite(drive) ? drive : 0,
+        billedHours: Number.isFinite(bill) ? bill : 0,
+      },
     });
   }
 
-  for (const iso of leaveByDay) {
-    prepared.push({ title: '', start: iso, allDay: true, extendedProps: { leaveKind: 'FLAG' } });
+  for (const [, jobs] of jobsByDay.entries()) {
+    for (const job of jobs) {
+      pushEvent({ ...job, id: `job-${job.id}` });
+    }
   }
 
-  return { preparedEvents: prepared, leaveByDay };
+  for (const [day, jobs] of jobsByDay.entries()) {
+    const totals = jobs.reduce(
+      (acc, job) => {
+        acc.work += Number(job.extendedProps?.workHours ?? 0) || 0;
+        acc.drive += Number(job.extendedProps?.driveHours ?? 0) || 0;
+        acc.bill += Number(job.extendedProps?.billedHours ?? 0) || 0;
+        return acc;
+      },
+      { work: 0, drive: 0, bill: 0 },
+    );
+
+    const shouldAddSummary = jobs.length > 0 || totals.work > 0 || totals.drive > 0 || totals.bill > 0;
+    if (!shouldAddSummary) continue;
+    if (leavesByDay.has(day) && jobs.length === 0) continue;
+
+    pushEvent({
+      id: `summary-${day}`,
+      start: day,
+      allDay: true,
+      title: '',
+      extendedProps: {
+        kind: 'summary',
+        workHours: totals.work,
+        driveHours: totals.drive,
+        billedHours: totals.bill,
+      },
+    });
+  }
+
+  return { preparedEvents: prepared, leaveByDay: leavesByDay, jobsByDay };
 }
 
 export function renderDaySummaries() {
@@ -71,7 +114,10 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 
   const rawEvents = Array.isArray(events) ? events : [];
   const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
+  const eventsProvider = (info, successCallback) => successCallback(preparedEvents);
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
+
+  const kindOrder = { job: 0, leave: 1, summary: 2 };
 
   const options = {
     locale: localeOption,
@@ -86,7 +132,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     dayMaxEvents: 3,
     dayMaxEventRows: 4,
     moreLinkClick: 'popover',
-    eventOrder: (a, b) => (a.extendedProps?.sort ?? 0) - (b.extendedProps?.sort ?? 0),
+    eventOrder: (a, b) => (kindOrder[a.extendedProps?.kind] ?? 0) - (kindOrder[b.extendedProps?.kind] ?? 0),
     leaveByDay,
     eventOverlap: (stillEvent, movingEvent) => {
       return stillEvent.allDay && movingEvent.allDay ? true : false;
@@ -101,18 +147,15 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
         span.className = 'day-flag strong';
         return { domNodes: [span] };
       }
-      if (arg.event.extendedProps?.isDaySummary) {
-        return true;
-      }
       return true;
     },
     dayCellDidMount(info) {
-      const leaveSet = info.view?.calendar?.getOption('leaveByDay') || new Set();
+      const leaveMap = info.view?.calendar?.getOption('leaveByDay') || new Map();
       const iso = info.date.toISOString().slice(0, 10);
-      if (leaveSet.has(iso)) info.el.setAttribute('data-has-leave', 'true');
+      if (leaveMap.has(iso)) info.el.setAttribute('data-has-leave', 'true');
     },
     datesSet() {},
-    events: preparedEvents,
+    events: eventsProvider,
     ...extraOptions,
   };
 
@@ -152,10 +195,9 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   calendar.setOption('customFlags', flags || []);
   const rawEvents = Array.isArray(events) ? events : [];
   const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
+  const eventsProvider = (info, successCallback) => successCallback(preparedEvents);
   calendar.setOption('leaveByDay', leaveByDay);
-  calendar.removeAllEvents();
-  if (preparedEvents.length) {
-    calendar.addEventSource(preparedEvents);
-  }
+  calendar.setOption('events', eventsProvider);
+  calendar.refetchEvents();
   calendar.rerenderDates();
 }
