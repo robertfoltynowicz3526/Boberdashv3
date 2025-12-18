@@ -398,3 +398,81 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
 .fc .fc-col-header-cell-cushion{
   color:#e7f3da; font-weight:700;
 }
+
+/* ───── Nowy widok kalendarza (job/leave/summary) ───── */
+.fc .fc-daygrid-day-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 110px;
+}
+
+.fc .fc-daygrid-event {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  color: inherit;
+}
+
+.fc-job-pill{
+  background: #4B8BFF;
+  color:#0B1B06;
+  border-radius:10px;
+  padding:6px 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.12);
+  font-size:12px;
+  line-height:1.25;
+}
+.fc-job-title{ font-weight:600; margin-bottom:2px; }
+.fc-job-meta{ opacity:.95; }
+
+.fc-leave-icon{
+  margin:auto;
+  width:48px; height:48px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:28px;
+  border-radius:14px;
+  background: rgba(255,255,255,.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1), 0 4px 20px rgba(0,0,0,.25);
+  color:#E2F1D0;
+}
+
+.fc-summary-pill{
+  margin-top:auto;
+  background: rgba(76,175,80,.18);
+  color:#DBF7B5;
+  border:1px solid rgba(219,247,181,.2);
+  border-radius:8px;
+  padding:4px 8px;
+  font-size:12px;
+}
+
+.fc-daygrid-event-harness,
+.fc-daygrid-event,
+.fc-event-mounted{
+  margin-top:4px;
+}
+
+.fc-theme-standard .fc-popover {
+  background:#182818;
+  color:#E2F1D0;
+  border:1px solid rgba(219,247,181,.2);
+}
+.fc-theme-standard .fc-popover .fc-popover-body .fc-event {
+  background:#4B8BFF;
+  border-radius:8px;
+  padding:4px 8px;
+  border:1px solid rgba(255,255,255,.12);
+}
+
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard .fc-list,
+.fc-theme-standard td,
+.fc-theme-standard th{
+  background:#24331F;
+  color:#DFF2C9;
+}
+.fc .fc-daygrid-day-number{ color:#B6DF7E; font-weight:600; }
+
+.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness{ display:block !important; }

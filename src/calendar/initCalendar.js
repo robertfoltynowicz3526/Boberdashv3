@@ -19,9 +19,9 @@ function formatDateKey(calendar, date) {
 function normalizeLeaveKind(rawValue) {
   const base = (rawValue || '').toString().toUpperCase().replace(/0/g, 'O');
   const plain = base.normalize('NFD').replace(/[^A-Z0-9]/gi, '');
-  if (plain === 'L4') return { kind: 'L4', label: 'L4' };
-  if (plain === 'URLOP') return { kind: 'URLOP', label: 'Urlop' };
-  if (plain === 'SWIETO') return { kind: 'SWIETO', label: 'Święto' };
+  if (plain === 'L4') return { leaveType: 'sick', label: 'L4' };
+  if (plain === 'URLOP') return { leaveType: 'free', label: 'Urlop' };
+  if (plain === 'SWIETO') return { leaveType: 'holiday', label: 'Święto' };
   return null;
 }
 
@@ -40,14 +40,15 @@ function readBilledHours(extendedProps = {}) {
 }
 
 function prepareCalendarEvents(rawEvents = [], FullCalendar) {
-  const sums = new Map();
+  const totalsByDay = new Map();
   const leaveByDay = new Map();
-  const workEvents = [];
+  const jobs = [];
 
   (Array.isArray(rawEvents) ? rawEvents : []).forEach((evt) => {
     if (!evt) return;
     const dateKey = formatDateKey(FullCalendar, evt.start || evt.startStr || evt.date || evt.startDate);
     if (!dateKey) return;
+
     const extendedProps = evt.extendedProps || {};
     const leaveInfo = normalizeLeaveKind(extendedProps.leaveKind || extendedProps.type || evt.leaveKind || evt.type);
     if (leaveInfo) {
@@ -55,51 +56,68 @@ function prepareCalendarEvents(rawEvents = [], FullCalendar) {
       return;
     }
 
-    const s = sums.get(dateKey) || { work: 0, drive: 0, bill: 0, hasOrders: false };
-    const workVal = Number(extendedProps.workH ?? extendedProps.workHours ?? extendedProps.work ?? 0);
-    const driveVal = Number(extendedProps.driveH ?? extendedProps.driveHours ?? extendedProps.drive ?? 0);
-    const billVal = readBilledHours(extendedProps);
-    if (Number.isFinite(workVal)) s.work += workVal;
-    if (Number.isFinite(driveVal)) s.drive += driveVal;
-    if (Number.isFinite(billVal)) s.bill += billVal;
+    if (extendedProps.isSummary || extendedProps.isDaySummary) return;
+
+    const workHours = Number(extendedProps.workH ?? extendedProps.workHours ?? extendedProps.work ?? 0);
+    const driveHours = Number(extendedProps.driveH ?? extendedProps.driveHours ?? extendedProps.drive ?? 0);
+    const billedHours = readBilledHours(extendedProps);
     const cleanTitle = (evt.title || '').trim();
-    if (cleanTitle) s.hasOrders = true;
-    sums.set(dateKey, s);
 
     if (!cleanTitle) return;
-    if (extendedProps.isSummary || extendedProps.isDaySummary) return;
-    workEvents.push({ ...evt, title: cleanTitle, _dateKey: dateKey });
+
+    const totals = totalsByDay.get(dateKey) || { work: 0, drive: 0, billed: 0 };
+    totals.work += Number.isFinite(workHours) ? workHours : 0;
+    totals.drive += Number.isFinite(driveHours) ? driveHours : 0;
+    totals.billed += Number.isFinite(billedHours) ? billedHours : 0;
+    totalsByDay.set(dateKey, totals);
+
+    jobs.push({
+      title: cleanTitle,
+      start: dateKey,
+      allDay: true,
+      extendedProps: {
+        ...extendedProps,
+        kind: 'job',
+        workHours: Number.isFinite(workHours) ? workHours : 0,
+        driveHours: Number.isFinite(driveHours) ? driveHours : 0,
+        billedHours: Number.isFinite(billedHours) ? billedHours : 0,
+      },
+    });
   });
 
   const prepared = [];
+
   leaveByDay.forEach((info, iso) => {
     prepared.push({
-      title: '',
       start: iso,
       allDay: true,
-      extendedProps: { leaveKind: info.kind, leaveLabel: info.label, sort: -999 },
+      extendedProps: { kind: 'leave', leaveType: info.leaveType, leaveLabel: info.label },
     });
   });
 
-  workEvents.forEach((evt) => {
-    if (leaveByDay.has(evt._dateKey)) return;
-    const cloned = { ...evt };
-    delete cloned._dateKey;
-    prepared.push(cloned);
+  jobs.forEach((evt) => {
+    if (leaveByDay.has(formatDateKey(FullCalendar, evt.start))) return;
+    prepared.push(evt);
   });
 
-  sums.forEach((s, iso) => {
-    if (!s.hasOrders || leaveByDay.has(iso)) return;
+  totalsByDay.forEach((totals, iso) => {
+    if (leaveByDay.has(iso)) return;
+    const workHours = Number.isFinite(totals.work) ? Number(totals.work.toFixed(1)) : 0;
+    const driveHours = Number.isFinite(totals.drive) ? Number(totals.drive.toFixed(1)) : 0;
+    const billedHours = Number.isFinite(totals.billed) ? Number(totals.billed.toFixed(1)) : 0;
     prepared.push({
-      title: `• Praca: ${s.work.toFixed(1)}h • Jazda: ${s.drive.toFixed(1)}h • Fakturowane: ${s.bill.toFixed(1)}h`,
       start: iso,
       allDay: true,
-      extendedProps: { isDaySummary: true, sort: 9999 },
+      extendedProps: {
+        kind: 'summary',
+        workHours,
+        driveHours,
+        billedHours,
+      },
     });
   });
 
-  const filtered = prepared.filter((e) => (e?.title ?? '').trim() !== '' || e?.extendedProps?.leaveKind);
-  return { preparedEvents: filtered, leaveByDay, sums };
+  return { preparedEvents: prepared, leaveByDay, totalsByDay };
 }
 
 export function renderDaySummaries(calendarInstance) {
@@ -110,8 +128,7 @@ export function renderDaySummaries(calendarInstance) {
 export function initCalendar(container, events = [], flags = [], extraOptions = {}) {
   const FullCalendar = window.FullCalendar;
   if (!FullCalendar || !container) return null;
-  const { preparedEvents, leaveByDay } = prepareCalendarEvents(events, FullCalendar);
-  let currentLeaveByDay = leaveByDay;
+  const { preparedEvents } = prepareCalendarEvents(events, FullCalendar);
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
   const options = {
     locale: localeOption,
@@ -123,10 +140,13 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     contentHeight: 'auto',
     handleWindowResize: true,
     fixedWeekCount: false,
-    dayMaxEvents: 3,
-    dayMaxEventRows: 4,
+    dayMaxEvents: true,
+    dayMaxEventRows: true,
     moreLinkClick: 'popover',
-    eventOrder: (a, b) => ((a.extendedProps?.sort ?? 0) - (b.extendedProps?.sort ?? 0)),
+    eventOrder: (a, b) => {
+      const rank = { job: 0, leave: 1, summary: 2 };
+      return (rank[a.extendedProps.kind] ?? 99) - (rank[b.extendedProps.kind] ?? 99);
+    },
     eventOverlap: (stillEvent, movingEvent) => {
       return stillEvent.allDay && movingEvent.allDay ? true : false;
     },
@@ -134,28 +154,34 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     validRange: undefined,
     customFlags: flags || [],
     eventContent(arg) {
-      const xp = arg.event.extendedProps || {};
-      const kind = (xp.leaveKind || '').toUpperCase();
-      if (kind === 'L4' || kind === 'URLOP' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
-        const wrap = document.createElement('div');
-        wrap.className = 'day-flag-wrap';
-        const icon = document.createElement('span');
-        icon.className = 'day-flag-icon';
-        icon.textContent = (kind === 'L4') ? '🏥' : (kind === 'URLOP' ? '🏖️' : '🌾');
-        const label = document.createElement('div');
-        label.className = 'day-flag-label';
-        label.textContent = xp.leaveLabel || (kind === 'L4' ? 'L4' : (kind === 'URLOP' ? 'Urlop' : 'Święto'));
-        wrap.appendChild(icon);
-        wrap.appendChild(label);
-        return { domNodes: [wrap] };
+      const kind = arg.event.extendedProps.kind;
+
+      if (kind === 'leave') {
+        const icon = arg.event.extendedProps.leaveType === 'sick' ? '🩺'
+          : arg.event.extendedProps.leaveType === 'holiday' ? '🌾'
+          : '🏁';
+        const el = document.createElement('div');
+        el.className = 'fc-leave-icon';
+        el.textContent = icon;
+        return { domNodes: [el] };
       }
-      if (xp.isDaySummary) return true;
-      return true;
-    },
-    dayCellDidMount(info) {
-      const iso = formatDateKey(FullCalendar, info.date);
-      const map = info.view?.calendar?.currentLeaveByDay || currentLeaveByDay;
-      if (map?.has(iso)) info.el.setAttribute('data-has-leave', 'true');
+
+      if (kind === 'summary') {
+        const { workHours = 0, driveHours = 0, billedHours = 0 } = arg.event.extendedProps;
+        const el = document.createElement('div');
+        el.className = 'fc-summary-pill';
+        el.innerHTML = `• Praca: ${workHours}h • Jazda: ${driveHours}h • Fakturowane: ${billedHours}h`;
+        return { domNodes: [el] };
+      }
+
+      const { workHours = 0, driveHours = 0, billedHours = 0 } = arg.event.extendedProps;
+      const wrap = document.createElement('div');
+      wrap.className = 'fc-job-pill';
+      wrap.innerHTML = `
+        <div class="fc-job-title">${arg.event.title}</div>
+        <div class="fc-job-meta">• Praca: ${workHours}h • Jazda: ${driveHours}h • Fakturowane: ${billedHours}h</div>
+      `;
+      return { domNodes: [wrap] };
     },
     datesSet() {},
     events: preparedEvents,
@@ -164,28 +190,16 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 
   const calendar = new FullCalendar.Calendar(container, options);
   const baseDatesSet = options.datesSet;
-  const baseEventDidMount = options.eventDidMount;
   calendar.setOption('datesSet', (info) => {
     if (typeof baseDatesSet === 'function') baseDatesSet(info);
     if (typeof extraOptions.onDatesSet === 'function') extraOptions.onDatesSet(info);
     requestAnimationFrame(() => calendar.updateSize());
   });
   calendar.setOption('eventDidMount', (info) => {
-    if (typeof baseEventDidMount === 'function') baseEventDidMount(info);
+    if (info.el.classList) info.el.classList.add('fc-event-mounted');
     if (typeof extraOptions.eventDidMount === 'function') extraOptions.eventDidMount(info);
-    if (info.el.classList.contains('absence-icon-holder')) {
-      const span = document.createElement('span');
-      span.className = 'absence-icon';
-      if (info.el.classList.contains('absence-l4')) span.textContent = '➕';
-      else if (info.el.classList.contains('absence-url')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-urlop')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-święto') || info.el.classList.contains('absence-swieto')) span.textContent = '🍃';
-      else span.textContent = '🌿';
-      info.el.appendChild(span);
-    }
   });
   calendar.render();
-  calendar.currentLeaveByDay = currentLeaveByDay;
   window.addEventListener('resize', () => {
     try { calendar.updateSize(); } catch (_) {}
   });
@@ -196,8 +210,7 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   calendar.setOption('customFlags', flags || []);
   calendar.removeAllEvents();
-  const { preparedEvents, leaveByDay } = prepareCalendarEvents(events, window.FullCalendar);
-  calendar.currentLeaveByDay = leaveByDay;
+  const { preparedEvents } = prepareCalendarEvents(events, window.FullCalendar);
   if (preparedEvents.length) {
     calendar.addEventSource(preparedEvents);
   }
