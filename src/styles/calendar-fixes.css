@@ -35,7 +35,13 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
 /* Eventy – tylko niebieskie karty, bez zielonych „chipów dnia” */
 .ab-chip, .leave-flag, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
-.fc-event { background:#3b82f6 !important; border:0 !important; border-radius:8px !important; }
+.fc-event--job,
+.fc-event--summary { background:#2563eb !important; border:0 !important; border-radius:8px !important; color:#fff !important; }
+.fc-event--summary { background:#1d4ed8 !important; }
+.fc-event--icon-only,
+.fc-event--leave,
+.fc-event--holiday,
+.fc-event--dayOff { background:transparent !important; border:0 !important; box-shadow:none !important; }
 .fc-event .fc-event-title { color:#fff !important; font-size:12px !important; line-height:1.25; white-space:normal !important; }
 
 /* --- Listy przewijane do końca (zakończone/klienci/maszyny) --- */
