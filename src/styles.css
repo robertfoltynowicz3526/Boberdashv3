@@ -113,14 +113,6 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-theme-standard td,.fc-theme-standard th{border-color:var(--jd-line-600)}
 .fc .fc-daygrid-day-number{color:var(--jd-text-500)}
 
-/* Eventy -> zielone JD */
-.fc-event,.fc .fc-daygrid-event{
-  background:linear-gradient(180deg,var(--brand) 0%,var(--brand-strong) 100%);
-  border:1px solid rgba(0,0,0,0.25);
-  color:#0b1a0b;border-radius:10px;padding:2px 6px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.35)
-}
-
 /* Podsumowanie dnia (jeden blok na komórkę) */
 .day-summary{
   background:linear-gradient(180deg,rgba(54,124,43,0.22),rgba(36,86,29,0.22));
@@ -197,15 +189,6 @@ input::placeholder{color:var(--jd-text-500)}
   overflow: visible;
 }
 
-.fc .fc-daygrid-event {
-  border-radius: 8px;
-  padding: 2px 6px;
-  box-shadow: 0 1px 0 rgba(0,0,0,.12);
-  z-index: 2;
-  background: var(--jd-blue);
-  color: #08131b;
-}
-
 .fc .fc-bg-event,
 .fc .fc-daygrid-bg-harness,
 .fc .fc-highlight {
@@ -251,13 +234,6 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid .fc-daygrid-bg-harness,
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
-
-/* odsuń chipy od góry */
-.fc .fc-daygrid-day-frame { padding-top: 6px; }
-.fc-daygrid-day-events { margin-top: 6px; }
-.fc-daygrid-event-harness { margin-top: 6px !important; }
-.fc .fc-daygrid-block-event .fc-event-main { line-height: 1.2; }
-.fc .fc-h-event { border: 0; }
 
 /* ikony flag (L4/Wolne/Święto) – wyśrodkowane, większe */
 .day-flag { position:static; inset:auto; display:flex; align-items:center; justify-content:center; width:48px; height:48px; margin:10px auto 2px; border-radius:12px; background:rgba(0,0,0,.28); pointer-events:none; }
@@ -333,68 +309,57 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
   background: var(--jd-green-2); border-color: var(--jd-green-2);
 }
 
-/* Odstęp od góry, żeby chipy nie kleiły się do krawędzi */
-.fc .fc-daygrid-day-frame{padding-top:10px;}
-.fc-daygrid-day-events{margin-top:10px;}
-.fc-daygrid-event-harness{margin-top:8px !important;}
+/* Odstępy i uporządkowanie eventów */
+.fc .fc-daygrid-day-frame{padding-top:8px;}
+.fc-daygrid-day-events{margin-top:8px;}
+.fc-daygrid-event-harness{margin-top:4px !important;}
+.fc-daygrid-event{margin-top:4px;border:0;box-shadow:none;}
+.fc-daygrid-event-dot,
+.fc-daygrid-event-harness .fc-event::before,
+.fc-daygrid-event-harness .fc-event::after{display:none !important;}
 
-/* Ukryj ewentualne „puste” chipy */
-.fc-event:has(.fc-event-title:empty),
-.fc-h-event .fc-event-main:empty{display:none !important;}
+/* Czytelne karty job/summary */
+.fc-daygrid-event .fc-event-main{padding:6px 8px;border-radius:8px;color:#fff;line-height:1.2;}
+.fc-event--job{background:#2563eb !important;color:#fff !important;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+.fc-event--summary{background:#1d4ed8 !important;color:#fff !important;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+.fc-event--summary .fc-event-main{font-weight:600;opacity:.95;}
 
-/* Dzień z L4/Wolne/Święto – pokazuj tylko ikonę, ukryj wszystkie chipy w komórce */
-.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness{display:none !important;}
-.fc-daygrid-day[data-has-leave="true"] .day-flag{display:flex;}
-
-/* Duża, wyraźna ikona (lepszy kontrast + glow) */
-.day-flag{
-  display:none; width:64px; height:64px; margin:18px auto 8px;
-  border-radius:16px; background:rgba(0,0,0,.32);
-  box-shadow:0 8px 18px rgba(0,0,0,.35) inset,0 0 0 2px rgba(216,169,0,.20);
-  align-items:center; justify-content:center;
+/* Ikony L4/Wolne/Święto – tylko ikona, bez kart */
+.fc-event--icon-only,
+.fc-event--leave,
+.fc-event--holiday,
+.fc-event--dayOff{
+  background:transparent !important;
+  box-shadow:none !important;
+  border:0 !important;
 }
-.day-flag.strong::before{
-  content:"🌾"; /* uniwersalna ikonka, zastępuje L4/Wolne/Święto */
-  font-size:34px; filter: drop-shadow(0 0 10px rgba(216,169,0,.45));
-}
-
-/* Podsumowanie dnia – niech siada niżej i ma stałą wysokość linii */
-.fc .fc-daygrid-block-event .fc-event-main{line-height:1.25;}
-
-/* Leave – tylko ikona, bez belki */
-.fc-event-leave .fc-event-main {
-  background: transparent !important;
-  padding: 0 !important;
-  border: 0 !important;
-}
-.leave-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  line-height: 1;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.08);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-  margin: 8px auto 0 auto;
+.fc-event--icon-only .icon,
+.fc-event--leave .icon,
+.fc-event--holiday .icon,
+.fc-event--dayOff .icon{
+  display:block;
+  font-size:28px;
+  width:48px; height:48px;
+  margin:10px auto 6px;
+  border-radius:12px;
+  background:rgba(120,170,0,.12);
+  backdrop-filter:blur(2px);
+  text-align:center;
+  line-height:48px;
 }
 
-/* Summary – jedna linia z trzema liczbami */
-.fc-event-summary .fc-event-main {
-  background: #4b74ff !important;
-  color: #fff !important;
-  border-radius: 8px;
-  padding: 2px 8px;
-}
-.summary-card .line {
-  font-size: 12px;
-  white-space: nowrap;
-}
+/* Summary – zawsze jedna linia */
+.summary-card .line{font-size:12px;white-space:nowrap;}
+.job-card .job-title{font-size:12px;font-weight:600;}
+.job-card .job-meta{font-size:11px;opacity:.9;margin-top:2px;}
 
-/* Job – opcjonalny retusz */
-.job-card .job-title {
-  font-size: 12px;
-  font-weight: 600;
+/* Popover „more” – kontrastowy */
+.fc-more-popover{
+  background:#1e2a1e;
+  color:#e8f1d7;
+  border:1px solid rgba(255,255,255,.08);
+}
+.fc-more-popover .fc-popover-body{
+  padding:8px 10px;
+  line-height:1.3;
 }

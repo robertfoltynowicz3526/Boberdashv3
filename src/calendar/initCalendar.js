@@ -46,6 +46,54 @@ const extractHours = (source = {}) => {
   return { workHours, driveHours, billedHours };
 };
 
+const classListFrom = (val) => {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') return [val];
+  return [];
+};
+
+const resolveEventKind = (raw = {}) => {
+  const ext = raw.extendedProps || {};
+  const classList = classListFrom(raw.classNames || raw.className);
+  const hasClass = (needle) => classList.some((c) => (c || '').toString().toLowerCase().includes(needle));
+  const baseType = (ext.type || ext.typ || raw.type || raw.typ || '').toString().trim().toLowerCase();
+  const leaveKind = normalizeLeaveType(ext.leaveKind || ext.leaveType || raw.leaveKind, ext.type || ext.typ || raw.type || raw.typ, classList);
+
+  const summaryAliases = ['summary'];
+  const jobAliases = ['job', 'zlecenie'];
+  const holidayAliases = ['holiday', 'święto', 'swieto', 'leave_holiday'];
+  const dayOffAliases = ['dayoff', 'wolne', 'urlop', 'free', 'leave_free'];
+  const leaveAliases = ['leave', 'l4', 'leave_l4', 'sick'];
+
+  if (summaryAliases.includes(baseType) || hasClass('summary')) return { kind: 'summary' };
+  if (holidayAliases.includes(baseType)) return { kind: 'holiday', leaveLabel: leaveKind || 'Święto' };
+  if (dayOffAliases.includes(baseType)) return { kind: 'dayOff', leaveLabel: leaveKind || 'Urlop' };
+  if (leaveAliases.includes(baseType)) return { kind: 'leave', leaveLabel: leaveKind || 'L4' };
+
+  if (leaveKind) {
+    if (leaveKind === 'Święto') return { kind: 'holiday', leaveLabel: leaveKind };
+    if (leaveKind === 'Urlop') return { kind: 'dayOff', leaveLabel: leaveKind };
+    return { kind: 'leave', leaveLabel: leaveKind };
+  }
+
+  if (jobAliases.includes(baseType)) return { kind: 'job' };
+  return { kind: 'job' };
+};
+
+const buildJobTitle = (raw = {}, hours = {}) => {
+  const ext = raw.extendedProps || {};
+  const baseTitle = (raw.customer || raw.title || ext.client || '').toString().trim();
+  const { workHours = 0, driveHours = 0, billedHours = 0 } = hours;
+  const hourParts = [];
+  if (workHours > 0) hourParts.push(`Praca: ${formatH(workHours)}`);
+  if (driveHours > 0) hourParts.push(`Jazda: ${formatH(driveHours)}`);
+  if (billedHours > 0) hourParts.push(`Fakturowane: ${formatH(billedHours)}`);
+  const fallback = hourParts.join(' • ');
+  if (baseTitle) return baseTitle;
+  if (fallback) return fallback;
+  return 'Zlecenie';
+};
+
 function prepareCalendarEvents(rawEvents = []) {
   const list = Array.isArray(rawEvents) ? rawEvents : [];
   const events = [];
@@ -54,31 +102,35 @@ function prepareCalendarEvents(rawEvents = []) {
   const emittedIds = new Set();
   const jobs = [];
   const leaves = [];
+  const summaries = new Map();
 
   list.forEach((raw) => {
     const day =
       toDayString(raw.date || raw.start || raw.startStr || raw.dateStr || raw.extendedProps?.date) ||
       null;
     if (!day) return;
-    const leaveType = normalizeLeaveType(
-      raw.extendedProps?.leaveKind || raw.extendedProps?.leaveType || raw.leaveKind,
-      raw.extendedProps?.type || raw.extendedProps?.typ || raw.type || raw.typ,
-      raw.classNames || raw.className
-    );
-    if (leaveType) {
-      leaveByDay.set(day, { type: leaveType });
-      leaves.push({ day, leaveType, raw });
+    const { kind, leaveLabel } = resolveEventKind(raw);
+
+    if (kind === 'summary') {
+      const { workHours, driveHours, billedHours } = extractHours(raw);
+      summaries.set(day, { workHours, driveHours, billedHours });
       return;
     }
-    const jobRecord = { day, raw };
+
+    if (kind === 'leave' || kind === 'dayOff' || kind === 'holiday') {
+      leaveByDay.set(day, { type: kind, label: leaveLabel });
+      leaves.push({ day, leaveType: leaveLabel || kind, kind, raw });
+      return;
+    }
+    const jobRecord = { day, raw, kind: 'job' };
     jobs.push(jobRecord);
     if (!jobsByDay.has(day)) jobsByDay.set(day, []);
     jobsByDay.get(day).push(jobRecord);
   });
 
   jobs.forEach(({ day, raw }) => {
-    const title = raw.customer || raw.title || raw.extendedProps?.client || '';
     const { workHours, driveHours, billedHours } = extractHours(raw);
+    const title = buildJobTitle(raw, { workHours, driveHours, billedHours });
     const empty = !title && workHours === 0 && driveHours === 0 && billedHours === 0;
     if (empty) return;
     const idBase = raw.id || `day-${day}-${events.length}`;
@@ -90,10 +142,11 @@ function prepareCalendarEvents(rawEvents = []) {
       start: day,
       allDay: true,
       title,
-      classNames: raw.classNames || raw.className,
+      classNames: classListFrom(raw.classNames || raw.className),
       extendedProps: {
         ...(raw.extendedProps || {}),
         kind: 'job',
+        type: 'job',
         workHours,
         driveHours,
         billedHours,
@@ -101,7 +154,7 @@ function prepareCalendarEvents(rawEvents = []) {
     });
   });
 
-  leaves.forEach(({ day, leaveType }) => {
+  leaves.forEach(({ day, leaveType, kind, raw }) => {
     const id = `leave-${day}`;
     if (emittedIds.has(id)) return;
     emittedIds.add(id);
@@ -110,10 +163,11 @@ function prepareCalendarEvents(rawEvents = []) {
       start: day,
       allDay: true,
       title: '',
-      classNames: ['fc-event-leave'],
+      classNames: classListFrom(raw?.classNames || raw?.className),
       extendedProps: {
-        kind: 'leave',
-        leaveType,
+        kind: kind || 'leave',
+        type: kind || 'leave',
+        leaveType: leaveType,
       },
     });
   });
@@ -129,8 +183,14 @@ function prepareCalendarEvents(rawEvents = []) {
       b += billedHours;
     });
 
-    if ((!dayJobs || dayJobs.length === 0) && w === 0 && d === 0 && b === 0) continue;
-    if ((dayJobs?.length ?? 0) === 0 && leaveByDay.has(day)) continue;
+    if (!dayJobs || dayJobs.length === 0) continue;
+    if (leaveByDay.has(day)) continue;
+    if (summaries.has(day)) {
+      const { workHours = 0, driveHours = 0, billedHours = 0 } = summaries.get(day) || {};
+      w = Math.max(w, workHours);
+      d = Math.max(d, driveHours);
+      b = Math.max(b, billedHours);
+    }
 
     const id = `summary-${day}`;
     if (emittedIds.has(id)) continue;
@@ -141,9 +201,10 @@ function prepareCalendarEvents(rawEvents = []) {
       start: day,
       allDay: true,
       title: '',
-      classNames: ['fc-event-summary'],
+      classNames: [],
       extendedProps: {
         kind: 'summary',
+        type: 'summary',
         workHours: w,
         driveHours: d,
         billedHours: b,
@@ -159,14 +220,20 @@ function formatH(x) {
 }
 
 function renderEventContent(arg) {
-  const kind = arg.event.extendedProps?.kind;
+  const kind = arg.event.extendedProps?.type || arg.event.extendedProps?.kind;
 
-  if (kind === 'leave') {
-    const t = arg.event.extendedProps.leaveType || '';
+  if (kind === 'leave' || kind === 'dayOff' || kind === 'holiday') {
+    const t = arg.event.extendedProps.leaveType || arg.event.extendedProps.leaveLabel || '';
+    const icon =
+      kind === 'holiday' || t === 'Święto'
+        ? '🌾'
+        : kind === 'dayOff' || t === 'Urlop'
+          ? '🏖️'
+          : '🏥';
     return {
       html: `
-        <div class="leave-icon" title="${t}">
-          ${t === 'Święto' ? '🌾' : t === 'Urlop' ? '🏖️' : '🏥'}
+        <div class="icon" title="${t}">
+          ${icon}
         </div>
       `,
     };
@@ -185,10 +252,19 @@ function renderEventContent(arg) {
     };
   }
 
+  const meta = [
+    arg.event.extendedProps.workHours > 0 ? `Praca ${formatH(arg.event.extendedProps.workHours)}` : '',
+    arg.event.extendedProps.driveHours > 0 ? `Jazda ${formatH(arg.event.extendedProps.driveHours)}` : '',
+    arg.event.extendedProps.billedHours > 0 ? `Fakturowane ${formatH(arg.event.extendedProps.billedHours)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
   return {
     html: `
       <div class="job-card">
         <div class="job-title">${arg.event.title ?? ''}</div>
+        ${meta ? `<div class="job-meta">${meta}</div>` : ''}
       </div>
     `,
   };
@@ -219,6 +295,8 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     dayMaxEvents: 3,
     dayMaxEventRows: 4,
     moreLinkClick: 'popover',
+    eventDisplay: 'block',
+    eventOrderStrict: true,
     leaveByDay,
     eventOverlap: (stillEvent, movingEvent) => {
       return stillEvent.allDay && movingEvent.allDay ? true : false;
@@ -233,8 +311,26 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
 
   options.eventContent = renderEventContent;
   options.eventOrder = (a, b) => {
-    const rank = { job: 0, leave: 1, summary: 2 };
-    return (rank[a.extendedProps?.kind] ?? 99) - (rank[b.extendedProps?.kind] ?? 99);
+    const rank = { leave: 0, dayOff: 0, holiday: 0, job: 1, summary: 2 };
+    const aKind = a.extendedProps?.type || a.extendedProps?.kind;
+    const bKind = b.extendedProps?.type || b.extendedProps?.kind;
+    return (rank[aKind] ?? 99) - (rank[bKind] ?? 99);
+  };
+  options.eventClassNames = (arg) => {
+    const type = arg.event.extendedProps?.type || arg.event.extendedProps?.kind;
+    const classes = classListFrom(arg.event.classNames);
+    const ensure = (cls) => {
+      if (!classes.includes(cls)) classes.push(cls);
+    };
+    if (type === 'summary') {
+      ensure('fc-event--summary');
+    } else if (type === 'leave' || type === 'dayOff' || type === 'holiday') {
+      ensure('fc-event--icon-only');
+      ensure(`fc-event--${type}`);
+    } else {
+      ensure('fc-event--job');
+    }
+    return classes;
   };
 
   const calendar = new FullCalendar.Calendar(container, options);
