@@ -313,7 +313,7 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
 .fc .fc-daygrid-day-frame{padding-top:8px;}
 .fc-daygrid-day-events{margin-top:8px;}
 .fc-daygrid-event-harness{margin-top:4px !important;}
-.fc-daygrid-event{margin-top:4px;border:0;box-shadow:none;}
+.fc-daygrid-event{display:block;margin-top:4px;border:0;box-shadow:none;}
 .fc-daygrid-event-dot,
 .fc-daygrid-event-harness .fc-event::before,
 .fc-daygrid-event-harness .fc-event::after{display:none !important;}
@@ -342,8 +342,7 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
   width:48px; height:48px;
   margin:10px auto 6px;
   border-radius:12px;
-  background:rgba(120,170,0,.12);
-  backdrop-filter:blur(2px);
+  background:transparent;
   text-align:center;
   line-height:48px;
 }

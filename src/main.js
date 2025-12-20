@@ -5,7 +5,7 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
+import { initCalendar, renderDaySummaries, updateCalendarData, prepareCalendarEvents } from './calendar/initCalendar.js';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -613,6 +613,202 @@ function initializeApp() {
         return null;
     };
 
+    const toDayStringLocal = (value) => {
+        if (!value) return '';
+        if (typeof value === 'string') return value.slice(0, 10);
+        if (typeof value?.toDate === 'function') return toDayStringLocal(value.toDate());
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return formatDateForStorage(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+    };
+
+    const mapStatusToEventType = (status = '') => {
+        const upper = (status || '').toString().trim().toUpperCase();
+        if (upper === 'L4' || upper === 'LEAVE_L4') return { type: 'leave', label: 'L4' };
+        if (upper === 'WOLNE' || upper === 'URL' || upper === 'LEAVE_FREE') return { type: 'dayOff', label: 'Urlop' };
+        if (upper === 'ŚWIĘTO' || upper === 'SWIETO' || upper === 'LEAVE_HOLIDAY') return { type: 'holiday', label: 'Święto' };
+        if (upper === 'SUMMARY') return { type: 'summary', label: '' };
+        return { type: 'job', label: '' };
+    };
+
+    const leaveKindFromFlags = (flags = {}, leaveKind = null) => {
+        const normalized = normalizeDayLeaveValue(leaveKind || '');
+        if (normalized && normalized !== DAY_LEAVE_NONE) return normalized;
+        if (flags?.l4) return 'L4';
+        if (flags?.swieto) return 'SWIETO';
+        if (flags?.urlop) return 'URL';
+        return null;
+    };
+
+    const buildLeaveEvent = (dayKey, leaveKind) => {
+        if (!dayKey || !leaveKind) return null;
+        const { type, label } = mapStatusToEventType(leaveKind);
+        const mappedType = type === 'job' ? 'leave' : type;
+        return {
+            id: `leave-${dayKey}-${mappedType}`,
+            start: dayKey,
+            allDay: true,
+            title: '',
+            extendedProps: {
+                type: mappedType,
+                leaveKind: leaveKind,
+                leaveType: label || leaveKind
+            }
+        };
+    };
+
+    const mapWorkDocToEvents = (docId, dane = {}) => {
+        const normalizedDay = normalizeDayRecord(docId, dane);
+        const dayKey = toDayStringLocal(normalizedDay.date || normalizedDay.id);
+        if (!dayKey) return [];
+        const { powiazane } = normalizujPowiazaneZlecenia(normalizedDay);
+        const billedBase = powiazane.length ? 0 : (Number(normalizedDay.billed) || 0);
+        const events = [];
+        const baseTitle = stripEwidencjaPrefix(
+            normalizedDay.klientNazwa || normalizedDay.zlecenieId || normalizedDay.title || normalizedDay.nrZlecenia || ''
+        );
+        const jobHours = {
+            workHours: Number(normalizedDay.work) || 0,
+            driveHours: Number(normalizedDay.drive) || 0,
+            billedHours: billedBase
+        };
+        const hasContent = Boolean(baseTitle) || jobHours.workHours > 0 || jobHours.driveHours > 0 || jobHours.billedHours > 0;
+        if (hasContent) {
+            events.push({
+                id: `work-${dayKey}`,
+                start: dayKey,
+                allDay: true,
+                title: baseTitle || (powiazane.length === 1 ? (powiazane[0].klientNazwa || powiazane[0].zlecenieId) : 'Zlecenie'),
+                extendedProps: {
+                    type: 'job',
+                    ...jobHours,
+                    client: normalizedDay.klientNazwa || ''
+                }
+            });
+        }
+        powiazane.forEach((powiazanie, index) => {
+            events.push({
+                id: `work-${dayKey}-linked-${index}`,
+                start: dayKey,
+                allDay: true,
+                title: powiazanie.klientNazwa || powiazanie.zlecenieId || 'Zlecenie',
+                extendedProps: {
+                    type: 'job',
+                    billedHours: Number(powiazanie.fakturowane) || 0,
+                    workHours: 0,
+                    driveHours: 0,
+                    client: powiazanie.klientNazwa || ''
+                }
+            });
+        });
+        const leaveKind = leaveKindFromFlags(normalizedDay.flags, normalizedDay.leaveKind);
+        const leaveEvent = buildLeaveEvent(dayKey, leaveKind);
+        if (leaveEvent) events.push(leaveEvent);
+        return events;
+    };
+
+    const mapEventDocToRawEvent = (docId, data = {}) => {
+        const baseExt = data.extendedProps || {};
+        const dayKey = toDayStringLocal(
+            data.date ||
+            data.start ||
+            data.startDate ||
+            data.startStr ||
+            data.dateStr ||
+            baseExt.date ||
+            baseExt.startDate ||
+            docId
+        );
+        if (!dayKey) return null;
+        const statusInfo = mapStatusToEventType(baseExt.type || baseExt.typ || data.type || data.typ || data.status);
+        const leaveKind = baseExt.leaveKind || data.leaveKind || statusInfo.label || '';
+        const workHours = Number(baseExt.workHours ?? data.workHours ?? data.work ?? data.praca) || 0;
+        const driveHours = Number(baseExt.driveHours ?? data.driveHours ?? data.drive ?? data.jazda) || 0;
+        const billedHours = Number(
+            baseExt.billedHours ??
+            baseExt.billH ??
+            data.billedHours ??
+            data.billH ??
+            data.bill ??
+            data.fh ??
+            data.fakturowane ??
+            data.billed ??
+            0
+        ) || 0;
+        return {
+            id: data.id || docId,
+            title: stripEwidencjaPrefix(data.title || data.client || data.customer || ''),
+            start: dayKey,
+            end: data.end || data.endDate || null,
+            allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
+            classNames: data.classNames || data.className || [],
+            extendedProps: {
+                ...baseExt,
+                type: statusInfo.type,
+                leaveType: baseExt.leaveType || data.leaveType || statusInfo.label || leaveKind || '',
+                leaveKind: leaveKind || '',
+                workHours,
+                driveHours,
+                billedHours
+            }
+        };
+    };
+
+    const loadCalendarEventsForRange = async (info) => {
+        const startBound = toDayStringLocal(info?.startStr || info?.start);
+        const endBound = toDayStringLocal(info?.endStr || info?.end);
+        if (!startBound || !endBound) {
+            console.warn('[calendar] Nieprawidłowy zakres dat do pobrania zdarzeń', info);
+            return { preparedEvents: [], leaveByDay: new Map() };
+        }
+        const eventsCollection = collection(db, 'events');
+        const workCollection = collection(db, 'godziny_pracy');
+        let workSnapshot = null;
+        try {
+            const workQuery = query(workCollection, where('date', '>=', startBound), where('date', '<', endBound));
+            workSnapshot = await getDocs(workQuery);
+        } catch (error) {
+            console.warn('[calendar] Nie udało się pobrać zdarzeń godzinowych z filtrem – używam pełnej kolekcji', error);
+            workSnapshot = await getDocs(workCollection);
+        }
+        const leaveSnapshot = await getDocs(eventsCollection);
+        const rawEvents = [];
+        workSnapshot.forEach((docSnap) => {
+            rawEvents.push(...mapWorkDocToEvents(docSnap.id, docSnap.data() || {}));
+        });
+        leaveSnapshot.forEach((docSnap) => {
+            const mapped = mapEventDocToRawEvent(docSnap.id, docSnap.data() || {});
+            if (!mapped) return;
+            const startKey = toDayStringLocal(mapped.start);
+            if (startKey >= startBound && startKey < endBound) {
+                rawEvents.push({ ...mapped, start: startKey });
+            }
+        });
+        const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
+        const sample = preparedEvents.slice(0, 3).map((ev) => ev.extendedProps?.type || ev.extendedProps?.kind || ev.title || ev.id);
+        if (preparedEvents.length === 0) {
+            console.warn(`[calendar] 0 eventów w zakresie ${startBound} – ${endBound} (źródła: ${rawEvents.length})`);
+        } else {
+            console.debug(`[calendar] Załadowano ${preparedEvents.length} eventów`, sample);
+        }
+        return { preparedEvents, leaveByDay };
+    };
+
+    const calendarEventsSource = async (info, successCallback, failureCallback) => {
+        try {
+            const { preparedEvents, leaveByDay } = await loadCalendarEventsForRange(info);
+            if (calendar) {
+                calendar.setOption('leaveByDay', leaveByDay);
+            }
+            successCallback(preparedEvents);
+        } catch (error) {
+            console.warn('[calendar] Nie udało się pobrać zdarzeń kalendarza', error);
+            if (typeof failureCallback === 'function') {
+                failureCallback(error);
+            }
+        }
+    };
+
     const buildCalendarFlags = () => {
         const byDate = new Map();
         wszystkieWpisyKalendarza.forEach((wpis) => {
@@ -653,7 +849,7 @@ function initializeApp() {
         if (!kalendarzContainer) return;
         calendar = initCalendar(
             kalendarzContainer,
-            [...workEvents, ...leaveEvents],
+            [],
             buildCalendarFlags(),
             {
                 plugins: calendarPlugins,
@@ -662,6 +858,7 @@ function initializeApp() {
                 selectable: true,
                 selectMirror: true,
                 unselectAuto: true,
+                events: calendarEventsSource,
                 eventDataTransform(event) {
                     if (event && typeof event.title === 'string') {
                         event.title = stripEwidencjaPrefix(event.title);
@@ -978,6 +1175,14 @@ function initializeApp() {
 
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
+        const eventsOption = calendar.getOption ? calendar.getOption('events') : null;
+        if (typeof eventsOption === 'function') {
+            calendar.refetchEvents();
+            if (calendar.view) {
+                obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
+            }
+            return;
+        }
         const combined = [...workEvents, ...leaveEvents];
         updateCalendarData(calendar, combined, buildCalendarFlags());
         if (calendar.view) {

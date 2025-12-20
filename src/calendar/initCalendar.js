@@ -1,6 +1,7 @@
 const toDayString = (dateInput) => {
   if (!dateInput) return null;
   if (typeof dateInput === 'string') return dateInput.slice(0, 10);
+  if (typeof dateInput?.toDate === 'function') return toDayString(dateInput.toDate());
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
   if (Number.isNaN(date.getTime())) return null;
   const y = date.getFullYear();
@@ -94,7 +95,7 @@ const buildJobTitle = (raw = {}, hours = {}) => {
   return 'Zlecenie';
 };
 
-function prepareCalendarEvents(rawEvents = []) {
+export function prepareCalendarEvents(rawEvents = []) {
   const list = Array.isArray(rawEvents) ? rawEvents : [];
   const events = [];
   const jobsByDay = new Map();
@@ -129,6 +130,7 @@ function prepareCalendarEvents(rawEvents = []) {
   });
 
   jobs.forEach(({ day, raw }) => {
+    if (leaveByDay.has(day)) return;
     const { workHours, driveHours, billedHours } = extractHours(raw);
     const title = buildJobTitle(raw, { workHours, driveHours, billedHours });
     const empty = !title && workHours === 0 && driveHours === 0 && billedHours === 0;
@@ -230,13 +232,14 @@ function renderEventContent(arg) {
         : kind === 'dayOff' || t === 'Urlop'
           ? '🏖️'
           : '🏥';
-    return {
-      html: `
-        <div class="icon" title="${t}">
-          ${icon}
-        </div>
-      `,
-    };
+    const wrapper = document.createElement('div');
+    wrapper.className = 'fc-event--icon-only';
+    const iconEl = document.createElement('div');
+    iconEl.className = 'icon';
+    iconEl.title = t;
+    iconEl.textContent = icon;
+    wrapper.appendChild(iconEl);
+    return { domNodes: [wrapper] };
   }
 
   if (kind === 'summary') {
@@ -286,6 +289,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     locale: localeOption,
     initialView: 'dayGridMonth',
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'month,week' },
+    timeZone: 'local',
     navLinks: true,
     expandRows: true,
     height: 'auto',
@@ -293,7 +297,7 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: 3,
-    dayMaxEventRows: 4,
+    dayMaxEventRows: 3,
     moreLinkClick: 'popover',
     eventDisplay: 'block',
     eventOrderStrict: true,
