@@ -3,8 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@8.15.5",
   "engines": {
-    "node": ">=18 <23"
+    "node": ">=18 <21"
   },
   "scripts": {
     "preinstall": "bash tools/ci-precheck.sh",
@@ -16,7 +17,7 @@
     "vite": "^6.0.3"
   },
   "dependencies": {
-    "firebase": "^12.2.1",
+    "firebase": "^10.12.5",
     "papaparse": "^5.5.3"
   }
 }

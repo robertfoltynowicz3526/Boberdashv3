@@ -9,6 +9,7 @@ node_modules/
 # Pliki środowiskowe
 # Jeśli kiedykolwiek dodasz pliki .env, będą bezpieczne.
 .env
+.env*
 .env.*
 !.env.example
 
