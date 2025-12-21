@@ -126,10 +126,6 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   font-size: 30px;
 }
 
-.calendar-shell .fc-daygrid-event.strip-summary {
-  display: none !important;
-}
-
 /* === Odznaka „leave” na środku kratki dnia === */
 .leave-badge {
   position: absolute;
