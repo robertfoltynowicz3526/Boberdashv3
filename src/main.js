@@ -1,4 +1,4 @@
-import { db, missingEnv } from './firebase-config.js';
+import { getFirebaseApp, db } from './services/firebase.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
@@ -6,22 +6,18 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
-import EnvWarning from './components/EnvWarning.jsx';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
 
 
 function initializeApp() {
-    // Ostrzeżenie o brakujących kluczach środowiskowych Firebase
-    try {
-        const host = document.querySelector('main') || document.body;
-        const banner = EnvWarning({ list: missingEnv });
-        if (banner && host) {
-            banner.dataset.envWarning = 'true';
-            host.prepend(banner);
-        }
-    } catch (_) { /* best-effort ui warning */ }
+    const app = getFirebaseApp();
+
+    const warnEl = document.getElementById('firebase-missing-banner')
+      || document.getElementById('firebaseWarning')
+      || document.querySelector('[data-firebase-warning]');
+    if (warnEl) warnEl.style.display = 'none';
     // --- STAŁE I ZMIENNE GLOBALNE ---
     const STAWKI = {
         S: { nazwa: "Wyjazdowe", stawka: 45 },

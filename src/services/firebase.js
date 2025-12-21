@@ -1,20 +1,29 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+// import { getAnalytics, isSupported } from 'firebase/analytics';
 
-const cfg = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+const firebaseConfig = {
+  apiKey: "AIzaSyA4VZWw2JvRR_IYFM-Ez75ZFtW3WodwTbc",
+  authDomain: "bobrzy-dashboard.firebaseapp.com",
+  projectId: "bobrzy-dashboard",
+  storageBucket: "bobrzy-dashboard.firebasestorage.app",
+  messagingSenderId: "648127119573",
+  appId: "1:648127119573:web:1c956817855adee82b625c",
+  measurementId: "G-9FPJ9DJEKM"
 };
 
-export const missingEnv = Object.entries(cfg)
-  .filter(([, v]) => !v)
-  .map(([k]) => k);
-if (missingEnv.length) console.warn('[Firebase] Missing env:', missingEnv);
+let cachedApp;
 
-const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+export function getFirebaseApp() {
+  // Inicjalizuj tylko raz
+  const app = cachedApp ?? getApps()[0] ?? initializeApp(firebaseConfig);
+  cachedApp = app;
+
+  // isSupported().then(supported => { if (supported) getAnalytics(app); });
+
+  return app;
+}
+
+export const app = getFirebaseApp();
 export const db = getFirestore(app);
-export { app, cfg as firebaseConfig };
+export { firebaseConfig };
