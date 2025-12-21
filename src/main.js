@@ -1,4 +1,4 @@
-import { getFirebaseApp, db } from './services/firebase.js';
+import { getFirebaseApp, db as getDb } from './services/firebase.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', initializeApp);
 
 function initializeApp() {
     const app = getFirebaseApp();
+    const db = getDb();
 
     const warnEl = document.getElementById('firebase-missing-banner')
       || document.getElementById('firebaseWarning')
