@@ -30,7 +30,7 @@ const getLeaveFlagForDate = (calendar, date) => {
   return type ? { type } : null;
 };
 
-function renderDaySummaries(calendar) {
+export function renderDaySummaries(calendar) {
   if (!calendar?.el) return;
   calendar.el.querySelectorAll('.day-summary').forEach((n) => n.remove());
   const toNum = (value) => (value == null ? 0 : Number(value) || 0);
@@ -194,4 +194,15 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   calendar.refetchEvents();
   renderDaySummaries(calendar);
   refreshDayFlags(calendar);
+}
+
+export function initCalendar(el, events = [], flags = [], options = {}) {
+  setCalendarEvents(events);
+  setDayFlags(flags);
+  const calendar = bootCalendar({ ...options, customFlags: flags || [] });
+  if (calendar) {
+    calendar.setOption('customFlags', flags || []);
+    calendar.refetchEvents();
+  }
+  return calendar;
 }
