@@ -35,8 +35,25 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
 /* Eventy – tylko niebieskie karty, bez zielonych „chipów dnia” */
 .ab-chip, .leave-flag, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
-.fc-event { background:#3b82f6 !important; border:0 !important; border-radius:8px !important; }
-.fc-event .fc-event-title { color:#fff !important; font-size:12px !important; line-height:1.25; white-space:normal !important; }
+.fc-event {
+  background:#3b82f6 !important;
+  border:0 !important;
+  border-radius:6px !important;
+  padding:2px 6px !important;
+  box-sizing:border-box !important;
+  min-width:0 !important;
+  overflow:hidden !important;
+}
+.fc-event .fc-event-title {
+  color:#fff !important;
+  font-size:12px !important;
+  line-height:1.25;
+  white-space:normal !important;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
 
 /* --- Listy przewijane do końca (zakończone/klienci/maszyny) --- */
 #closed-orders, .closed-orders,
@@ -83,46 +100,96 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .calendar-shell .day-summary {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  font-weight: 400;
-  margin: 0;
+  background: rgba(59,130,246,0.15);
+  border: 1px solid rgba(59,130,246,0.45);
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-weight: 500;
+  margin: 4px 0 0;
+  box-sizing: border-box;
+}
+
+.calendar-shell .day-summary-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+  min-width:0;
+}
+
+.calendar-shell .day-summary__chip {
+  background: rgba(59,130,246,0.22);
+  color:#dfe9ff;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.calendar-shell .day-summary__chip.chip-work { background: rgba(74,222,128,0.25); color:#e8ffe8; }
+.calendar-shell .day-summary__chip.chip-drive { background: rgba(250,204,21,0.25); color:#fff3c4; }
+.calendar-shell .day-summary__chip.chip-billed { background: rgba(59,130,246,0.25); }
+
+.calendar-shell .fc-daygrid-event {
+  box-sizing:border-box;
+  min-width:0;
+  overflow:hidden;
 }
 
 .calendar-shell .day-summary .fc-event-title {
   white-space: normal;
+  display:-webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   line-height: 1.25;
   font-size: 12px;
 }
 
 .calendar-shell .leave-event {
-  background: rgba(0,0,0,0) !important;
-  border: 0 !important;
+  background: rgba(0,0,0,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
   box-shadow: none !important;
+  border-radius:6px !important;
+  padding:2px 4px !important;
+  color:#f8f9fa;
+  box-sizing:border-box;
+  min-width:0;
+  overflow:hidden;
 }
 
 .calendar-shell .leave-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 18px;
   line-height: 30px;
-  width: 44px;
-  height: 44px;
-  margin: 6px auto 2px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+  width: 24px;
+  height: 24px;
+  margin-right:4px;
 }
 
 .calendar-shell .leave-l4 .leave-icon,
 .calendar-shell .leave-free .leave-icon,
 .calendar-shell .leave-holiday .leave-icon {
-  font-size: 30px;
+  font-size: 18px;
 }
 
 .calendar-shell .fc-daygrid-event.strip-summary {
   display: none !important;
+}
+
+.calendar-shell .leave-chip {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  font-size:12px;
+  line-height:1.2;
+  min-width:0;
+  white-space:nowrap;
+}
+
+.calendar-shell .leave-label {
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 /* === Odznaka „leave” na środku kratki dnia === */

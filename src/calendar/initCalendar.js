@@ -3,6 +3,10 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
+const LEAVE_ICON = { URL: '🌿', WOLNE: '🌿', L4: '🩺', SWIETO: '🏁' };
+const LEAVE_LABEL = { URL: 'Urlop', WOLNE: 'Wolne', L4: 'L4', SWIETO: 'Święto' };
+
 const normalizeDateKey = (value) => {
   if (!value) return '';
   if (typeof value === 'string') return value.slice(0, 10);
@@ -21,6 +25,21 @@ const normalizeLeaveKind = (value) => {
   return null;
 };
 
+const normalizeLeaveCode = (value) => {
+  const raw = (value ?? '').toString().trim().toUpperCase();
+  if (!raw) return null;
+  if (raw.startsWith('LEAVE_')) {
+    if (raw.includes('L4')) return 'L4';
+    if (raw.includes('HOLIDAY') || raw.includes('SWIETO') || raw.includes('ŚWIĘTO')) return 'SWIETO';
+    if (raw.includes('FREE') || raw.includes('URL')) return 'URL';
+  }
+  if (raw === 'L4') return 'L4';
+  if (raw === 'SWIETO' || raw === 'ŚWIĘTO' || raw === 'HOLIDAY') return 'SWIETO';
+  if (raw === 'WOLNE' || raw === 'FREE') return 'WOLNE';
+  if (raw === 'URL' || raw === 'URLOP') return 'URL';
+  return null;
+};
+
 const getLeaveFlagForDate = (calendar, date) => {
   const key = normalizeDateKey(date);
   if (!key || !calendar) return null;
@@ -30,28 +49,123 @@ const getLeaveFlagForDate = (calendar, date) => {
   return type ? { type } : null;
 };
 
+const getLeaveCode = (event) => {
+  if (!event) return null;
+  const props = event.extendedProps || {};
+  return normalizeLeaveCode(
+    props.leaveCode ||
+      props.leaveKind ||
+      props.kind ||
+      props.type ||
+      props.typ ||
+      event.type ||
+      event.typ ||
+      event.kind,
+  );
+};
+
+const isLeaveEvent = (event) => {
+  if (!event) return false;
+  const type = getLeaveCode(event);
+  if (type) return true;
+  const props = event.extendedProps || {};
+  const rawType = props.type || props.typ;
+  return typeof rawType === 'string' && rawType.toUpperCase().startsWith('LEAVE');
+};
+
+const addRangeToLeaveSet = (targetSet, startDate, endDate) => {
+  if (!startDate) return;
+  const start = new Date(startDate);
+  const end = endDate ? new Date(endDate) : start;
+  if (Number.isNaN(start.getTime())) return;
+  const inclusiveEnd = Number.isNaN(end.getTime()) ? start.getTime() : end.getTime() - MILLISECONDS_IN_DAY;
+  const endTs = inclusiveEnd < start.getTime() ? start.getTime() : inclusiveEnd;
+  for (let ts = start.getTime(); ts <= endTs; ts += MILLISECONDS_IN_DAY) {
+    targetSet.add(normalizeDateKey(new Date(ts)));
+  }
+};
+
+const collectLeaveDays = (events = []) => {
+  const leaveDays = new Set();
+  (events || []).forEach((event) => {
+    if (!isLeaveEvent(event)) return;
+    addRangeToLeaveSet(leaveDays, event.start || event.startStr, event.end || event.endStr || event.end);
+  });
+  return leaveDays;
+};
+
+const isLeaveDay = (calendar, date, leaveDaysSet) => {
+  const key = normalizeDateKey(date);
+  if (!key) return false;
+  if (leaveDaysSet?.has(key)) return true;
+  return Boolean(getLeaveFlagForDate(calendar, key));
+};
+
+const createLeaveDisplayEvent = (event, fallbackId) => {
+  const leaveCode = getLeaveCode(event);
+  const start = event?.start || event?.date || event?.startStr;
+  if (!leaveCode || !start) return null;
+  const label = LEAVE_LABEL[leaveCode] || 'Dzień wolny';
+  const icon = LEAVE_ICON[leaveCode] || '';
+  return {
+    ...event,
+    id: event?.id || fallbackId || `leave-${normalizeDateKey(start)}`,
+    title: [icon, label].filter(Boolean).join(' ').trim(),
+    start,
+    end: event?.end || event?.endStr || start,
+    allDay: event?.allDay ?? true,
+    display: 'block',
+    classNames: ['leave-event'],
+    extendedProps: {
+      ...(event?.extendedProps || {}),
+      leaveCode,
+      leaveKind: leaveCode,
+    },
+  };
+};
+
 function renderDaySummaries(calendar) {
   if (!calendar?.el) return;
   calendar.el.querySelectorAll('.day-summary').forEach((n) => n.remove());
   const toNum = (value) => (value == null ? 0 : Number(value) || 0);
-  const events = calendar.getEvents().filter((e) => !['l4', 'urlop', 'wolne'].includes(normalizeLeaveKind(e.extendedProps?.kind)));
+  const events = calendar.getEvents();
+  const leaveDays = collectLeaveDays(events);
   const by = new Map();
-  events.forEach((e) => {
-    const key = (e.startStr || '').slice(0, 10);
-    if (!key) return;
-    const x = e.extendedProps || {};
-    const acc = by.get(key) || { w: 0, d: 0, b: 0 };
-    acc.w += toNum(x.workH ?? x.workHours);
-    acc.d += toNum(x.driveH ?? x.driveHours);
-    acc.b += toNum(x.billH ?? x.billedHours);
-    by.set(key, acc);
-  });
+  events
+    .filter((e) => !isLeaveEvent(e))
+    .forEach((e) => {
+      const key = normalizeDateKey(e.start || e.startStr);
+      if (!key || isLeaveDay(calendar, key, leaveDays)) return;
+      const x = e.extendedProps || {};
+      const acc = by.get(key) || { w: 0, d: 0, b: 0 };
+      acc.w += toNum(x.workH ?? x.workHours ?? x.work ?? x.praca);
+      acc.d += toNum(x.driveH ?? x.driveHours ?? x.drive ?? x.jazda);
+      acc.b += toNum(x.billH ?? x.billedHours ?? x.billed ?? x.fakturowane);
+      by.set(key, acc);
+    });
   by.forEach((v, key) => {
+    if ((v.w <= 0) && (v.d <= 0) && (v.b <= 0)) return;
     const cell = calendar.el.querySelector(`[data-date="${key}"] .fc-daygrid-day-frame`);
     if (!cell) return;
     const el = document.createElement('div');
     el.className = 'day-summary';
-    el.textContent = `• Praca: ${v.w.toFixed(1)}h • Jazda: ${v.d.toFixed(1)}h • Fakturowane: ${v.b.toFixed(1)}h`;
+    const row = document.createElement('div');
+    row.className = 'day-summary-row';
+
+    const addChip = (label, value, cls) => {
+      if (value <= 0) return;
+      const chip = document.createElement('span');
+      chip.className = `day-summary__chip ${cls || ''}`.trim();
+      chip.textContent = `${label}: ${value.toFixed(1)}h`;
+      row.appendChild(chip);
+    };
+
+    addChip('Praca', v.w, 'chip-work');
+    addChip('Jazda', v.d, 'chip-drive');
+    addChip('Fakturowane', v.b, 'chip-billed');
+
+    if (!row.children.length) return;
+    el.appendChild(row);
     cell.appendChild(el);
   });
 }
@@ -79,8 +193,8 @@ function refreshDayFlags(calendar) {
   });
 }
 
-export function bootCalendar(extraOptions = {}) {
-  const el = document.getElementById('calendar') || document.getElementById('kalendarz');
+export function bootCalendar(extraOptions = {}, hostEl = null) {
+  const el = hostEl || document.getElementById('calendar') || document.getElementById('kalendarz');
   if (!el) return null;
 
   const plugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
@@ -113,29 +227,26 @@ export function bootCalendar(extraOptions = {}) {
     events: async (info, success) => {
       try {
         const raw = await loadEventsFromDb(info.start, info.end);
-        const mapped = (raw || []).map((e) => {
-          const kind = normalizeLeaveKind(e?.extendedProps?.kind || e?.kind || e?.type);
-          if (kind) {
-            const start = e.start || e.date;
-            const end = e.end || start;
-            return {
-              ...e,
-              start,
-              end,
-              allDay: e.allDay ?? true,
-              display: 'background',
-              classNames: ['ev-leave', `ev-leave--${kind}`],
-              extendedProps: { ...(e.extendedProps || {}), kind },
-            };
+        const leaveAddedForDay = new Set();
+        const mapped = (raw || []).reduce((acc, e) => {
+          const leave = createLeaveDisplayEvent(e);
+          if (leave) {
+            const dateKey = normalizeDateKey(leave.start);
+            if (!leaveAddedForDay.has(dateKey)) {
+              leaveAddedForDay.add(dateKey);
+              acc.push(leave);
+            }
+            return acc;
           }
           const extendedProps = { ...(e.extendedProps || {}) };
           if (!extendedProps.kind && e.kind) extendedProps.kind = e.kind;
-          return {
+          acc.push({
             ...e,
             title: e.title || e.extendedProps?.client || '',
             extendedProps,
-          };
-        });
+          });
+          return acc;
+        }, []);
         success(mapped);
       } catch (e) {
         console.error('events loader error:', e);
@@ -149,6 +260,26 @@ export function bootCalendar(extraOptions = {}) {
       } catch (e) {
         console.error('selectAllow error:', e);
         return true;
+      }
+    },
+    eventContent: (arg) => {
+      try {
+        const leaveCode = getLeaveCode(arg?.event);
+        if (!leaveCode) return undefined;
+        const wrapper = document.createElement('span');
+        wrapper.className = 'leave-chip';
+        const icon = document.createElement('span');
+        icon.className = 'leave-icon';
+        icon.textContent = LEAVE_ICON[leaveCode] || '';
+        const label = document.createElement('span');
+        label.className = 'leave-label';
+        label.textContent = LEAVE_LABEL[leaveCode] || arg?.event?.title || 'Dzień wolny';
+        if (icon.textContent) wrapper.appendChild(icon);
+        wrapper.appendChild(label);
+        return { domNodes: [wrapper] };
+      } catch (e) {
+        console.error('eventContent error:', e);
+        return undefined;
       }
     },
     ...extraOptions,
@@ -185,6 +316,16 @@ export function bootCalendar(extraOptions = {}) {
 
   return calendar;
 }
+
+export function initCalendar(hostEl, events = [], flags = [], extraOptions = {}) {
+  const calendar = bootCalendar(extraOptions, hostEl);
+  if (calendar) {
+    updateCalendarData(calendar, events, flags);
+  }
+  return calendar;
+}
+
+export { renderDaySummaries };
 
 export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
