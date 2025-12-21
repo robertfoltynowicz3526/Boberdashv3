@@ -1,5 +1,5 @@
 import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../firebase-config.js';
+import { db } from '../services/firebase.js';
 
 const startOfMonth = (date) => {
   const d = date instanceof Date ? date : new Date(date);
