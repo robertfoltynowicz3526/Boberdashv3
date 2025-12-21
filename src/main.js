@@ -396,11 +396,16 @@ function initializeApp() {
 
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
-        const leaveKind = (payload.extendedProps?.leaveKind || payload.leaveKind || '').toLowerCase();
-        const className = `absence-${leaveKind || 'other'}`;
+        const leaveKind = normalizeDayLeaveValue(payload.extendedProps?.leaveKind || payload.leaveKind || payload.typ || payload.type || '');
+        const kindForClass = leaveKind || 'URL';
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
-        const extendedProps = payload.extendedProps || { leaveKind: leaveKind || '' };
+        const extendedProps = {
+            ...(payload.extendedProps || {}),
+            leaveKind: leaveKind || '',
+            kind: leaveKind ? leaveKind.toLowerCase() : ''
+        };
+        const badgeTitle = payload.title || LEAVE_TITLE_MAP[leaveKind] || 'Urlop';
         return [
             {
                 id: `${leaveId}::bg`,
@@ -408,20 +413,20 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'background',
-                classNames: ['absence-bg', className],
+                classNames: payload.className || payload.classNames || ['leave-bg', `leave-bg--${kindForClass}`],
                 overlap: false,
-                title: payload.title || '',
+                title: badgeTitle,
                 extendedProps
             },
             {
-                id: `${leaveId}::icon`,
+                id: `${leaveId}::badge`,
+                title: badgeTitle,
                 start,
                 end,
                 allDay: true,
-                display: 'background',
-                classNames: ['absence-icon-holder', className],
+                display: 'auto',
+                classNames: ['leave-badge', `leave-badge--${kindForClass}`],
                 overlap: false,
-                title: payload.title || '',
                 extendedProps
             }
         ];
@@ -459,7 +464,8 @@ function initializeApp() {
             display: 'block',
             typ: type,
             type,
-            extendedProps: { typ: type, type, leaveKind: normalizedKind }
+            className: ['leave-bg', `leave-bg--${normalizedKind || 'URL'}`],
+            extendedProps: { typ: type, type, leaveKind: normalizedKind, kind: normalizedKind ? normalizedKind.toLowerCase() : '' }
         };
         await setDoc(leaveDocRef, payload);
         const withoutCurrent = removeLeaveEventsForId(leaveDocId);
@@ -627,7 +633,9 @@ function initializeApp() {
         });
 
         leaveEvents.forEach((ev) => {
-            if (!Array.isArray(ev?.classNames) || !ev.classNames.includes('absence-icon-holder')) return;
+            const classes = ev?.classNames || [];
+            const isLeaveClass = classes.includes('leave-badge') || classes.includes('leave-bg') || classes.includes('absence-icon-holder');
+            if (!Array.isArray(classes) || !isLeaveClass) return;
             const key = normalizeDayKey(ev?.start || ev?.date);
             if (!key || byDate.has(key)) return;
             const kind = ev?.extendedProps?.leaveKind || ev?.extendedProps?.type || ev?.leaveKind;
@@ -1065,20 +1073,34 @@ function initializeApp() {
                         });
                     });
                 }
-                events.push({
-                    id: `godziny_${id}`,
-                    title: 'Ewidencja dnia',
-                    start: id,
-                    allDay: true,
-                    className: ['strip-summary'],
-                    extendedProps: {
-                        client: 'Ewidencja dnia',
-                        machineModel: null,
-                        fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                        typ: null,
-                        ...baseHoursProps
-                    }
-                });
+                const nadgodzinyValue = Number(dane?.nadgodziny) || 0;
+                const hasLeave = Boolean(normalizedDay?.leaveKind) || Boolean(dane?.leaveKind) ||
+                    Boolean(normalizedDay?.flags?.urlop || normalizedDay?.flags?.l4 || normalizedDay?.flags?.swieto) ||
+                    Boolean(dane?.flags?.urlop || dane?.flags?.l4 || dane?.flags?.swieto);
+
+                const hasAnySummaryHours =
+                    (workValue > 0) ||
+                    (driveValue > 0) ||
+                    (nadgodzinyValue > 0) ||
+                    (billedHoursForSummary > 0);
+
+                if (!hasLeave && hasAnySummaryHours) {
+                    events.push({
+                        id: `godziny_${id}`,
+                        title: 'Ewidencja dnia',
+                        start: id,
+                        allDay: true,
+                        className: ['strip-summary'],
+                        extendedProps: {
+                            client: 'Ewidencja dnia',
+                            machineModel: null,
+                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
+                            typ: null,
+                            nadgodziny: nadgodzinyValue,
+                            ...baseHoursProps
+                        }
+                    });
+                }
             });
             workEvents = events;
             przerysujZdarzeniaKalendarza();
@@ -1107,10 +1129,12 @@ function initializeApp() {
                         end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
                         allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
                         display: 'background',
+                        className: ['leave-bg', `leave-bg--${normalizedKind || 'URL'}`],
                         extendedProps: {
                             typ: normalizedType,
                             type: normalizedType,
-                            leaveKind: normalizedKind || ''
+                            leaveKind: normalizedKind || '',
+                            kind: normalizedKind ? normalizedKind.toLowerCase() : ''
                         }
                     };
                     return mapLeavePayloadToEvents(docSnap.id, payload);
