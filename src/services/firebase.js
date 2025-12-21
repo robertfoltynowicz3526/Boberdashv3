@@ -1,6 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-// import { getAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA4VZWw2JvRR_IYFM-Ez75ZFtW3WodwTbc",
@@ -12,18 +11,14 @@ const firebaseConfig = {
   measurementId: "G-9FPJ9DJEKM"
 };
 
-let cachedApp;
-
+let _app;
 export function getFirebaseApp() {
-  // Inicjalizuj tylko raz
-  const app = cachedApp ?? getApps()[0] ?? initializeApp(firebaseConfig);
-  cachedApp = app;
-
-  // isSupported().then(supported => { if (supported) getAnalytics(app); });
-
-  return app;
+  _app ||= (getApps()[0] ?? initializeApp(firebaseConfig));
+  return _app;
 }
 
-export const app = getFirebaseApp();
-export const db = getFirestore(app);
-export { firebaseConfig };
+let _db;
+export function db() {
+  _db ||= getFirestore(getFirebaseApp());
+  return _db;
+}

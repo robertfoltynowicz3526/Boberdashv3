@@ -127,55 +127,55 @@ const mapDocsToEvents = (orders = [], leaves = []) => {
   return events;
 };
 
-async function fetchOrders(startStr, endStr) {
-  if (!db) {
-    console.warn('[Calendar] Brak połączenia z Firestore – pomijam pobieranie zdarzeń.');
-    return [];
-  }
+let calendarInstance = null;
+let calendarHost = null;
+let currentRange = null;
+let loaderEl = null;
+let navigationWired = false;
+let lastLoadToken = 0;
 
-  const docs = [];
-  const dateFields = ['date', 'start', 'startDate'];
-  for (const field of dateFields) {
-    try {
-      const ref = collection(db, 'orders');
-      const qRef = query(ref, where(field, '>=', startStr), where(field, '<=', endStr), orderBy(field));
-      const snap = await getDocs(qRef);
-      snap.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
-      if (snap.size > 0) break;
-    } catch (error) {
-      console.warn(`[Calendar] Nie udało się pobrać orders po polu ${field}.`, error);
-    }
+const getDbInstance = () => {
+  try {
+    return db();
+  } catch (error) {
+    console.error('[Calendar] Firestore init error:', error);
+    return null;
   }
-  if (!docs.length) {
-    try {
-      const legacyRef = collection(db, 'zlecenia');
-      const qLegacy = query(legacyRef, where('date', '>=', startStr), where('date', '<=', endStr), orderBy('date'));
-      const snap = await getDocs(qLegacy);
-      snap.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
-    } catch (error) {
-      console.warn('[Calendar] Nie udało się pobrać zlecenia (legacy).', error);
-    }
-  }
-  return docs;
-}
+};
 
-async function fetchLeaves(startStr, endStr) {
-  if (!db) return [];
-  const leaves = [];
-  const collections = ['leaves', 'calendarFlags'];
-  for (const col of collections) {
+const ensureLoader = () => {
+  if (!calendarHost) return null;
+  if (!loaderEl || !loaderEl.parentElement) {
+    loaderEl = document.createElement('div');
+    loaderEl.className = 'calendar-loading';
+    loaderEl.innerHTML = '<span>Ładowanie wydarzeń…</span>';
+    calendarHost.appendChild(loaderEl);
+  }
+  return loaderEl;
+};
+
+const setLoading = (isLoading) => {
+  const el = ensureLoader();
+  if (!el) return;
+  el.classList.toggle('is-active', Boolean(isLoading));
+};
+
+const destroyCalendarInstance = () => {
+  if (calendarInstance) {
     try {
-      const ref = collection(db, col);
-      const qRef = query(ref, where('date', '>=', startStr), where('date', '<=', endStr), orderBy('date'));
-      const snap = await getDocs(qRef);
-      snap.forEach((docSnap) => leaves.push({ id: docSnap.id, ...docSnap.data() }));
-      if (snap.size > 0) break;
+      calendarInstance.destroy();
     } catch (error) {
-      console.warn(`[Calendar] Nie udało się pobrać wpisów urlopowych z ${col}.`, error);
+      console.error('[Calendar] destroy error:', error);
     }
   }
-  return leaves;
-}
+  calendarInstance = null;
+  currentRange = null;
+  lastLoadToken += 1;
+  if (loaderEl?.parentElement) {
+    loaderEl.parentElement.removeChild(loaderEl);
+  }
+  loaderEl = null;
+};
 
 function renderEventContent(arg) {
   const type = arg.event.extendedProps?.type;
@@ -197,16 +197,100 @@ function renderEventContent(arg) {
   };
 }
 
-const wireNavigationButtons = (calendarApi) => {
-  if (!calendarApi) return;
+const wireNavigationButtons = () => {
+  if (navigationWired) return;
+  navigationWired = true;
   const hook = (id, action) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', action);
   };
-  hook('btn-prev', () => calendarApi.prev());
-  hook('btn-next', () => calendarApi.next());
-  hook('btn-today', () => calendarApi.today());
+  hook('btn-prev', () => calendarInstance?.prev());
+  hook('btn-next', () => calendarInstance?.next());
+  hook('btn-today', () => calendarInstance?.today());
 };
+
+async function fetchOrders(startStr, endStr) {
+  const firestore = getDbInstance();
+  if (!firestore) {
+    console.warn('[Calendar] Brak połączenia z Firestore – pomijam pobieranie zdarzeń.');
+    return [];
+  }
+
+  const docs = [];
+  const dateFields = ['date', 'start', 'startDate'];
+  for (const field of dateFields) {
+    try {
+      const ref = collection(firestore, 'orders');
+      const qRef = query(ref, where(field, '>=', startStr), where(field, '<=', endStr), orderBy(field));
+      const snap = await getDocs(qRef);
+      snap.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+      if (snap.size > 0) break;
+    } catch (error) {
+      console.warn(`[Calendar] Nie udało się pobrać orders po polu ${field}.`, error);
+    }
+  }
+  if (!docs.length) {
+    try {
+      const legacyRef = collection(firestore, 'zlecenia');
+      const qLegacy = query(legacyRef, where('date', '>=', startStr), where('date', '<=', endStr), orderBy('date'));
+      const snap = await getDocs(qLegacy);
+      snap.forEach((docSnap) => docs.push({ id: docSnap.id, ...docSnap.data() }));
+    } catch (error) {
+      console.warn('[Calendar] Nie udało się pobrać zlecenia (legacy).', error);
+    }
+  }
+  return docs;
+}
+
+async function fetchLeaves(startStr, endStr) {
+  const firestore = getDbInstance();
+  if (!firestore) return [];
+  const leaves = [];
+  const collections = ['leaves', 'calendarFlags'];
+  for (const col of collections) {
+    try {
+      const ref = collection(firestore, col);
+      const qRef = query(ref, where('date', '>=', startStr), where('date', '<=', endStr), orderBy('date'));
+      const snap = await getDocs(qRef);
+      snap.forEach((docSnap) => leaves.push({ id: docSnap.id, ...docSnap.data() }));
+      if (snap.size > 0) break;
+    } catch (error) {
+      console.warn(`[Calendar] Nie udało się pobrać wpisów urlopowych z ${col}.`, error);
+    }
+  }
+  return leaves;
+}
+
+async function reloadEvents(rangeStart, rangeEnd) {
+  if (!calendarInstance) return;
+  const activeStart = startOfMonth(rangeStart);
+  const startStr = toDayString(activeStart);
+  const endStr = toDayString(endOfMonth(rangeEnd || rangeStart));
+  if (!startStr || !endStr) return;
+
+  const loadId = ++lastLoadToken;
+  setLoading(true);
+  try {
+    const [orders, leaves] = await Promise.all([fetchOrders(startStr, endStr), fetchLeaves(startStr, endStr)]);
+    if (loadId !== lastLoadToken) return;
+    const events = mapDocsToEvents(orders, leaves);
+    calendarInstance.removeAllEvents();
+    calendarInstance.addEventSource(events);
+    const sample = events.slice(0, 3);
+    console.debug('[Calendar] events:', events.length, { range: `${startStr}..${endStr}`, sample });
+    if (events.length === 0) {
+      console.warn(`[Calendar] Brak zdarzeń do wyświetlenia dla zakresu ${startStr}..${endStr}.`);
+    }
+  } catch (error) {
+    if (loadId === lastLoadToken) {
+      console.error('[Calendar] Events loader error', error);
+    }
+  } finally {
+    if (loadId === lastLoadToken) {
+      setLoading(false);
+    }
+  }
+}
 
 export function renderDaySummaries() {}
 
@@ -214,75 +298,71 @@ export function initCalendar(container, _events = [], _flags = [], extraOptions 
   const FullCalendar = window.FullCalendar;
   if (!FullCalendar || !container) return null;
 
+  destroyCalendarInstance();
+  calendarHost = container;
+  calendarHost.innerHTML = '';
+  currentRange = null;
+
+  const calendarEl = document.createElement('div');
+  calendarEl.id = 'calendar';
+  calendarHost.appendChild(calendarEl);
+
+  const { onDatesSet, eventDidMount, ...restOptions } = extraOptions || {};
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
-  const options = {
-    ...extraOptions,
+  calendarInstance = new FullCalendar.Calendar(calendarEl, {
+    ...restOptions,
     locale: localeOption,
-    initialView: 'dayGridMonth',
-    timeZone: 'local',
+    initialView: restOptions?.initialView || 'dayGridMonth',
+    timeZone: restOptions?.timeZone || 'local',
     height: 'auto',
     dayMaxEventRows: 3,
     moreLinkClick: 'popover',
     displayEventTime: false,
     eventDisplay: 'block',
+    events: [],
     eventContent: renderEventContent,
-  };
-
-  const calendar = new FullCalendar.Calendar(container, options);
-  calendar.setOption('eventOrder', (a, b) => {
+  });
+  calendarInstance.setOption('eventOrder', (a, b) => {
     const rank = { leave: 0, dayOff: 0, holiday: 0, order: 1, summary: 2 };
     const aType = a.extendedProps?.type;
     const bType = b.extendedProps?.type;
     return (rank[aType] ?? 99) - (rank[bType] ?? 99);
   });
-  calendar.setOption('eventClassNames', (arg) => {
+  calendarInstance.setOption('eventClassNames', (arg) => {
     const type = arg.event.extendedProps?.type;
     if (type === 'summary') return ['fc-event--summary'];
     if (type === 'leave' || type === 'dayOff' || type === 'holiday') return ['fc-event--icon-only'];
     return ['fc-event--order'];
   });
-  calendar.setOption('events', async (info, success, failure) => {
-    try {
-      const activeStart = startOfMonth(info.start);
-      const activeEnd = endOfMonth(info.start);
-      const startStr = toDayString(activeStart);
-      const endStr = toDayString(activeEnd);
-      const [orders, leaves] = await Promise.all([fetchOrders(startStr, endStr), fetchLeaves(startStr, endStr)]);
-      const events = mapDocsToEvents(orders, leaves);
-      const sample = events.slice(0, 3);
-      console.debug('[Calendar] events:', events.length, { range: `${startStr}..${endStr}`, sample });
-      if (events.length === 0) {
-        console.warn(`[Calendar] Brak zdarzeń do wyświetlenia dla zakresu ${startStr}..${endStr}.`);
-      }
-      success(events);
-    } catch (err) {
-      console.error('events loader error', err);
-      failure(err);
-    }
+  calendarInstance.setOption('datesSet', (info) => {
+    currentRange = { start: info.start, end: info.end };
+    if (typeof onDatesSet === 'function') onDatesSet(info);
+    reloadEvents(info.start, info.end);
+    requestAnimationFrame(() => {
+      try {
+        calendarInstance?.updateSize();
+      } catch (_) {}
+    });
   });
-
-  const baseDatesSet = options.datesSet;
-  calendar.setOption('datesSet', (info) => {
-    if (typeof baseDatesSet === 'function') baseDatesSet(info);
-    if (typeof extraOptions.onDatesSet === 'function') extraOptions.onDatesSet(info);
-    requestAnimationFrame(() => calendar.updateSize());
-  });
-  if (typeof extraOptions.eventDidMount === 'function') {
-    calendar.setOption('eventDidMount', (info) => extraOptions.eventDidMount(info));
+  if (typeof eventDidMount === 'function') {
+    calendarInstance.setOption('eventDidMount', (info) => eventDidMount(info));
   }
 
-  calendar.render();
-  wireNavigationButtons(calendar.getApi());
+  calendarInstance.render();
+  wireNavigationButtons();
   window.addEventListener('resize', () => {
     try {
-      calendar.updateSize();
+      calendarInstance?.updateSize();
     } catch (_) {}
   });
-  return calendar;
+  return calendarInstance;
 }
 
-export function updateCalendarData(calendar, flags = []) {
-  if (!calendar) return;
-  calendar.setOption('customFlags', flags || []);
-  calendar.refetchEvents();
+export function updateCalendarData(_calendar, flags = []) {
+  if (flags && flags.length) {
+    console.debug('[Calendar] updateCalendarData flags', flags);
+  }
+  if (calendarInstance && currentRange) {
+    reloadEvents(currentRange.start, currentRange.end);
+  }
 }

@@ -175,9 +175,12 @@ input::placeholder{color:var(--jd-text-500)}
   overflow: hidden;
 }
 
-.fc .fc-daygrid-body,
+.fc .fc-daygrid-body {
+  overflow: hidden;
+}
+
 .fc .fc-daygrid-day-frame {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .fc .fc-bg-event,
@@ -367,9 +370,32 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
   height:100%;
   font-size:28px;
   opacity:.9;
+  pointer-events:none;
 }
 .fc-daygrid-day-frame{
   overflow:hidden;
+}
+
+.calendar-wrap{
+  position:relative;
+}
+.calendar-container{
+  position:relative;
+}
+.calendar-loading{
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.05));
+  z-index:5;
+  color:#f6f7fb;
+  font-weight:600;
+  letter-spacing:.02em;
+}
+.calendar-loading.is-active{
+  display:flex;
 }
 
 .list-pagination{
