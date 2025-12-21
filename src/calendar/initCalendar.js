@@ -96,7 +96,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         return; // <--- krytyczne: nie renderuj sumy
       }
 
-      // 2) Normalny dzień: kafel sumy tylko jeśli istnieją jakiekolwiek dane > 0
+      // 2) Normalny dzień: kafel sumy tylko jeśli summaryByDay ma wpis
       if (!sum) {
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
