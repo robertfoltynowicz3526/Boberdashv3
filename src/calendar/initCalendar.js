@@ -67,54 +67,45 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     eventDisplay: 'block',
     eventOrder: 'sortOrder,title',
     dayCellClassNames: (arg) => {
-      const iso = arg.date.toISOString().slice(0, 10);
-      const leave = window.__calendarDecorations?.leaveByDate?.[iso];
-      if (!leave) return [];
-      const base = ['day-leave', `day-leave--${leave.kind}`];
-      const extra = typeof extraDayCellClassNames === 'function' ? extraDayCellClassNames(arg) : [];
-      return [...base, ...(Array.isArray(extra) ? extra : [])];
+      if (typeof extraDayCellClassNames === 'function') {
+        const extra = extraDayCellClassNames(arg);
+        return Array.isArray(extra) ? extra : [];
+      }
+      return [];
     },
     dayCellDidMount: (arg) => {
       const iso = arg.date.toISOString().slice(0, 10);
       const deco = window.__calendarDecorations || {};
-      const leave = deco.leaveByDate?.[iso];
       const sum = deco.summaryByDate?.[iso];
+      const leave = deco.leaveByDate?.[iso];
 
-      const old = arg.el.querySelector('.day-deco');
-      if (old) old.remove();
-
-      if (!leave && !sum) {
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return;
-      }
-
-      const wrap = document.createElement('div');
-      wrap.className = 'day-deco';
+      arg.el.querySelectorAll('.cell-sum, .cell-leave').forEach(n => n.remove());
 
       if (leave) {
-        const chip = document.createElement('div');
-        chip.className = `day-chip day-chip--leave day-chip--${leave.kind}`;
-        chip.textContent = `${leave.icon} ${leave.label}`;
-        wrap.appendChild(chip);
+        const label =
+          leave === 'L4' ? 'L4' :
+          (leave === 'SWIETO' ? 'Święto' : 'Urlop');
+
+        const l = document.createElement('div');
+        l.className = 'cell-leave';
+        l.textContent = label;
+        arg.el.appendChild(l);
       }
 
       if (sum) {
         const parts = [];
-        if (sum.work > 0) parts.push(`P:${sum.work.toFixed(1)}h`);
-        if (sum.drive > 0) parts.push(`J:${sum.drive.toFixed(1)}h`);
-        if (sum.billed > 0) parts.push(`F:${sum.billed.toFixed(1)}h`);
-        if (sum.over > 0) parts.push(`N:${sum.over.toFixed(1)}h`);
+        if (sum.work > 0) parts.push(`Praca: ${sum.work.toFixed(1)}h`);
+        if (sum.drive > 0) parts.push(`Jazda: ${sum.drive.toFixed(1)}h`);
+        if (sum.billed > 0) parts.push(`Fakturowane: ${sum.billed.toFixed(1)}h`);
 
         if (parts.length) {
           const s = document.createElement('div');
-          s.className = 'day-chip day-chip--sum';
-          s.textContent = parts.join(' • ');
-          wrap.appendChild(s);
+          s.className = 'cell-sum';
+          s.textContent = `• ${parts.join(' • ')}`;
+          arg.el.appendChild(s);
         }
       }
 
-      arg.el.style.position = 'relative';
-      arg.el.prepend(wrap);
       if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
     },
     events: async (info, success) => {

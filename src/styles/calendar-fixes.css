@@ -97,166 +97,45 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   font-size: 12px;
 }
 
-.calendar-shell .leave-event {
-  background: rgba(0,0,0,0) !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-.calendar-shell .leave-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  line-height: 30px;
-  width: 44px;
-  height: 44px;
-  margin: 6px auto 2px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35));
-}
-
-.calendar-shell .leave-l4 .leave-icon,
-.calendar-shell .leave-free .leave-icon,
-.calendar-shell .leave-holiday .leave-icon {
-  font-size: 30px;
-}
-
 /* Opcjonalny panel scrollowalny do list */
 .scroll-panel {
   max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
 
-/* Subtelne tło dla dni wolnych */
-.fc .leave-bg {
-  opacity: 0.25;
-}
-.fc .leave-bg--L4 { opacity: 0.28; }
-.fc .leave-bg--SWIETO { opacity: 0.22; }
-.fc .leave-bg--URL { opacity: 0.22; }
-
-/* Mała plakietka (badge) dla L4/Urlop/Święto */
-.fc .leave-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: auto;
-  max-width: 100%;
-  border-radius: 10px;
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 2px 8px;
-  margin-top: 2px;
-  border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(0,0,0,0.35);
-  backdrop-filter: blur(4px);
-}
-.fc .leave-badge .fc-event-main { padding: 0 !important; }
-.fc .leave-badge .fc-event-title { font-weight: 700; }
-
-/* Ewidencja dnia ma być mała i tylko gdy ma sens */
-.fc .strip-summary {
-  border-radius: 12px;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-.fc .strip-summary .fc-event-main { padding: 0 !important; }
-
-/* Summary (podsumowanie dnia) – kompakt */
-.fc .strip-summary {
-  border-radius: 12px;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-.fc .strip-summary .fc-event-main { padding: 0 !important; }
-.fc .summary-inline { font-weight: 700; }
-
-/* Zlecenia – tylko tytuł */
-.fc .fc-title-only { font-weight: 600; }
-
-/* Dni wolne – subtelne tło */
-.fc .leave-bg { opacity: 0.22; }
-
-/* Dni wolne – badge z ikoną (bez “full blue”) */
-.fc .leave-badge.fc-event {
-  background: rgba(0,0,0,0.35) !important;
-  border: 1px solid rgba(255,255,255,0.25) !important;
-  color: #fff !important;
-  border-radius: 999px !important;
+/* Zlecenia: pill jak na screenie */
+.fc .order-event.fc-event {
+  border-radius: 10px !important;
   padding: 2px 8px !important;
   font-size: 12px !important;
   line-height: 1.2 !important;
 }
-.fc .leave-badge .fc-event-main { padding: 0 !important; }
-.fc .leave-badge .fc-event-title { font-weight: 800; }
+.fc .order-event .fc-event-main { padding: 0 !important; }
+.fc .fc-title-only { font-weight: 700; }
 
-/* Zlecenie: tylko tytuł klienta */
-.fc .order-event .fc-event-title { font-weight: 700; }
-
-/* Podsumowanie dnia: jedna linia */
-.fc .strip-summary { border-radius: 12px; padding: 2px 8px; font-size: 12px; line-height: 1.2; }
-.fc .strip-summary .fc-event-main { padding: 0 !important; }
-.fc .summary-inline { font-weight: 800; }
-
-/* Tło dnia wolnego */
-.fc .leave-bg { opacity: 0.22; }
-
-/* Badge dnia wolnego: WYRAŹNY */
-.fc .leave-badge.fc-event {
-  background: rgba(0,0,0,0.55) !important;
-  border: 1px solid rgba(255,255,255,0.35) !important;
-  color: #fff !important;
-  border-radius: 999px !important;
-  padding: 2px 10px !important;
-  font-size: 13px !important;
-  line-height: 1.2 !important;
-}
-.fc .leave-badge .fc-event-main { padding: 0 !important; }
-.fc .leave-badge .fc-event-title { font-weight: 900; }
-
-/* Dekoracje w komórce dnia */
-.fc .day-deco{
-  position:absolute;
-  top:4px;
-  left:4px;
-  right:4px;
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-  z-index:3;
-  pointer-events:none;
+/* Podsumowanie dnia jako belka na dole komórki */
+.fc .fc-daygrid-day-frame { position: relative; } /* ważne */
+.fc .cell-sum{
+  margin: 4px 6px 6px 6px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  pointer-events: none;
 }
 
-.fc .day-chip{
-  border-radius:999px;
-  padding:2px 8px;
-  font-size:12px;
-  line-height:1.2;
-  font-weight:800;
-  background:rgba(0,0,0,0.40);
-  border:1px solid rgba(255,255,255,0.25);
-  color:#fff;
-  backdrop-filter: blur(4px);
+/* Wolne – subtelny napis w tle (bez eventów) */
+.fc .cell-leave{
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.35;
+  pointer-events: none;
+  text-transform: none;
 }
-
-.fc .day-chip--sum{
-  font-weight:900;
-}
-
-/* Czytelne dni wolne */
-.fc .day-chip--leave{ background:rgba(0,0,0,0.55); }
-.fc .day-leave{ }
-.fc .day-leave--L4{ }
-.fc .day-leave--SWIETO{ }
-.fc .day-leave--URL{ }
-
-/* Subtelne tło komórki, gdy wolne */
-.fc .day-leave--L4 { box-shadow: inset 0 0 0 9999px rgba(255, 0, 0, 0.06); }
-.fc .day-leave--SWIETO { box-shadow: inset 0 0 0 9999px rgba(255, 255, 0, 0.05); }
-.fc .day-leave--URL { box-shadow: inset 0 0 0 9999px rgba(0, 140, 255, 0.05); }
-
-/* Zlecenia: tylko nazwa klienta, bez “kafli godzinowych” */
-.fc .order-event .fc-event-title{ font-weight:800; }
-.fc .fc-title-only{ font-weight:800; }
