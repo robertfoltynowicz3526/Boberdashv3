@@ -79,17 +79,39 @@ function refreshDayFlags(calendar) {
   });
 }
 
-export function bootCalendar(extraOptions = {}, hostEl = null) {
-  const el = hostEl || document.getElementById('calendar') || document.getElementById('kalendarz');
-  if (!el) return null;
+export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
+  const el =
+    hostEl ||
+    document.getElementById('kalendarz') ||
+    document.getElementById('calendar') ||
+    document.getElementById('kalendarz-container');
 
-  const plugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
-  if (!Calendar || plugins.length === 0) {
-    console.error('FullCalendar resources not available');
-    return null;
+  if (!el) throw new Error('Nie znaleziono kontenera kalendarza (#kalendarz / #calendar).');
+
+  if (window.__fcCalendar) {
+    try {
+      window.__fcCalendar.destroy();
+    } catch (_) {}
+    window.__fcCalendar = null;
   }
 
-  const calendar = new Calendar(el, {
+  const {
+    dayCellDidMount: extraDayCellDidMount,
+    datesSet: extraDatesSet,
+    eventsSet: extraEventsSet,
+    selectAllow: extraSelectAllow,
+    dateClick: extraDateClick,
+    select: extraSelect,
+    eventDataTransform: extraEventDataTransform,
+    eventContent: extraEventContent,
+    eventDidMount: extraEventDidMount,
+    eventClick: extraEventClick,
+    ...restExtraOptions
+  } = extraOptions || {};
+
+  const plugins = (extraOptions?.plugins?.length ? extraOptions.plugins : [dayGridPlugin, interactionPlugin]).filter(Boolean);
+
+  const baseOptions = {
     plugins,
     initialView: 'dayGridMonth',
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
@@ -108,7 +130,8 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
     eventOrder: 'start,-duration,title',
     dayCellDidMount: (info) => {
       const frame = info.el.querySelector('.fc-daygrid-day-frame') || info.el;
-      applyFlagToCell(calendar, frame, info.date);
+      applyFlagToCell(window.__fcCalendar, frame, info.date);
+      if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(info);
     },
     events: async (info, success) => {
       try {
@@ -153,8 +176,9 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
     },
     selectAllow: (selection) => {
       try {
-        const flag = getLeaveFlagForDate(calendar, selection?.start);
-        return !flag;
+        const flag = getLeaveFlagForDate(window.__fcCalendar, selection?.start);
+        const extraAllowed = typeof extraSelectAllow === 'function' ? extraSelectAllow(selection) : true;
+        return !flag && extraAllowed;
       } catch (e) {
         console.error('selectAllow error:', e);
         return true;
@@ -162,7 +186,7 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
     },
     eventContent: (info) => {
       const classNames = info.event.classNames || [];
-      if (!classNames.includes('strip-summary')) return undefined;
+      if (!classNames.includes('strip-summary')) return typeof extraEventContent === 'function' ? extraEventContent(info) : undefined;
       const p = info.event.extendedProps || {};
       const work = Number(p.workHours ?? p.praca ?? 0) || 0;
       const drive = Number(p.driveHours ?? p.jazda ?? 0) || 0;
@@ -174,6 +198,10 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
       if (over > 0) parts.push(`Nadg.: ${over.toFixed(1)}h`);
       if (billed > 0) parts.push(`Fakt.: ${billed.toFixed(1)}h`);
       const html = parts.join(' • ');
+      if (typeof extraEventContent === 'function') {
+        const extra = extraEventContent(info);
+        if (extra != null) return extra;
+      }
       if (!html) return { html: '' };
       return { html };
     },
@@ -188,40 +216,102 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
           info.el.style.display = 'none';
         }
       }
+      if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },
-    ...extraOptions,
-  });
+    datesSet: (...args) => {
+      renderDaySummaries(window.__fcCalendar);
+      refreshDayFlags(window.__fcCalendar);
+      if (typeof extraDatesSet === 'function') extraDatesSet(...args);
+    },
+    eventsSet: (...args) => {
+      renderDaySummaries(window.__fcCalendar);
+      refreshDayFlags(window.__fcCalendar);
+      if (typeof extraEventsSet === 'function') extraEventsSet(...args);
+    },
+    dateClick: (info) => {
+      if (typeof extraDateClick === 'function') extraDateClick(info);
+    },
+    select: (info) => {
+      if (typeof extraSelect === 'function') extraSelect(info);
+    },
+    eventDataTransform: (info) => (typeof extraEventDataTransform === 'function' ? extraEventDataTransform(info) : info),
+    eventClick: (info) => {
+      if (typeof extraEventClick === 'function') extraEventClick(info);
+    },
+    ...restExtraOptions,
+  };
 
-  calendar.render();
+  const resourceOptions = {
+    ...baseOptions,
+  };
+
+  const fallbackOptions = {
+    ...baseOptions,
+    initialView: baseOptions.initialView || 'dayGridMonth',
+  };
+
+  let calendar = null;
+
+  try {
+    calendar = new Calendar(el, resourceOptions);
+    window.__fcCalendar = calendar;
+    calendar.render();
+  } catch (e) {
+    const msg = String(e?.message || e);
+    console.warn('[calendar] resources unavailable -> fallback', e);
+
+    if (msg.toLowerCase().includes('resource') || msg.toLowerCase().includes('resources')) {
+      try {
+        calendar = new Calendar(el, fallbackOptions);
+        window.__fcCalendar = calendar;
+        calendar.render();
+        const noteId = 'calendar-fallback-note';
+        if (!document.getElementById(noteId)) {
+          const note = document.createElement('div');
+          note.id = noteId;
+          note.textContent = 'Kalendarz uruchomiony w trybie bez zasobów (resources).';
+          note.style.cssText = 'margin:8px 0;padding:6px 10px;border-radius:10px;background:rgba(0,0,0,0.25);font-size:12px;';
+          el.parentElement?.insertBefore(note, el);
+        }
+      } catch (e2) {
+        throw e2;
+      }
+    } else {
+      throw e;
+    }
+  }
+
   renderDaySummaries(calendar);
   refreshDayFlags(calendar);
-  calendar.on('datesSet', () => {
-    renderDaySummaries(calendar);
-    refreshDayFlags(calendar);
-  });
-  calendar.on('eventsSet', () => {
-    renderDaySummaries(calendar);
-    refreshDayFlags(calendar);
-  });
 
   let ro = null;
   try {
     if ('ResizeObserver' in window) {
-      ro = new window.ResizeObserver(() => calendar.updateSize());
+      ro = new window.ResizeObserver(() => window.__fcCalendar?.updateSize?.());
       ro.observe(el);
     }
   } catch (e) {
     console.warn('ResizeObserver fallback:', e);
   }
   if (!ro) {
-    window.addEventListener('resize', () => calendar.updateSize());
+    window.addEventListener('resize', () => window.__fcCalendar?.updateSize?.());
   }
 
   document.getElementById('btnPrev')?.addEventListener('click', () => calendar.prev());
   document.getElementById('btnNext')?.addEventListener('click', () => calendar.next());
   document.getElementById('btnToday')?.addEventListener('click', () => calendar.today());
 
+  setTimeout(() => {
+    try {
+      window.__fcCalendar?.updateSize?.();
+    } catch (_) {}
+  }, 50);
+
   return calendar;
+}
+
+export function bootCalendar(extraOptions = {}, hostEl = null) {
+  return inicjalizujKalendarz(extraOptions, hostEl);
 }
 
 export function initCalendar(hostEl, events = [], flags = [], extraOptions = {}) {

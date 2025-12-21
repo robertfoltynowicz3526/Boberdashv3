@@ -727,8 +727,15 @@ function initializeApp() {
             }
         }
         setTimeout(() => {
-            calendar.updateSize();
-            calendar.updateDates();
+            const cal = window.__fcCalendar;
+            if (cal && typeof cal.updateSize === 'function') {
+                cal.updateSize();
+            } else {
+                console.warn('[calendar] updateSize skipped (calendar not ready)');
+            }
+            if (cal && typeof cal.updateDates === 'function') {
+                cal.updateDates();
+            }
             window.dispatchEvent(new Event('resize'));
         }, 0);
         window.addEventListener('resize', handleCalendarResize);
