@@ -30,16 +30,7 @@ const getLeaveFlagForDate = (calendar, date) => {
   return type ? { type } : null;
 };
 
-const getStripSummaryValues = (event) => {
-  const props = event?.extendedProps || {};
-  const work = Number(props.workHours ?? props.workH) || 0;
-  const drive = Number(props.driveHours ?? props.driveH) || 0;
-  const billed = Number(props.billedHours ?? props.billH ?? props.fh) || 0;
-  const nadgodziny = Number(props.nadgodziny ?? props.overtime) || 0;
-  return { work, drive, billed, nadgodziny };
-};
-
-function renderDaySummaries(calendar) {
+export function renderDaySummaries(calendar) {
   if (!calendar?.el) return;
   calendar.el.querySelectorAll('.day-summary').forEach((n) => n.remove());
   const toNum = (value) => (value == null ? 0 : Number(value) || 0);
@@ -88,8 +79,8 @@ function refreshDayFlags(calendar) {
   });
 }
 
-export function bootCalendar(extraOptions = {}) {
-  const el = document.getElementById('calendar') || document.getElementById('kalendarz');
+export function bootCalendar(extraOptions = {}, hostEl = null) {
+  const el = hostEl || document.getElementById('calendar') || document.getElementById('kalendarz');
   if (!el) return null;
 
   const plugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
@@ -172,11 +163,15 @@ export function bootCalendar(extraOptions = {}) {
     eventContent: (info) => {
       const classNames = info.event.classNames || [];
       if (!classNames.includes('strip-summary')) return undefined;
-      const { work, drive, billed, nadgodziny } = getStripSummaryValues(info.event);
+      const p = info.event.extendedProps || {};
+      const work = Number(p.workHours ?? p.praca ?? 0) || 0;
+      const drive = Number(p.driveHours ?? p.jazda ?? 0) || 0;
+      const billed = Number(p.billedHours ?? p.fakturowane ?? 0) || 0;
+      const over = Number(p.nadgodziny ?? 0) || 0;
       const parts = [];
       if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
       if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
-      if (nadgodziny > 0) parts.push(`Nadg.: ${nadgodziny.toFixed(1)}h`);
+      if (over > 0) parts.push(`Nadg.: ${over.toFixed(1)}h`);
       if (billed > 0) parts.push(`Fakt.: ${billed.toFixed(1)}h`);
       const html = parts.join(' • ');
       if (!html) return { html: '' };
@@ -184,8 +179,12 @@ export function bootCalendar(extraOptions = {}) {
     },
     eventDidMount: (info) => {
       if ((info.event.classNames || []).includes('strip-summary')) {
-        const { work, drive, billed, nadgodziny } = getStripSummaryValues(info.event);
-        if (work === 0 && drive === 0 && billed === 0 && nadgodziny === 0) {
+        const p = info.event.extendedProps || {};
+        const work = Number(p.workHours ?? p.praca ?? 0) || 0;
+        const drive = Number(p.driveHours ?? p.jazda ?? 0) || 0;
+        const billed = Number(p.billedHours ?? p.fakturowane ?? 0) || 0;
+        const over = Number(p.nadgodziny ?? 0) || 0;
+        if (work === 0 && drive === 0 && billed === 0 && over === 0) {
           info.el.style.display = 'none';
         }
       }
@@ -222,6 +221,19 @@ export function bootCalendar(extraOptions = {}) {
   document.getElementById('btnNext')?.addEventListener('click', () => calendar.next());
   document.getElementById('btnToday')?.addEventListener('click', () => calendar.today());
 
+  return calendar;
+}
+
+export function initCalendar(hostEl, events = [], flags = [], extraOptions = {}) {
+  setCalendarEvents(events);
+  setDayFlags(flags);
+  const calendar = bootCalendar(extraOptions, hostEl);
+  if (calendar) {
+    calendar.setOption('customFlags', flags || []);
+    calendar.refetchEvents();
+    renderDaySummaries(calendar);
+    refreshDayFlags(calendar);
+  }
   return calendar;
 }
 
