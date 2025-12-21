@@ -106,17 +106,12 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const drive = Number(sum.drive||0) || 0;
       const billed = Number(sum.billed||0) || 0;
       const over = Number(sum.over||0) || 0;
-
-      if (work === 0 && drive === 0 && billed === 0 && over === 0) {
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return;
-      }
-
-      const parts = [];
-      if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
-      if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
-      if (billed > 0) parts.push(`Fakturowane: ${billed.toFixed(1)}h`);
-      if (over > 0) parts.push(`Nadgodziny: ${over.toFixed(1)}h`);
+      const parts = [
+        `Praca: ${work.toFixed(1)}h`,
+        `Jazda: ${drive.toFixed(1)}h`,
+        `Fakturowane: ${billed.toFixed(1)}h`,
+        `Nadgodziny: ${over.toFixed(1)}h`,
+      ];
 
       const box = document.createElement('div');
       box.className = 'cell-sum';

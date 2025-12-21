@@ -936,6 +936,8 @@ function initializeApp() {
             const manualByDay = new Map();     // day -> {work, drive, billed, over}
             const ordersByDay = new Map();     // day -> {work, drive, billed, over}
             const leaveByDay = {};             // day -> leave kind
+            const hasManualDay = new Set();    // dni z ręcznym wpisem (nawet jeśli 0)
+            const hasOrderDay = new Set();     // dni z co najmniej jednym zleceniem
 
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
@@ -994,6 +996,7 @@ function initializeApp() {
 
                         const s = sumOrderLineItems(zlecenie);
                         addAgg(ordersByDay, day, s);
+                        hasOrderDay.add(day);
                     });
                 }
                 const hasAnySummaryHours =
@@ -1009,6 +1012,7 @@ function initializeApp() {
                         over: Number(dane?.nadgodziny ?? baseHoursProps?.nadgodziny ?? 0) || 0,
                     });
                 }
+                hasManualDay.add(day);
             });
 
             const mergedLeaveByDay = { ...leaveByDay, ...leaveByDayFromEvents };
@@ -1016,27 +1020,32 @@ function initializeApp() {
             const leaveSet = new Set(Object.keys(mergedLeaveByDay));
 
             for (let i = events.length - 1; i >= 0; i--) {
-                const day = events[i]?.extendedProps?.day || isoDay(events[i]?.start);
-                if (leaveSet.has(day)) events.splice(i, 1);
+                const d = events[i]?.extendedProps?.day || (typeof events[i]?.start === 'string' ? events[i].start.slice(0,10) : '');
+                if (leaveSet.has(d)) events.splice(i, 1);
+            }
+
+            for (const d of leaveSet) {
+                hasManualDay.delete(d);
+                hasOrderDay.delete(d);
+                manualByDay.delete?.(d);
+                ordersByDay.delete?.(d);
             }
 
             const summaryByDay = {};
-            const allDays = new Set([...manualByDay.keys(), ...ordersByDay.keys()]);
+            const allDays = new Set([...hasManualDay, ...hasOrderDay]);
+
             for (const day of allDays) {
-                if (leaveSet.has(day)) continue; // dzień wolny -> żadnych sum
+                if (leaveSet.has(day)) continue;
 
-                const m = manualByDay.get(day) || { work:0, drive:0, billed:0, over:0 };
-                const o = ordersByDay.get(day) || { work:0, drive:0, billed:0, over:0 };
+                const m = manualByDay.get(day) || {work:0, drive:0, billed:0, over:0};
+                const o = ordersByDay.get(day) || {work:0, drive:0, billed:0, over:0};
 
-                const work = (m.work||0) + (o.work||0);
-                const drive = (m.drive||0) + (o.drive||0);
-                const billed = (m.billed||0) + (o.billed||0);
-                const over = (m.over||0) + (o.over||0);
-
-                // jeśli brak danych -> nie zapisuj w ogóle (żeby kafel się nie pojawił)
-                if (work === 0 && drive === 0 && billed === 0 && over === 0) continue;
-
-                summaryByDay[day] = { work, drive, billed, over };
+                summaryByDay[day] = {
+                    work: (m.work||0) + (o.work||0),
+                    drive: (m.drive||0) + (o.drive||0),
+                    billed: (m.billed||0) + (o.billed||0),
+                    over: (m.over||0) + (o.over||0),
+                };
             }
 
             for (let i = events.length - 1; i >= 0; i--) {
