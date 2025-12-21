@@ -1,5 +1,7 @@
 import { getFirebaseApp, db } from './services/firebase.js';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, getCountFromServer, limit } from "firebase/firestore";
+import { colRefResolved, getCollections, LS_KEY, CANDIDATES } from './services/collections.js';
+import { humanFsError } from './services/fsError.js';
 import Papa from 'papaparse';
 import './styles.css';
 import './styles/desktop-only.css';
@@ -7,12 +9,117 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
 
+const collectionRefCache = {};
+async function getColRef(key) {
+    if (!collectionRefCache[key]) {
+        collectionRefCache[key] = colRefResolved(key);
+    }
+    return collectionRefCache[key];
+}
+async function docRefFromCol(key, ...segments) {
+    const col = await getColRef(key);
+    return doc(col, ...segments);
+}
+async function ensureCollectionsMap() {
+    return getCollections();
+}
+function renderFsError(targetEl, err) {
+    const msg = humanFsError(err);
+    if (targetEl) {
+        targetEl.innerHTML = `<div class="app-inline-warning">${msg}</div>`;
+    } else {
+        alert(msg);
+    }
+}
+
+async function renderDebugDataPage() {
+    const root = document.body;
+    root.innerHTML = '';
+    const container = document.createElement('div');
+    container.style.padding = '24px';
+    container.style.fontFamily = 'Inter, system-ui, sans-serif';
+    container.innerHTML = `
+      <h1>Diagnostyka Firestore</h1>
+      <p>Autodetekcja kolekcji jest cache'owana w <code>localStorage.${LS_KEY}</code>. Warianty nazw: ${Object.entries(CANDIDATES).map(([k, vals]) => `${k}: [${vals.join(', ')}]`).join(' | ')}</p>
+      <div style="display:flex; gap:12px; margin:12px 0;">
+        <button id="debug-clear-cache">Wyczyść cache detekcji kolekcji</button>
+        <button id="debug-recheck">Sprawdź kolekcje</button>
+      </div>
+      <div id="debug-cache"></div>
+      <div id="debug-results" style="margin-top:16px;"></div>
+    `;
+    root.appendChild(container);
+
+    const cacheDiv = container.querySelector('#debug-cache');
+    const resultsDiv = container.querySelector('#debug-results');
+
+    const renderCache = async () => {
+        const map = await ensureCollectionsMap();
+        cacheDiv.innerHTML = `<pre>${JSON.stringify(map, null, 2)}</pre>`;
+    };
+
+    const collectionsToCheck = [
+        { key: 'clients', label: 'Klienci' },
+        { key: 'machines', label: 'Maszyny' },
+        { key: 'orders', label: 'Zlecenia' },
+        { key: 'calendar', label: 'Kalendarz' },
+        { key: 'leaves', label: 'Urlopy' },
+    ];
+
+    const runDiagnostics = async () => {
+        resultsDiv.innerHTML = '';
+        for (const { key, label } of collectionsToCheck) {
+            const card = document.createElement('div');
+            card.style.border = '1px solid #e2e8f0';
+            card.style.borderRadius = '8px';
+            card.style.padding = '12px';
+            card.style.marginBottom = '12px';
+            card.innerHTML = `<h3>${label}</h3><div class="debug-content">Ładowanie...</div>`;
+            resultsDiv.appendChild(card);
+            const content = card.querySelector('.debug-content');
+            try {
+                const col = await getColRef(key);
+                const countSnap = await getCountFromServer(col);
+                const count = countSnap.data().count;
+                const snap = await getDocs(query(col, limit(5)));
+                const samples = [];
+                snap.forEach(d => samples.push({ id: d.id, ...d.data() }));
+                content.innerHTML = `
+                  <p>Liczba dokumentów: <strong>${count}</strong></p>
+                  <pre>${JSON.stringify(samples, null, 2) || '[]'}</pre>
+                `;
+            } catch (err) {
+                content.innerHTML = `<div class="app-inline-warning">${humanFsError(err)}</div>`;
+            }
+        }
+    };
+
+    container.querySelector('#debug-clear-cache').onclick = () => {
+        localStorage.removeItem(LS_KEY);
+        location.reload();
+    };
+    container.querySelector('#debug-recheck').onclick = runDiagnostics;
+
+    await renderCache();
+    await runDiagnostics();
+}
+
 // Uruchom dopiero po załadowaniu DOM:
-window.addEventListener('DOMContentLoaded', initializeApp);
+window.addEventListener('DOMContentLoaded', () => {
+    initializeApp().catch(err => {
+        console.error('Błąd inicjalizacji aplikacji:', err);
+        renderFsError(document.getElementById('firebase-missing-banner'), err);
+    });
+});
 
 
-function initializeApp() {
+async function initializeApp() {
     const app = getFirebaseApp();
+
+    if (window.location.hash === '#/debug-data') {
+        await renderDebugDataPage();
+        return;
+    }
 
     const warnEl = document.getElementById('firebase-missing-banner')
       || document.getElementById('firebaseWarning')
@@ -452,7 +559,7 @@ function initializeApp() {
         if (!dateKey) return;
         const normalizedKind = normalizeDayLeaveValue(leaveKind || '');
         const leaveDocId = getLeaveEventDocId(dateKey);
-        const leaveDocRef = doc(db, 'events', leaveDocId);
+        const leaveDocRef = await docRefFromCol('leaves', leaveDocId);
         if (!normalizedKind || normalizedKind === DAY_LEAVE_NONE) {
             try {
                 await deleteDoc(leaveDocRef);
@@ -479,11 +586,16 @@ function initializeApp() {
             type,
             extendedProps: { typ: type, type, leaveKind: normalizedKind }
         };
-        await setDoc(leaveDocRef, payload);
-        const withoutCurrent = removeLeaveEventsForId(leaveDocId);
-        const mapped = mapLeavePayloadToEvents(leaveDocId, payload);
-        leaveEvents = [...withoutCurrent, ...mapped];
-        przerysujZdarzeniaKalendarza();
+        try {
+            await setDoc(leaveDocRef, payload);
+            const withoutCurrent = removeLeaveEventsForId(leaveDocId);
+            const mapped = mapLeavePayloadToEvents(leaveDocId, payload);
+            leaveEvents = [...withoutCurrent, ...mapped];
+            przerysujZdarzeniaKalendarza();
+        } catch (err) {
+            console.error('Nie udało się zsynchronizować urlopu:', err);
+            renderFsError(kalendarzPodsumowanieDiv, err);
+        }
     }
 
     const trackedModals = [];
@@ -792,7 +904,7 @@ function initializeApp() {
         renderMultiZlecenia();
 
 
-        const docRef = doc(db, "godziny_pracy", data);
+        const docRef = await docRefFromCol('calendar', data);
         try {
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
@@ -1005,7 +1117,8 @@ function initializeApp() {
             flags
         };
         try {
-            await setDoc(doc(db, "godziny_pracy", data), dane);
+            const dayDocRef = await docRefFromCol('calendar', data);
+            await setDoc(dayDocRef, dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
             const localRecord = normalizeDayRecord(data, dane);
             localRecord.fakturowane = fakturowaneDoZapisu;
@@ -1024,6 +1137,7 @@ function initializeApp() {
             renderPodsumowanie();
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
+            renderFsError(kalendarzPodsumowanieDiv, e);
         }
     }
 
@@ -1035,12 +1149,20 @@ function initializeApp() {
         }
     }
 
-    function wyswietlWpisyKalendarza() {
+    async function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
             if (calendar) calendar.removeAllEvents();
             return;
         }
-        onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
+        let calendarCol;
+        try {
+            calendarCol = await getColRef('calendar');
+        } catch (err) {
+            console.error('Nie udało się pobrać kolekcji kalendarza:', err);
+            renderFsError(kalendarzPodsumowanieDiv, err);
+            return;
+        }
+        onSnapshot(calendarCol, (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
 
@@ -1133,12 +1255,16 @@ function initializeApp() {
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
+        }, (error) => {
+            console.error('Błąd nasłuchiwania kalendarza:', error);
+            renderFsError(kalendarzPodsumowanieDiv, error);
         });
     }
 
-    function nasluchujNaUrlopy() {
+    async function nasluchujNaUrlopy() {
         try {
-            onSnapshot(collection(db, 'events'), (snapshot) => {
+            const leavesCol = await getColRef('leaves');
+            onSnapshot(leavesCol, (snapshot) => {
                 leaveEvents = snapshot.docs.flatMap(docSnap => {
                     const data = docSnap.data() || {};
                     const baseProps = data.extendedProps || {};
@@ -1167,9 +1293,13 @@ function initializeApp() {
                 }).filter(Boolean);
                 przerysujZdarzeniaKalendarza();
                 leaveEventsReady = true;
+            }, (error) => {
+                console.error('Nie udało się pobrać urlopów:', error);
+                renderFsError(kalendarzPodsumowanieDiv, error);
             });
         } catch (error) {
             console.error('Nie udało się pobrać urlopów:', error);
+            renderFsError(kalendarzPodsumowanieDiv, error);
         }
     }
 
@@ -1220,8 +1350,14 @@ function initializeApp() {
         if (target.classList.contains('event-delete-btn')) {
             const data = target.dataset.date;
             if (confirm(`Czy na pewno chcesz usunąć wpis z dnia ${data}?`)) {
-                await deleteDoc(doc(db, "godziny_pracy", data));
-                await syncLeaveEventForDay(data, null);
+                try {
+                    const dayDoc = await docRefFromCol('calendar', data);
+                    await deleteDoc(dayDoc);
+                    await syncLeaveEventForDay(data, null);
+                } catch (error) {
+                    console.error('Nie udało się usunąć wpisu kalendarza:', error);
+                    renderFsError(kalendarzPodsumowanieDiv, error);
+                }
             }
         }
     }
@@ -1844,8 +1980,15 @@ function initializeApp() {
             telefon: klientForm['klient-telefon'].value || '---',
             createdAt: new Date()
         };
-        try { await addDoc(collection(db, "klienci"), dane); klientForm.reset(); }
-        catch (e) { console.error("Błąd dodawania klienta: ", e); }
+        try {
+            const clientsCol = await getColRef('clients');
+            await addDoc(clientsCol, dane);
+            klientForm.reset();
+        }
+        catch (e) {
+            console.error("Błąd dodawania klienta: ", e);
+            renderFsError(listaKlientowDiv, e);
+        }
     }
 
     function odswiezSelectKlientaDoZlecenia() {
@@ -2037,14 +2180,15 @@ function wyswietlKlientow() {
   }
 }
 
-function nasluchujNaKlientow() {
+async function nasluchujNaKlientow() {
   viewState.clients.loading = true;
   viewState.clients.error = null;
   wyswietlKlientow();
   try {
+    const clientsCol = await getColRef('clients');
     if (unsubscribeKlienci) unsubscribeKlienci();
     unsubscribeKlienci = onSnapshot(
-      query(collection(db, "klienci"), orderBy("nazwa")),
+      query(clientsCol, orderBy("nazwa")),
       (snapshot) => {
         _wszystkieKlienciCache = [];  // odśwież cache
         snapshot.forEach((docSnap) => {
@@ -2059,13 +2203,13 @@ function nasluchujNaKlientow() {
       },
       (error) => {
         viewState.clients.loading = false;
-        viewState.clients.error = error?.message || 'Nie udało się pobrać listy klientów.';
+        viewState.clients.error = humanFsError(error);
         wyswietlKlientow();
       }
     );
   } catch (err) {
     viewState.clients.loading = false;
-    viewState.clients.error = err?.message || 'Nie udało się pobrać listy klientów.';
+    viewState.clients.error = humanFsError(err);
     wyswietlKlientow();
   }
 }
@@ -2121,8 +2265,14 @@ async function obslugaListyKlientow(event) {
 
   if (event.target.classList.contains('delete-btn')) {
     if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "klienci", klientId));
-      wyswietlMaszyny();
+      try {
+        const klientDoc = await docRefFromCol('clients', klientId);
+        await deleteDoc(klientDoc);
+        wyswietlMaszyny();
+      } catch (error) {
+        console.error('Nie udało się usunąć klienta:', error);
+        renderFsError(listaKlientowDiv, error);
+      }
     }
     return;
   }
@@ -2141,8 +2291,9 @@ async function obslugaListyKlientow(event) {
         openModal(machineHistoryModal);
 
         try {
+            const ordersCol = await getColRef('orders');
             const qMasz = query(
-                collection(db, "zlecenia"),
+                ordersCol,
                 where("maszynaId", "==", maszynaId),
                 where("status", "==", "ukończone"),
                 orderBy("dataUkonczenia", "desc")
@@ -2231,10 +2382,14 @@ async function obslugaListyKlientow(event) {
             telefon: editKlientForm['edit-klient-telefon'].value || '---',
         };
         try {
-            await updateDoc(doc(db, "klienci", klientId), dane);
+            const klientDocRef = await docRefFromCol('clients', klientId);
+            await updateDoc(klientDocRef, dane);
 
             if (stareDane.nazwa !== nowaNazwa) {
-                const qMaszyny = query(collection(db, "maszyny"), where("klientId", "==", klientId));
+                const maszynyCol = await getColRef('machines');
+                const zleceniaCol = await getColRef('orders');
+                const kalendarzCol = await getColRef('calendar');
+                const qMaszyny = query(maszynyCol, where("klientId", "==", klientId));
                 const maszynySnap = await getDocs(qMaszyny);
                 const batchMaszyny = runTransaction(db, async (transaction) => {
                     maszynySnap.forEach(maszynaDoc => {
@@ -2242,7 +2397,7 @@ async function obslugaListyKlientow(event) {
                     });
                 });
 
-                const qZlecenia = query(collection(db, "zlecenia"), where("klientId", "==", klientId));
+                const qZlecenia = query(zleceniaCol, where("klientId", "==", klientId));
                 const zleceniaSnap = await getDocs(qZlecenia);
                 const batchZlecenia = runTransaction(db, async (transaction) => {
                     zleceniaSnap.forEach(zlecenieDoc => {
@@ -2255,7 +2410,7 @@ async function obslugaListyKlientow(event) {
                     .map(z => z.id);
 
                 if (powiazaneZleceniaIds.length > 0) {
-                    const qGodziny = query(collection(db, "godziny_pracy"), where("zlecenieId", "in", powiazaneZleceniaIds));
+                    const qGodziny = query(kalendarzCol, where("zlecenieId", "in", powiazaneZleceniaIds));
                     const godzinySnap = await getDocs(qGodziny);
                     const batchGodziny = runTransaction(db, async (transaction) => {
                         godzinySnap.forEach(godzinaDoc => {
@@ -2292,8 +2447,15 @@ async function obslugaListyKlientow(event) {
             motogodziny: Number(maszynaForm['maszyna-mth'].value) || 0,
             createdAt: new Date()
         };
-        try { await addDoc(collection(db, "maszyny"), dane); maszynaForm.reset(); }
-        catch (e) { console.error("Błąd dodawania maszyny: ", e); }
+        try {
+            const machinesCol = await getColRef('machines');
+            await addDoc(machinesCol, dane);
+            maszynaForm.reset();
+        }
+        catch (e) {
+            console.error("Błąd dodawania maszyny: ", e);
+            renderFsError(listaMaszynDiv, e);
+        }
     }
 
     function wyswietlMaszyny() {
@@ -2420,13 +2582,14 @@ async function obslugaListyKlientow(event) {
     }
 
 
-    function nasluchujNaMaszyny() {
+    async function nasluchujNaMaszyny() {
         viewState.machines.loading = true;
         viewState.machines.error = null;
         wyswietlMaszyny();
         try {
+            const machinesCol = await getColRef('machines');
             if (unsubscribeMaszyny) unsubscribeMaszyny();
-            unsubscribeMaszyny = onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
+            unsubscribeMaszyny = onSnapshot(query(machinesCol, orderBy("klientNazwa")), (snapshot) => {
                 _wszystkieMaszynyCache = [];
                 wszystkieMaszyny = [];
                 snapshot.forEach(docSnap => {
@@ -2441,12 +2604,12 @@ async function obslugaListyKlientow(event) {
                 wyswietlKlientow();
             }, (error) => {
                 viewState.machines.loading = false;
-                viewState.machines.error = error?.message || 'Nie udało się pobrać listy maszyn.';
+                viewState.machines.error = humanFsError(error);
                 wyswietlMaszyny();
             });
         } catch (err) {
             viewState.machines.loading = false;
-            viewState.machines.error = err?.message || 'Nie udało się pobrać listy maszyn.';
+            viewState.machines.error = humanFsError(err);
             wyswietlMaszyny();
         }
     }
@@ -2479,8 +2642,14 @@ async function obslugaListyKlientow(event) {
 
   if (el.classList.contains('delete-btn')) {
     if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "maszyny", maszynaId));
-      wyswietlKlientow();
+      try {
+        const maszynaDoc = await docRefFromCol('machines', maszynaId);
+        await deleteDoc(maszynaDoc);
+        wyswietlKlientow();
+      } catch (error) {
+        console.error('Nie udało się usunąć maszyny:', error);
+        renderFsError(listaMaszynDiv, error);
+      }
     }
     return;
   }
@@ -2526,10 +2695,12 @@ async function zapiszEdycjeMaszyny(event) {
         motogodziny: Number(editMaszynaForm['edit-maszyna-mth'].value) || 0,
     };
     try {
-        await updateDoc(doc(db, "maszyny", maszynaId), dane);
+        const maszynaDoc = await docRefFromCol('machines', maszynaId);
+        await updateDoc(maszynaDoc, dane);
 
         if (stareDane.model !== nowyModel || stareDane.typMaszyny !== nowyTyp) {
-            const qZlecenia = query(collection(db, "zlecenia"), where("maszynaId", "==", maszynaId));
+            const ordersCol = await getColRef('orders');
+            const qZlecenia = query(ordersCol, where("maszynaId", "==", maszynaId));
             await runTransaction(db, async (transaction) => {
                 const zleceniaSnap = await getDocs(qZlecenia);
                 zleceniaSnap.forEach(zlecenieDoc => {
@@ -2745,13 +2916,14 @@ function wyswietlZlecenia() {
 
 
 
-function nasluchujNaZlecenia() {
+async function nasluchujNaZlecenia() {
     viewState.orders.loading = true;
     viewState.orders.error = null;
     wyswietlZlecenia();
     try {
+        const ordersCol = await getColRef('orders');
         if (unsubscribeZlecenia) unsubscribeZlecenia();
-        unsubscribeZlecenia = onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
+        unsubscribeZlecenia = onSnapshot(query(ordersCol, orderBy("createdAt", "desc")), (snapshot) => {
             _wszystkieZleceniaCache = [];
             wszystkieZlecenia = [];
             snapshot.forEach(docSnap => {
@@ -2768,12 +2940,12 @@ function nasluchujNaZlecenia() {
             przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
         }, (error) => {
             viewState.orders.loading = false;
-            viewState.orders.error = error?.message || 'Nie udało się pobrać listy zleceń.';
+            viewState.orders.error = humanFsError(error);
             wyswietlZlecenia();
         });
     } catch (err) {
         viewState.orders.loading = false;
-        viewState.orders.error = err?.message || 'Nie udało się pobrać listy zleceń.';
+        viewState.orders.error = humanFsError(err);
         wyswietlZlecenia();
     }
 }
@@ -2784,6 +2956,7 @@ async function przeprowadzMigracjeStartEnd() {
     if (migracjaStartEndWykonana) return;
     migracjaStartEndWykonana = true;
     const aktualizacje = [];
+    const ordersCol = await getColRef('orders');
     for (const zlecenie of _wszystkieZleceniaCache) {
         const payload = {};
         if (!zlecenie.startAt) {
@@ -2798,7 +2971,7 @@ async function przeprowadzMigracjeStartEnd() {
         }
         if (Object.keys(payload).length > 0) {
             aktualizacje.push(
-                updateDoc(doc(db, "zlecenia", zlecenie.id), payload)
+                updateDoc(doc(ordersCol, zlecenie.id), payload)
                     .catch(err => console.error('[Migracja start/end 2024-05] Nie udało się zaktualizować', zlecenie.id, err))
             );
         }
@@ -2852,16 +3025,21 @@ async function dodajZlecenie(event) {
     } else { alert("Wybierz klienta i maszynę LUB opcję 'Szybkie Zlecenie'."); return; }
 
     try {
-        await addDoc(collection(db, "zlecenia"), dane);
+        const ordersCol = await getColRef('orders');
+        await addDoc(ordersCol, dane);
         if (dane.maszynaId && zlecenieForm.motogodziny.value) {
-            await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny });
+            const maszynaDoc = await docRefFromCol('machines', dane.maszynaId);
+            await updateDoc(maszynaDoc, { motogodziny: dane.motogodziny });
         }
         zlecenieForm.reset();
         zlecenieKlientSelect.value = '';
         zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
         zlecenieMaszynaSelect.disabled = true;
         zlecenieKlientSelect.dispatchEvent(new Event('change'));
-    } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
+    } catch (e) {
+        console.error("Błąd dodawania zlecenia: ", e);
+        renderFsError(aktywneZleceniaLista, e);
+    }
 }
 
 function handleDetailsButtonClick(docId, event) {
@@ -2888,7 +3066,15 @@ async function obslugaListyZlecen(event) {
     if (!docId) return;
 
     if (target.classList.contains('delete-btn')) {
-        if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); }
+        if (confirm("Na pewno usunąć?")) {
+            try {
+                const orderDoc = await docRefFromCol('orders', docId);
+                await deleteDoc(orderDoc);
+            } catch (error) {
+                console.error('Nie udało się usunąć zlecenia:', error);
+                renderFsError(aktywneZleceniaLista, error);
+            }
+        }
         return;
     }
     if (target.classList.contains('details-zlecenie-btn')) {
@@ -2911,7 +3097,7 @@ async function obslugaListyZlecen(event) {
     }
         if (target.classList.contains('complete-btn')) {
         if (!completeModal || !completeModalForm) return;
-        const docSnap = await getDoc(doc(db, "zlecenia", docId));
+        const docSnap = await getDoc(await docRefFromCol('orders', docId));
         if (docSnap.exists()) {
             const zlecenie = docSnap.data();
             const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
@@ -2948,7 +3134,7 @@ async function obslugaListyZlecen(event) {
     if (target.classList.contains('reopen-btn')) {
         const reopenReason = prompt("Powód ponownego otwarcia (opcjonalnie):", "");
         try {
-            const zlecenieRef = doc(db, "zlecenia", docId);
+            const zlecenieRef = await docRefFromCol('orders', docId);
             const snap = await getDoc(zlecenieRef);
             if (!snap.exists()) return;
             const data = snap.data();
@@ -3018,7 +3204,7 @@ async function zapiszEdycjeZlecenia(event) {
         return;
     }
 
-    const zlecenieRef = doc(db, "zlecenia", zlecenieId);
+    const zlecenieRef = await docRefFromCol('orders', zlecenieId);
     try {
         const zlecenieSnap = await getDoc(zlecenieRef);
         const zlecenieData = zlecenieSnap.data();
@@ -3138,27 +3324,35 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
     }
-    const qKalendarz = query(
-        collection(db, "godziny_pracy"),
-        orderBy("__name__", "desc")
-    );
-    const querySnapshotKalendarz = await getDocs(qKalendarz);
-    let kalendarzHtml = '';
-    querySnapshotKalendarz.forEach((docSnap) => {
-        const wpis = docSnap.data();
-        const { powiazane } = normalizujPowiazaneZlecenia(wpis);
-        const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
-        if (!powiazanie) return;
-        const dataWpisu = docSnap.id;
-        kalendarzHtml += `
+    try {
+        const calendarCol = await getColRef('calendar');
+        const qKalendarz = query(
+            calendarCol,
+            orderBy("__name__", "desc")
+        );
+        const querySnapshotKalendarz = await getDocs(qKalendarz);
+        let kalendarzHtml = '';
+        querySnapshotKalendarz.forEach((docSnap) => {
+            const wpis = docSnap.data();
+            const { powiazane } = normalizujPowiazaneZlecenia(wpis);
+            const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
+            if (!powiazanie) return;
+            const dataWpisu = docSnap.id;
+            kalendarzHtml += `
             <div class="calendar-entry-item">
                 <span class="date">[${dataWpisu}]</span>
                 Praca: ${formatujLiczbe(wpis.praca || 0)}h | Fakturowane dla zlecenia: ${formatujLiczbe(powiazanie.fakturowane)}h | Nadgodziny: ${formatujLiczbe(wpis.nadgodziny || 0)}h | Jazda: ${formatujLiczbe(wpis.jazda || 0)}h
                 ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
             </div>`;
-    });
-    if (kalendarzDiv) {
-        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+        });
+        if (kalendarzDiv) {
+            kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+        }
+    } catch (error) {
+        console.error('Nie udało się pobrać wpisów kalendarza:', error);
+        if (kalendarzDiv) {
+            kalendarzDiv.innerHTML = `<div class="app-inline-warning">${humanFsError(error)}</div>`;
+        }
     }
     opisDiv.innerHTML = zlecenie.opis ? `<p>${zlecenie.opis}</p>` : '<p>Brak opisu.</p>';
 
@@ -3178,7 +3372,8 @@ async function zapiszPrzypisanie(event) {
     const nowaMaszynaModel = assignForm['assign-nowa-maszyna-model'].value.trim();
     try {
         if (!klientId && nowyKlientNazwa) {
-            const nowyKlientDoc = await addDoc(collection(db, "klienci"), { nazwa: nowyKlientNazwa, createdAt: new Date() });
+            const clientsCol = await getColRef('clients');
+            const nowyKlientDoc = await addDoc(clientsCol, { nazwa: nowyKlientNazwa, createdAt: new Date() });
             klientId = nowyKlientDoc.id;
         }
         if (!klientId) { alert("Musisz wybrać lub dodać klienta."); return; }
@@ -3186,7 +3381,8 @@ async function zapiszPrzypisanie(event) {
             await new Promise(resolve => setTimeout(resolve, 500));
             const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
             if (!klient) { alert("Błąd: Nie znaleziono danych nowo dodanego klienta. Spróbuj ponownie."); return; }
-            const nowaMaszynaDoc = await addDoc(collection(db, "maszyny"), {
+            const machinesCol = await getColRef('machines');
+            const nowaMaszynaDoc = await addDoc(machinesCol, {
                 klientId: klientId, klientNazwa: klient.nazwa,
                 typMaszyny: nowaMaszynaTyp, model: nowaMaszynaModel, createdAt: new Date()
             });
@@ -3199,7 +3395,7 @@ async function zapiszPrzypisanie(event) {
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
         if (!maszyna) { alert("Błąd: Nie znaleziono danych wybranej/dodanej maszyny. Spróbuj ponownie."); return; }
 
-        const zlecenieRef = doc(db, "zlecenia", zlecenieId);
+        const zlecenieRef = await docRefFromCol('orders', zlecenieId);
         const zlecenieSnap = await getDoc(zlecenieRef);
         if (!zlecenieSnap.exists()) { alert("Błąd: Nie znaleziono zlecenia do przypisania."); return; }
         const zlecenieData = zlecenieSnap.data();
@@ -3300,7 +3496,7 @@ async function obslugaListyCzesci(event) {
             return;
         }
         const motoHours = Number.isFinite(motoHoursRaw) ? motoHoursRaw : 0;
-        const zlecenieRef = doc(db, "zlecenia", docId);
+        const zlecenieRef = await docRefFromCol('orders', docId);
 
         try {
             const zlecenieStartSnap = await getDoc(zlecenieRef);
