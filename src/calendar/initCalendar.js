@@ -185,32 +185,36 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       }
     },
     eventContent: (info) => {
-      const classNames = info.event.classNames || [];
-      if (!classNames.includes('strip-summary')) return typeof extraEventContent === 'function' ? extraEventContent(info) : undefined;
+      const classes = info.event.classNames || [];
+      const isSummary = classes.includes('strip-summary');
+
+      if (!isSummary) {
+        return { html: `<div class="fc-title-only">${info.event.title || ''}</div>` };
+      }
+
       const p = info.event.extendedProps || {};
       const work = Number(p.workHours ?? p.praca ?? 0) || 0;
       const drive = Number(p.driveHours ?? p.jazda ?? 0) || 0;
-      const billed = Number(p.billedHours ?? p.fakturowane ?? 0) || 0;
+      const billed = Number(p.billedHours ?? p.fakturowane ?? p.fh ?? 0) || 0;
       const over = Number(p.nadgodziny ?? 0) || 0;
+
       const parts = [];
       if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
       if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
-      if (over > 0) parts.push(`Nadg.: ${over.toFixed(1)}h`);
       if (billed > 0) parts.push(`Fakt.: ${billed.toFixed(1)}h`);
-      const html = parts.join(' • ');
-      if (typeof extraEventContent === 'function') {
-        const extra = extraEventContent(info);
-        if (extra != null) return extra;
-      }
-      if (!html) return { html: '' };
-      return { html };
+      if (over > 0) parts.push(`Nadg.: ${over.toFixed(1)}h`);
+
+      if (!parts.length) return { html: '' };
+
+      return { html: `<div class="summary-inline">${parts.join(' • ')}</div>` };
     },
     eventDidMount: (info) => {
-      if ((info.event.classNames || []).includes('strip-summary')) {
+      const classes = info.event.classNames || [];
+      if (classes.includes('strip-summary')) {
         const p = info.event.extendedProps || {};
         const work = Number(p.workHours ?? p.praca ?? 0) || 0;
         const drive = Number(p.driveHours ?? p.jazda ?? 0) || 0;
-        const billed = Number(p.billedHours ?? p.fakturowane ?? 0) || 0;
+        const billed = Number(p.billedHours ?? p.fakturowane ?? p.fh ?? 0) || 0;
         const over = Number(p.nadgodziny ?? 0) || 0;
         if (work === 0 && drive === 0 && billed === 0 && over === 0) {
           info.el.style.display = 'none';

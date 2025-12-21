@@ -398,6 +398,8 @@ function initializeApp() {
         if (!leaveId || !payload || !payload.start) return [];
         const leaveKind = normalizeDayLeaveValue(payload.extendedProps?.leaveKind || payload.leaveKind || payload.typ || payload.type || '');
         const kind = String(payload?.extendedProps?.leaveKind ?? payload?.leaveKind ?? payload?.typ ?? payload?.type ?? leaveKind ?? 'URL').toUpperCase();
+        const icon = kind === 'L4' ? '🤒' : (kind === 'SWIETO' ? '🎉' : '🏖️');
+        const label = kind === 'L4' ? 'L4' : (kind === 'SWIETO' ? 'Święto' : 'Urlop');
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
         const extendedProps = {
@@ -405,7 +407,7 @@ function initializeApp() {
             leaveKind: leaveKind || '',
             kind: leaveKind ? leaveKind.toLowerCase() : ''
         };
-        const badgeTitle = payload.title || LEAVE_TITLE_MAP[leaveKind] || 'Urlop';
+        const badgeTitle = `${icon} ${label}`;
         return [
             {
                 id: `${leaveId}::bg`,
@@ -1067,23 +1069,18 @@ function initializeApp() {
                         const machineModel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (zlecenie?.maszynaModel || '');
                         const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
                         const typZlecenia = zlecenie?.typZlecenia || null;
+                        const extendedProps = {
+                            client: klientLabel,
+                            machineModel,
+                            fh: Number(powiazanie.fakturowane) || 0,
+                            typ: typZlecenia
+                        };
                         events.push({
                             id: `powiazane_${id}_${powiazanie.zlecenieId || 'brak'}_${index}`,
                             title: klientLabel,
                             start: id,
                             allDay: true,
-                            extendedProps: {
-                                client: klientLabel,
-                                machineModel,
-                                fh: Number(powiazanie.fakturowane) || 0,
-                                typ: typZlecenia,
-                                workHours: 0,
-                                driveHours: 0,
-                                billedHours: Number(powiazanie.fakturowane) || 0,
-                                workH: 0,
-                                driveH: 0,
-                                billH: Number(powiazanie.fakturowane) || 0
-                            }
+                            extendedProps
                         });
                     });
                 }
@@ -1098,8 +1095,10 @@ function initializeApp() {
                     (billedHoursForSummary > 0);
 
                 if (!hasLeave && hasAnySummaryHours) {
+                    const summaryId = `summary_${id}`;
+                    if (events.some(e => e.id === summaryId)) return;
                     events.push({
-                        id: `godziny_${id}`,
+                        id: summaryId,
                         title: 'Ewidencja dnia',
                         start: id,
                         allDay: true,
