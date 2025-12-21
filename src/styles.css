@@ -121,15 +121,6 @@ input::placeholder{color:var(--jd-text-500)}
   border-radius:12px;padding:6px 8px;margin-top:4px;font-size:12px
 }
 
-/* Ikony L4/Święto/Urlop – centralnie, większe */
-.day-flag{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
-.day-flag .pill{
-  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;
-  box-shadow:0 4px 12px rgba(0,0,0,0.35)}
-.day-flag--urlop .pill{background:rgba(252,209,22,0.18);border:2px solid var(--accent)}
-.day-flag--wolne .pill{background:rgba(71,162,60,0.18);border:2px solid var(--jd-green-400)}
-.day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
-
 /* Kalendarz zawsze w ramie – nic nie wystaje */
 .calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:hidden}
 .fc{width:100%}
@@ -235,41 +226,11 @@ input::placeholder{color:var(--jd-text-500)}
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
 
-/* ikony flag (L4/Wolne/Święto) – wyśrodkowane, większe */
-.day-flag { position:static; inset:auto; display:flex; align-items:center; justify-content:center; width:48px; height:48px; margin:10px auto 2px; border-radius:12px; background:rgba(0,0,0,.28); pointer-events:none; }
-.day-flag.l4::before { content:"🏥"; font-size:26px; }
-.day-flag.off::before { content:"🏁"; font-size:26px; }
-.day-flag.holiday::before { content:"🌾"; font-size:26px; }
-
-/* safety: jeśli coś wpadnie w dzień z flagą, ukryj chipy */
-.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness { display:none !important; }
-
 /* --- Odstęp od góry dla chipów, żeby nie „przyklejały się” do krawędzi --- */
 .fc .fc-daygrid-day-frame { padding-top: 8px; }
 .fc-daygrid-day-events { margin-top: 8px; }
 .fc-daygrid-event-harness { margin-top: 8px !important; }
 .fc .fc-daygrid-block-event .fc-event-main { line-height: 1.2; }
-
-/* --- Ukryj nietreściwe/puste eventy, które mogłyby robić „pasek” --- */
-.fc-event:has(.fc-event-title:empty),
-.fc-h-event .fc-event-main:empty {
-  display: none !important;
-}
-
-/* --- Dni z flagą (L4 / Wolne / Święto) – wyśrodkowana większa ikona, bez chipów --- */
-.day-flag {
-  display: flex; align-items: center; justify-content: center;
-  width: 52px; height: 52px; margin: 12px auto 4px;
-  border-radius: 14px;
-  background: rgba(0,0,0,0.28);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.25) inset, 0 1px 0 rgba(255,255,255,0.08);
-}
-.day-flag.l4::before { content: "🏥"; font-size: 28px; }
-.day-flag.off::before { content: "🏁"; font-size: 28px; }
-.day-flag.holiday::before { content: "🌾"; font-size: 28px; }
-
-/* Jeśli dzień ma flagę – ukryj wszelkie chipy wewnątrz komórki */
-.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness { display: none !important; }
 
 /* --- Delikatne porządki kolorystyczne (John Deere vibe) --- */
 :root{
@@ -318,41 +279,6 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
 .fc-daygrid-event-harness .fc-event::before,
 .fc-daygrid-event-harness .fc-event::after{display:none !important;}
 
-/* Czytelne karty job/summary */
-.fc-daygrid-event .fc-event-main{padding:6px 8px;border-radius:8px;color:#fff;line-height:1.2;}
-.fc-event--job{background:#2563eb !important;color:#fff !important;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
-.fc-event--summary{background:#1d4ed8 !important;color:#fff !important;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
-.fc-event--summary .fc-event-main{font-weight:600;opacity:.95;}
-
-/* Ikony L4/Wolne/Święto – tylko ikona, bez kart */
-.fc-event--icon-only,
-.fc-event--leave,
-.fc-event--holiday,
-.fc-event--dayOff{
-  background:transparent !important;
-  box-shadow:none !important;
-  border:0 !important;
-}
-.fc-event--icon-only .icon,
-.fc-event--leave .icon,
-.fc-event--holiday .icon,
-.fc-event--dayOff .icon{
-  display:block;
-  font-size:28px;
-  width:48px; height:48px;
-  margin:10px auto 6px;
-  border-radius:12px;
-  background:rgba(120,170,0,.12);
-  backdrop-filter:blur(2px);
-  text-align:center;
-  line-height:48px;
-}
-
-/* Summary – zawsze jedna linia */
-.summary-card .line{font-size:12px;white-space:nowrap;}
-.job-card .job-title{font-size:12px;font-weight:600;}
-.job-card .job-meta{font-size:11px;opacity:.9;margin-top:2px;}
-
 /* Popover „more” – kontrastowy */
 .fc-more-popover{
   background:#1e2a1e;
@@ -363,3 +289,38 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
   padding:8px 10px;
   line-height:1.3;
 }
+
+/* FullCalendar – odsłonięcie */
+.fc-daygrid-event { display:block; margin-top:4px; border:0; }
+.fc-daygrid-event-dot { display:none !important; }
+.fc-daygrid-event-harness .fc-event::before,
+.fc-daygrid-event-harness .fc-event::after { display:none !important; }
+
+/* Ikony L4/Wolne/Święto */
+.fc-event--icon-only {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  text-align: center;
+}
+.fc-event--icon-only .icon {
+  font-size: 26px;
+  line-height: 48px;
+  width: 48px; height: 48px;
+  margin: 6px auto 4px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+}
+
+/* Karty zleceń i podsumowań */
+.ev { padding:6px 8px; border-radius:8px; color:#e9f0ff; }
+.ev--job { background:#3a6cf8; }
+.ev--sum { background:#274b2a; color:#c2f1c6; }
+
+/* Brak cienkich pasków u góry komórek */
+.fc-daygrid-block-event .fc-event-title,
+.fc-daygrid-event { overflow: visible; }
+
+/* Nie pozwól, by cokolwiek wypływało poza ramkę dnia */
+.fc-daygrid-day-events { padding: 2px 4px; }

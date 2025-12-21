@@ -978,8 +978,7 @@ function initializeApp() {
 
     function przerysujZdarzeniaKalendarza() {
         if (!calendar) return;
-        const combined = [...workEvents, ...leaveEvents];
-        updateCalendarData(calendar, combined, buildCalendarFlags());
+        updateCalendarData(calendar, buildCalendarFlags());
         if (calendar.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }

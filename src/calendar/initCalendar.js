@@ -1,3 +1,6 @@
+import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../firebase-config.js';
+
 const toDayString = (dateInput) => {
   if (!dateInput) return null;
   if (typeof dateInput === 'string') return dateInput.slice(0, 10);
@@ -9,353 +12,227 @@ const toDayString = (dateInput) => {
   return `${y}-${m}-${d}`;
 };
 
-const normalizeLeaveType = (leaveKind = '', type = '', classNames = []) => {
-  const kindUpper = (leaveKind || '').toString().trim().toUpperCase();
-  const typeUpper = (type || '').toString().trim().toUpperCase();
-  const classes = Array.isArray(classNames) ? classNames : (typeof classNames === 'string' ? [classNames] : []);
-  const hasClass = (needle) => classes.some((c) => (c || '').toString().toLowerCase().includes(needle));
-
-  if (kindUpper === 'L4' || typeUpper.includes('LEAVE_L4') || hasClass('absence-l4')) return 'L4';
-  if (kindUpper === 'SWIETO' || kindUpper === 'ŚWIĘTO' || typeUpper.includes('LEAVE_HOLIDAY') || hasClass('absence-święto') || hasClass('absence-swieto')) return 'Święto';
-  if (kindUpper === 'URL' || kindUpper === 'WOLNE' || kindUpper === 'URLP' || typeUpper.includes('LEAVE_FREE') || hasClass('absence-url') || hasClass('absence-urlop') || hasClass('absence-wolne')) return 'Urlop';
-  return kindUpper === '' && typeUpper === '' ? '' : (kindUpper || typeUpper || '');
-};
-
-const extractHours = (source = {}) => {
-  const props = source.extendedProps || {};
+const normalizeHours = (doc = {}) => {
   const toNum = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
   };
-  const workHours = toNum(props.workHours ?? props.workH ?? props.work ?? source.workHours ?? source.work ?? source.praca);
-  const driveHours = toNum(props.driveHours ?? props.driveH ?? props.drive ?? source.driveHours ?? source.drive ?? source.jazda);
-  const billedHours = toNum(
-    props.billedHours ??
-      props.billHours ??
-      props.billH ??
-      props.bill ??
-      props.invoiceHours ??
-      props.fh ??
-      source.billedHours ??
-      source.bill ??
-      source.fh ??
-      source.invoiceHours ??
-      source.fakturowane ??
-      source.billed
-  );
-  return { workHours, driveHours, billedHours };
+  return {
+    work: toNum(doc.workHours ?? doc.work ?? doc.praca),
+    drive: toNum(doc.driveHours ?? doc.drive ?? doc.jazda),
+    invo: toNum(doc.invoicedHours ?? doc.invoiced ?? doc.billed ?? doc.fakturowane ?? doc.fh),
+  };
 };
 
-const classListFrom = (val) => {
-  if (Array.isArray(val)) return val;
-  if (typeof val === 'string') return [val];
-  return [];
+const detectType = (doc = {}) => {
+  const rawType = (doc.type || doc.typ || '').toString().toLowerCase();
+  const status = (doc.status || '').toString();
+  const leaveKind = (doc.leaveKind || doc.leaveType || '').toString().toLowerCase();
+  const isLeave = (val) => ['leave', 'leave_l4', 'l4', 'sick'].includes(val);
+  const isDayOff = (val) => ['dayoff', 'wolne', 'free', 'leave_free', 'urlop'].includes(val);
+  const isHoliday = (val) => ['holiday', 'święto', 'swieto', 'leave_holiday'].includes(val);
+
+  if (isLeave(rawType) || isLeave(leaveKind)) return 'leave';
+  if (isDayOff(rawType) || isDayOff(leaveKind)) return 'dayOff';
+  if (isHoliday(rawType) || isHoliday(leaveKind)) return 'holiday';
+
+  if (/(L4|chorobowe)/i.test(status)) return 'leave';
+  if (/(wolne|day off|urlop)/i.test(status)) return 'dayOff';
+  if (/(święto|swieto|holiday)/i.test(status)) return 'holiday';
+
+  if (rawType === 'summary') return 'summary';
+  return 'job';
 };
 
-const resolveEventKind = (raw = {}) => {
-  const ext = raw.extendedProps || {};
-  const classList = classListFrom(raw.classNames || raw.className);
-  const hasClass = (needle) => classList.some((c) => (c || '').toString().toLowerCase().includes(needle));
-  const baseType = (ext.type || ext.typ || raw.type || raw.typ || '').toString().trim().toLowerCase();
-  const leaveKind = normalizeLeaveType(ext.leaveKind || ext.leaveType || raw.leaveKind, ext.type || ext.typ || raw.type || raw.typ, classList);
-
-  const summaryAliases = ['summary'];
-  const jobAliases = ['job', 'zlecenie'];
-  const holidayAliases = ['holiday', 'święto', 'swieto', 'leave_holiday'];
-  const dayOffAliases = ['dayoff', 'wolne', 'urlop', 'free', 'leave_free'];
-  const leaveAliases = ['leave', 'l4', 'leave_l4', 'sick'];
-
-  if (summaryAliases.includes(baseType) || hasClass('summary')) return { kind: 'summary' };
-  if (holidayAliases.includes(baseType)) return { kind: 'holiday', leaveLabel: leaveKind || 'Święto' };
-  if (dayOffAliases.includes(baseType)) return { kind: 'dayOff', leaveLabel: leaveKind || 'Urlop' };
-  if (leaveAliases.includes(baseType)) return { kind: 'leave', leaveLabel: leaveKind || 'L4' };
-
-  if (leaveKind) {
-    if (leaveKind === 'Święto') return { kind: 'holiday', leaveLabel: leaveKind };
-    if (leaveKind === 'Urlop') return { kind: 'dayOff', leaveLabel: leaveKind };
-    return { kind: 'leave', leaveLabel: leaveKind };
-  }
-
-  if (jobAliases.includes(baseType)) return { kind: 'job' };
-  return { kind: 'job' };
-};
-
-const buildJobTitle = (raw = {}, hours = {}) => {
-  const ext = raw.extendedProps || {};
-  const baseTitle = (raw.customer || raw.title || ext.client || '').toString().trim();
-  const { workHours = 0, driveHours = 0, billedHours = 0 } = hours;
-  const hourParts = [];
-  if (workHours > 0) hourParts.push(`Praca: ${formatH(workHours)}`);
-  if (driveHours > 0) hourParts.push(`Jazda: ${formatH(driveHours)}`);
-  if (billedHours > 0) hourParts.push(`Fakturowane: ${formatH(billedHours)}`);
-  const fallback = hourParts.join(' • ');
-  if (baseTitle) return baseTitle;
-  if (fallback) return fallback;
-  return 'Zlecenie';
-};
-
-function prepareCalendarEvents(rawEvents = []) {
-  const list = Array.isArray(rawEvents) ? rawEvents : [];
-  const events = [];
-  const jobsByDay = new Map();
-  const leaveByDay = new Map();
-  const emittedIds = new Set();
+const mapDocsToEvents = (raw = []) => {
   const jobs = [];
-  const leaves = [];
-  const summaries = new Map();
+  const icons = [];
+  const sumsByDate = new Map();
+  const emitted = new Set();
 
-  list.forEach((raw) => {
-    const day =
-      toDayString(raw.date || raw.start || raw.startStr || raw.dateStr || raw.extendedProps?.date) ||
-      null;
-    if (!day) return;
-    const { kind, leaveLabel } = resolveEventKind(raw);
+  for (const doc of raw) {
+    const date = toDayString(doc.date || doc.start || doc.startDate || '');
+    if (!date) continue;
+    const type = detectType(doc);
+    const { work, drive, invo } = normalizeHours(doc);
 
-    if (kind === 'summary') {
-      const { workHours, driveHours, billedHours } = extractHours(raw);
-      summaries.set(day, { workHours, driveHours, billedHours });
-      return;
+    if (type === 'job') {
+      const id = doc.id || `${date}-${Math.random().toString(36).slice(2, 8)}`;
+      const key = `job-${id}`;
+      if (emitted.has(key)) continue;
+      emitted.add(key);
+      jobs.push({
+        id,
+        start: date,
+        allDay: true,
+        title: doc.title || doc.client || doc.klient || 'Zlecenie',
+        extendedProps: { type, work, drive, invo },
+      });
+      const s = sumsByDate.get(date) || { work: 0, drive: 0, invo: 0 };
+      s.work += work;
+      s.drive += drive;
+      s.invo += invo;
+      sumsByDate.set(date, s);
+      continue;
     }
 
-    if (kind === 'leave' || kind === 'dayOff' || kind === 'holiday') {
-      leaveByDay.set(day, { type: kind, label: leaveLabel });
-      leaves.push({ day, leaveType: leaveLabel || kind, kind, raw });
-      return;
+    if (type === 'leave' || type === 'dayOff' || type === 'holiday') {
+      const key = `icon-${date}`;
+      if (emitted.has(key)) continue;
+      emitted.add(key);
+      icons.push({
+        id: doc.id || `${date}-icon-${type}`,
+        start: date,
+        allDay: true,
+        title: type,
+        extendedProps: { type },
+        display: 'block',
+        classNames: ['fc-event--icon-only'],
+      });
     }
-    const jobRecord = { day, raw, kind: 'job' };
-    jobs.push(jobRecord);
-    if (!jobsByDay.has(day)) jobsByDay.set(day, []);
-    jobsByDay.get(day).push(jobRecord);
-  });
+  }
 
-  jobs.forEach(({ day, raw }) => {
-    const { workHours, driveHours, billedHours } = extractHours(raw);
-    const title = buildJobTitle(raw, { workHours, driveHours, billedHours });
-    const empty = !title && workHours === 0 && driveHours === 0 && billedHours === 0;
-    if (empty) return;
-    const idBase = raw.id || `day-${day}-${events.length}`;
-    const id = `job-${idBase}`;
-    if (emittedIds.has(id)) return;
-    emittedIds.add(id);
-    events.push({
-      id,
-      start: day,
+  const summaries = [];
+  for (const [date, s] of sumsByDate.entries()) {
+    const hasIcon = icons.some((e) => e.start === date);
+    if (hasIcon) continue;
+    if (s.work + s.drive + s.invo === 0) continue;
+    summaries.push({
+      id: `${date}-summary`,
+      start: date,
       allDay: true,
-      title,
-      classNames: classListFrom(raw.classNames || raw.className),
-      extendedProps: {
-        ...(raw.extendedProps || {}),
-        kind: 'job',
-        type: 'job',
-        workHours,
-        driveHours,
-        billedHours,
-      },
-    });
-  });
-
-  leaves.forEach(({ day, leaveType, kind, raw }) => {
-    const id = `leave-${day}`;
-    if (emittedIds.has(id)) return;
-    emittedIds.add(id);
-    events.push({
-      id,
-      start: day,
-      allDay: true,
-      title: '',
-      classNames: classListFrom(raw?.classNames || raw?.className),
-      extendedProps: {
-        kind: kind || 'leave',
-        type: kind || 'leave',
-        leaveType: leaveType,
-      },
-    });
-  });
-
-  for (const [day, dayJobs] of jobsByDay.entries()) {
-    let w = 0;
-    let d = 0;
-    let b = 0;
-    dayJobs.forEach(({ raw }) => {
-      const { workHours, driveHours, billedHours } = extractHours(raw);
-      w += workHours;
-      d += driveHours;
-      b += billedHours;
-    });
-
-    if (!dayJobs || dayJobs.length === 0) continue;
-    if (leaveByDay.has(day)) continue;
-    if (summaries.has(day)) {
-      const { workHours = 0, driveHours = 0, billedHours = 0 } = summaries.get(day) || {};
-      w = Math.max(w, workHours);
-      d = Math.max(d, driveHours);
-      b = Math.max(b, billedHours);
-    }
-
-    const id = `summary-${day}`;
-    if (emittedIds.has(id)) continue;
-    emittedIds.add(id);
-
-    events.push({
-      id,
-      start: day,
-      allDay: true,
-      title: '',
-      classNames: [],
-      extendedProps: {
-        kind: 'summary',
-        type: 'summary',
-        workHours: w,
-        driveHours: d,
-        billedHours: b,
-      },
+      title: `• Praca: ${s.work.toFixed(1)}h • Jazda: ${s.drive.toFixed(1)}h • Fakturowane: ${s.invo.toFixed(1)}h`,
+      extendedProps: { type: 'summary' },
     });
   }
 
-  return { preparedEvents: events, leaveByDay };
-}
+  const events = [...icons, ...jobs, ...summaries];
+  return events;
+};
 
-function formatH(x) {
-  return `${(Number(x || 0)).toFixed(1)}h`;
+async function fetchEventsFromFirestore(startStr, endStr) {
+  if (!db) {
+    console.warn('[Calendar] Brak połączenia z Firestore – pomijam pobieranie zdarzeń.');
+    return [];
+  }
+
+  const raw = [];
+  try {
+    const godzinyRef = collection(db, 'godziny_pracy');
+    const godzinyQuery = query(godzinyRef, where('date', '>=', startStr), where('date', '<=', endStr), orderBy('date'));
+    const godzinySnap = await getDocs(godzinyQuery);
+    godzinySnap.forEach((docSnap) => raw.push({ id: docSnap.id, ...docSnap.data() }));
+  } catch (error) {
+    console.error('[Calendar] Nie udało się pobrać wpisów godzin z Firestore.', error);
+  }
+
+  try {
+    const eventsRef = collection(db, 'events');
+    const eventsQuery = query(eventsRef, where('start', '>=', startStr), where('start', '<=', endStr), orderBy('start'));
+    const eventsSnap = await getDocs(eventsQuery);
+    eventsSnap.forEach((docSnap) => raw.push({ id: docSnap.id, ...docSnap.data() }));
+  } catch (error) {
+    console.error('[Calendar] Nie udało się pobrać zdarzeń (events) z Firestore.', error);
+  }
+
+  if (!raw.length) {
+    console.warn(`[Calendar] Firestore zwrócił 0 dokumentów dla zakresu ${startStr}..${endStr}.`);
+  }
+
+  return raw;
 }
 
 function renderEventContent(arg) {
-  const kind = arg.event.extendedProps?.type || arg.event.extendedProps?.kind;
-
-  if (kind === 'leave' || kind === 'dayOff' || kind === 'holiday') {
-    const t = arg.event.extendedProps.leaveType || arg.event.extendedProps.leaveLabel || '';
-    const icon =
-      kind === 'holiday' || t === 'Święto'
-        ? '🌾'
-        : kind === 'dayOff' || t === 'Urlop'
-          ? '🏖️'
-          : '🏥';
-    return {
-      html: `
-        <div class="icon" title="${t}">
-          ${icon}
-        </div>
-      `,
-    };
+  const type = arg.event.extendedProps?.type;
+  if (type === 'leave' || type === 'dayOff' || type === 'holiday') {
+    const el = document.createElement('div');
+    el.className = 'fc-event--icon-only';
+    const iconHolder = document.createElement('div');
+    iconHolder.className = 'icon';
+    iconHolder.textContent = type === 'leave' ? '🤒' : type === 'dayOff' ? '🏖️' : '🌾';
+    el.appendChild(iconHolder);
+    return { domNodes: [el] };
   }
 
-  if (kind === 'summary') {
-    const w = formatH(arg.event.extendedProps.workHours);
-    const d = formatH(arg.event.extendedProps.driveHours);
-    const b = formatH(arg.event.extendedProps.billedHours);
-    return {
-      html: `
-        <div class="summary-card">
-          <div class="line">• Praca: ${w} • Jazda: ${d} • Fakturowane: ${b}</div>
-        </div>
-      `,
-    };
+  if (type === 'summary') {
+    return { html: `<div class="ev ev--sum">${arg.event.title}</div>` };
   }
 
-  const meta = [
-    arg.event.extendedProps.workHours > 0 ? `Praca ${formatH(arg.event.extendedProps.workHours)}` : '',
-    arg.event.extendedProps.driveHours > 0 ? `Jazda ${formatH(arg.event.extendedProps.driveHours)}` : '',
-    arg.event.extendedProps.billedHours > 0 ? `Fakturowane ${formatH(arg.event.extendedProps.billedHours)}` : '',
-  ]
-    .filter(Boolean)
-    .join(' • ');
+  return { html: `<div class="ev ev--job"><div class="ev__title">${arg.event.title}</div></div>` };
+}
 
-  return {
-    html: `
-      <div class="job-card">
-        <div class="job-title">${arg.event.title ?? ''}</div>
-        ${meta ? `<div class="job-meta">${meta}</div>` : ''}
-      </div>
-    `,
+const wireNavigationButtons = (calendarApi) => {
+  if (!calendarApi) return;
+  const hook = (id, action) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', action);
   };
-}
+  hook('btn-prev', () => calendarApi.prev());
+  hook('btn-next', () => calendarApi.next());
+  hook('btn-today', () => calendarApi.today());
+};
 
-export function renderDaySummaries() {
-  // Podsumowanie dnia jest teraz renderowane jako osobny event.
-}
+export function renderDaySummaries() {}
 
-export function initCalendar(container, events = [], flags = [], extraOptions = {}) {
+export function initCalendar(container, _events = [], _flags = [], extraOptions = {}) {
   const FullCalendar = window.FullCalendar;
   if (!FullCalendar || !container) return null;
 
-  const rawEvents = Array.isArray(events) ? events : [];
-  const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
   const localeOption = (FullCalendar?.locales || []).find((l) => l.code === 'pl') || 'pl';
-
   const options = {
+    ...extraOptions,
     locale: localeOption,
     initialView: 'dayGridMonth',
-    headerToolbar: { left: 'prev,next today', center: 'title', right: 'month,week' },
-    navLinks: true,
-    expandRows: true,
+    timeZone: 'local',
     height: 'auto',
-    contentHeight: 'auto',
-    handleWindowResize: true,
-    fixedWeekCount: false,
-    dayMaxEvents: 3,
-    dayMaxEventRows: 4,
+    dayMaxEventRows: 3,
     moreLinkClick: 'popover',
+    displayEventTime: false,
     eventDisplay: 'block',
-    eventOrderStrict: true,
-    leaveByDay,
-    eventOverlap: (stillEvent, movingEvent) => {
-      return stillEvent.allDay && movingEvent.allDay ? true : false;
-    },
-    eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-    validRange: undefined,
-    customFlags: flags || [],
-    datesSet() {},
-    events: preparedEvents,
-    ...extraOptions,
-  };
-
-  options.eventContent = renderEventContent;
-  options.eventOrder = (a, b) => {
-    const rank = { leave: 0, dayOff: 0, holiday: 0, job: 1, summary: 2 };
-    const aKind = a.extendedProps?.type || a.extendedProps?.kind;
-    const bKind = b.extendedProps?.type || b.extendedProps?.kind;
-    return (rank[aKind] ?? 99) - (rank[bKind] ?? 99);
-  };
-  options.eventClassNames = (arg) => {
-    const type = arg.event.extendedProps?.type || arg.event.extendedProps?.kind;
-    const classes = classListFrom(arg.event.classNames);
-    const ensure = (cls) => {
-      if (!classes.includes(cls)) classes.push(cls);
-    };
-    if (type === 'summary') {
-      ensure('fc-event--summary');
-    } else if (type === 'leave' || type === 'dayOff' || type === 'holiday') {
-      ensure('fc-event--icon-only');
-      ensure(`fc-event--${type}`);
-    } else {
-      ensure('fc-event--job');
-    }
-    return classes;
+    eventContent: renderEventContent,
   };
 
   const calendar = new FullCalendar.Calendar(container, options);
+  calendar.setOption('eventOrder', (a, b) => {
+    const rank = { leave: 0, dayOff: 0, holiday: 0, job: 1, summary: 2 };
+    const aType = a.extendedProps?.type;
+    const bType = b.extendedProps?.type;
+    return (rank[aType] ?? 99) - (rank[bType] ?? 99);
+  });
+  calendar.setOption('eventClassNames', (arg) => {
+    const type = arg.event.extendedProps?.type;
+    if (type === 'summary') return ['fc-event--summary'];
+    if (type === 'leave' || type === 'dayOff' || type === 'holiday') return ['fc-event--icon-only'];
+    return ['fc-event--job'];
+  });
+  calendar.setOption('events', async (info, success, failure) => {
+    try {
+      const raw = await fetchEventsFromFirestore(info.startStr, info.endStr);
+      const events = mapDocsToEvents(raw);
+      const sample = events.slice(0, 3);
+      console.debug('[Calendar] events:', events.length, { range: `${info.startStr}..${info.endStr}`, sample });
+      if (events.length === 0) {
+        console.warn(`[Calendar] Brak zdarzeń do wyświetlenia dla zakresu ${info.startStr}..${info.endStr}. Raw: ${raw.length}`);
+      }
+      success(events);
+    } catch (err) {
+      console.error('events loader error', err);
+      failure(err);
+    }
+  });
+
   const baseDatesSet = options.datesSet;
-  const baseEventDidMount = options.eventDidMount;
   calendar.setOption('datesSet', (info) => {
     if (typeof baseDatesSet === 'function') baseDatesSet(info);
     if (typeof extraOptions.onDatesSet === 'function') extraOptions.onDatesSet(info);
     requestAnimationFrame(() => calendar.updateSize());
   });
-  calendar.setOption('eventDidMount', (info) => {
-    if (typeof baseEventDidMount === 'function') baseEventDidMount(info);
-    if (typeof extraOptions.eventDidMount === 'function') extraOptions.eventDidMount(info);
-    if (info.el.classList.contains('absence-icon-holder')) {
-      const span = document.createElement('span');
-      span.className = 'absence-icon';
-      if (info.el.classList.contains('absence-l4')) span.textContent = '➕';
-      else if (info.el.classList.contains('absence-url')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-urlop')) span.textContent = '🏁';
-      else if (info.el.classList.contains('absence-święto') || info.el.classList.contains('absence-swieto')) span.textContent = '🍃';
-      else span.textContent = '🌿';
-      info.el.appendChild(span);
-    }
-  });
+  if (typeof extraOptions.eventDidMount === 'function') {
+    calendar.setOption('eventDidMount', (info) => extraOptions.eventDidMount(info));
+  }
+
   calendar.render();
+  wireNavigationButtons(calendar.getApi());
   window.addEventListener('resize', () => {
     try {
       calendar.updateSize();
@@ -364,15 +241,8 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
   return calendar;
 }
 
-export function updateCalendarData(calendar, events = [], flags = []) {
+export function updateCalendarData(calendar, flags = []) {
   if (!calendar) return;
   calendar.setOption('customFlags', flags || []);
-  const rawEvents = Array.isArray(events) ? events : [];
-  const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
-  calendar.batchRendering(() => {
-    calendar.setOption('leaveByDay', leaveByDay);
-    calendar.setOption('events', preparedEvents);
-  });
-  calendar.rerenderEvents();
-  calendar.rerenderDates();
+  calendar.refetchEvents();
 }
