@@ -397,7 +397,7 @@ function initializeApp() {
     const mapLeavePayloadToEvents = (leaveId, payload) => {
         if (!leaveId || !payload || !payload.start) return [];
         const leaveKind = normalizeDayLeaveValue(payload.extendedProps?.leaveKind || payload.leaveKind || payload.typ || payload.type || '');
-        const kindForClass = leaveKind || 'URL';
+        const kind = String(payload?.extendedProps?.leaveKind ?? payload?.leaveKind ?? payload?.typ ?? payload?.type ?? leaveKind ?? 'URL').toUpperCase();
         const start = payload.start;
         const end = payload.end || formatDateForStorage(addDaysToDate(new Date(payload.start), 1));
         const extendedProps = {
@@ -413,7 +413,7 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'background',
-                classNames: payload.className || payload.classNames || ['leave-bg', `leave-bg--${kindForClass}`],
+                classNames: payload.className || payload.classNames || ['leave-bg', `leave-bg--${kind}`],
                 overlap: false,
                 title: badgeTitle,
                 extendedProps
@@ -425,7 +425,7 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'auto',
-                classNames: ['leave-badge', `leave-badge--${kindForClass}`],
+                classNames: ['leave-badge', `leave-badge--${kind}`],
                 overlap: false,
                 extendedProps
             }
@@ -456,6 +456,7 @@ function initializeApp() {
         const type = normalizedKind === 'L4'
             ? 'LEAVE_L4'
             : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE');
+        const kindForClass = String(normalizedKind || 'URL').toUpperCase();
         const payload = {
             title: LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
             start: formatDateForStorage(startDate),
@@ -464,7 +465,7 @@ function initializeApp() {
             display: 'background',
             typ: type,
             type,
-            className: ['leave-bg', `leave-bg--${normalizedKind || 'URL'}`],
+            className: ['leave-bg', `leave-bg--${kindForClass}`],
             extendedProps: { typ: type, type, leaveKind: normalizedKind, kind: normalizedKind ? normalizedKind.toLowerCase() : '' }
         };
         await setDoc(leaveDocRef, payload);
@@ -1008,22 +1009,28 @@ function initializeApp() {
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
                 const fakturowaneValue = powiazane.length > 0 ? suma : (Number(normalizedDay.billed) || 0);
-                const workValue = Number(normalizedDay.work) || 0;
-                const driveValue = Number(normalizedDay.drive) || 0;
-                const billedHoursForSummary = powiazane.length > 0 ? 0 : fakturowaneValue;
+                const billedHoursForSummaryValue = powiazane.length > 0 ? 0 : fakturowaneValue;
                 const baseHoursProps = {
-                    workHours: workValue,
-                    driveHours: driveValue,
-                    billedHours: billedHoursForSummary,
-                    workH: workValue,
-                    driveH: driveValue,
-                    billH: billedHoursForSummary
+                    workHours: Number(normalizedDay.work) || 0,
+                    driveHours: Number(normalizedDay.drive) || 0,
+                    billedHours: billedHoursForSummaryValue,
+                    workH: Number(normalizedDay.work) || 0,
+                    driveH: Number(normalizedDay.drive) || 0,
+                    billH: billedHoursForSummaryValue,
+                    praca: Number(normalizedDay.work ?? dane?.praca) || 0,
+                    jazda: Number(normalizedDay.drive ?? dane?.jazda) || 0,
+                    fakturowane: billedHoursForSummaryValue,
+                    nadgodziny: Number(dane?.nadgodziny) || 0
                 };
+                const workValue = Number(baseHoursProps?.workHours ?? baseHoursProps?.praca ?? 0) || 0;
+                const driveValue = Number(baseHoursProps?.driveHours ?? baseHoursProps?.jazda ?? 0) || 0;
+                const billedHoursForSummary = Number(baseHoursProps?.billedHours ?? baseHoursProps?.fakturowane ?? 0) || 0;
+                const nadgodzinyValue = Number(dane?.nadgodziny ?? baseHoursProps?.nadgodziny ?? 0) || 0;
                 const wpis = {
                     ...normalizedDay,
                     billed: fakturowaneValue,
                     fakturowane: fakturowaneValue,
-                    nadgodziny: Number(dane?.nadgodziny) || 0,
+                    nadgodziny: nadgodzinyValue,
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
@@ -1073,7 +1080,6 @@ function initializeApp() {
                         });
                     });
                 }
-                const nadgodzinyValue = Number(dane?.nadgodziny) || 0;
                 const hasLeave = Boolean(normalizedDay?.leaveKind) || Boolean(dane?.leaveKind) ||
                     Boolean(normalizedDay?.flags?.urlop || normalizedDay?.flags?.l4 || normalizedDay?.flags?.swieto) ||
                     Boolean(dane?.flags?.urlop || dane?.flags?.l4 || dane?.flags?.swieto);
@@ -1122,6 +1128,7 @@ function initializeApp() {
                         : (normalizedKind ? (normalizedKind === 'L4' ? 'LEAVE_L4' : (normalizedKind === 'SWIETO' ? 'LEAVE_HOLIDAY' : 'LEAVE_FREE')) : null);
                     const isLeave = Boolean(normalizedType);
                     if (!isLeave || !data.start) return [];
+                    const kindForClass = String(baseProps.leaveKind ?? data.leaveKind ?? data.typ ?? data.type ?? normalizedKind ?? 'URL').toUpperCase();
                     const payload = {
                         id: docSnap.id,
                         title: data.title || LEAVE_TITLE_MAP[normalizedKind] || 'Urlop',
@@ -1129,7 +1136,7 @@ function initializeApp() {
                         end: data.end || formatDateForStorage(addDaysToDate(new Date(data.start), 1)),
                         allDay: typeof data.allDay === 'boolean' ? data.allDay : true,
                         display: 'background',
-                        className: ['leave-bg', `leave-bg--${normalizedKind || 'URL'}`],
+                        className: ['leave-bg', `leave-bg--${kindForClass}`],
                         extendedProps: {
                             typ: normalizedType,
                             type: normalizedType,
