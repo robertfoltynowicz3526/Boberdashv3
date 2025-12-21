@@ -1,4 +1,4 @@
-import { db } from './firebase-config.js';
+import { db } from './lib/firebase.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
