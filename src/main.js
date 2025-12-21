@@ -9,27 +9,69 @@ import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 
 const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
 
+const parsePlNumber = (v) => {
+    if (v == null) return 0;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+    const s = String(v).trim().replace(/\s/g, '').replace(',', '.');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+};
+
+const pickNum = (obj, keys) => {
+    for (const k of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k)) {
+            const n = parsePlNumber(obj[k]);
+            if (n !== 0) return n; // prefer first non-zero
+            // jeśli 0, nie zwracaj od razu – pozwól znaleźć inne pole z wartością
+        }
+    }
+    // jeśli wszystkie były 0 albo brak, zwróć 0
+    for (const k of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k)) return parsePlNumber(obj[k]);
+    }
+    return 0;
+};
+
 const addAgg = (map, day, patch) => {
-    const cur = map.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
-    cur.work += Number(patch.work || 0) || 0;
-    cur.drive += Number(patch.drive || 0) || 0;
-    cur.billed += Number(patch.billed || 0) || 0;
-    cur.over += Number(patch.over || 0) || 0;
+    const cur = map.get(day) || { work:0, drive:0, billed:0, over:0 };
+    cur.work += parsePlNumber(patch.work);
+    cur.drive += parsePlNumber(patch.drive);
+    cur.billed += parsePlNumber(patch.billed);
+    cur.over += parsePlNumber(patch.over);
     map.set(day, cur);
 };
 
-const sumOrderLineItems = (order) => {
-    const items =
-        order?.pozycje || order?.wpisy || order?.items || order?.entries || [];
-    let work = 0, drive = 0, billed = 0, over = 0;
+// NAJWAŻNIEJSZE: zliczaj z „wpisów dnia” (to co widzisz w modalu jako: "F: 6.00 h — Klient")
+const sumFromDayLinks = (dayDoc) => {
+    // nazwy list mogą się różnić — bierzemy wszystkie najczęstsze
+    const lists = [
+        dayDoc?.powiazane,
+        dayDoc?.powiazania,
+        dayDoc?.powiazaneZlecenia,
+        dayDoc?.zlecenia,
+        dayDoc?.wpisyZlecen,
+        dayDoc?.wpisy,
+        dayDoc?.items,
+        dayDoc?.entries
+    ].filter(Array.isArray);
 
-    for (const it of items) {
-        work += Number(it.praca ?? it.work ?? it.workHours ?? it.godzinyPracy ?? 0) || 0;
-        drive += Number(it.jazda ?? it.drive ?? it.driveHours ?? it.czasJazdy ?? 0) || 0;
-        billed += Number(it.fakturowane ?? it.billed ?? it.billedHours ?? it.godzinyFakturowane ?? it.fh ?? 0) || 0;
-        over += Number(it.nadgodziny ?? it.over ?? 0) || 0;
+    const merged = lists.flat();
+
+    let work=0, drive=0, billed=0, over=0;
+
+    for (const it of merged) {
+        // pola, które realnie spotykasz w UI:
+        // - fakturowane: fh / fakturowane / fakt / billed / billedHours / godzinyWyfakturowane
+        // - jazda: jazda / czasJazdy / drive / driveHours
+        // - praca: praca / work / workHours / godzinyPracy
+        // - nadgodziny: nadgodziny / over
+        billed += pickNum(it, ['fh','fakturowane','fakt','billed','billedHours','godzinyWyfakturowane','godzinyFakturowane']);
+        drive  += pickNum(it, ['jazda','czasJazdy','drive','driveHours']);
+        work   += pickNum(it, ['praca','work','workHours','godzinyPracy','godziny']);
+        over   += pickNum(it, ['nadgodziny','over']);
     }
-    return { work, drive, billed, over };
+
+    return { work, drive, billed, over, _count: merged.length };
 };
 
 const setDecorations = (decorations) => {
@@ -939,34 +981,17 @@ function initializeApp() {
             const hasManualDay = new Set();    // dni z ręcznym wpisem (nawet jeśli 0)
             const hasOrderDay = new Set();     // dni z co najmniej jednym zleceniem
 
-            snapshotGodziny.forEach(docSnap => {
+            snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
                 const day = isoDay(id);
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
-                const fakturowaneValue = powiazane.length > 0 ? suma : (Number(normalizedDay.billed) || 0);
-                const billedHoursForSummaryValue = powiazane.length > 0 ? 0 : fakturowaneValue;
-                const baseHoursProps = {
-                    workHours: Number(normalizedDay.work) || 0,
-                    driveHours: Number(normalizedDay.drive) || 0,
-                    billedHours: billedHoursForSummaryValue,
-                    workH: Number(normalizedDay.work) || 0,
-                    driveH: Number(normalizedDay.drive) || 0,
-                    billH: billedHoursForSummaryValue,
-                    praca: Number(normalizedDay.work ?? dane?.praca) || 0,
-                    jazda: Number(normalizedDay.drive ?? dane?.jazda) || 0,
-                    fakturowane: billedHoursForSummaryValue,
-                    nadgodziny: Number(dane?.nadgodziny) || 0
-                };
-                const workValue = Number(baseHoursProps?.workHours ?? baseHoursProps?.praca ?? 0) || 0;
-                const driveValue = Number(baseHoursProps?.driveHours ?? baseHoursProps?.jazda ?? 0) || 0;
-                const billedHoursForSummary = Number(baseHoursProps?.billedHours ?? baseHoursProps?.fakturowane ?? 0) || 0;
                 const wpis = {
                     ...normalizedDay,
-                    billed: fakturowaneValue,
-                    fakturowane: fakturowaneValue,
-                    nadgodziny: Number(dane?.nadgodziny ?? baseHoursProps?.nadgodziny ?? 0) || 0,
+                    billed: suma,
+                    fakturowane: suma,
+                    nadgodziny: Number(dane?.nadgodziny ?? 0) || 0,
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
@@ -980,39 +1005,46 @@ function initializeApp() {
                     leaveByDay[day] = 'SWIETO';
                 }
 
-                if (powiazane.length) {
+                if (!leaveByDay[day] && powiazane.length) {
                     powiazane.forEach((powiazanie) => {
-                        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
                         const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
                         const clientName = klientLabel || 'Zlecenie';
-                        events.push({
-                            id: `order_${powiazanie.zlecenieId}`,
-                            start: day,
-                            allDay: true,
-                            title: clientName,
-                            className: ['order-event'],
-                            extendedProps: { day, orderId: powiazanie.zlecenieId }
-                        });
+                        if (!leaveByDay[day]) {
+                            events.push({
+                                id: `order_${powiazanie.zlecenieId}`,
+                                start: day,
+                                allDay: true,
+                                title: clientName,
+                                className: ['order-event'],
+                                extendedProps: { day, orderId: powiazanie.zlecenieId }
+                            });
+                        }
+                    });
+                }
 
-                        const s = sumOrderLineItems(zlecenie);
+                // jeśli dzień wolny -> tylko ikona, więc nie agregujemy zleceń ani manual
+                if (!leaveByDay[day]) {
+                    const s = sumFromDayLinks(dane);
+                    if (s._count > 0) {
                         addAgg(ordersByDay, day, s);
                         hasOrderDay.add(day);
-                    });
+                    }
                 }
-                const hasAnySummaryHours =
-                    (workValue > 0) ||
-                    (driveValue > 0) ||
-                    (billedHoursForSummary > 0);
 
-                if (hasAnySummaryHours || !manualByDay.has(day)) {
+                if (!leaveByDay[day]) {
                     manualByDay.set(day, {
-                        work: Number(baseHoursProps?.workHours ?? baseHoursProps?.praca ?? 0) || 0,
-                        drive: Number(baseHoursProps?.driveHours ?? baseHoursProps?.jazda ?? 0) || 0,
-                        billed: Number(baseHoursProps?.billedHours ?? baseHoursProps?.fakturowane ?? baseHoursProps?.fh ?? 0) || 0,
-                        over: Number(dane?.nadgodziny ?? baseHoursProps?.nadgodziny ?? 0) || 0,
+                        work:  parsePlNumber(dane?.godzinyPracy ?? dane?.praca ?? dane?.workHours ?? 0),
+                        drive: parsePlNumber(dane?.czasJazdy ?? dane?.jazda ?? dane?.driveHours ?? 0),
+                        billed:parsePlNumber(dane?.godzinyWyfakturowane ?? dane?.fakturowane ?? dane?.fh ?? dane?.billedHours ?? 0),
+                        over:  parsePlNumber(dane?.nadgodziny ?? 0),
                     });
+
+                    // zaznacz, że dzień ma dane ręczne tylko jeśli cokolwiek wpisane (nie chcesz pustych kafli)
+                    const m = manualByDay.get(day);
+                    if ((m.work||0)!==0 || (m.drive||0)!==0 || (m.billed||0)!==0 || (m.over||0)!==0) {
+                        hasManualDay.add(day);
+                    }
                 }
-                hasManualDay.add(day);
             });
 
             const mergedLeaveByDay = { ...leaveByDay, ...leaveByDayFromEvents };
@@ -1040,12 +1072,15 @@ function initializeApp() {
                 const m = manualByDay.get(day) || {work:0, drive:0, billed:0, over:0};
                 const o = ordersByDay.get(day) || {work:0, drive:0, billed:0, over:0};
 
-                summaryByDay[day] = {
-                    work: (m.work||0) + (o.work||0),
-                    drive: (m.drive||0) + (o.drive||0),
-                    billed: (m.billed||0) + (o.billed||0),
-                    over: (m.over||0) + (o.over||0),
-                };
+                const work = (m.work||0) + (o.work||0);
+                const drive = (m.drive||0) + (o.drive||0);
+                const billed = (m.billed||0) + (o.billed||0);
+                const over = (m.over||0) + (o.over||0);
+
+                // jeśli finalnie wszystko 0 -> NIE pokazuj kafla
+                if (work===0 && drive===0 && billed===0 && over===0) continue;
+
+                summaryByDay[day] = { work, drive, billed, over };
             }
 
             for (let i = events.length - 1; i >= 0; i--) {
@@ -1064,6 +1099,16 @@ function initializeApp() {
                 ) {
                     events.splice(i, 1);
                 }
+            }
+
+            const dbgDay = '2025-12-20';
+            if (summaryByDay[dbgDay] || ordersByDay.get(dbgDay) || manualByDay.get(dbgDay)) {
+                console.log('[DBG]', dbgDay, {
+                    manual: manualByDay.get(dbgDay),
+                    ordersAgg: ordersByDay.get(dbgDay),
+                    summary: summaryByDay[dbgDay],
+                    leave: leaveByDay[dbgDay]
+                });
             }
 
             lastSummaryByDay = summaryByDay;
