@@ -121,29 +121,44 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   font-size: 30px;
 }
 
-.calendar-shell .fc-daygrid-event.strip-summary {
-  display: none !important;
-}
-
-/* === Odznaka „leave” na środku kratki dnia === */
-.leave-badge {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  font-size: 30px;
-  opacity: .9;
-}
-.leave-badge--l4,
-.leave-badge--wolne,
-.leave-badge--swieto {
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
-}
-
 /* Opcjonalny panel scrollowalny do list */
 .scroll-panel {
   max-height: calc(100vh - 240px);
   overflow-y: auto;
 }
+
+/* Subtelne tło dla dni wolnych */
+.fc .leave-bg {
+  opacity: 0.25;
+}
+.fc .leave-bg--L4 { opacity: 0.28; }
+.fc .leave-bg--SWIETO { opacity: 0.22; }
+.fc .leave-bg--URL { opacity: 0.22; }
+
+/* Mała plakietka (badge) dla L4/Urlop/Święto */
+.fc .leave-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  max-width: 100%;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 2px 8px;
+  margin-top: 2px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(4px);
+}
+.fc .leave-badge .fc-event-main { padding: 0 !important; }
+.fc .leave-badge .fc-event-title { font-weight: 700; }
+
+/* Ewidencja dnia ma być mała i tylko gdy ma sens */
+.fc .strip-summary {
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.fc .strip-summary .fc-event-main { padding: 0 !important; }
