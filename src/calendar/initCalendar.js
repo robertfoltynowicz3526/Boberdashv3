@@ -76,41 +76,42 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     dayCellDidMount: (arg) => {
       const day = arg.date.toISOString().slice(0, 10);
       const deco = window.__calendarDecorations || {};
-      const sum = deco.summaryByDay?.[day];
       const leave = deco.leaveByDay?.[day];
+      const sum = deco.summaryByDay?.[day];
 
-      arg.el.querySelectorAll('.cell-sum, .cell-leave').forEach(n => n.remove());
+      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon').forEach(n => n.remove());
 
       if (leave) {
-        const label =
-          leave === 'L4' ? 'L4' :
-          (leave === 'SWIETO' ? 'Święto' : 'Urlop');
+        const icon =
+          leave === 'L4' ? '🤒' :
+          (leave === 'SWIETO' ? '🎉' :
+          (leave === 'URL' ? '🏖️' : '⛔'));
 
-        const l = document.createElement('div');
-        l.className = 'cell-leave';
-        l.textContent = label;
-        arg.el.appendChild(l);
+        const big = document.createElement('div');
+        big.className = `cell-leave-icon cell-leave-icon--${leave}`;
+        big.textContent = icon;
+        arg.el.appendChild(big);
+        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+        return;
       }
 
-      if (sum) {
-        const work = Number(sum.work || 0) || 0;
-        const drive = Number(sum.drive || 0) || 0;
-        const billed = Number(sum.billed || 0) || 0;
-        const over = Number(sum.over || 0) || 0;
+      const s = sum || { work:0, drive:0, billed:0, over:0 };
+      const work = Number(s.work||0) || 0;
+      const drive = Number(s.drive||0) || 0;
+      const billed = Number(s.billed||0) || 0;
+      const over = Number(s.over||0) || 0;
 
-        if (work || drive || billed || over) {
-          const parts = [];
-          if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
-          if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
-          if (billed > 0) parts.push(`Fakturowane: ${billed.toFixed(1)}h`);
-          if (over > 0) parts.push(`Nadgodziny: ${over.toFixed(1)}h`);
+      const parts = [
+        `Praca: ${work.toFixed(1)}h`,
+        `Jazda: ${drive.toFixed(1)}h`,
+        `Fakturowane: ${billed.toFixed(1)}h`,
+        `Nadgodziny: ${over.toFixed(1)}h`,
+      ];
 
-          const s = document.createElement('div');
-          s.className = 'cell-sum';
-          s.textContent = `• ${parts.join(' • ')}`;
-          arg.el.appendChild(s);
-        }
-      }
+      const box = document.createElement('div');
+      box.className = 'cell-sum';
+      box.textContent = parts.join(' • ');
+      arg.el.appendChild(box);
 
       if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
     },
