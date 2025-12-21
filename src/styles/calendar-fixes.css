@@ -215,3 +215,48 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 .fc .leave-badge .fc-event-main { padding: 0 !important; }
 .fc .leave-badge .fc-event-title { font-weight: 900; }
+
+/* Dekoracje w komórce dnia */
+.fc .day-deco{
+  position:absolute;
+  top:4px;
+  left:4px;
+  right:4px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  z-index:3;
+  pointer-events:none;
+}
+
+.fc .day-chip{
+  border-radius:999px;
+  padding:2px 8px;
+  font-size:12px;
+  line-height:1.2;
+  font-weight:800;
+  background:rgba(0,0,0,0.40);
+  border:1px solid rgba(255,255,255,0.25);
+  color:#fff;
+  backdrop-filter: blur(4px);
+}
+
+.fc .day-chip--sum{
+  font-weight:900;
+}
+
+/* Czytelne dni wolne */
+.fc .day-chip--leave{ background:rgba(0,0,0,0.55); }
+.fc .day-leave{ }
+.fc .day-leave--L4{ }
+.fc .day-leave--SWIETO{ }
+.fc .day-leave--URL{ }
+
+/* Subtelne tło komórki, gdy wolne */
+.fc .day-leave--L4 { box-shadow: inset 0 0 0 9999px rgba(255, 0, 0, 0.06); }
+.fc .day-leave--SWIETO { box-shadow: inset 0 0 0 9999px rgba(255, 255, 0, 0.05); }
+.fc .day-leave--URL { box-shadow: inset 0 0 0 9999px rgba(0, 140, 255, 0.05); }
+
+/* Zlecenia: tylko nazwa klienta, bez “kafli godzinowych” */
+.fc .order-event .fc-event-title{ font-weight:800; }
+.fc .fc-title-only{ font-weight:800; }
