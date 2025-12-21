@@ -13,7 +13,7 @@ const normalizeDateKey = (value) => {
 const isLeaveDay = (date) => {
   const key = normalizeDateKey(date);
   if (!key) return false;
-  return Boolean(window.__calendarDecorations?.leaveByDate?.[key]);
+  return Boolean(window.__calendarDecorations?.leaveByDay?.[key]);
 };
 
 export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
@@ -59,8 +59,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     contentHeight: 'auto',
     handleWindowResize: true,
     fixedWeekCount: false,
+    dayMaxEvents: true,
     showNonCurrentDates: true,
-    dayMaxEventRows: 3,
     moreLinkClick: 'popover',
     eventOverlap: false,
     slotEventOverlap: false,
@@ -74,10 +74,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return [];
     },
     dayCellDidMount: (arg) => {
-      const iso = arg.date.toISOString().slice(0, 10);
+      const day = arg.date.toISOString().slice(0, 10);
       const deco = window.__calendarDecorations || {};
-      const sum = deco.summaryByDate?.[iso];
-      const leave = deco.leaveByDate?.[iso];
+      const sum = deco.summaryByDay?.[day];
+      const leave = deco.leaveByDay?.[day];
 
       arg.el.querySelectorAll('.cell-sum, .cell-leave').forEach(n => n.remove());
 
@@ -93,12 +93,18 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       }
 
       if (sum) {
-        const parts = [];
-        if (sum.work > 0) parts.push(`Praca: ${sum.work.toFixed(1)}h`);
-        if (sum.drive > 0) parts.push(`Jazda: ${sum.drive.toFixed(1)}h`);
-        if (sum.billed > 0) parts.push(`Fakturowane: ${sum.billed.toFixed(1)}h`);
+        const work = Number(sum.work || 0) || 0;
+        const drive = Number(sum.drive || 0) || 0;
+        const billed = Number(sum.billed || 0) || 0;
+        const over = Number(sum.over || 0) || 0;
 
-        if (parts.length) {
+        if (work || drive || billed || over) {
+          const parts = [];
+          if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
+          if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
+          if (billed > 0) parts.push(`Fakturowane: ${billed.toFixed(1)}h`);
+          if (over > 0) parts.push(`Nadgodziny: ${over.toFixed(1)}h`);
+
           const s = document.createElement('div');
           s.className = 'cell-sum';
           s.textContent = `• ${parts.join(' • ')}`;
@@ -144,7 +150,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     eventContent: (info) => {
       if (typeof extraEventContent === 'function') return extraEventContent(info);
-      return { html: `<div class=\"fc-title-only\">${info.event.title || ''}</div>` };
+      return { html: `<div class="fc-title-only">${info.event.title || ''}</div>` };
     },
     eventDidMount: (info) => {
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);

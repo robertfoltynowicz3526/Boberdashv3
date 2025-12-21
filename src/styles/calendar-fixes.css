@@ -103,7 +103,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   overflow-y: auto;
 }
 
-/* Zlecenia: pill jak na screenie */
+/* Zlecenia: tylko nazwa klienta */
 .fc .order-event.fc-event {
   border-radius: 10px !important;
   padding: 2px 8px !important;
@@ -113,29 +113,38 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .fc .order-event .fc-event-main { padding: 0 !important; }
 .fc .fc-title-only { font-weight: 700; }
 
-/* Podsumowanie dnia jako belka na dole komórki */
-.fc .fc-daygrid-day-frame { position: relative; } /* ważne */
+/* Komórka dnia musi być relative, żeby “dół” działał */
+.fc .fc-daygrid-day-frame { position: relative; }
+
+/* NIEBIESKI kafel podsumowania na dole komórki */
 .fc .cell-sum{
-  margin: 4px 6px 6px 6px;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 12px;
   line-height: 1.2;
   font-weight: 700;
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(80, 120, 255, 0.95);
+  border: 1px solid rgba(255,255,255,0.22);
   color: #fff;
   pointer-events: none;
+  z-index: 3;
 }
 
-/* Wolne – subtelny napis w tle (bez eventów) */
+/* Zostaw miejsce na kafel sumy (żeby eventy nie wchodziły pod niego) */
+.fc .fc-daygrid-day-events { padding-bottom: 34px; }
+
+/* Wolne: subtelny napis w tle */
 .fc .cell-leave{
   position: absolute;
-  left: 6px;
+  left: 8px;
   top: 6px;
   font-size: 12px;
   font-weight: 700;
   opacity: 0.35;
   pointer-events: none;
-  text-transform: none;
+  z-index: 2;
 }
