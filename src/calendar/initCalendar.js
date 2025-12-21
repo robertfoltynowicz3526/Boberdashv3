@@ -1,64 +1,197 @@
-function isoFromEvent(event) {
-  const iso =
-    (event?.startStr || event?.start || event?.dateStr || event?.date)?.toISOString?.()?.slice(0, 10) ??
-    event?.start?.slice?.(0, 10);
-  return iso || null;
-}
+const toDayString = (dateInput) => {
+  if (!dateInput) return null;
+  if (typeof dateInput === 'string') return dateInput.slice(0, 10);
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (Number.isNaN(date.getTime())) return null;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const normalizeLeaveType = (leaveKind = '', type = '', classNames = []) => {
+  const kindUpper = (leaveKind || '').toString().trim().toUpperCase();
+  const typeUpper = (type || '').toString().trim().toUpperCase();
+  const classes = Array.isArray(classNames) ? classNames : (typeof classNames === 'string' ? [classNames] : []);
+  const hasClass = (needle) => classes.some((c) => (c || '').toString().toLowerCase().includes(needle));
+
+  if (kindUpper === 'L4' || typeUpper.includes('LEAVE_L4') || hasClass('absence-l4')) return 'L4';
+  if (kindUpper === 'SWIETO' || kindUpper === 'ŚWIĘTO' || typeUpper.includes('LEAVE_HOLIDAY') || hasClass('absence-święto') || hasClass('absence-swieto')) return 'Święto';
+  if (kindUpper === 'URL' || kindUpper === 'WOLNE' || kindUpper === 'URLP' || typeUpper.includes('LEAVE_FREE') || hasClass('absence-url') || hasClass('absence-urlop') || hasClass('absence-wolne')) return 'Urlop';
+  return kindUpper === '' && typeUpper === '' ? '' : (kindUpper || typeUpper || '');
+};
+
+const extractHours = (source = {}) => {
+  const props = source.extendedProps || {};
+  const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const workHours = toNum(props.workHours ?? props.workH ?? props.work ?? source.workHours ?? source.work ?? source.praca);
+  const driveHours = toNum(props.driveHours ?? props.driveH ?? props.drive ?? source.driveHours ?? source.drive ?? source.jazda);
+  const billedHours = toNum(
+    props.billedHours ??
+      props.billHours ??
+      props.billH ??
+      props.bill ??
+      props.invoiceHours ??
+      props.fh ??
+      source.billedHours ??
+      source.bill ??
+      source.fh ??
+      source.invoiceHours ??
+      source.fakturowane ??
+      source.billed
+  );
+  return { workHours, driveHours, billedHours };
+};
 
 function prepareCalendarEvents(rawEvents = []) {
-  const events = Array.isArray(rawEvents) ? rawEvents : [];
-  const prepared = [];
+  const list = Array.isArray(rawEvents) ? rawEvents : [];
+  const events = [];
+  const jobsByDay = new Map();
+  const leaveByDay = new Map();
+  const emittedIds = new Set();
+  const jobs = [];
+  const leaves = [];
 
-  const sums = new Map();
-  for (const e of events) {
-    const iso = isoFromEvent(e);
-    if (!iso) continue;
-    const k = e.extendedProps || {};
-    const work = Number(k.workHours ?? k.work ?? 0);
-    const drive = Number(k.driveHours ?? k.drive ?? 0);
-    const bill = Number(k.billHours ?? k.bill ?? k.invoiceHours ?? 0);
-    if (!sums.has(iso)) sums.set(iso, { work: 0, drive: 0, bill: 0, hasOrders: false });
-    const s = sums.get(iso);
-    if ((e.title ?? '').trim() !== '' && !k.leaveKind) s.hasOrders = true;
-    s.work += Number.isFinite(work) ? work : 0;
-    s.drive += Number.isFinite(drive) ? drive : 0;
-    s.bill += Number.isFinite(bill) ? bill : 0;
-  }
-
-  const leaveByDay = new Set();
-  for (const e of events) {
-    const kind = (e.extendedProps?.leaveKind || '').toUpperCase();
-    if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO') {
-      const iso = (e.startStr || e.start)?.toISOString?.()?.slice(0, 10) ?? e.start?.slice?.(0, 10);
-      if (iso) leaveByDay.add(iso);
+  list.forEach((raw) => {
+    const day =
+      toDayString(raw.date || raw.start || raw.startStr || raw.dateStr || raw.extendedProps?.date) ||
+      null;
+    if (!day) return;
+    const leaveType = normalizeLeaveType(
+      raw.extendedProps?.leaveKind || raw.extendedProps?.leaveType || raw.leaveKind,
+      raw.extendedProps?.type || raw.extendedProps?.typ || raw.type || raw.typ,
+      raw.classNames || raw.className
+    );
+    if (leaveType) {
+      leaveByDay.set(day, { type: leaveType });
+      leaves.push({ day, leaveType, raw });
+      return;
     }
-  }
+    const jobRecord = { day, raw };
+    jobs.push(jobRecord);
+    if (!jobsByDay.has(day)) jobsByDay.set(day, []);
+    jobsByDay.get(day).push(jobRecord);
+  });
 
-  for (const e of events) {
-    const title = (e?.title ?? '').trim();
-    if (title === '') continue;
-    if (e?.extendedProps?.isSummary) continue;
-    const iso = isoFromEvent(e);
-    if (iso && leaveByDay.has(iso)) continue;
-    prepared.push(e);
-  }
-
-  for (const [iso, s] of sums.entries()) {
-    if (leaveByDay.has(iso)) continue;
-    if (!s.hasOrders) continue;
-    prepared.push({
-      title: `• Praca: ${s.work.toFixed(1)}h • Jazda: ${s.drive.toFixed(1)}h • Fakturowane: ${s.bill.toFixed(1)}h`,
-      start: iso,
+  jobs.forEach(({ day, raw }) => {
+    const title = raw.customer || raw.title || raw.extendedProps?.client || '';
+    const { workHours, driveHours, billedHours } = extractHours(raw);
+    const empty = !title && workHours === 0 && driveHours === 0 && billedHours === 0;
+    if (empty) return;
+    const idBase = raw.id || `day-${day}-${events.length}`;
+    const id = `job-${idBase}`;
+    if (emittedIds.has(id)) return;
+    emittedIds.add(id);
+    events.push({
+      id,
+      start: day,
       allDay: true,
-      extendedProps: { isDaySummary: true, sort: 9999 },
+      title,
+      classNames: raw.classNames || raw.className,
+      extendedProps: {
+        ...(raw.extendedProps || {}),
+        kind: 'job',
+        workHours,
+        driveHours,
+        billedHours,
+      },
+    });
+  });
+
+  leaves.forEach(({ day, leaveType }) => {
+    const id = `leave-${day}`;
+    if (emittedIds.has(id)) return;
+    emittedIds.add(id);
+    events.push({
+      id,
+      start: day,
+      allDay: true,
+      title: '',
+      classNames: ['fc-event-leave'],
+      extendedProps: {
+        kind: 'leave',
+        leaveType,
+      },
+    });
+  });
+
+  for (const [day, dayJobs] of jobsByDay.entries()) {
+    let w = 0;
+    let d = 0;
+    let b = 0;
+    dayJobs.forEach(({ raw }) => {
+      const { workHours, driveHours, billedHours } = extractHours(raw);
+      w += workHours;
+      d += driveHours;
+      b += billedHours;
+    });
+
+    if ((!dayJobs || dayJobs.length === 0) && w === 0 && d === 0 && b === 0) continue;
+    if ((dayJobs?.length ?? 0) === 0 && leaveByDay.has(day)) continue;
+
+    const id = `summary-${day}`;
+    if (emittedIds.has(id)) continue;
+    emittedIds.add(id);
+
+    events.push({
+      id,
+      start: day,
+      allDay: true,
+      title: '',
+      classNames: ['fc-event-summary'],
+      extendedProps: {
+        kind: 'summary',
+        workHours: w,
+        driveHours: d,
+        billedHours: b,
+      },
     });
   }
 
-  for (const iso of leaveByDay) {
-    prepared.push({ title: '', start: iso, allDay: true, extendedProps: { leaveKind: 'FLAG' } });
+  return { preparedEvents: events, leaveByDay };
+}
+
+function formatH(x) {
+  return `${(Number(x || 0)).toFixed(1)}h`;
+}
+
+function renderEventContent(arg) {
+  const kind = arg.event.extendedProps?.kind;
+
+  if (kind === 'leave') {
+    const t = arg.event.extendedProps.leaveType || '';
+    return {
+      html: `
+        <div class="leave-icon" title="${t}">
+          ${t === 'Święto' ? '🌾' : t === 'Urlop' ? '🏖️' : '🏥'}
+        </div>
+      `,
+    };
   }
 
-  return { preparedEvents: prepared, leaveByDay };
+  if (kind === 'summary') {
+    const w = formatH(arg.event.extendedProps.workHours);
+    const d = formatH(arg.event.extendedProps.driveHours);
+    const b = formatH(arg.event.extendedProps.billedHours);
+    return {
+      html: `
+        <div class="summary-card">
+          <div class="line">• Praca: ${w} • Jazda: ${d} • Fakturowane: ${b}</div>
+        </div>
+      `,
+    };
+  }
+
+  return {
+    html: `
+      <div class="job-card">
+        <div class="job-title">${arg.event.title ?? ''}</div>
+      </div>
+    `,
+  };
 }
 
 export function renderDaySummaries() {
@@ -86,7 +219,6 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     dayMaxEvents: 3,
     dayMaxEventRows: 4,
     moreLinkClick: 'popover',
-    eventOrder: (a, b) => (a.extendedProps?.sort ?? 0) - (b.extendedProps?.sort ?? 0),
     leaveByDay,
     eventOverlap: (stillEvent, movingEvent) => {
       return stillEvent.allDay && movingEvent.allDay ? true : false;
@@ -94,26 +226,15 @@ export function initCalendar(container, events = [], flags = [], extraOptions = 
     eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
     validRange: undefined,
     customFlags: flags || [],
-    eventContent(arg) {
-      const kind = (arg.event.extendedProps?.leaveKind || '').toUpperCase();
-      if (kind === 'L4' || kind === 'WOLNE' || kind === 'ŚWIĘTO' || kind === 'SWIETO' || kind === 'FLAG') {
-        const span = document.createElement('span');
-        span.className = 'day-flag strong';
-        return { domNodes: [span] };
-      }
-      if (arg.event.extendedProps?.isDaySummary) {
-        return true;
-      }
-      return true;
-    },
-    dayCellDidMount(info) {
-      const leaveSet = info.view?.calendar?.getOption('leaveByDay') || new Set();
-      const iso = info.date.toISOString().slice(0, 10);
-      if (leaveSet.has(iso)) info.el.setAttribute('data-has-leave', 'true');
-    },
     datesSet() {},
     events: preparedEvents,
     ...extraOptions,
+  };
+
+  options.eventContent = renderEventContent;
+  options.eventOrder = (a, b) => {
+    const rank = { job: 0, leave: 1, summary: 2 };
+    return (rank[a.extendedProps?.kind] ?? 99) - (rank[b.extendedProps?.kind] ?? 99);
   };
 
   const calendar = new FullCalendar.Calendar(container, options);
@@ -152,10 +273,10 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   calendar.setOption('customFlags', flags || []);
   const rawEvents = Array.isArray(events) ? events : [];
   const { preparedEvents, leaveByDay } = prepareCalendarEvents(rawEvents);
-  calendar.setOption('leaveByDay', leaveByDay);
-  calendar.removeAllEvents();
-  if (preparedEvents.length) {
-    calendar.addEventSource(preparedEvents);
-  }
+  calendar.batchRendering(() => {
+    calendar.setOption('leaveByDay', leaveByDay);
+    calendar.setOption('events', preparedEvents);
+  });
+  calendar.rerenderEvents();
   calendar.rerenderDates();
 }
