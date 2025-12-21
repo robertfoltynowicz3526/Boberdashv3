@@ -332,3 +332,69 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
 .fc .fc-button-primary:not(:disabled):active {
   background: var(--jd-green-2); border-color: var(--jd-green-2);
 }
+
+/* Odstęp od góry, żeby chipy nie kleiły się do krawędzi */
+.fc .fc-daygrid-day-frame{padding-top:10px;}
+.fc-daygrid-day-events{margin-top:10px;}
+.fc-daygrid-event-harness{margin-top:8px !important;}
+
+/* Ukryj ewentualne „puste” chipy */
+.fc-event:has(.fc-event-title:empty),
+.fc-h-event .fc-event-main:empty{display:none !important;}
+
+/* Dzień z L4/Wolne/Święto – pokazuj tylko ikonę, ukryj wszystkie chipy w komórce */
+.fc-daygrid-day[data-has-leave="true"] .fc-daygrid-event-harness{display:none !important;}
+.fc-daygrid-day[data-has-leave="true"] .day-flag{display:flex;}
+
+/* Duża, wyraźna ikona (lepszy kontrast + glow) */
+.day-flag{
+  display:none; width:64px; height:64px; margin:18px auto 8px;
+  border-radius:16px; background:rgba(0,0,0,.32);
+  box-shadow:0 8px 18px rgba(0,0,0,.35) inset,0 0 0 2px rgba(216,169,0,.20);
+  align-items:center; justify-content:center;
+}
+.day-flag.strong::before{
+  content:"🌾"; /* uniwersalna ikonka, zastępuje L4/Wolne/Święto */
+  font-size:34px; filter: drop-shadow(0 0 10px rgba(216,169,0,.45));
+}
+
+/* Podsumowanie dnia – niech siada niżej i ma stałą wysokość linii */
+.fc .fc-daygrid-block-event .fc-event-main{line-height:1.25;}
+
+/* Leave – tylko ikona, bez belki */
+.fc-event-leave .fc-event-main {
+  background: transparent !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.leave-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  margin: 8px auto 0 auto;
+}
+
+/* Summary – jedna linia z trzema liczbami */
+.fc-event-summary .fc-event-main {
+  background: #4b74ff !important;
+  color: #fff !important;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.summary-card .line {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Job – opcjonalny retusz */
+.job-card .job-title {
+  font-size: 12px;
+  font-weight: 600;
+}
