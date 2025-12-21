@@ -461,7 +461,7 @@ function initializeApp() {
             start: formatDateForStorage(startDate),
             end: formatDateForStorage(addDaysToDate(startDate, 1)),
             allDay: true,
-            display: 'block',
+            display: 'background',
             typ: type,
             type,
             className: ['leave-bg', `leave-bg--${normalizedKind || 'URL'}`],

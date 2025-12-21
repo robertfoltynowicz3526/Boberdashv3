@@ -123,25 +123,34 @@ export function bootCalendar(extraOptions = {}) {
       try {
         const raw = await loadEventsFromDb(info.start, info.end);
         const mapped = (raw || []).map((e) => {
-          const kind = normalizeLeaveKind(e?.extendedProps?.kind || e?.kind || e?.type);
-          if (kind) {
+          const rawClassNames = [
+            ...(Array.isArray(e.classNames) ? e.classNames : []),
+            ...(Array.isArray(e.className) ? e.className : (typeof e.className === 'string' ? e.className.split(/\s+/) : [])),
+          ].filter(Boolean);
+          const kind = normalizeLeaveKind(e?.extendedProps?.kind || e?.kind || e?.type || e?.leaveKind || e?.extendedProps?.leaveKind);
+          const isLeaveBg = rawClassNames.includes('leave-bg');
+          const isLeaveBadge = rawClassNames.includes('leave-badge');
+          if (kind || isLeaveBg || isLeaveBadge) {
             const start = e.start || e.date;
             const end = e.end || start;
+            const classNames = rawClassNames.length ? rawClassNames : ['ev-leave', `ev-leave--${kind || 'urlop'}`];
             return {
               ...e,
               start,
               end,
               allDay: e.allDay ?? true,
-              display: 'background',
-              classNames: ['ev-leave', `ev-leave--${kind}`],
-              extendedProps: { ...(e.extendedProps || {}), kind },
+              display: e.display || (isLeaveBg ? 'background' : e.display),
+              classNames,
+              extendedProps: { ...(e.extendedProps || {}), kind: kind || e?.extendedProps?.kind || e?.kind || e?.type },
             };
           }
           const extendedProps = { ...(e.extendedProps || {}) };
           if (!extendedProps.kind && e.kind) extendedProps.kind = e.kind;
+          const classNames = rawClassNames.length ? rawClassNames : undefined;
           return {
             ...e,
             title: e.title || e.extendedProps?.client || '',
+            classNames,
             extendedProps,
           };
         });
