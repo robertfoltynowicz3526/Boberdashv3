@@ -23,7 +23,9 @@ function initializeApp() {
     const fhOf = (event) => {
         const evType = event?.extendedProps?.type || event?.extendedProps?.typ;
         const isLeave = typeof evType === 'string' && evType.startsWith('LEAVE');
-        return isLeave ? 0 : Number(event?.extendedProps?.fh || 0);
+        const props = event?.extendedProps || {};
+        const billed = props.fh ?? props.billedHours ?? props.fakturowane ?? props.billH ?? 0;
+        return isLeave ? 0 : (Number(billed) || 0);
     };
     function ymNow() {
         const d = new Date();
@@ -427,9 +429,10 @@ function initializeApp() {
                 end,
                 allDay: true,
                 display: 'auto',
+                sortOrder: 0,
                 classNames: ['leave-badge', `leave-badge--${kind}`],
                 overlap: false,
-                extendedProps
+                extendedProps: { ...extendedProps, sortOrder: 0 }
             }
         ];
     };
@@ -1011,6 +1014,17 @@ function initializeApp() {
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
+            const manualSummaryByDay = new Map();
+            const ordersSummaryByDay = new Map();
+
+            const addToDay = (map, day, patch) => {
+                const cur = map.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
+                cur.work += Number(patch.work || 0) || 0;
+                cur.drive += Number(patch.drive || 0) || 0;
+                cur.billed += Number(patch.billed || 0) || 0;
+                cur.over += Number(patch.over || 0) || 0;
+                map.set(day, cur);
+            };
 
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
@@ -1075,12 +1089,29 @@ function initializeApp() {
                             fh: Number(powiazanie.fakturowane) || 0,
                             typ: typZlecenia
                         };
+                        const clientName = klientLabel || null;
+                        const day = id;
+                        addToDay(ordersSummaryByDay, day, {
+                            work: Number(zlecenie?.pracaGodziny ?? zlecenie?.workHours ?? 0) || 0,
+                            drive: Number(zlecenie?.jazdaGodziny ?? zlecenie?.driveHours ?? 0) || 0,
+                            billed: Number(zlecenie?.fakturowaneGodziny ?? zlecenie?.billedHours ?? 0) || 0,
+                            over: Number(zlecenie?.nadgodziny ?? 0) || 0,
+                        });
                         events.push({
                             id: `powiazane_${id}_${powiazanie.zlecenieId || 'brak'}_${index}`,
-                            title: klientLabel,
+                            title: clientName || 'Zlecenie',
                             start: id,
                             allDay: true,
-                            extendedProps
+                            sortOrder: 2,
+                            className: ['order-event'],
+                            extendedProps: {
+                                sortOrder: 2,
+                                clientName,
+                                orderId: powiazanie.zlecenieId || null,
+                                machineModel,
+                                fh: Number(powiazanie.fakturowane) || 0,
+                                typ: typZlecenia
+                            }
                         });
                     });
                 }
@@ -1095,25 +1126,46 @@ function initializeApp() {
                     (billedHoursForSummary > 0);
 
                 if (!hasLeave && hasAnySummaryHours) {
-                    const summaryId = `summary_${id}`;
-                    if (events.some(e => e.id === summaryId)) return;
-                    events.push({
-                        id: summaryId,
-                        title: 'Ewidencja dnia',
-                        start: id,
-                        allDay: true,
-                        className: ['strip-summary'],
-                        extendedProps: {
-                            client: 'Ewidencja dnia',
-                            machineModel: null,
-                            fh: (!powiazane.length && fakturowaneValue > 0) ? fakturowaneValue : null,
-                            typ: null,
-                            nadgodziny: nadgodzinyValue,
-                            ...baseHoursProps
-                        }
+                    manualSummaryByDay.set(id, {
+                        work: Number(baseHoursProps?.workHours ?? baseHoursProps?.praca ?? 0) || 0,
+                        drive: Number(baseHoursProps?.driveHours ?? baseHoursProps?.jazda ?? 0) || 0,
+                        billed: Number(baseHoursProps?.billedHours ?? baseHoursProps?.fakturowane ?? baseHoursProps?.fh ?? 0) || 0,
+                        over: Number(dane?.nadgodziny ?? baseHoursProps?.nadgodziny ?? 0) || 0,
                     });
                 }
             });
+
+            const allDays = new Set([...manualSummaryByDay.keys(), ...ordersSummaryByDay.keys()]);
+            for (const day of allDays) {
+                const src = manualSummaryByDay.get(day) || ordersSummaryByDay.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
+                const work = Number(src.work || 0) || 0;
+                const drive = Number(src.drive || 0) || 0;
+                const billed = Number(src.billed || 0) || 0;
+                const over = Number(src.over || 0) || 0;
+
+                if (work === 0 && drive === 0 && billed === 0 && over === 0) continue;
+
+                for (let i = events.length - 1; i >= 0; i--) {
+                    if (events[i]?.id === `summary_${day}`) events.splice(i, 1);
+                    if (String(events[i]?.id || '').startsWith(`godziny_${day}`)) events.splice(i, 1);
+                }
+
+                events.push({
+                    id: `summary_${day}`,
+                    start: day,
+                    allDay: true,
+                    title: 'Podsumowanie',
+                    sortOrder: 1,
+                    className: ['strip-summary'],
+                    extendedProps: {
+                        sortOrder: 1,
+                        workHours: work,
+                        driveHours: drive,
+                        billedHours: billed,
+                        nadgodziny: over
+                    }
+                });
+            }
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
