@@ -74,45 +74,54 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return [];
     },
     dayCellDidMount: (arg) => {
-      const day = arg.date.toISOString().slice(0, 10);
+      const day = arg.date.toISOString().slice(0,10);
       const deco = window.__calendarDecorations || {};
-      const leave = deco.leaveByDay?.[day];
-      const sum = deco.summaryByDay?.[day];
+      const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
+      const sum = deco.summaryByDay?.[day];     // {work,drive,billed,over} albo undefined
 
+      // wyczyść poprzednie
       arg.el.querySelectorAll('.cell-sum, .cell-leave-icon').forEach(n => n.remove());
 
+      // 1) Dzień wolny -> TYLKO ikona, NIC więcej
       if (leave) {
         const icon =
           leave === 'L4' ? '🤒' :
           (leave === 'SWIETO' ? '🎉' :
           (leave === 'URL' ? '🏖️' : '⛔'));
-
         const big = document.createElement('div');
         big.className = `cell-leave-icon cell-leave-icon--${leave}`;
         big.textContent = icon;
         arg.el.appendChild(big);
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+        return; // <--- krytyczne: nie renderuj sumy
+      }
+
+      // 2) Normalny dzień: kafel sumy tylko jeśli istnieją jakiekolwiek dane > 0
+      if (!sum) {
+        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
       }
 
-      const s = sum || { work:0, drive:0, billed:0, over:0 };
-      const work = Number(s.work||0) || 0;
-      const drive = Number(s.drive||0) || 0;
-      const billed = Number(s.billed||0) || 0;
-      const over = Number(s.over||0) || 0;
+      const work = Number(sum.work||0) || 0;
+      const drive = Number(sum.drive||0) || 0;
+      const billed = Number(sum.billed||0) || 0;
+      const over = Number(sum.over||0) || 0;
 
-      const parts = [
-        `Praca: ${work.toFixed(1)}h`,
-        `Jazda: ${drive.toFixed(1)}h`,
-        `Fakturowane: ${billed.toFixed(1)}h`,
-        `Nadgodziny: ${over.toFixed(1)}h`,
-      ];
+      if (work === 0 && drive === 0 && billed === 0 && over === 0) {
+        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+        return;
+      }
+
+      const parts = [];
+      if (work > 0) parts.push(`Praca: ${work.toFixed(1)}h`);
+      if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
+      if (billed > 0) parts.push(`Fakturowane: ${billed.toFixed(1)}h`);
+      if (over > 0) parts.push(`Nadgodziny: ${over.toFixed(1)}h`);
 
       const box = document.createElement('div');
       box.className = 'cell-sum';
       box.textContent = parts.join(' • ');
       arg.el.appendChild(box);
-
       if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
     },
     events: async (info, success) => {
