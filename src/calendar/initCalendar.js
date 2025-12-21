@@ -127,7 +127,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     eventOverlap: false,
     slotEventOverlap: false,
     eventDisplay: 'block',
-    eventOrder: 'start,-duration,title',
+    eventOrder: 'sortOrder,title',
     dayCellDidMount: (info) => {
       const frame = info.el.querySelector('.fc-daygrid-day-frame') || info.el;
       applyFlagToCell(window.__fcCalendar, frame, info.date);
@@ -203,8 +203,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (drive > 0) parts.push(`Jazda: ${drive.toFixed(1)}h`);
       if (billed > 0) parts.push(`Fakt.: ${billed.toFixed(1)}h`);
       if (over > 0) parts.push(`Nadg.: ${over.toFixed(1)}h`);
-
-      if (!parts.length) return { html: '' };
 
       return { html: `<div class="summary-inline">${parts.join(' • ')}</div>` };
     },
