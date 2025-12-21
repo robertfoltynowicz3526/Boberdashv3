@@ -134,17 +134,18 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   z-index: 3;
 }
 
-/* Zostaw miejsce na kafel sumy (żeby eventy nie wchodziły pod niego) */
-.fc .fc-daygrid-day-events { padding-bottom: 34px; }
+/* Zostaw miejsce na kafel sumy (żeby eventy nie nachodziły) */
+.fc .fc-daygrid-day-events { padding-bottom: 38px; }
 
-/* Wolne: subtelny napis w tle */
-.fc .cell-leave{
+/* DUŻA IKONA WOLNEGO – tylko ona w dniu wolnym */
+.fc .cell-leave-icon{
   position: absolute;
-  left: 8px;
-  top: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  opacity: 0.35;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  opacity: 0.65;
   pointer-events: none;
   z-index: 2;
 }

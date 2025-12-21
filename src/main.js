@@ -18,7 +18,7 @@ const addAgg = (map, day, patch) => {
     map.set(day, cur);
 };
 
-const setCalendarDecorations = (decorations) => {
+const setDecorations = (decorations) => {
     window.__calendarDecorations = decorations;
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
 };
@@ -919,21 +919,9 @@ function initializeApp() {
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
-            const manualByDay = new Map();      // day -> {work, drive, billed, over}
-            const ordersAggByDay = new Map();   // day -> {work, drive, billed, over}
-            const leaveByDay = {};              // day -> leave kind
-
-            const addOrderEvent = (dayStr, clientName, orderId) => {
-                const safeOrderId = orderId || dayStr;
-                events.push({
-                    id: `order_${safeOrderId}`,
-                    start: dayStr,
-                    allDay: true,
-                    title: clientName || 'Zlecenie',
-                    className: ['order-event'],
-                    extendedProps: { orderId: orderId || null, dayStr }
-                });
-            };
+            const manualByDay = new Map();     // day -> {work, drive, billed, over}
+            const ordersByDay = new Map();     // day -> {work, drive, billed, over}
+            const leaveByDay = {};             // day -> leave kind
 
             snapshotGodziny.forEach(docSnap => {
                 const dane = docSnap.data();
@@ -981,13 +969,21 @@ function initializeApp() {
                         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === powiazanie.zlecenieId) || null;
                         const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
                         const clientName = klientLabel || 'Zlecenie';
-                        addAgg(ordersAggByDay, day, {
+                        events.push({
+                            id: `order_${powiazanie.zlecenieId}`,
+                            start: day,
+                            allDay: true,
+                            title: clientName,
+                            className: ['order-event'],
+                            extendedProps: { day, orderId: powiazanie.zlecenieId }
+                        });
+
+                        addAgg(ordersByDay, day, {
                             work: Number(zlecenie?.pracaGodziny ?? zlecenie?.workHours ?? 0) || 0,
                             drive: Number(zlecenie?.jazdaGodziny ?? zlecenie?.driveHours ?? 0) || 0,
                             billed: Number(zlecenie?.fakturowaneGodziny ?? zlecenie?.billedHours ?? 0) || 0,
                             over: Number(zlecenie?.nadgodziny ?? 0) || 0,
                         });
-                        addOrderEvent(day, clientName, powiazanie.zlecenieId);
                     });
                 }
                 const hasAnySummaryHours =
@@ -995,7 +991,7 @@ function initializeApp() {
                     (driveValue > 0) ||
                     (billedHoursForSummary > 0);
 
-                if (hasAnySummaryHours) {
+                if (hasAnySummaryHours || !manualByDay.has(day)) {
                     manualByDay.set(day, {
                         work: Number(baseHoursProps?.workHours ?? baseHoursProps?.praca ?? 0) || 0,
                         drive: Number(baseHoursProps?.driveHours ?? baseHoursProps?.jazda ?? 0) || 0,
@@ -1006,10 +1002,20 @@ function initializeApp() {
             });
 
             const summaryByDay = {};
-            const allDays = new Set([...manualByDay.keys(), ...ordersAggByDay.keys()]);
+            const mergedLeaveByDay = { ...leaveByDay, ...leaveByDayFromEvents };
+            leaveByDayFromHours = { ...leaveByDay };
+            const leaveSet = new Set(Object.keys(mergedLeaveByDay));
+
+            for (let i = events.length - 1; i >= 0; i--) {
+                const day = events[i]?.extendedProps?.day || isoDay(events[i]?.start);
+                if (leaveSet.has(day)) events.splice(i, 1);
+            }
+
+            const allDays = new Set([...manualByDay.keys(), ...ordersByDay.keys()]);
             for (const day of allDays) {
+                if (leaveSet.has(day)) continue;
                 const m = manualByDay.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
-                const o = ordersAggByDay.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
+                const o = ordersByDay.get(day) || { work: 0, drive: 0, billed: 0, over: 0 };
                 const work = (m.work || 0) + (o.work || 0);
                 const drive = (m.drive || 0) + (o.drive || 0);
                 const billed = (m.billed || 0) + (o.billed || 0);
@@ -1021,16 +1027,22 @@ function initializeApp() {
                 const ev = events[i] || {};
                 const id = String(ev?.id || '');
                 const cls = ev?.className || ev?.classNames || [];
+                const title = ev?.title || '';
                 const classList = Array.isArray(cls) ? cls : String(cls || '').split(/\\s+/);
-                if (id.startsWith('summary_') || id.startsWith('godziny_') || classList.includes('strip-summary')) {
+                if (
+                    id.startsWith('summary_') ||
+                    id.startsWith('godziny_') ||
+                    classList.includes('strip-summary') ||
+                    classList.includes('leave-bg') ||
+                    classList.includes('leave-badge') ||
+                    /^Ewidencja dnia/i.test(String(title || ''))
+                ) {
                     events.splice(i, 1);
                 }
             }
 
-            const mergedLeaveByDay = { ...leaveByDay, ...leaveByDayFromEvents };
-            leaveByDayFromHours = { ...leaveByDay };
             lastSummaryByDay = summaryByDay;
-            setCalendarDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
+            setDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
 
             workEvents = events;
             przerysujZdarzeniaKalendarza();
@@ -1052,7 +1064,16 @@ function initializeApp() {
                 leaveByDayFromEvents = nextLeaveByDayFromEvents;
                 const summaryByDay = lastSummaryByDay || {};
                 const mergedLeaveByDay = { ...leaveByDayFromHours, ...leaveByDayFromEvents };
-                setCalendarDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
+                const leaveSet = new Set(Object.keys(mergedLeaveByDay));
+                const filteredEvents = (workEvents || []).filter((ev) => {
+                    const day = ev?.extendedProps?.day || isoDay(ev?.start);
+                    return !leaveSet.has(day);
+                });
+                if (filteredEvents.length !== workEvents.length) {
+                    workEvents = filteredEvents;
+                    przerysujZdarzeniaKalendarza();
+                }
+                setDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
 
             });
         } catch (error) {
