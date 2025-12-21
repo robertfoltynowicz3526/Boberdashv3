@@ -1,4 +1,4 @@
-import { db } from './firebase-config.js';
+import { db, missingEnv } from './firebase-config.js';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
@@ -6,12 +6,22 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, renderDaySummaries, updateCalendarData } from './calendar/initCalendar.js';
+import EnvWarning from './components/EnvWarning.jsx';
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
 
 
 function initializeApp() {
+    // Ostrzeżenie o brakujących kluczach środowiskowych Firebase
+    try {
+        const host = document.querySelector('main') || document.body;
+        const banner = EnvWarning({ list: missingEnv });
+        if (banner && host) {
+            banner.dataset.envWarning = 'true';
+            host.prepend(banner);
+        }
+    } catch (_) { /* best-effort ui warning */ }
     // --- STAŁE I ZMIENNE GLOBALNE ---
     const STAWKI = {
         S: { nazwa: "Wyjazdowe", stawka: 45 },
@@ -190,6 +200,18 @@ function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+    const PAGE_SIZE = 50;
+    const viewState = {
+        clients: { loading: false, error: null, page: 1 },
+        machines: { loading: false, error: null, page: 1 },
+        orders: { loading: false, error: null, pageActive: 1, pageDone: 1 },
+        inventory: { loading: false, error: null, page: 1 },
+    };
+    let unsubscribeKlienci = null;
+    let unsubscribeMaszyny = null;
+    let unsubscribeZlecenia = null;
+    let unsubscribeMagazyn = null;
+    const inventoryFilters = { search: '', sort: 'name' };
 
     const toDateSafe = (value) => {
         if (!value) return null;
@@ -486,6 +508,37 @@ function initializeApp() {
         }
     };
 
+    const ensureMagazynFilters = () => {
+        const tableSection = document.querySelector('#magazyn .table-section');
+        if (!tableSection || tableSection.querySelector('#magazyn-search-input')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'form-grid form-grid-2';
+        wrap.innerHTML = `
+            <div class="form-group">
+                <label for="magazyn-search-input">Szukaj…</label>
+                <input type="search" id="magazyn-search-input" placeholder="Nazwa, SKU, klient...">
+            </div>
+            <div class="form-group">
+                <label for="magazyn-sort-select">Sortowanie</label>
+                <select id="magazyn-sort-select">
+                    <option value="name">Nazwa</option>
+                    <option value="sku">SKU / Index</option>
+                </select>
+            </div>
+        `;
+        tableSection.insertBefore(wrap, tableSection.firstChild);
+        const searchInput = wrap.querySelector('#magazyn-search-input');
+        const sortSelect = wrap.querySelector('#magazyn-sort-select');
+        if (searchInput) searchInput.addEventListener('input', () => {
+            inventoryFilters.search = searchInput.value || '';
+            renderMagazynRows();
+        });
+        if (sortSelect) sortSelect.addEventListener('change', () => {
+            inventoryFilters.sort = sortSelect.value || 'name';
+            renderMagazynRows();
+        });
+    };
+
     function moveOrdersSearchBetweenSections() {
         const search = document.querySelector('#orders-search');
         const activeSection = document.querySelector('.orders-active');
@@ -563,6 +616,7 @@ function initializeApp() {
     };
 
     ensureMagazynSummaryPlacement();
+    ensureMagazynFilters();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     window.openTab = (evt, tabName) => {
@@ -572,6 +626,7 @@ function initializeApp() {
         evt.currentTarget.classList.add('active');
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
+            ensureMagazynFilters();
         }
     };
     const now = new Date();
@@ -1841,6 +1896,23 @@ function initializeApp() {
 
 function wyswietlKlientow() {
   try {
+    if (viewState.clients.loading) {
+      if (listaKlientowDiv) listaKlientowDiv.innerHTML = "<p>Ładowanie klientów...</p>";
+      return;
+    }
+    if (viewState.clients.error) {
+      if (listaKlientowDiv) {
+        listaKlientowDiv.innerHTML = `
+          <div class="app-inline-warning">
+            Błąd ładowania klientów: ${viewState.clients.error}
+            <button id="retry-clients" class="btn-edit" style="margin-left:8px;">Ponów</button>
+          </div>
+        `;
+        const retryBtn = document.getElementById('retry-clients');
+        if (retryBtn) retryBtn.onclick = () => nasluchujNaKlientow();
+      }
+      return;
+    }
     // Poczekaj na maszyny – bez nich nie budujemy list pod klientami
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieKlienciCache.length > 0) {
       console.log("Czekam na maszyny przed renderowaniem klientów...");
@@ -1867,7 +1939,12 @@ function wyswietlKlientow() {
       return tekst.includes(frazaWyszukiwania);
     });
 
-    przefiltrowaniKlienci.forEach(klient => {
+    const totalPages = Math.max(1, Math.ceil(przefiltrowaniKlienci.length / PAGE_SIZE));
+    if (viewState.clients.page > totalPages) viewState.clients.page = totalPages;
+    const start = (viewState.clients.page - 1) * PAGE_SIZE;
+    const slicedKlienci = przefiltrowaniKlienci.slice(start, start + PAGE_SIZE);
+
+    slicedKlienci.forEach(klient => {
       wszystkieKlienci.push(klient);
 
       // Maszyny tego klienta
@@ -1932,6 +2009,23 @@ function wyswietlKlientow() {
 
     if (listaKlientowDiv) {
       listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
+      if (totalPages > 1) {
+        const pager = document.createElement('div');
+        pager.className = 'list-pagination';
+        pager.innerHTML = `
+          <button class="btn-ghost" ${viewState.clients.page <= 1 ? 'disabled' : ''} data-dir="prev">Poprzednia</button>
+          <span>Strona ${viewState.clients.page} / ${totalPages}</span>
+          <button class="btn-ghost" ${viewState.clients.page >= totalPages ? 'disabled' : ''} data-dir="next">Następna</button>
+        `;
+        pager.addEventListener('click', (ev) => {
+          const dir = ev.target?.dataset?.dir;
+          if (!dir) return;
+          if (dir === 'prev' && viewState.clients.page > 1) viewState.clients.page -= 1;
+          if (dir === 'next' && viewState.clients.page < totalPages) viewState.clients.page += 1;
+          wyswietlKlientow();
+        });
+        listaKlientowDiv.appendChild(pager);
+      }
     }
     if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
     odswiezSelectKlientaDoZlecenia();
@@ -1948,18 +2042,36 @@ function wyswietlKlientow() {
 }
 
 function nasluchujNaKlientow() {
-  onSnapshot(
-    query(collection(db, "klienci"), orderBy("nazwa")),
-    (snapshot) => {
-      _wszystkieKlienciCache = [];  // odśwież cache
-      snapshot.forEach((docSnap) => {
-        _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      // Po załadowaniu klientów przerysuj listy, które ich potrzebują:
-      wyswietlMaszyny();   // żeby przypiąć maszyny pod klientów
-      wyswietlKlientow();  // żeby wyrenderować listę klientów + selecty
-    }
-  );
+  viewState.clients.loading = true;
+  viewState.clients.error = null;
+  wyswietlKlientow();
+  try {
+    if (unsubscribeKlienci) unsubscribeKlienci();
+    unsubscribeKlienci = onSnapshot(
+      query(collection(db, "klienci"), orderBy("nazwa")),
+      (snapshot) => {
+        _wszystkieKlienciCache = [];  // odśwież cache
+        snapshot.forEach((docSnap) => {
+          _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        viewState.clients.loading = false;
+        viewState.clients.error = null;
+        viewState.clients.page = 1;
+        // Po załadowaniu klientów przerysuj listy, które ich potrzebują:
+        wyswietlMaszyny();   // żeby przypiąć maszyny pod klientów
+        wyswietlKlientow();  // żeby wyrenderować listę klientów + selecty
+      },
+      (error) => {
+        viewState.clients.loading = false;
+        viewState.clients.error = error?.message || 'Nie udało się pobrać listy klientów.';
+        wyswietlKlientow();
+      }
+    );
+  } catch (err) {
+    viewState.clients.loading = false;
+    viewState.clients.error = err?.message || 'Nie udało się pobrać listy klientów.';
+    wyswietlKlientow();
+  }
 }
 async function obslugaListyKlientow(event) {
   // 1) próbujemy znaleźć klikniętą strzałkę albo jej rodzica z data-target
@@ -2189,6 +2301,23 @@ async function obslugaListyKlientow(event) {
     }
 
     function wyswietlMaszyny() {
+        if (viewState.machines.loading) {
+            if (listaMaszynDiv) listaMaszynDiv.innerHTML = "<p>Ładowanie maszyn...</p>";
+            return;
+        }
+        if (viewState.machines.error) {
+            if (listaMaszynDiv) {
+                listaMaszynDiv.innerHTML = `
+                    <div class="app-inline-warning">
+                        Błąd ładowania maszyn: ${viewState.machines.error}
+                        <button id="retry-machines" class="btn-edit" style="margin-left:8px;">Ponów</button>
+                    </div>
+                `;
+                const retryBtn = document.getElementById('retry-machines');
+                if (retryBtn) retryBtn.onclick = () => nasluchujNaMaszyny();
+            }
+            return;
+        }
         if (_wszystkieKlienciCache.length === 0 && _wszystkieMaszynyCache.length > 0) {
             listaMaszynDiv.innerHTML = "<p>Ładowanie danych klientów...</p>";
             return;
@@ -2202,7 +2331,12 @@ async function obslugaListyKlientow(event) {
             return tekst.includes(frazaWyszukiwania);
         });
 
-        const pogrupowaneMaszyny = przefiltrowaneMaszyny.reduce((acc, maszyna) => {
+        const totalPages = Math.max(1, Math.ceil(przefiltrowaneMaszyny.length / PAGE_SIZE));
+        if (viewState.machines.page > totalPages) viewState.machines.page = totalPages;
+        const start = (viewState.machines.page - 1) * PAGE_SIZE;
+        const slicedMaszyny = przefiltrowaneMaszyny.slice(start, start + PAGE_SIZE);
+
+        const pogrupowaneMaszyny = slicedMaszyny.reduce((acc, maszyna) => {
             (acc[maszyna.klientNazwa] = acc[maszyna.klientNazwa] || []).push(maszyna);
             return acc;
         }, {});
@@ -2224,6 +2358,23 @@ async function obslugaListyKlientow(event) {
         }
        if (listaMaszynDiv) {
             listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
+            if (totalPages > 1) {
+                const pager = document.createElement('div');
+                pager.className = 'list-pagination';
+                pager.innerHTML = `
+                    <button class="btn-ghost" ${viewState.machines.page <= 1 ? 'disabled' : ''} data-dir="prev">Poprzednia</button>
+                    <span>Strona ${viewState.machines.page} / ${totalPages}</span>
+                    <button class="btn-ghost" ${viewState.machines.page >= totalPages ? 'disabled' : ''} data-dir="next">Następna</button>
+                `;
+                pager.addEventListener('click', (ev) => {
+                    const dir = ev.target?.dataset?.dir;
+                    if (!dir) return;
+                    if (dir === 'prev' && viewState.machines.page > 1) viewState.machines.page -= 1;
+                    if (dir === 'next' && viewState.machines.page < totalPages) viewState.machines.page += 1;
+                    wyswietlMaszyny();
+                });
+                listaMaszynDiv.appendChild(pager);
+            }
         }
         if (zlecenieKlientSelect) {
             zlecenieKlientSelect.dispatchEvent(new Event('change'));
@@ -2274,17 +2425,34 @@ async function obslugaListyKlientow(event) {
 
 
     function nasluchujNaMaszyny() {
-        onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
-            _wszystkieMaszynyCache = [];
-            wszystkieMaszyny = [];
-            snapshot.forEach(docSnap => {
-                const maszyna = { id: docSnap.id, ...docSnap.data() };
-                _wszystkieMaszynyCache.push(maszyna);
-                wszystkieMaszyny.push(maszyna);
+        viewState.machines.loading = true;
+        viewState.machines.error = null;
+        wyswietlMaszyny();
+        try {
+            if (unsubscribeMaszyny) unsubscribeMaszyny();
+            unsubscribeMaszyny = onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
+                _wszystkieMaszynyCache = [];
+                wszystkieMaszyny = [];
+                snapshot.forEach(docSnap => {
+                    const maszyna = { id: docSnap.id, ...docSnap.data() };
+                    _wszystkieMaszynyCache.push(maszyna);
+                    wszystkieMaszyny.push(maszyna);
+                });
+                viewState.machines.loading = false;
+                viewState.machines.error = null;
+                viewState.machines.page = 1;
+                wyswietlMaszyny();
+                wyswietlKlientow();
+            }, (error) => {
+                viewState.machines.loading = false;
+                viewState.machines.error = error?.message || 'Nie udało się pobrać listy maszyn.';
+                wyswietlMaszyny();
             });
+        } catch (err) {
+            viewState.machines.loading = false;
+            viewState.machines.error = err?.message || 'Nie udało się pobrać listy maszyn.';
             wyswietlMaszyny();
-            wyswietlKlientow();
-        });
+        }
     }
 
     async function obslugaListyMaszyn(event) {
@@ -2425,6 +2593,25 @@ function createZlecenieListItem(zlecenie, bodyHtml, actionsHtml) {
 }
 
 function wyswietlZlecenia() {
+    if (viewState.orders.loading) {
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie zleceń...</p>";
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie zleceń...</p>";
+        return;
+    }
+    if (viewState.orders.error) {
+        const errHtml = `
+            <div class="app-inline-warning">
+                Błąd ładowania zleceń: ${viewState.orders.error}
+                <button data-retry="orders" class="btn-edit" style="margin-left:8px;">Ponów</button>
+            </div>
+        `;
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = errHtml;
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = errHtml;
+        document.querySelectorAll('[data-retry="orders"]').forEach(btn => {
+            btn.onclick = () => nasluchujNaZlecenia();
+        });
+        return;
+    }
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
         if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
         if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -2502,16 +2689,60 @@ function wyswietlZlecenia() {
         }
     });
 
+    const totalActivePages = Math.max(1, Math.ceil(aktywneElements.length / PAGE_SIZE));
+    if (viewState.orders.pageActive > totalActivePages) viewState.orders.pageActive = totalActivePages;
+    const activeStart = (viewState.orders.pageActive - 1) * PAGE_SIZE;
+    const aktywneSlice = aktywneElements.slice(activeStart, activeStart + PAGE_SIZE);
+
+    const totalDonePages = Math.max(1, Math.ceil(ukonczoneElements.length / PAGE_SIZE));
+    if (viewState.orders.pageDone > totalDonePages) viewState.orders.pageDone = totalDonePages;
+    const doneStart = (viewState.orders.pageDone - 1) * PAGE_SIZE;
+    const ukonczoneSlice = ukonczoneElements.slice(doneStart, doneStart + PAGE_SIZE);
+
     renderListInBatches(
         aktywneZleceniaLista,
-        aktywneElements,
+        aktywneSlice,
         "Brak aktywnych zleceń lub pasujących do wyszukiwania."
     );
     renderListInBatches(
         ukonczoneZleceniaLista,
-        ukonczoneElements,
+        ukonczoneSlice,
         "Brak ukończonych zleceń lub pasujących do wyszukiwania."
     );
+    if (aktywneZleceniaLista && totalActivePages > 1) {
+        const pager = document.createElement('div');
+        pager.className = 'list-pagination';
+        pager.innerHTML = `
+            <button class="btn-ghost" ${viewState.orders.pageActive <= 1 ? 'disabled' : ''} data-dir="prev">Poprzednia</button>
+            <span>Strona ${viewState.orders.pageActive} / ${totalActivePages}</span>
+            <button class="btn-ghost" ${viewState.orders.pageActive >= totalActivePages ? 'disabled' : ''} data-dir="next">Następna</button>
+        `;
+        pager.addEventListener('click', (ev) => {
+            const dir = ev.target?.dataset?.dir;
+            if (!dir) return;
+            if (dir === 'prev' && viewState.orders.pageActive > 1) viewState.orders.pageActive -= 1;
+            if (dir === 'next' && viewState.orders.pageActive < totalActivePages) viewState.orders.pageActive += 1;
+            wyswietlZlecenia();
+        });
+        aktywneZleceniaLista.appendChild(pager);
+    }
+    if (ukonczoneZleceniaLista && totalDonePages > 1) {
+        const pager = document.createElement('div');
+        pager.className = 'list-pagination';
+        pager.innerHTML = `
+            <button class="btn-ghost" ${viewState.orders.pageDone <= 1 ? 'disabled' : ''} data-dir="prev">Poprzednia</button>
+            <span>Strona ${viewState.orders.pageDone} / ${totalDonePages}</span>
+            <button class="btn-ghost" ${viewState.orders.pageDone >= totalDonePages ? 'disabled' : ''} data-dir="next">Następna</button>
+        `;
+        pager.addEventListener('click', (ev) => {
+            const dir = ev.target?.dataset?.dir;
+            if (!dir) return;
+            if (dir === 'prev' && viewState.orders.pageDone > 1) viewState.orders.pageDone -= 1;
+            if (dir === 'next' && viewState.orders.pageDone < totalDonePages) viewState.orders.pageDone += 1;
+            wyswietlZlecenia();
+        });
+        ukonczoneZleceniaLista.appendChild(pager);
+    }
     obliczIPokazPodsumowanieFinansowe();
 }
 
@@ -2519,18 +2750,36 @@ function wyswietlZlecenia() {
 
 
 function nasluchujNaZlecenia() {
-    onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
-        _wszystkieZleceniaCache = [];
-        wszystkieZlecenia = [];
-        snapshot.forEach(docSnap => {
-            const zlecenie = { id: docSnap.id, ...docSnap.data() };
-            _wszystkieZleceniaCache.push(zlecenie);
-            wszystkieZlecenia.push(zlecenie);
+    viewState.orders.loading = true;
+    viewState.orders.error = null;
+    wyswietlZlecenia();
+    try {
+        if (unsubscribeZlecenia) unsubscribeZlecenia();
+        unsubscribeZlecenia = onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
+            _wszystkieZleceniaCache = [];
+            wszystkieZlecenia = [];
+            snapshot.forEach(docSnap => {
+                const zlecenie = { id: docSnap.id, ...docSnap.data() };
+                _wszystkieZleceniaCache.push(zlecenie);
+                wszystkieZlecenia.push(zlecenie);
+            });
+            viewState.orders.loading = false;
+            viewState.orders.error = null;
+            viewState.orders.pageActive = 1;
+            viewState.orders.pageDone = 1;
+            wyswietlZlecenia();
+            odswiezPodsumowania();
+            przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
+        }, (error) => {
+            viewState.orders.loading = false;
+            viewState.orders.error = error?.message || 'Nie udało się pobrać listy zleceń.';
+            wyswietlZlecenia();
         });
+    } catch (err) {
+        viewState.orders.loading = false;
+        viewState.orders.error = err?.message || 'Nie udało się pobrać listy zleceń.';
         wyswietlZlecenia();
-        odswiezPodsumowania();
-        przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
-    });
+    }
 }
 
 let migracjaStartEndWykonana = false;
@@ -3314,42 +3563,136 @@ async function obslugaListyCzesci(event) {
         }
     }
 
+    function renderMagazynRows() {
+        if (!magazynLista) return;
+        const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="6">Magazyn pusty.</td></tr>';
+        const wrapper = magazynLista.parentElement;
+        if (wrapper) {
+            wrapper.style.maxHeight = 'calc(100vh - 240px)';
+            wrapper.style.overflow = 'auto';
+        }
+        if (viewState.inventory.loading) {
+            magazynLista.innerHTML = '<tr class="empty-row"><td data-label="Informacja" colspan="6">Ładowanie magazynu...</td></tr>';
+            return;
+        }
+        if (viewState.inventory.error) {
+            magazynLista.innerHTML = `
+                <tr class="empty-row">
+                    <td data-label="Informacja" colspan="6">
+                        Błąd ładowania magazynu: ${viewState.inventory.error}
+                        <button id="retry-magazyn" class="btn-edit" style="margin-left:8px;">Ponów</button>
+                    </td>
+                </tr>
+            `;
+            const retryBtn = document.getElementById('retry-magazyn');
+            if (retryBtn) retryBtn.onclick = () => wyswietlMagazyn();
+            return;
+        }
+        let przefiltrowane = [...wszystkieProdukty];
+        if (inventoryFilters.search) {
+            const q = inventoryFilters.search.toLowerCase();
+            przefiltrowane = przefiltrowane.filter((p) => {
+                const tekst = `${p.nazwa || ''} ${p.index || ''} ${p.klient || ''} ${p.location || ''}`.toLowerCase();
+                return tekst.includes(q);
+            });
+        }
+        przefiltrowane.sort((a, b) => {
+            if (inventoryFilters.sort === 'sku') {
+                return (a.index || '').localeCompare(b.index || '');
+            }
+            return (a.nazwa || '').localeCompare(b.nazwa || '');
+        });
+        const totalPages = Math.max(1, Math.ceil(przefiltrowane.length / PAGE_SIZE));
+        if (viewState.inventory.page > totalPages) viewState.inventory.page = totalPages;
+        const start = (viewState.inventory.page - 1) * PAGE_SIZE;
+        const slice = przefiltrowane.slice(start, start + PAGE_SIZE);
+
+        let html = '';
+        slice.forEach((produkt) => {
+            const ilosc = wartoscLiczbowa(produkt.ilosc);
+            const pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
+            const jestOlejem = Boolean(produkt.jestOlejem);
+            const iloscFormatowana = formatujIloscMagazynu(ilosc);
+            const iloscWLitrach = jestOlejem && pojemnosc
+                ? (ilosc * pojemnosc).toFixed(2) + ' L'
+                : '---';
+            const datasetQty = ilosc;
+            html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
+                <td data-label="Index">${produkt.index}</td>
+                <td data-label="Nazwa">${produkt.nazwa}</td>
+                <td data-label="Ilość (szt.)">${iloscFormatowana} szt.</td>
+                <td data-label="Ilość (Litry)">${iloscWLitrach}</td>
+                <td data-label="Klient">${produkt.klient}</td>
+                <td data-label="Akcje">
+                    <button class="add-stock-btn">Dodaj</button>
+                    <button class="remove-stock-btn">Zdejmij</button>
+                    <button class="delete-btn">Usuń</button>
+                </td>
+            </tr>`;
+        });
+        magazynLista.innerHTML = html || emptyRowHtml;
+
+        const tableSection = document.querySelector('#magazyn .table-section');
+        if (tableSection) {
+            let pager = document.getElementById('magazyn-pagination');
+            if (!pager) {
+                pager = document.createElement('div');
+                pager.id = 'magazyn-pagination';
+                pager.className = 'list-pagination';
+                tableSection.appendChild(pager);
+            }
+            if (totalPages > 1) {
+                pager.innerHTML = `
+                    <button class="btn-ghost" ${viewState.inventory.page <= 1 ? 'disabled' : ''} data-dir="prev">Poprzednia</button>
+                    <span>Strona ${viewState.inventory.page} / ${totalPages}</span>
+                    <button class="btn-ghost" ${viewState.inventory.page >= totalPages ? 'disabled' : ''} data-dir="next">Następna</button>
+                `;
+                pager.onclick = (ev) => {
+                    const dir = ev.target?.dataset?.dir;
+                    if (!dir) return;
+                    if (dir === 'prev' && viewState.inventory.page > 1) viewState.inventory.page -= 1;
+                    if (dir === 'next' && viewState.inventory.page < totalPages) viewState.inventory.page += 1;
+                    renderMagazynRows();
+                };
+            } else {
+                pager.innerHTML = '';
+            }
+        }
+        renderMagazynWModalu();
+    }
+
     function wyswietlMagazyn() {
         if (!magazynLista) return;
-        onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
-            let html = '';
-            const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="6">Magazyn pusty.</td></tr>';
-            wszystkieProdukty = [];
-            if (snapshot.empty) { magazynLista.innerHTML = emptyRowHtml; return; }
-            snapshot.forEach((docSnap) => {
-                const produkt = docSnap.data();
-                produkt.id = docSnap.id;
-                 produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
-                produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
-                const jestOlejem = Boolean(produkt.jestOlejem);
-                produkt.jestOlejem = jestOlejem;
-                const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
-                const iloscWLitrach = jestOlejem && produkt.pojemnosc
-                    ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
-                    : '---';
-                const datasetQty = produkt.ilosc;               
-                wszystkieProdukty.push(produkt);
-                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
-                    <td data-label="Index">${produkt.index}</td>
-                    <td data-label="Nazwa">${produkt.nazwa}</td>
-                    <td data-label="Ilość (szt.)">${iloscFormatowana} szt.</td>
-                    <td data-label="Ilość (Litry)">${iloscWLitrach}</td>
-                    <td data-label="Klient">${produkt.klient}</td>
-                    <td data-label="Akcje">
-                        <button class="add-stock-btn">Dodaj</button>
-                        <button class="remove-stock-btn">Zdejmij</button>
-                        <button class="delete-btn">Usuń</button>
-                    </td>
-                </tr>`;
+        viewState.inventory.loading = true;
+        viewState.inventory.error = null;
+        renderMagazynRows();
+        try {
+            if (unsubscribeMagazyn) unsubscribeMagazyn();
+            unsubscribeMagazyn = onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
+                wszystkieProdukty = [];
+                if (snapshot.empty) {
+                    viewState.inventory.loading = false;
+                    renderMagazynRows();
+                    return;
+                }
+                snapshot.forEach((docSnap) => {
+                    const produkt = docSnap.data();
+                    produkt.id = docSnap.id;
+                    wszystkieProdukty.push(produkt);
+                });
+                viewState.inventory.loading = false;
+                viewState.inventory.page = 1;
+                renderMagazynRows();
+            }, (error) => {
+                viewState.inventory.loading = false;
+                viewState.inventory.error = error?.message || 'Nie udało się pobrać magazynu.';
+                renderMagazynRows();
             });
-            magazynLista.innerHTML = html || emptyRowHtml;
-            renderMagazynWModalu();
-        });
+        } catch (err) {
+            viewState.inventory.loading = false;
+            viewState.inventory.error = err?.message || 'Nie udało się pobrać magazynu.';
+            renderMagazynRows();
+        }
     }
 
    // --- PODPIĘCIE EVENTÓW ---

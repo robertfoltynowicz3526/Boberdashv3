@@ -98,7 +98,7 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* Scroll dla list długich */
 .scroll-y{
-  max-height:calc(100vh - 280px);
+  max-height:calc(100vh - 240px);
   overflow:auto;
   overscroll-behavior:contain;
 }
@@ -341,3 +341,44 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
 /* Poprawka szerokości/meta (jeśli wciąż „pływa”) */
 .fc-daygrid-event-harness .fc-event::before,
 .fc-daygrid-event-harness .fc-event::after { display:none !important; }
+
+/* Nowe chipy kalendarza */
+.fc-order-chip{
+  background:#3b82f6;
+  color:#fff;
+  border-radius:10px;
+  padding:4px 8px;
+  margin-top:6px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.fc-summary-chip{
+  background:#1d7a3a;
+  color:#eaffea;
+  border-radius:10px;
+  padding:4px 8px;
+  margin-top:6px;
+}
+.fc-leave-icon{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  font-size:28px;
+  opacity:.9;
+}
+.fc-daygrid-day-frame{
+  overflow:hidden;
+}
+
+.list-pagination{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:10px;
+}
+.list-pagination button[disabled]{
+  opacity:0.5;
+  cursor:not-allowed;
+}
