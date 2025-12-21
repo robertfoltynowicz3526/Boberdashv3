@@ -228,8 +228,6 @@ input::placeholder{color:var(--jd-text-500)}
 
 /* --- Odstęp od góry dla chipów, żeby nie „przyklejały się” do krawędzi --- */
 .fc .fc-daygrid-day-frame { padding-top: 8px; }
-.fc-daygrid-day-events { margin-top: 8px; }
-.fc-daygrid-event-harness { margin-top: 8px !important; }
 .fc .fc-daygrid-block-event .fc-event-main { line-height: 1.2; }
 
 /* --- Delikatne porządki kolorystyczne (John Deere vibe) --- */
@@ -270,57 +268,76 @@ body { color: var(--jd-text); background: radial-gradient(1200px 1200px at 70% -
   background: var(--jd-green-2); border-color: var(--jd-green-2);
 }
 
-/* Odstępy i uporządkowanie eventów */
-.fc .fc-daygrid-day-frame{padding-top:8px;}
-.fc-daygrid-day-events{margin-top:8px;}
-.fc-daygrid-event-harness{margin-top:4px !important;}
-.fc-daygrid-event{margin-top:4px;border:0;box-shadow:none;}
-.fc-daygrid-event-dot,
-.fc-daygrid-event-harness .fc-event::before,
-.fc-daygrid-event-harness .fc-event::after{display:none !important;}
-
-/* Popover „more” – kontrastowy */
-.fc-more-popover{
-  background:#1e2a1e;
-  color:#e8f1d7;
-  border:1px solid rgba(255,255,255,.08);
-}
-.fc-more-popover .fc-popover-body{
-  padding:8px 10px;
-  line-height:1.3;
-}
-
-/* FullCalendar – odsłonięcie */
-.fc-daygrid-event { display:block; margin-top:4px; border:0; }
+/* Podstawy układu w komórce */
+.fc-daygrid-event { display:block; border:0; margin-top:6px; }
 .fc-daygrid-event-dot { display:none !important; }
-.fc-daygrid-event-harness .fc-event::before,
-.fc-daygrid-event-harness .fc-event::after { display:none !important; }
+.fc-daygrid-day-events { padding: 4px 6px; }
 
-/* Ikony L4/Wolne/Święto */
-.fc-event--icon-only {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  text-align: center;
+/* Kafelek bazowy */
+.fc-ev {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  padding: 6px 8px;
+  line-height: 1.2;
+  overflow: hidden;
+  color: #eaf2ff;                 /* czytelny na ciemnym tle */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.25) inset;
 }
-.fc-event--icon-only .icon {
-  font-size: 26px;
-  line-height: 48px;
-  width: 48px; height: 48px;
-  margin: 6px auto 4px;
+
+/* Zlecenie – niebiesko-zielony akcent */
+.fc-ev--job {
+  background: #2f6bea;            /* główne tło kafla */
+}
+.fc-ev--job .fc-ev__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.fc-ev--job .fc-ev__meta {
+  background: rgba(0,0,0,0.18);   /* spójny pasek meta */
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #eaf2ff;
+}
+
+/* Podsumowanie dnia – zielony JD */
+.fc-ev--sum {
+  background: #224a26;            /* ciemna zieleń */
+  color: #c9f7cd;
+}
+.fc-ev--sum .fc-ev__meta {
+  background: rgba(0,0,0,0.18);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+/* L4 / Wolne / Święto – sama ikona, bez niebieskiego paska */
+.fc-ev--icon {
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: center;
+  padding: 0;
+}
+.fc-ev--icon .fc-ev__icon {
+  width: 44px; height: 44px;
+  line-height: 44px;
+  margin: 4px auto 2px;
   border-radius: 12px;
   background: rgba(255,255,255,0.06);
+  font-size: 22px;
 }
 
-/* Karty zleceń i podsumowań */
-.ev { padding:6px 8px; border-radius:8px; color:#e9f0ff; }
-.ev--job { background:#3a6cf8; }
-.ev--sum { background:#274b2a; color:#c2f1c6; }
+/* Popover „+X more” – czytelny */
+.fc-popover {
+  background: #162416;
+  color: #eaf2ff;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.fc-popover .fc-event { margin-top: 6px; }
 
-/* Brak cienkich pasków u góry komórek */
-.fc-daygrid-block-event .fc-event-title,
-.fc-daygrid-event { overflow: visible; }
-
-/* Nie pozwól, by cokolwiek wypływało poza ramkę dnia */
-.fc-daygrid-day-events { padding: 2px 4px; }
+/* Poprawka szerokości/meta (jeśli wciąż „pływa”) */
+.fc-daygrid-event-harness .fc-event::before,
+.fc-daygrid-event-harness .fc-event::after { display:none !important; }

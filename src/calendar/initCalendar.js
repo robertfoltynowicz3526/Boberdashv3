@@ -61,11 +61,20 @@ const mapDocsToEvents = (raw = []) => {
       const key = `job-${id}`;
       if (emitted.has(key)) continue;
       emitted.add(key);
+      const clientName =
+        doc.client ||
+        doc.customer ||
+        doc.kontrahent ||
+        doc.nabywca ||
+        doc.machine ||
+        doc.maszyna ||
+        doc.title ||
+        'Zlecenie';
       jobs.push({
         id,
         start: date,
         allDay: true,
-        title: doc.title || doc.client || doc.klient || 'Zlecenie',
+        title: clientName,
         extendedProps: { type, work, drive, invo },
       });
       const s = sumsByDate.get(date) || { work: 0, drive: 0, invo: 0 };
@@ -146,19 +155,34 @@ function renderEventContent(arg) {
   const type = arg.event.extendedProps?.type;
   if (type === 'leave' || type === 'dayOff' || type === 'holiday') {
     const el = document.createElement('div');
-    el.className = 'fc-event--icon-only';
-    const iconHolder = document.createElement('div');
-    iconHolder.className = 'icon';
-    iconHolder.textContent = type === 'leave' ? '🤒' : type === 'dayOff' ? '🏖️' : '🌾';
-    el.appendChild(iconHolder);
+    el.className = 'fc-ev fc-ev--icon';
+    el.innerHTML = `<div class="fc-ev__icon">${type === 'leave' ? '🤒' : type === 'dayOff' ? '🏖️' : '🌾'}</div>`;
     return { domNodes: [el] };
   }
 
   if (type === 'summary') {
-    return { html: `<div class="ev ev--sum">${arg.event.title}</div>` };
+    return {
+      html: `
+        <div class="fc-ev fc-ev--sum">
+          <div class="fc-ev__meta">${arg.event.title}</div>
+        </div>
+      `,
+    };
   }
 
-  return { html: `<div class="ev ev--job"><div class="ev__title">${arg.event.title}</div></div>` };
+  const { work = 0, drive = 0, invo = 0 } = arg.event.extendedProps || {};
+  return {
+    html: `
+      <div class="fc-ev fc-ev--job">
+        <div class="fc-ev__title" title="${arg.event.title}">${arg.event.title}</div>
+        <div class="fc-ev__meta">
+          • Praca: ${Number(work).toFixed(1)}h
+          • Jazda: ${Number(drive).toFixed(1)}h
+          • Fakturowane: ${Number(invo).toFixed(1)}h
+        </div>
+      </div>
+    `,
+  };
 }
 
 const wireNavigationButtons = (calendarApi) => {
