@@ -162,3 +162,32 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   line-height: 1.2;
 }
 .fc .strip-summary .fc-event-main { padding: 0 !important; }
+
+/* Summary (podsumowanie dnia) – kompakt */
+.fc .strip-summary {
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.fc .strip-summary .fc-event-main { padding: 0 !important; }
+.fc .summary-inline { font-weight: 700; }
+
+/* Zlecenia – tylko tytuł */
+.fc .fc-title-only { font-weight: 600; }
+
+/* Dni wolne – subtelne tło */
+.fc .leave-bg { opacity: 0.22; }
+
+/* Dni wolne – badge z ikoną (bez “full blue”) */
+.fc .leave-badge.fc-event {
+  background: rgba(0,0,0,0.35) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+  padding: 2px 8px !important;
+  font-size: 12px !important;
+  line-height: 1.2 !important;
+}
+.fc .leave-badge .fc-event-main { padding: 0 !important; }
+.fc .leave-badge .fc-event-title { font-weight: 800; }
