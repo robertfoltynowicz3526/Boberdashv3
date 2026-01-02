@@ -990,7 +990,7 @@ function initializeApp() {
             const leaveByDay = {};             // day -> leave kind
             const hasManualDay = new Set();    // dni z ręcznym wpisem (nawet jeśli 0)
             const hasOrderDay = new Set();     // dni z co najmniej jednym zleceniem
-            window.__lastDayDocs = window.__lastDayDocs || {};
+            window.__lastDayDocs = {};
 
             snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
