@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDay } from './calendar/daySummary.js';
+import { computeDayTotals } from './utils/dayTotals.js';
 
 const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
 
@@ -882,6 +882,23 @@ function initializeApp() {
             flags
         };
         try {
+            const updatedDayDoc = buildDayDocForTotals({
+                ...dane,
+                powiazane
+            });
+            const { leave, hasData, totals } = computeDayTotals(updatedDayDoc);
+            const deco = window.__calendarDecorations || { summaryByDay: {}, leaveByDay: {} };
+            if (leave) {
+                deco.leaveByDay[ data ] = leave;
+                delete deco.summaryByDay[ data ];
+            } else {
+                delete deco.leaveByDay[ data ];
+                if (hasData && totals) deco.summaryByDay[ data ] = totals;
+                else delete deco.summaryByDay[ data ];
+            }
+            window.__calendarDecorations = deco;
+            window.__fcCalendar?.rerenderDates?.();
+
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
             const localRecord = normalizeDayRecord(data, dane);
@@ -932,7 +949,11 @@ function initializeApp() {
                 window.__lastDayDocs[dayStr] = dane;
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
-                const { leave, summary, hasData } = computeDay(dane);
+                const totalsDoc = buildDayDocForTotals({
+                    ...dane,
+                    powiazane
+                });
+                const { leave, hasData, totals } = computeDayTotals(totalsDoc);
                 const wpis = {
                     ...normalizedDay,
                     billed: suma,
@@ -943,8 +964,8 @@ function initializeApp() {
                 wszystkieWpisyKalendarza.push(wpis);
                 if (leave) {
                     leaveByDay[dayStr] = leave;
-                } else if (hasData) {
-                    summaryByDay[dayStr] = summary;
+                } else if (hasData && totals) {
+                    summaryByDay[dayStr] = totals;
                 }
 
                 if (!leaveByDay[dayStr] && powiazane.length) {
@@ -1179,6 +1200,30 @@ function initializeApp() {
         const fallback = Number(dane?.fakturowane) || 0;
         const suma = maPowiazania ? sumaPowiazanych : fallback;
         return { powiazane, suma, maPowiazania };
+    }
+
+    function buildDayDocForTotals(dayDoc = {}) {
+        const leaveKind =
+            dayDoc?.leaveKind ||
+            dayDoc?.dayLeave ||
+            (dayDoc?.flags?.urlop ? 'URL' : dayDoc?.flags?.l4 ? 'L4' : dayDoc?.flags?.swieto ? 'SWIETO' : null);
+        const statusDnia =
+            dayDoc?.statusDnia ??
+            dayDoc?.status ??
+            dayDoc?.dayStatus ??
+            dayDoc?.wolne ??
+            dayDoc?.leave ??
+            leaveKind;
+        const powiazane = Array.isArray(dayDoc?.powiazane)
+            ? dayDoc.powiazane
+            : Array.isArray(dayDoc?.zleceniaPowiazane)
+                ? dayDoc.zleceniaPowiazane
+                : undefined;
+        return {
+            ...dayDoc,
+            statusDnia,
+            powiazane
+        };
     }
 
 
