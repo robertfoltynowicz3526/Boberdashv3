@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDaySummary } from './utils/dayTotals.js';
+import { computeDaySummary } from './calendar/computeDaySummary.js';
 
 const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
 
@@ -24,9 +24,6 @@ const setDecorations = (decorations) => {
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
 };
 
-let leaveByDayFromHours = {};
-let leaveByDayFromEvents = {};
-let lastSummaryByDay = {};
 
 // Uruchom dopiero po załadowaniu DOM:
 window.addEventListener('DOMContentLoaded', initializeApp);
@@ -882,11 +879,7 @@ function initializeApp() {
             flags
         };
         try {
-            const updatedDayDoc = buildDayDocForTotals({
-                ...dane,
-                powiazane
-            });
-            const { leaveKind, hasAnyData, summary } = computeDaySummary(updatedDayDoc);
+            const { leaveKind, hasAnyData, summary } = computeDaySummary(dane);
             const current = window.__calendarDecorations || { summaryByDay: {}, leaveByDay: {} };
             const nextDecorations = {
                 summaryByDay: { ...(current.summaryByDay || {}) },
@@ -953,11 +946,7 @@ function initializeApp() {
                 window.__lastDayDocs[dayStr] = dane;
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
-                const totalsDoc = buildDayDocForTotals({
-                    ...dane,
-                    powiazane
-                });
-                const { leaveKind, hasAnyData, summary } = computeDaySummary(totalsDoc);
+                const { leaveKind, hasAnyData, summary } = computeDaySummary(dane);
                 const wpis = {
                     ...normalizedDay,
                     billed: suma,
@@ -1001,14 +990,13 @@ function initializeApp() {
                         },
                         entries: powiazane
                     };
+                    console.log('[DBG][dayDoc]', dbgDay, dane);
                     console.log('[DBG][modal]', dbgDay, modalSnapshot);
-                    console.log('[DBG][computeDaySummary]', dbgDay, computeDaySummary(totalsDoc));
+                    console.log('[DBG][computeDaySummary]', dbgDay, computeDaySummary(dane));
                 }
             });
 
-            const mergedLeaveByDay = { ...leaveByDay, ...leaveByDayFromEvents };
-            leaveByDayFromHours = { ...leaveByDay };
-            const leaveSet = new Set(Object.keys(mergedLeaveByDay));
+            const leaveSet = new Set(Object.keys(leaveByDay));
 
             for (let i = events.length - 1; i >= 0; i--) {
                 const d = events[i]?.extendedProps?.day || (typeof events[i]?.start === 'string' ? events[i].start.slice(0,10) : '');
@@ -1037,8 +1025,7 @@ function initializeApp() {
                 }
             }
 
-            lastSummaryByDay = summaryByDay;
-            setDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
+            setDecorations({ summaryByDay, leaveByDay });
 
             workEvents = events;
             przerysujZdarzeniaKalendarza();
@@ -1054,34 +1041,8 @@ function initializeApp() {
     }
 
     function nasluchujNaUrlopy() {
-        try {
-            onSnapshot(collection(db, 'events'), (snapshot) => {
-                const nextLeaveByDayFromEvents = {};
-                snapshot.docs.forEach((docSnap) => {
-                    const data = docSnap.data() || {};
-                    const rawKind = data?.extendedProps?.leaveKind || data.leaveKind || data.typ || data.type || '';
-                    const dayStr = isoDay(data.start || data.date);
-                    if (!dayStr) return;
-                    nextLeaveByDayFromEvents[dayStr] = String(rawKind || 'URL').toUpperCase();
-                });
-                leaveByDayFromEvents = nextLeaveByDayFromEvents;
-                const summaryByDay = lastSummaryByDay || {};
-                const mergedLeaveByDay = { ...leaveByDayFromHours, ...leaveByDayFromEvents };
-                const leaveSet = new Set(Object.keys(mergedLeaveByDay));
-                const filteredEvents = (workEvents || []).filter((ev) => {
-                    const day = ev?.extendedProps?.day || isoDay(ev?.start);
-                    return !leaveSet.has(day);
-                });
-                if (filteredEvents.length !== workEvents.length) {
-                    workEvents = filteredEvents;
-                    przerysujZdarzeniaKalendarza();
-                }
-                setDecorations({ summaryByDay, leaveByDay: mergedLeaveByDay });
-
-            });
-        } catch (error) {
-            console.error('Nie udało się pobrać urlopów:', error);
-        }
+        // Źródłem prawdy dla statusu dnia jest dokument "godziny_pracy".
+        // Zewnętrzne kolekcje (np. events) nie wpływają na dekoracje kalendarza.
     }
 
     function obliczSumeGodzinZKalendarza(start, end) {
