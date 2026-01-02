@@ -109,8 +109,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const parts = [
         `Praca: ${work.toFixed(1)}h`,
         `Jazda: ${drive.toFixed(1)}h`,
-        `Fakturowane: ${billed.toFixed(1)}h`,
-        `Nadgodziny: ${over.toFixed(1)}h`,
+        `Fakt: ${billed.toFixed(1)}h`,
+        `Nadg: ${over.toFixed(1)}h`,
       ];
 
       const box = document.createElement('div');

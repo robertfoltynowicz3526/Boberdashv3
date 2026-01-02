@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDaySummary } from './calendar/computeDaySummary.js';
+import { computeDayTotals } from './calendar/computeDayTotals.js';
 
 const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
 
@@ -154,6 +154,7 @@ function initializeApp() {
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
     const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
+    const SHOW_ZERO_DAYS = true;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -201,6 +202,9 @@ function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+    let manualByDay = new Map();
+    let ordersByDay = new Map();
+    let leaveByDay = new Map();
 
     const toDateSafe = (value) => {
         if (!value) return null;
@@ -390,6 +394,111 @@ function initializeApp() {
         if (!checked) return null;
         const normalized = normalizeDayLeaveValue(checked.value);
         return normalized === DAY_LEAVE_NONE ? null : normalized;
+    };
+
+    const listDaysInRange = (start, end) => {
+        const startDate = normalizeAllDayDate(start);
+        const endDate = normalizeAllDayDate(end);
+        if (!startDate || !endDate) return [];
+        const days = [];
+        const cursor = new Date(startDate.getTime());
+        while (cursor < endDate) {
+            days.push(formatDateForStorage(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+        }
+        return days;
+    };
+
+    const isOrderActive = (order) => order && (order.status === 'aktywne' || order.status === 'nieprzypisane');
+
+    const buildActiveOrderIndex = () => new Map(
+        _wszystkieZleceniaCache.filter(isOrderActive).map(order => [order.id, order])
+    );
+
+    const resolveOrderClientName = (orderId, entryClientName, orderIndex) => {
+        if (entryClientName) return entryClientName;
+        const order = orderIndex.get(orderId);
+        if (!order) return orderId || 'Zlecenie';
+        const klient = _wszystkieKlienciCache.find(k => k.id === order.klientId);
+        return order.klientNazwa || klient?.nazwa || orderId || 'Zlecenie';
+    };
+
+    const buildManualDayDoc = (dayDoc = {}) => ({
+        work: parsePlNumber(dayDoc?.work ?? dayDoc?.praca ?? 0),
+        drive: parsePlNumber(dayDoc?.drive ?? dayDoc?.jazda ?? 0),
+        billed: parsePlNumber(dayDoc?.billed ?? dayDoc?.fakturowane ?? 0),
+        over: parsePlNumber(dayDoc?.nadgodziny ?? 0),
+    });
+
+    const buildOrdersForDay = (dayDoc = {}, activeOrderIndex) => {
+        const entries = Array.isArray(dayDoc?.zleceniaPowiazane)
+            ? dayDoc.zleceniaPowiazane.filter(entry => entry?.zlecenieId)
+            : [];
+        if (!entries.length && dayDoc?.zlecenieId) {
+            entries.push({
+                zlecenieId: dayDoc.zlecenieId,
+                klientNazwa: dayDoc.klientNazwa || null,
+                fakturowane: dayDoc.fakturowane ?? 0
+            });
+        }
+        return entries
+            .filter(entry => activeOrderIndex.has(entry.zlecenieId))
+            .map(entry => ({
+                orderId: entry.zlecenieId,
+                clientName: resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, activeOrderIndex),
+                work: parsePlNumber(entry?.work ?? 0),
+                drive: parsePlNumber(entry?.drive ?? 0),
+                billed: parsePlNumber(entry?.fakturowane ?? 0),
+                over: parsePlNumber(entry?.over ?? 0),
+            }));
+    };
+
+    const debugDayParam = new URLSearchParams(location.search).get('dbgDay');
+
+    const logDebugDayTotals = (dayStr) => {
+        if (!debugDayParam || dayStr !== debugDayParam) return;
+        const manualDayDoc = manualByDay.get(dayStr) || { work: 0, drive: 0, billed: 0, over: 0 };
+        const ordersForDay = ordersByDay.get(dayStr) || [];
+        console.log('[DBG][manualDayDoc]', dayStr, manualDayDoc);
+        console.log('[DBG][ordersForDay]', dayStr, ordersForDay);
+        console.log('[DBG][computeDayTotals]', dayStr, computeDayTotals(dayStr, manualDayDoc, ordersForDay));
+    };
+
+    const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
+        const view = calendar?.view || window.__fcCalendar?.view;
+        const start = rangeStart || view?.currentStart || null;
+        const end = rangeEnd || view?.currentEnd || null;
+        const summaryByDay = {};
+        const leaveByDayOut = {};
+        const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
+            ...manualByDay.keys(),
+            ...ordersByDay.keys(),
+            ...leaveByDay.keys()
+        ]));
+
+        daysToRender.forEach((dayStr) => {
+            const leaveKind = leaveByDay.get(dayStr);
+            if (leaveKind) {
+                leaveByDayOut[dayStr] = leaveKind;
+                logDebugDayTotals(dayStr);
+                return;
+            }
+            const manualDayDoc = manualByDay.get(dayStr) || { work: 0, drive: 0, billed: 0, over: 0 };
+            const ordersForDay = ordersByDay.get(dayStr) || [];
+            const totals = computeDayTotals(dayStr, manualDayDoc, ordersForDay);
+            const hasAny =
+                ordersForDay.length > 0 ||
+                totals.work !== 0 ||
+                totals.drive !== 0 ||
+                totals.billed !== 0 ||
+                totals.over !== 0;
+            if (SHOW_ZERO_DAYS || hasAny) {
+                summaryByDay[dayStr] = totals;
+            }
+            logDebugDayTotals(dayStr);
+        });
+
+        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -604,6 +713,7 @@ function initializeApp() {
                 datesSet(viewInfo) {
                     if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
                         obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
+                        rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                     }
                 }
             }
@@ -879,21 +989,17 @@ function initializeApp() {
             flags
         };
         try {
-            const { leaveKind, hasAnyData, summary } = computeDaySummary(dane);
-            const current = window.__calendarDecorations || { summaryByDay: {}, leaveByDay: {} };
-            const nextDecorations = {
-                summaryByDay: { ...(current.summaryByDay || {}) },
-                leaveByDay: { ...(current.leaveByDay || {}) }
-            };
-            if (leaveKind) {
-                nextDecorations.leaveByDay[ data ] = leaveKind;
-                delete nextDecorations.summaryByDay[ data ];
+            const dayKey = isoDay(data);
+            const activeOrderIndex = buildActiveOrderIndex();
+            manualByDay.set(dayKey, buildManualDayDoc(dane));
+            ordersByDay.set(dayKey, buildOrdersForDay(dane, activeOrderIndex));
+            const leaveKindNormalized = normalizeDayLeaveValue(selectedLeaveKind || '');
+            if (leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE) {
+                leaveByDay.set(dayKey, leaveKindNormalized);
             } else {
-                delete nextDecorations.leaveByDay[ data ];
-                if (hasAnyData && summary) nextDecorations.summaryByDay[ data ] = summary;
-                else delete nextDecorations.summaryByDay[ data ];
+                leaveByDay.delete(dayKey);
             }
-            setDecorations(nextDecorations);
+            rebuildCalendarDecorations();
 
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
@@ -933,12 +1039,13 @@ function initializeApp() {
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
             const events = [];
-            const leaveByDay = {};             // day -> leave kind
-            const summaryByDay = {};
+            manualByDay = new Map();
+            ordersByDay = new Map();
+            leaveByDay = new Map();
             window.__lastDayDocs = {};
             window.__calendarDecorations = { summaryByDay: {}, leaveByDay: {} };
 
-            const dbgDay = new URLSearchParams(location.search).get('dbgDay');
+            const activeOrderIndex = buildActiveOrderIndex();
             snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
@@ -946,7 +1053,6 @@ function initializeApp() {
                 window.__lastDayDocs[dayStr] = dane;
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
-                const { leaveKind, hasAnyData, summary } = computeDaySummary(dane);
                 const wpis = {
                     ...normalizedDay,
                     billed: suma,
@@ -955,56 +1061,33 @@ function initializeApp() {
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
+                manualByDay.set(dayStr, buildManualDayDoc(dane));
+                const ordersForDay = buildOrdersForDay(dane, activeOrderIndex);
+                ordersByDay.set(dayStr, ordersForDay);
+                const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null);
                 if (leaveKind) {
-                    leaveByDay[dayStr] = leaveKind;
-                } else if (hasAnyData && summary) {
-                    summaryByDay[dayStr] = summary;
+                    leaveByDay.set(dayStr, leaveKind);
                 }
 
-                if (!leaveByDay[dayStr] && powiazane.length) {
-                    powiazane.forEach((powiazanie) => {
-                        const klientLabel = powiazanie.klientNazwa || pobierzNazwePowiazania(powiazanie.zlecenieId);
-                        const clientName = klientLabel || 'Zlecenie';
-                        if (!leaveByDay[dayStr]) {
-                            events.push({
-                                id: `order_${powiazanie.zlecenieId}`,
-                                start: dayStr,
-                                allDay: true,
-                                title: clientName,
-                                className: ['order-event'],
-                                extendedProps: { day: dayStr, orderId: powiazanie.zlecenieId }
-                            });
-                        }
+                if (!leaveKind && ordersForDay.length) {
+                    ordersForDay.forEach((order) => {
+                        events.push({
+                            id: `order_${order.orderId}`,
+                            start: dayStr,
+                            allDay: true,
+                            title: order.clientName || 'Zlecenie',
+                            className: ['order-event'],
+                            extendedProps: { day: dayStr, orderId: order.orderId }
+                        });
                     });
-                }
-
-                if (dbgDay && dayStr === dbgDay) {
-                    const billedModal = powiazane.length ? suma : Number(dane?.fakturowane ?? normalizedDay.billed ?? 0) || 0;
-                    const modalSnapshot = {
-                        leaveKind: normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null),
-                        manual: {
-                            work: Number(normalizedDay.work) || 0,
-                            drive: Number(normalizedDay.drive) || 0,
-                            billed: billedModal,
-                            over: Number(dane?.nadgodziny ?? 0) || 0
-                        },
-                        entries: powiazane
-                    };
-                    console.log('[DBG][dayDoc]', dbgDay, dane);
-                    console.log('[DBG][modal]', dbgDay, modalSnapshot);
-                    console.log('[DBG][computeDaySummary]', dbgDay, computeDaySummary(dane));
                 }
             });
 
-            const leaveSet = new Set(Object.keys(leaveByDay));
+            const leaveSet = new Set(Array.from(leaveByDay.keys()));
 
             for (let i = events.length - 1; i >= 0; i--) {
                 const d = events[i]?.extendedProps?.day || (typeof events[i]?.start === 'string' ? events[i].start.slice(0,10) : '');
                 if (leaveSet.has(d)) events.splice(i, 1);
-            }
-
-            for (const d of leaveSet) {
-                delete summaryByDay[d];
             }
 
             for (let i = events.length - 1; i >= 0; i--) {
@@ -1025,18 +1108,11 @@ function initializeApp() {
                 }
             }
 
-            setDecorations({ summaryByDay, leaveByDay });
+            rebuildCalendarDecorations();
 
             workEvents = events;
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
-
-            if (dbgDay) {
-                console.log('[DBG][summaryByDay]', dbgDay, {
-                    summary: window.__calendarDecorations.summaryByDay[dbgDay],
-                    leaveKind: window.__calendarDecorations.leaveByDay[dbgDay]
-                });
-            }
         });
     }
 
@@ -2470,6 +2546,7 @@ function nasluchujNaZlecenia() {
         });
         wyswietlZlecenia();
         odswiezPodsumowania();
+        rebuildCalendarDecorations();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
     });
 }
