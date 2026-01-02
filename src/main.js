@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDayTotals } from './utils/dayTotals.js';
+import { computeDaySummary } from './utils/dayTotals.js';
 
 const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
 
@@ -886,18 +886,21 @@ function initializeApp() {
                 ...dane,
                 powiazane
             });
-            const { leave, hasData, totals } = computeDayTotals(updatedDayDoc);
-            const deco = window.__calendarDecorations || { summaryByDay: {}, leaveByDay: {} };
-            if (leave) {
-                deco.leaveByDay[ data ] = leave;
-                delete deco.summaryByDay[ data ];
+            const { leaveKind, hasAnyData, summary } = computeDaySummary(updatedDayDoc);
+            const current = window.__calendarDecorations || { summaryByDay: {}, leaveByDay: {} };
+            const nextDecorations = {
+                summaryByDay: { ...(current.summaryByDay || {}) },
+                leaveByDay: { ...(current.leaveByDay || {}) }
+            };
+            if (leaveKind) {
+                nextDecorations.leaveByDay[ data ] = leaveKind;
+                delete nextDecorations.summaryByDay[ data ];
             } else {
-                delete deco.leaveByDay[ data ];
-                if (hasData && totals) deco.summaryByDay[ data ] = totals;
-                else delete deco.summaryByDay[ data ];
+                delete nextDecorations.leaveByDay[ data ];
+                if (hasAnyData && summary) nextDecorations.summaryByDay[ data ] = summary;
+                else delete nextDecorations.summaryByDay[ data ];
             }
-            window.__calendarDecorations = deco;
-            window.__fcCalendar?.rerenderDates?.();
+            setDecorations(nextDecorations);
 
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
@@ -942,6 +945,7 @@ function initializeApp() {
             window.__lastDayDocs = {};
             window.__calendarDecorations = { summaryByDay: {}, leaveByDay: {} };
 
+            const dbgDay = new URLSearchParams(location.search).get('dbgDay');
             snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
@@ -953,7 +957,7 @@ function initializeApp() {
                     ...dane,
                     powiazane
                 });
-                const { leave, hasData, totals } = computeDayTotals(totalsDoc);
+                const { leaveKind, hasAnyData, summary } = computeDaySummary(totalsDoc);
                 const wpis = {
                     ...normalizedDay,
                     billed: suma,
@@ -962,10 +966,10 @@ function initializeApp() {
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
-                if (leave) {
-                    leaveByDay[dayStr] = leave;
-                } else if (hasData && totals) {
-                    summaryByDay[dayStr] = totals;
+                if (leaveKind) {
+                    leaveByDay[dayStr] = leaveKind;
+                } else if (hasAnyData && summary) {
+                    summaryByDay[dayStr] = summary;
                 }
 
                 if (!leaveByDay[dayStr] && powiazane.length) {
@@ -983,6 +987,22 @@ function initializeApp() {
                             });
                         }
                     });
+                }
+
+                if (dbgDay && dayStr === dbgDay) {
+                    const billedModal = powiazane.length ? suma : Number(dane?.fakturowane ?? normalizedDay.billed ?? 0) || 0;
+                    const modalSnapshot = {
+                        leaveKind: normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null),
+                        manual: {
+                            work: Number(normalizedDay.work) || 0,
+                            drive: Number(normalizedDay.drive) || 0,
+                            billed: billedModal,
+                            over: Number(dane?.nadgodziny ?? 0) || 0
+                        },
+                        entries: powiazane
+                    };
+                    console.log('[DBG][modal]', dbgDay, modalSnapshot);
+                    console.log('[DBG][computeDaySummary]', dbgDay, computeDaySummary(totalsDoc));
                 }
             });
 
@@ -1024,8 +1044,12 @@ function initializeApp() {
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
 
-            const dbg = new URLSearchParams(location.search).get('dbgDay');
-            if (dbg) console.log('[DBG]', dbg, window.__calendarDecorations.summaryByDay[dbg], window.__calendarDecorations.leaveByDay[dbg]);
+            if (dbgDay) {
+                console.log('[DBG][summaryByDay]', dbgDay, {
+                    summary: window.__calendarDecorations.summaryByDay[dbgDay],
+                    leaveKind: window.__calendarDecorations.leaveByDay[dbgDay]
+                });
+            }
         });
     }
 
@@ -1203,26 +1227,20 @@ function initializeApp() {
     }
 
     function buildDayDocForTotals(dayDoc = {}) {
-        const leaveKind =
-            dayDoc?.leaveKind ||
-            dayDoc?.dayLeave ||
-            (dayDoc?.flags?.urlop ? 'URL' : dayDoc?.flags?.l4 ? 'L4' : dayDoc?.flags?.swieto ? 'SWIETO' : null);
-        const statusDnia =
-            dayDoc?.statusDnia ??
-            dayDoc?.status ??
-            dayDoc?.dayStatus ??
-            dayDoc?.wolne ??
-            dayDoc?.leave ??
-            leaveKind;
+        const normalizedKind = normalizeDayLeaveValue(dayDoc?.leaveKind || dayDoc?.dayLeave || '');
+        const leaveKind = normalizedKind && normalizedKind !== DAY_LEAVE_NONE ? normalizedKind : null;
         const powiazane = Array.isArray(dayDoc?.powiazane)
             ? dayDoc.powiazane
             : Array.isArray(dayDoc?.zleceniaPowiazane)
                 ? dayDoc.zleceniaPowiazane
-                : undefined;
+                : [];
+        const flags = normalizeDayFlags(dayDoc?.flags || {}, leaveKind);
         return {
             ...dayDoc,
-            statusDnia,
-            powiazane
+            leaveKind,
+            flags,
+            powiazane,
+            zleceniaPowiazane: powiazane
         };
     }
 
