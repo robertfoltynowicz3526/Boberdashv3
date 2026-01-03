@@ -21,6 +21,9 @@ const parsePlNumber = (v) => {
 
 const setDecorations = (decorations) => {
     window.__calendarDecorations = decorations;
+    if (window.calendar) {
+        window.__fcCalendar = window.calendar;
+    }
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
 };
 
@@ -204,6 +207,7 @@ function initializeApp() {
     let manualFakturowaneValue = 0;
     let manualByDay = new Map();
     let ordersByDay = new Map();
+    let dayDocsByDay = new Map();
     let leaveByDay = new Map();
 
     const toDateSafe = (value) => {
@@ -455,13 +459,12 @@ function initializeApp() {
 
     const debugDayParam = new URLSearchParams(location.search).get('dbgDay');
 
-    const logDebugDayTotals = (dayStr) => {
+    const logDebugDayTotals = (dayStr, dayDoc, totals, inSummary) => {
         if (!debugDayParam || dayStr !== debugDayParam) return;
-        const manualDayDoc = manualByDay.get(dayStr) || { work: 0, drive: 0, billed: 0, over: 0 };
-        const ordersForDay = ordersByDay.get(dayStr) || [];
-        console.log('[DBG][manualDayDoc]', dayStr, manualDayDoc);
-        console.log('[DBG][ordersForDay]', dayStr, ordersForDay);
-        console.log('[DBG][computeDayTotals]', dayStr, computeDayTotals(dayStr, manualDayDoc, ordersForDay));
+        console.log('[DBG][dayDoc.exists]', dayStr, Boolean(dayDoc));
+        console.log('[DBG][dayDoc]', dayStr, dayDoc || null);
+        console.log('[DBG][computeDayTotals]', dayStr, totals);
+        console.log('[DBG][summaryByDay]', dayStr, Boolean(inSummary));
     };
 
     const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
@@ -480,7 +483,7 @@ function initializeApp() {
             const leaveKind = leaveByDay.get(dayStr);
             if (leaveKind) {
                 leaveByDayOut[dayStr] = leaveKind;
-                logDebugDayTotals(dayStr);
+                logDebugDayTotals(dayStr, dayDocsByDay.get(dayStr) || null, null, false);
                 return;
             }
             const manualDayDoc = manualByDay.get(dayStr) || { work: 0, drive: 0, billed: 0, over: 0 };
@@ -495,7 +498,7 @@ function initializeApp() {
             if (SHOW_ZERO_DAYS || hasAny) {
                 summaryByDay[dayStr] = totals;
             }
-            logDebugDayTotals(dayStr);
+            logDebugDayTotals(dayStr, dayDocsByDay.get(dayStr) || null, totals, Boolean(summaryByDay[dayStr]));
         });
 
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
@@ -991,8 +994,13 @@ function initializeApp() {
         try {
             const dayKey = isoDay(data);
             const activeOrderIndex = buildActiveOrderIndex();
-            manualByDay.set(dayKey, buildManualDayDoc(dane));
-            ordersByDay.set(dayKey, buildOrdersForDay(dane, activeOrderIndex));
+            const dayDocForTotals = buildDayDocForTotals({
+                ...normalizeDayRecord(dayKey, dane),
+                zleceniaPowiazane: normalizujPowiazaneZlecenia(dane).powiazane
+            });
+            dayDocsByDay.set(dayKey, dayDocForTotals);
+            manualByDay.set(dayKey, buildManualDayDoc(dayDocForTotals));
+            ordersByDay.set(dayKey, buildOrdersForDay(dayDocForTotals, activeOrderIndex));
             const leaveKindNormalized = normalizeDayLeaveValue(selectedLeaveKind || '');
             if (leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE) {
                 leaveByDay.set(dayKey, leaveKindNormalized);
@@ -1041,9 +1049,10 @@ function initializeApp() {
             const events = [];
             manualByDay = new Map();
             ordersByDay = new Map();
+            dayDocsByDay = new Map();
             leaveByDay = new Map();
             window.__lastDayDocs = {};
-            window.__calendarDecorations = { summaryByDay: {}, leaveByDay: {} };
+            setDecorations({ summaryByDay: {}, leaveByDay: {} });
 
             const activeOrderIndex = buildActiveOrderIndex();
             snapshotGodziny.forEach((docSnap) => {
@@ -1061,8 +1070,10 @@ function initializeApp() {
                     zleceniaPowiazane: powiazane
                 };
                 wszystkieWpisyKalendarza.push(wpis);
-                manualByDay.set(dayStr, buildManualDayDoc(dane));
-                const ordersForDay = buildOrdersForDay(dane, activeOrderIndex);
+                const dayDocForTotals = buildDayDocForTotals({ ...normalizedDay, zleceniaPowiazane: powiazane });
+                dayDocsByDay.set(dayStr, dayDocForTotals);
+                manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
+                const ordersForDay = buildOrdersForDay(dayDocForTotals, activeOrderIndex);
                 ordersByDay.set(dayStr, ordersForDay);
                 const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null);
                 if (leaveKind) {
