@@ -6,7 +6,12 @@ import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyT
 const normalizeDateKey = (value) => {
   if (!value) return '';
   if (typeof value === 'string') return value.slice(0, 10);
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, '0');
+    const dd = String(value.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
   return '';
 };
 
@@ -74,7 +79,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return [];
     },
     dayCellDidMount: (arg) => {
-      const day = arg.date.toISOString().slice(0,10);
+      const day = normalizeDateKey(arg.date);
       const deco = window.__calendarDecorations || {};
       const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
       const sum = deco.summaryByDay?.[day];     // {work,drive,billed,over} albo undefined
