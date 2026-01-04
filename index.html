@@ -52,9 +52,11 @@
         <div id="klienci" class="tab-content page-wide">
             <h2>Baza Klientów</h2>
             <div class="base-toolbar">
-                <div class="form-group">
-                    <label for="klient-search-input">Wyszukaj klienta</label>
-                    <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres...">
+                <div class="toolbar-fields">
+                    <div class="form-group">
+                        <label for="klient-search-input">Szukaj: nazwa, NIP, adres…</label>
+                        <input type="search" id="klient-search-input" placeholder="Szukaj: nazwa, NIP, adres…">
+                    </div>
                 </div>
                 <button type="button" id="klient-add-btn" class="btn-add">Dodaj klienta</button>
             </div>
@@ -67,9 +69,17 @@
         <div id="maszyny" class="tab-content page-wide">
             <h2>Baza Maszyn</h2>
             <div class="base-toolbar">
-                <div class="form-group">
-                    <label for="maszyna-search-input">Wyszukaj maszynę</label>
-                    <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta...">
+                <div class="toolbar-fields">
+                    <div class="form-group">
+                        <label for="maszyna-search-input">Szukaj: typ, model, S/N, klient…</label>
+                        <input type="search" id="maszyna-search-input" placeholder="Szukaj: typ, model, S/N, klient…">
+                    </div>
+                    <div class="form-group">
+                        <label for="maszyna-client-filter">Klient</label>
+                        <select id="maszyna-client-filter">
+                            <option value="">Wszyscy</option>
+                        </select>
+                    </div>
                 </div>
                 <button type="button" id="maszyna-add-btn" class="btn-add">Dodaj maszynę</button>
             </div>
