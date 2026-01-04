@@ -54,6 +54,34 @@ export const getLinkedEntries = (dayDoc) => {
   return lists.flat();
 };
 
+const buildEntryKey = (entry) => {
+  if (!entry) return '';
+  const entryId = get(entry, ['entryId','id']);
+  if (entryId != null) return String(entryId);
+  const orderId = get(entry, ['zlecenieId','orderId']);
+  const kindRaw = get(entry, ['typ','type','kind','kod','flag','rodzaj','kategoria','symbol']);
+  const kind = kindRaw ? String(kindRaw).trim().toUpperCase() : '';
+  const hours = parsePlNumber(get(entry, ['h','hours','godziny','wartosc','value','czas','ile','qty']));
+  const billed = parsePlNumber(get(entry, ['fh','fakturowane','godzinyFakturowane','godzinyWyfakturowane']));
+  const drive = parsePlNumber(get(entry, ['jazda','czasJazdy','driveHours']));
+  const work = parsePlNumber(get(entry, ['praca','workHours','godzinyPracy','godziny']));
+  const over = parsePlNumber(get(entry, ['nadgodziny','over']));
+  const dayKey = get(entry, ['dayStr','date','day']);
+  return [orderId || '', kind, hours, billed, work, drive, over, dayKey || ''].join('|');
+};
+
+const dedupeEntries = (entries) => {
+  const seen = new Set();
+  const deduped = [];
+  for (const entry of entries) {
+    const key = buildEntryKey(entry);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(entry);
+  }
+  return deduped;
+};
+
 // LICZENIE Z POZYCJI: tu NIE MA ZGADYWANIA — liczymy sumę z wpisów
 // Preferujemy format typowany (F/J/P/N + hours). Jeśli go nie ma, liczymy z konkretnych pól fh/jazda/praca/nadgodziny.
 export const sumFromEntries = (entries) => {
@@ -91,7 +119,7 @@ export const isEmptyDay = (dayDoc) => {
   if (leave) return false; // wolne to nie “puste” (bo ma ikonę)
 
   const m = extractManual(dayDoc);
-  const entries = getLinkedEntries(dayDoc);
+  const entries = dedupeEntries(getLinkedEntries(dayDoc));
 
   const manualAllZero = (m.work===0 && m.drive===0 && m.billed===0 && m.over===0);
   const noteEmpty = !m.note;
@@ -103,15 +131,15 @@ export const isEmptyDay = (dayDoc) => {
 // FINALNE PODSUMOWANIE DNIA = manual + entries (zlecenia/klienci)
 export const computeDay = (dayDoc) => {
   const leave = getLeaveKind(dayDoc);
-  const entries = getLinkedEntries(dayDoc);
+  const entries = dedupeEntries(getLinkedEntries(dayDoc));
   const m = extractManual(dayDoc);
   const e = sumFromEntries(entries);
 
   const summary = {
-    work:  m.work + e.work,
-    drive: m.drive + e.drive,
-    billed:m.billed + e.billed,
-    over:  m.over + e.over
+    work:  e.work + (e.work === 0 ? m.work : 0),
+    drive: e.drive + (e.drive === 0 ? m.drive : 0),
+    billed:e.billed + (e.billed === 0 ? m.billed : 0),
+    over:  e.over + (e.over === 0 ? m.over : 0)
   };
 
   const hasData = !isEmptyDay(dayDoc) && !leave && (

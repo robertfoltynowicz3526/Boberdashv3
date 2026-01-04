@@ -32,6 +32,31 @@ const readManualTotals = (manualDayDoc = {}) => ({
   over: parsePlNumber(manualDayDoc.over ?? 0),
 });
 
+const buildOrderKey = (order) => {
+  if (!order) return '';
+  const entryId = order?.entryId ?? order?.id ?? null;
+  if (entryId != null) return String(entryId);
+  const orderId = order?.orderId ?? order?.zlecenieId ?? '';
+  const client = order?.clientName ?? order?.klientNazwa ?? '';
+  const work = parsePlNumber(order?.work ?? 0);
+  const drive = parsePlNumber(order?.drive ?? 0);
+  const billed = parsePlNumber(order?.billed ?? 0);
+  const over = parsePlNumber(order?.over ?? 0);
+  return [orderId, client, work, drive, billed, over].join('|');
+};
+
+const dedupeOrders = (ordersForDay = []) => {
+  const seen = new Set();
+  const deduped = [];
+  ordersForDay.forEach((order) => {
+    const key = buildOrderKey(order);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    deduped.push(order);
+  });
+  return deduped;
+};
+
 const sumOrderContributions = (ordersForDay = []) =>
   ordersForDay.reduce(
     (acc, order) => {
@@ -43,6 +68,23 @@ const sumOrderContributions = (ordersForDay = []) =>
     },
     { work: 0, drive: 0, billed: 0, over: 0 }
   );
+
+const computeFinalTotals = (fromClients, fromManual) => ({
+  work: fromClients.work + (fromClients.work === 0 ? fromManual.work : 0),
+  drive: fromClients.drive + (fromClients.drive === 0 ? fromManual.drive : 0),
+  billed: fromClients.billed + (fromClients.billed === 0 ? fromManual.billed : 0),
+  over: fromClients.over + (fromClients.over === 0 ? fromManual.over : 0),
+});
+
+const getDebugDayKey = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    return params.get('dbgDay');
+  } catch (_) {
+    return null;
+  }
+};
 
 let getManualDayDoc = () => null;
 let getOrdersForDay = () => [];
@@ -70,22 +112,28 @@ export const computeDayTotals = (dayStr) => {
   const leaveKind = getLeaveKindForDay(key) || null;
   const isLeave = Boolean(leaveKind);
 
-  const manual = readManualTotals(manualDayDoc);
-  const fromOrders = sumOrderContributions(ordersForDay);
-  const totals = {
-    work: manual.work + fromOrders.work,
-    drive: manual.drive + fromOrders.drive,
-    billed: manual.billed + fromOrders.billed,
-    over: manual.over + fromOrders.over,
-  };
+  const totalsFromManual = readManualTotals(manualDayDoc);
+  const uniqueOrders = dedupeOrders(ordersForDay);
+  const totalsFromClients = sumOrderContributions(uniqueOrders);
+  const totals = computeFinalTotals(totalsFromClients, totalsFromManual);
 
   const hasData =
     !isLeave &&
-    (ordersForDay.length > 0 ||
+    (uniqueOrders.length > 0 ||
       totals.work !== 0 ||
       totals.drive !== 0 ||
       totals.billed !== 0 ||
       totals.over !== 0);
+
+  const debugKey = getDebugDayKey();
+  if (debugKey && key === debugKey) {
+    console.log('[dbgDay] totals', {
+      day: key,
+      totalsFromClients,
+      totalsFromManual,
+      finalTotals: totals,
+    });
+  }
 
   return { totals, isLeave, hasData, leaveKind };
 };
