@@ -27,6 +27,69 @@ const isLeaveDay = (date) => {
   return Boolean(window.__calendarDecorations?.leaveByDay?.[key]);
 };
 
+const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
+  if (!cellEl) return;
+  cellEl.querySelectorAll('.cell-sum, .cell-leave-icon').forEach((node) => node.remove());
+  if (!decorations || !dayKey) {
+    if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
+    return;
+  }
+
+  const leave = decorations.leaveByDay?.[dayKey];
+  const sum = decorations.summaryByDay?.[dayKey];
+
+  if (leave) {
+    const icon =
+      leave === 'L4' ? '🤒' :
+      (leave === 'SWIETO' ? '🎉' :
+      (leave === 'URL' ? '🏖️' : '⛔'));
+    const big = document.createElement('div');
+    big.className = `cell-leave-icon cell-leave-icon--${leave}`;
+    big.textContent = icon;
+    cellEl.appendChild(big);
+    if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
+    return;
+  }
+
+  if (!sum) {
+    if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
+    return;
+  }
+
+  const work = Number(sum.work || 0) || 0;
+  const drive = Number(sum.drive || 0) || 0;
+  const billed = Number(sum.billed || 0) || 0;
+  const over = Number(sum.over || 0) || 0;
+  const parts = [
+    `Praca: ${work.toFixed(1)}h`,
+    `Jazda: ${drive.toFixed(1)}h`,
+    `Fakturowane: ${billed.toFixed(1)}h`,
+    `Nadgodziny: ${over.toFixed(1)}h`,
+  ];
+
+  const box = document.createElement('div');
+  box.className = 'cell-sum';
+  box.textContent = parts.join(' • ');
+  cellEl.appendChild(box);
+  if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
+};
+
+const applyDecorationsFromPlaceholders = (root = document) => {
+  const decorations = window.__calendarDecorations || null;
+  if (!decorations) return;
+  const placeholders = root.querySelectorAll('.cell-sum-placeholder[data-day]');
+  placeholders.forEach((placeholder) => {
+    const dayKey = normalizeDateKey(placeholder.dataset.day, 'cell-sum-placeholder');
+    if (!dayKey) return;
+    const cellEl =
+      placeholder.closest('.fc-daygrid-day') ||
+      placeholder.closest('[data-date]') ||
+      placeholder.parentElement;
+    if (!cellEl) return;
+    renderDayCellDecorations(cellEl, dayKey, decorations);
+  });
+};
+
 export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
   const el =
     hostEl ||
@@ -87,60 +150,14 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     dayCellDidMount: (arg) => {
       arg.el.dataset.daycellMounted = '1';
       const day = normalizeDateKey(arg.date, 'dayCellDidMount');
-      const deco = window.__calendarDecorations || null;
-
-      // wyczyść poprzednie
-      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon').forEach(n => n.remove());
-
-      if (!deco) {
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return;
-      }
-
-      if (!day) {
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return;
-      }
-
-      const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
-      const sum = deco.summaryByDay?.[day];     // {work,drive,billed,over} albo undefined
-
-      // 1) Dzień wolny -> TYLKO ikona, NIC więcej
-      if (leave) {
-        const icon =
-          leave === 'L4' ? '🤒' :
-          (leave === 'SWIETO' ? '🎉' :
-          (leave === 'URL' ? '🏖️' : '⛔'));
-        const big = document.createElement('div');
-        big.className = `cell-leave-icon cell-leave-icon--${leave}`;
-        big.textContent = icon;
-        arg.el.appendChild(big);
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return; // <--- krytyczne: nie renderuj sumy
-      }
-
-      // 2) Normalny dzień: kafel sumy tylko jeśli summaryByDay ma wpis
-      if (!sum) {
-        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
-        return;
-      }
-
-      const work = Number(sum.work||0) || 0;
-      const drive = Number(sum.drive||0) || 0;
-      const billed = Number(sum.billed||0) || 0;
-      const over = Number(sum.over||0) || 0;
-      const parts = [
-        `Praca: ${work.toFixed(1)}h`,
-        `Jazda: ${drive.toFixed(1)}h`,
-        `Fakt: ${billed.toFixed(1)}h`,
-        `Nadg: ${over.toFixed(1)}h`,
-      ];
-
-      const box = document.createElement('div');
-      box.className = 'cell-sum';
-      box.textContent = parts.join(' • ');
-      arg.el.appendChild(box);
-      if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+      const decorations = window.__calendarDecorations || null;
+      renderDayCellDecorations(arg.el, day, decorations, extraDayCellDidMount, arg);
+    },
+    dayCellContent: (arg) => {
+      const day = normalizeDateKey(arg.date, 'dayCellContent');
+      const dayNumber = arg.dayNumberText || '';
+      const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
+      return { html: `<div class="fc-daygrid-day-number">${dayNumber}</div>${placeholder}` };
     },
     events: async (info, success) => {
       try {
@@ -184,8 +201,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },
     datesSet: (...args) => {
-      try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
       if (typeof extraDatesSet === 'function') extraDatesSet(...args);
+      try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
+      try { applyDecorationsFromPlaceholders(); } catch (_) {}
     },
     eventsSet: (...args) => {
       if (typeof extraEventsSet === 'function') extraEventsSet(...args);
@@ -218,6 +236,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     calendar = new Calendar(el, resourceOptions);
     window.__fcCalendar = calendar;
     calendar.render();
+    window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
+    try { applyDecorationsFromPlaceholders(); } catch (_) {}
   } catch (e) {
     const msg = String(e?.message || e);
     console.warn('[calendar] resources unavailable -> fallback', e);
@@ -227,6 +247,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         calendar = new Calendar(el, fallbackOptions);
         window.__fcCalendar = calendar;
         calendar.render();
+        window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
+        try { applyDecorationsFromPlaceholders(); } catch (_) {}
         const noteId = 'calendar-fallback-note';
         if (!document.getElementById(noteId)) {
           const note = document.createElement('div');

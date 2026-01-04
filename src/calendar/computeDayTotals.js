@@ -1,6 +1,6 @@
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-const normalizeDayKey = (value) => {
+const normalizeDayKey = (value, context = '') => {
   if (!value) return '';
   let key = '';
   if (typeof value === 'string') key = value.slice(0, 10);
@@ -10,7 +10,11 @@ const normalizeDayKey = (value) => {
     const dd = String(value.getDate()).padStart(2, '0');
     key = `${yyyy}-${mm}-${dd}`;
   }
-  return DATE_KEY_RE.test(key) ? key : '';
+  if (!DATE_KEY_RE.test(key)) {
+    console.error('[calendar] invalid day key', { context, value, key });
+    return '';
+  }
+  return key;
 };
 
 const parsePlNumber = (value) => {
@@ -51,7 +55,7 @@ export const configureDayTotals = ({ manualGetter, ordersGetter, leaveGetter } =
 };
 
 export const computeDayTotals = (dayStr) => {
-  const key = normalizeDayKey(dayStr);
+  const key = normalizeDayKey(dayStr, 'computeDayTotals');
   if (!key) {
     return {
       totals: { work: 0, drive: 0, billed: 0, over: 0 },
