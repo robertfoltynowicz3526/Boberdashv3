@@ -458,16 +458,24 @@ td.num {
 
 .qty-cell {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: flex-end;
   gap: 0.35rem;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .qty-value {
   display: inline-block;
   min-width: 3.5ch;
   text-align: right;
+}
+
+#magazyn-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--table-header);
 }
 
 .unit-badge {
@@ -877,6 +885,21 @@ select {
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1rem;
+}
+
+.modal-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.oil-converter {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
 }
 
 .modal-content-large {
@@ -1840,9 +1863,11 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   background:transparent;
   color:inherit;
 }
-.year-section{ border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03); }
+.year-section{ border-radius:14px; overflow:visible; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03); }
 .year-section + .year-section{ margin-top:16px; }
-.year-toggle{ width:100%; border:none; background:transparent; color:inherit; padding:14px 16px; display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center; cursor:pointer; text-align:left; }
+.year-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.year-header .export-menu{ padding-right:12px; }
+.year-toggle{ flex:1; min-width:0; border:none; background:transparent; color:inherit; padding:14px 16px; display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center; cursor:pointer; text-align:left; }
 .year-toggle .chevron{ font-size:1rem; transition:transform .2s ease; }
 .year-toggle .year-meta{ display:grid; gap:6px; }
 .year-toggle .year-title{ font-size:1rem; font-weight:700; }
@@ -1980,11 +2005,15 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 /* Grid dla magazynu */
 .warehouse-shell {
-  max-width: 1320px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 1.5rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .warehouse-toolbar {
@@ -2013,6 +2042,18 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 .warehouse-toolbar .btn-add {
   height: 44px;
+}
+
+.warehouse-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.warehouse-table {
+  width: 100%;
+  min-width: 0;
 }
 
 .warehouse-quick-actions .quick-actions-grid {
@@ -2166,18 +2207,9 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   display: grid;
 }
 
-.warehouse-grid{
-  display:grid;
-  gap:16px;
-  grid-template-columns:minmax(280px, 360px) 1fr;
-  align-items:start;
-}
-.warehouse-grid .side{ position:sticky; top:84px; align-self:start; }
-.warehouse-grid .main{ min-width:0; }
 @media (max-width:768px){
-  .warehouse-grid{ grid-template-columns:1fr; }
-  .warehouse-grid .side{ position:static; }
   .warehouse-toolbar{ grid-template-columns: 1fr; }
+  .warehouse-actions{ width:100%; justify-content:flex-start; flex-wrap:wrap; }
 }
 
 /* Tabela magazynu rozciągnięta w prawo */
@@ -2361,6 +2393,74 @@ main,
 
 .summary-card h3 {
   margin:0 0 10px; color:#e9ffe9;
+}
+
+.summary-card .card-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+
+.summary-card .card-head h3 {
+  margin:0;
+}
+
+.export-menu {
+  position: relative;
+}
+
+.export-trigger {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.18);
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.export-trigger .icon {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.export-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 220px;
+  background: #0f2615;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  display: none;
+  z-index: 10;
+}
+
+.export-menu.is-open .export-menu-panel {
+  display: block;
+}
+
+.export-menu-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.export-menu-item:hover {
+  background: rgba(255,255,255,.08);
 }
 
 /* tabele – wyraźne linie i kontrast */
