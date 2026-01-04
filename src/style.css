@@ -106,6 +106,7 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
   display: flex;
   align-items: stretch;
+  width: 100%;
 }
 
 body::before {
@@ -316,6 +317,8 @@ main {
 .tab-content {
   display: none;
   animation: fadeIn 0.35s ease both;
+  width: 100%;
+  max-width: none;
 }
 
 .tab-content h2 {
@@ -741,8 +744,8 @@ select {
 /* Kalendarz wypełnia kartę i nie wychodzi poza nią */
 #calendar-shell {
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   height: auto;
   min-height: auto;
 }
@@ -2182,18 +2185,6 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 #magazyn .table-wrap{ width:100%; }
 
 /* Szeroki kontener aplikacji na desktopie */
-@media (min-width:1200px){
-  .app,
-  .app-shell,
-  .page,
-  .content,
-  .container,
-  main{
-    max-width:1440px;
-    margin-inline:auto;
-    padding-inline:24px;
-  }
-}
 
 /* Sekcje niech zajmują pełną szerokość */
 .app,
@@ -2237,8 +2228,8 @@ main,
 .calendar-card, [data-section="kalendarz"] .card {
   grid-column: 1 / -1;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 #kalendarz { height: auto; min-height: auto; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
@@ -2253,6 +2244,22 @@ main,
 [data-section="podsumowanie"] .card{ padding:16px; border:1px solid var(--border-color, #e5e7eb); border-radius:12px; background:var(--card-bg, #fff); box-shadow:0 10px 30px rgba(0,0,0,0.05); }
 .card-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .summary-controls{ display:flex; align-items:center; gap:8px; }
+.summary-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  width:100%;
+}
+.summary-toolbar-left,
+.summary-toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.summary-toolbar-right{ margin-left:auto; }
 .vacation-block{ display:grid; gap:12px; }
 .vacation-allowance-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .vacation-allowance-row input{ max-width:120px; }
@@ -2293,7 +2300,7 @@ main,
 
 /* ==== Kalendarz – większy i czytelny ==== */
 [data-section="kalendarz"] .card,
-.calendar-card { grid-column: 1 / -1; width: 100%; max-width: 1280px; margin: 0 auto; }
+.calendar-card { grid-column: 1 / -1; width: 100%; max-width: none; margin: 0; }
 
 #kalendarz {
   height: auto;
@@ -2395,8 +2402,8 @@ main,
 [data-section="pulpit"] .card,
 [data-section="kalendarz"] .card {
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 /* Mniej powietrza nad/po bokach */
@@ -2457,8 +2464,8 @@ main,
 [data-section="kalendarz"] .card,
 .calendar-card {
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 /* Mniej powietrza nad/po bokach; w dół – dynamiczna wysokość względem okna */
