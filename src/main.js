@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDayTotals } from './calendar/computeDayTotals.js';
+import { computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const normalizeDayKey = (value, context = '') => {
@@ -45,7 +45,6 @@ const setDecorations = (decorations) => {
     }
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
     try { window.__fcCalendar?.refetchEvents?.(); } catch (_) { }
-    console.log('calendar?', !!window.__fcCalendar);
 };
 
 
@@ -230,6 +229,11 @@ function initializeApp() {
     let ordersByDay = new Map();
     let dayDocsByDay = new Map();
     let leaveByDay = new Map();
+    configureDayTotals({
+        manualGetter: (dayKey) => manualByDay.get(dayKey) || null,
+        ordersGetter: (dayKey) => ordersByDay.get(dayKey) || [],
+        leaveGetter: (dayKey) => leaveByDay.get(dayKey) || null
+    });
 
     const toDateSafe = (value) => {
         if (!value) return null;
@@ -478,20 +482,11 @@ function initializeApp() {
             }));
     };
 
-    const debugDayParam = new URLSearchParams(location.search).get('dbgDay');
-
-    const logDebugDayTotals = (dayStr, dayDoc, totals, inSummary) => {
-        if (!debugDayParam || dayStr !== debugDayParam) return;
-        console.log('[DBG][dayDoc.exists]', dayStr, Boolean(dayDoc));
-        console.log('[DBG][dayDoc]', dayStr, dayDoc || null);
-        console.log('[DBG][computeDayTotals]', dayStr, totals);
-        console.log('[DBG][summaryByDay]', dayStr, Boolean(inSummary));
-    };
-
     const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
         const view = calendar?.view || window.__fcCalendar?.view;
         const start = rangeStart || view?.currentStart || null;
         const end = rangeEnd || view?.currentEnd || null;
+        window.__calendarDecorations = { summaryByDay: {}, leaveByDay: {} };
         const summaryByDay = {};
         const leaveByDayOut = {};
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
@@ -503,29 +498,17 @@ function initializeApp() {
         daysToRender.forEach((dayStr) => {
             const normalizedDay = normalizeDayKey(dayStr, 'rebuildCalendarDecorations');
             if (!normalizedDay) return;
-            const leaveKind = leaveByDay.get(normalizedDay);
-            if (leaveKind) {
+            const { totals, isLeave, hasData, leaveKind } = computeDayTotals(normalizedDay);
+            if (isLeave) {
                 leaveByDayOut[normalizedDay] = leaveKind;
-                logDebugDayTotals(normalizedDay, dayDocsByDay.get(normalizedDay) || null, null, false);
                 return;
             }
-            const manualDayDoc = manualByDay.get(normalizedDay) || { work: 0, drive: 0, billed: 0, over: 0 };
-            const ordersForDay = ordersByDay.get(normalizedDay) || [];
-            const totals = computeDayTotals(normalizedDay, manualDayDoc, ordersForDay);
-            const hasAny =
-                ordersForDay.length > 0 ||
-                totals.work !== 0 ||
-                totals.drive !== 0 ||
-                totals.billed !== 0 ||
-                totals.over !== 0;
-            if (SHOW_ZERO_DAYS || hasAny) {
+            if (SHOW_ZERO_DAYS || hasData) {
                 summaryByDay[normalizedDay] = totals;
             }
-            logDebugDayTotals(normalizedDay, dayDocsByDay.get(normalizedDay) || null, totals, Boolean(summaryByDay[normalizedDay]));
         });
 
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
-        console.log('summary days:', Object.keys(summaryByDay).length);
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -1102,7 +1085,8 @@ function initializeApp() {
                     leaveByDay.set(dayStr, leaveKind);
                 }
 
-                if (!leaveKind && ordersForDay.length) {
+                const { isLeave } = computeDayTotals(dayStr);
+                if (!isLeave && ordersForDay.length) {
                     ordersForDay.forEach((order) => {
                         const eventDay = normalizeDayKey(dayStr, 'order-event');
                         if (!eventDay) return;
@@ -1118,35 +1102,9 @@ function initializeApp() {
                 }
             });
 
-            const leaveSet = new Set(Array.from(leaveByDay.keys()));
-
-            for (let i = events.length - 1; i >= 0; i--) {
-                const d = events[i]?.extendedProps?.day || (typeof events[i]?.start === 'string' ? events[i].start.slice(0,10) : '');
-                if (leaveSet.has(d)) events.splice(i, 1);
-            }
-
-            for (let i = events.length - 1; i >= 0; i--) {
-                const ev = events[i] || {};
-                const id = String(ev?.id || '');
-                const cls = ev?.className || ev?.classNames || [];
-                const title = ev?.title || '';
-                const classList = Array.isArray(cls) ? cls : String(cls || '').split(/\\s+/);
-                if (
-                    id.startsWith('summary_') ||
-                    id.startsWith('godziny_') ||
-                    classList.includes('strip-summary') ||
-                    classList.includes('leave-bg') ||
-                    classList.includes('leave-badge') ||
-                    /^Ewidencja dnia/i.test(String(title || ''))
-                ) {
-                    events.splice(i, 1);
-                }
-            }
-
             rebuildCalendarDecorations();
 
             workEvents = events;
-            console.log('events:', workEvents.length);
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
         });

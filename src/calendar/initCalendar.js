@@ -87,27 +87,17 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     dayCellDidMount: (arg) => {
       arg.el.dataset.daycellMounted = '1';
       const day = normalizeDateKey(arg.date, 'dayCellDidMount');
-      const debugDayCells = window.__calendarDebugDayCells !== false;
-      const addDebugLabel = (label) => {
-        if (!debugDayCells) return;
-        const tag = document.createElement('div');
-        tag.className = 'cell-debug';
-        tag.textContent = label;
-        arg.el.appendChild(tag);
-      };
       const deco = window.__calendarDecorations || null;
 
       // wyczyść poprzednie
-      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon, .cell-debug').forEach(n => n.remove());
+      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon').forEach(n => n.remove());
 
       if (!deco) {
-        addDebugLabel('NO-DECO');
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
       }
 
       if (!day) {
-        addDebugLabel('BAD-DATE');
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
       }
@@ -131,11 +121,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
       // 2) Normalny dzień: kafel sumy tylko jeśli summaryByDay ma wpis
       if (!sum) {
-        addDebugLabel('NO-SUM');
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
       }
-      addDebugLabel('HAS-SUM');
 
       const work = Number(sum.work||0) || 0;
       const drive = Number(sum.drive||0) || 0;
