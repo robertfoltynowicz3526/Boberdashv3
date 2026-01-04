@@ -135,6 +135,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     plugins,
     initialView: 'dayGridMonth',
     headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+    locale: 'pl',
+    buttonText: {
+      today: 'Dziś',
+      month: 'Miesiąc',
+      week: 'Tydzień',
+    },
+    titleFormat: { year: 'numeric', month: 'long' },
     navLinks: true,
     expandRows: true,
     height: 'auto',

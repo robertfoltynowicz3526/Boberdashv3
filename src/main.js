@@ -324,6 +324,8 @@ function initializeApp() {
     let workEvents = [];
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
+    let magazynSort = { key: 'nazwa', dir: 'asc' };
+    let activeWarehouseProduct = null;
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
@@ -449,10 +451,42 @@ function initializeApp() {
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
     const magazynLista = document.getElementById('magazyn-lista');
+    const magazynTable = document.getElementById('magazyn-table');
+    const magazynSearchInput = document.getElementById('magazyn-search-input');
+    const magazynFilterClient = document.getElementById('magazyn-filter-client');
+    const magazynFilterOilType = document.getElementById('magazyn-filter-oil-type');
+    const magazynFilterContainer = document.getElementById('magazyn-filter-container');
+    const magazynAddBtn = document.getElementById('magazyn-add-btn');
+    const magazynAddBtnSide = document.getElementById('magazyn-add-btn-side');
+    const magazynBulkFocusBtn = document.getElementById('magazyn-bulk-focus');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
-    const stockModalForm = document.getElementById('stock-change-form');
-    const stockModalCloseButton = stockModal ? stockModal.querySelector('.close-button') : null;
+    const bulkItemsInput = document.getElementById('bulk-items');
+    const bulkPreviewList = document.getElementById('bulk-preview-list');
+    const bulkErrors = document.getElementById('bulk-errors');
+    const bulkReport = document.getElementById('bulk-add-report');
+    const productDetailsModal = document.getElementById('product-details-modal');
+    const productDetailsCloseButton = productDetailsModal ? productDetailsModal.querySelector('.close-button') : null;
+    const productEditForm = document.getElementById('product-edit-form');
+    const productEditId = document.getElementById('product-edit-id');
+    const productEditIndex = document.getElementById('product-edit-index');
+    const productEditName = document.getElementById('product-edit-name');
+    const productEditClient = document.getElementById('product-edit-client');
+    const productCurrentQty = document.getElementById('product-current-qty');
+    const productCurrentLiters = document.getElementById('product-current-liters');
+    const productLastChange = document.getElementById('product-last-change');
+    const productChangeQtyInput = document.getElementById('product-change-qty');
+    const productChangeUnit = document.getElementById('product-change-unit');
+    const productAddBtn = document.getElementById('product-add-btn');
+    const productRemoveBtn = document.getElementById('product-remove-btn');
+    const productDeleteBtn = document.getElementById('product-delete-btn');
+    const qtyToggleButtons = productDetailsModal ? productDetailsModal.querySelectorAll('.qty-toggle') : [];
+    const productAddModal = document.getElementById('product-add-modal');
+    const productAddCloseButton = productAddModal ? productAddModal.querySelector('.close-button') : null;
+    const itemIsOilCheckbox = document.getElementById('item-is-oil');
+    const itemOilFields = document.getElementById('item-oil-fields');
+    const itemOilTypeSelect = document.getElementById('item-oil-type');
+    const itemOilContainerSelect = document.getElementById('item-oil-container');
     const addOilBtn = document.getElementById('add-oil-btn');
     const oilTypeSelect = document.getElementById('oil-type');
     const oilContainerSizeSelect = document.getElementById('oil-container-size');
@@ -703,7 +737,7 @@ function initializeApp() {
     }
 
     const trackedModals = [];
-    [kalendarzModal, completeModal, stockModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
+    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
         .forEach(modal => { if (modal) trackedModals.push(modal); });
 
     const modalBackdrop = document.createElement('div');
@@ -1594,11 +1628,13 @@ function initializeApp() {
         return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
     }
 
+    const monthYearFormatter = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' });
+
     function formatujMiesiac(miesiac) {
         if (!miesiac) return '';
         try {
             const data = new Date(`${miesiac}-01T00:00:00`);
-            return data.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+            return monthYearFormatter.format(data).toLowerCase();
         } catch (e) {
             return miesiac;
         }
@@ -3541,63 +3577,183 @@ async function obslugaListyCzesci(event) {
     }
 
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
+    const normalizeClientName = (value) => {
+        const trimmed = (value || '').trim();
+        if (!trimmed || trimmed === '---') return 'Brak';
+        return trimmed;
+    };
+
+    const parseOilMeta = (produkt = {}) => {
+        let typOleju = produkt.typOleju || produkt.typOlej || produkt.typ;
+        let pojemnosc = Number(produkt.pojemnosc) || null;
+        if (!typOleju || !pojemnosc) {
+            const index = String(produkt.index || '');
+            const match = index.match(/OLEJ-([A-Z0-9]+)-(\d+(?:\.\d+)?)L/i);
+            if (match) {
+                typOleju = typOleju || match[1];
+                pojemnosc = pojemnosc || Number(match[2]);
+            }
+        }
+        if (!typOleju || !pojemnosc) {
+            const name = String(produkt.nazwa || '');
+            const matchName = name.match(/Olej\s+([A-Z0-9]+)\s+(\d+(?:\.\d+)?)L/i);
+            if (matchName) {
+                typOleju = typOleju || matchName[1];
+                pojemnosc = pojemnosc || Number(matchName[2]);
+            }
+        }
+        return {
+            typOleju: typOleju || '',
+            pojemnosc: Number.isFinite(pojemnosc) ? pojemnosc : null
+        };
+    };
+
+    const formatWarehouseDate = (value) => {
+        const date = toDateSafe(value);
+        if (!date) return '—';
+        return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const setOilFieldsVisibility = (visible) => {
+        if (!itemOilFields) return;
+        itemOilFields.classList.toggle('is-visible', visible);
+    };
+
+    const resetProductAddForm = () => {
+        if (!magazynForm) return;
+        magazynForm.reset();
+        if (itemIsOilCheckbox) itemIsOilCheckbox.checked = false;
+        setOilFieldsVisibility(false);
+    };
+
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
-        const ilosc = Number(magazynForm['item-ilosc'].value);
-        if (!Number.isFinite(ilosc) || ilosc <= 0) { alert("Podaj dodatnią ilość."); return; }
-        if (!Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
+        if (!magazynForm) return;
+        const index = magazynForm['item-index'].value.trim();
+        const nazwa = magazynForm['item-name'].value.trim();
+        const klient = magazynForm['item-klient'].value.trim();
+        const ilosc = Number(magazynForm['item-ilosc'].value || 0);
+        const isOil = Boolean(itemIsOilCheckbox?.checked);
+        const pojemnosc = Number(itemOilContainerSelect?.value || '');
+        const typOleju = itemOilTypeSelect?.value || '';
+
+        if (!index || !nazwa) { alert("Index i nazwa są wymagane."); return; }
+        if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === index.toLowerCase())) {
+            alert("Index musi być unikalny."); return;
+        }
+        if (!Number.isFinite(ilosc) || ilosc < 0) { alert("Podaj poprawną ilość (>= 0)."); return; }
+        if (!isOil && !Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
+        if (isOil && (!typOleju || !Number.isFinite(pojemnosc) || pojemnosc <= 0)) {
+            alert("Uzupełnij typ oleju i pojemnik."); return;
+        }
+
         const dane = {
-            index: magazynForm['item-index'].value,
-            nazwa: magazynForm['item-name'].value,
-            ilosc,
-            klient: magazynForm['item-klient'].value || '---',
+            index,
+            nazwa,
+            ilosc: Number(ilosc),
+            klient: klient || '---',
             createdAt: new Date(),
-            jestOlejem: false,
+            updatedAt: new Date(),
+            jestOlejem: isOil,
+            typOleju: isOil ? typOleju : null,
+            pojemnosc: isOil ? pojemnosc : null,
         };
         try {
             await addDoc(collection(db, "magazyn"), dane);
-            magazynForm.reset();
+            resetProductAddForm();
+            if (productAddModal) hideModal(productAddModal);
         } catch (e) {
             console.error("Błąd dodawania do magazynu: ", e);
         }
     }
 
+    const parseBulkItems = (text) => {
+        const lines = (text || '').split('\n').map(line => line.trim()).filter(Boolean);
+        const seen = new Set();
+        return lines.map((line, idx) => {
+            const parts = line.split(';').map(p => p.trim());
+            if (parts.length < 3) {
+                return { line, index: idx + 1, valid: false, error: 'Nieprawidłowy format (brak pól).' };
+            }
+            const [index, nazwa, ilosc] = parts;
+            const parsedIlosc = Number(ilosc);
+            if (!index) return { line, index: idx + 1, valid: false, error: 'Brak indexu.' };
+            if (!nazwa) return { line, index: idx + 1, valid: false, error: 'Brak nazwy.' };
+            const normalizedIndex = index.toLowerCase();
+            if (seen.has(normalizedIndex)) {
+                return { line, index: idx + 1, valid: false, error: 'Duplikat indexu w liście.' };
+            }
+            seen.add(normalizedIndex);
+            if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === normalizedIndex)) {
+                return { line, index: idx + 1, valid: false, error: 'Index już istnieje.' };
+            }
+            if (!Number.isFinite(parsedIlosc) || parsedIlosc < 0) {
+                return { line, index: idx + 1, valid: false, error: 'Nieprawidłowa ilość.' };
+            }
+            if (!Number.isInteger(parsedIlosc)) {
+                return { line, index: idx + 1, valid: false, error: 'Ilość musi być liczbą całkowitą.' };
+            }
+            return { line, index: idx + 1, valid: true, data: { index, nazwa, ilosc: parsedIlosc } };
+        });
+    };
+
+    const renderBulkPreview = () => {
+        if (!bulkItemsInput || !bulkPreviewList || !bulkErrors) return;
+        const parsed = parseBulkItems(bulkItemsInput.value);
+        bulkPreviewList.innerHTML = parsed.map(item => `
+            <li>
+                <span>${item.index}. ${item.data ? `${item.data.index} • ${item.data.nazwa}` : item.line}</span>
+                <span class="${item.valid ? 'status-ok' : 'status-error'}">${item.valid ? 'OK' : item.error}</span>
+            </li>
+        `).join('') || '<li>Brak danych do podglądu.</li>';
+        const errors = parsed.filter(item => !item.valid);
+        bulkErrors.textContent = errors.length ? `Błędy: ${errors.length}. Popraw dane przed zapisem.` : '';
+        if (bulkReport) bulkReport.textContent = '';
+    };
+
     async function dodajMasowo(event) {
         event.preventDefault();
-        const klient = bulkAddForm['bulk-klient'].value;
-        const itemsText = bulkAddForm['bulk-items'].value.trim();
-        if (!itemsText) return;
-        const lines = itemsText.split('\n');
+        const klient = (bulkAddForm?.['bulk-klient']?.value || '').trim() || '---';
+        const itemsText = bulkItemsInput?.value || '';
+        if (!itemsText.trim()) return;
+        const parsed = parseBulkItems(itemsText);
+        const validItems = parsed.filter(item => item.valid && item.data);
+        const invalidItems = parsed.filter(item => !item.valid);
+        if (!validItems.length) {
+            alert("Nie znaleziono poprawnych rekordów do dodania.");
+            return;
+        }
         let dodaneCount = 0;
+        const skipped = [];
         try {
-            for (const line of lines) {
-                const parts = line.split(';');
-                if (parts.length === 3) {
-                    const [index, nazwa, ilosc] = parts;
-                    const parsedIlosc = Number(ilosc.trim());
-                    if (!Number.isFinite(parsedIlosc) || parsedIlosc <= 0) {
-                        console.warn("Pominięto linię (nieprawidłowa ilość):", line);
-                        continue;
-                    }
-                    if (!Number.isInteger(parsedIlosc)) {
-                        console.warn("Pominięto linię (ilość musi być całkowita):", line);
-                        continue;
-                    }
-                    await addDoc(collection(db, "magazyn"), {
-                        index: index.trim(),
-                        nazwa: nazwa.trim(),
-                        ilosc: parsedIlosc,
-                        klient,
-                        jestOlejem: false,
-                        createdAt: new Date()
-                    });
-                    dodaneCount++;
-                } else {
-                    console.warn("Pominięto linię (nieprawidłowy format):", line);
+            for (const item of validItems) {
+                const existing = wszystkieProdukty.find(p => (p.index || '').toLowerCase() === item.data.index.toLowerCase());
+                if (existing) {
+                    skipped.push(`${item.data.index}: duplikat indexu`);
+                    continue;
                 }
+                await addDoc(collection(db, "magazyn"), {
+                    index: item.data.index,
+                    nazwa: item.data.nazwa,
+                    ilosc: item.data.ilosc,
+                    klient,
+                    jestOlejem: false,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+                dodaneCount++;
             }
-            alert(`Pomyślnie dodano ${dodaneCount} produktów.`);
-            bulkAddForm.reset();
+            const invalidReasons = invalidItems.map(item => `${item.index}: ${item.error}`);
+            const skippedCount = invalidItems.length + skipped.length;
+            if (bulkReport) {
+                bulkReport.innerHTML = `
+                    <strong>Raport:</strong> dodano ${dodaneCount}, pominięto ${skippedCount}.
+                    ${skippedCount ? `<div>Powody: ${[...invalidReasons, ...skipped].join(' • ')}</div>` : ''}
+                `;
+            }
+            bulkAddForm?.reset();
+            if (bulkPreviewList) bulkPreviewList.innerHTML = '';
+            if (bulkErrors) bulkErrors.textContent = '';
         } catch (error) {
             console.error("Błąd masowego dodawania:", error);
             alert("Wystąpił błąd.");
@@ -3615,8 +3771,10 @@ async function obslugaListyCzesci(event) {
             ilosc: 1,
             klient: '---',
             jestOlejem: true,
+            typOleju: typ,
             pojemnosc,
-            createdAt: new Date()
+            createdAt: new Date(),
+            updatedAt: new Date()
         };
         try {
             await addDoc(collection(db, "magazyn"), dane);
@@ -3648,40 +3806,185 @@ async function obslugaListyCzesci(event) {
         }
     }
 
-    async function obslugaTabeliMagazynu(event) {
-        const tr = event.target.closest('tr'); if (!tr) return;
-        const docId = tr.dataset.id;
-        if (event.target.classList.contains('delete-btn')) {
-            if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "magazyn", docId)); }
-        } else if (event.target.classList.contains('add-stock-btn') || event.target.classList.contains('remove-stock-btn')) {
-            if (!stockModal) return;
-            const titleEl = document.getElementById('stock-modal-title');
-            const nameEl = document.getElementById('stock-modal-name');
-            const currentQtyEl = document.getElementById('stock-modal-current-qty');
-            const idInput = document.getElementById('stock-change-id');
-            const qtyInput = document.getElementById('stock-change-qty');
-            if (!titleEl || !nameEl || !currentQtyEl || !idInput || !qtyInput) return;
+    const updateSortButtons = () => {
+        if (!magazynTable) return;
+        magazynTable.querySelectorAll('.sort-btn').forEach(btn => {
+            const key = btn.dataset.sort;
+            if (!key) return;
+            btn.classList.toggle('is-active', magazynSort.key === key);
+            btn.classList.toggle('is-desc', magazynSort.dir === 'desc' && magazynSort.key === key);
+        });
+    };
 
-            stockChangeOperation = event.target.classList.contains('add-stock-btn') ? 'add' : 'remove';
-            titleEl.textContent = stockChangeOperation === 'add' ? 'Dodaj do stanu' : 'Zdejmij ze stanu';
-            nameEl.textContent = tr.dataset.name;
-            currentQtyEl.textContent = Number(tr.dataset.qty).toFixed(2) + ' szt.';
-            idInput.value = docId;
-            qtyInput.step = tr.dataset.isOil === 'true' ? "0.01" : "1";
-            qtyInput.placeholder = tr.dataset.isOil === 'true' ? "np. 0.5" : "Tylko liczby całkowite";
-            qtyInput.value = '';
-            openModal(stockModal);
+    const applyMagazynFilters = (items) => {
+        const search = (magazynSearchInput?.value || '').trim().toLowerCase();
+        const clientFilter = magazynFilterClient?.value || '';
+        const oilTypeFilter = magazynFilterOilType?.value || '';
+        const containerFilter = magazynFilterContainer?.value || '';
+        return (items || []).filter(item => {
+            const clientName = normalizeClientName(item.klient);
+            const matchesSearch = !search || [item.index, item.nazwa, clientName].some(val => String(val || '').toLowerCase().includes(search));
+            const { typOleju, pojemnosc } = parseOilMeta(item);
+            const matchesClient = !clientFilter || clientName === clientFilter;
+            const matchesOilType = !oilTypeFilter || typOleju === oilTypeFilter;
+            const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
+            return matchesSearch && matchesClient && matchesOilType && matchesContainer;
+        });
+    };
+
+    const sortMagazynItems = (items) => {
+        const dir = magazynSort.dir === 'desc' ? -1 : 1;
+        const getLiters = (item) => {
+            const { pojemnosc } = parseOilMeta(item);
+            return pojemnosc ? (Number(item.ilosc) || 0) * pojemnosc : 0;
+        };
+        return [...items].sort((a, b) => {
+            switch (magazynSort.key) {
+                case 'ilosc':
+                    return ((Number(a.ilosc) || 0) - (Number(b.ilosc) || 0)) * dir;
+                case 'litry':
+                    return (getLiters(a) - getLiters(b)) * dir;
+                case 'klient':
+                    return normalizeClientName(a.klient).localeCompare(normalizeClientName(b.klient), 'pl') * dir;
+                case 'index':
+                    return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
+                case 'updatedAt': {
+                    const aDate = toDateSafe(a.updatedAt || a.createdAt);
+                    const bDate = toDateSafe(b.updatedAt || b.createdAt);
+                    return ((aDate?.getTime() || 0) - (bDate?.getTime() || 0)) * dir;
+                }
+                case 'nazwa':
+                default:
+                    return (a.nazwa || '').localeCompare(b.nazwa || '', 'pl') * dir;
+            }
+        });
+    };
+
+    const renderMagazynTable = () => {
+        if (!magazynLista) return;
+        const filtered = sortMagazynItems(applyMagazynFilters(wszystkieProdukty));
+        const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Magazyn pusty.</td></tr>';
+        if (!filtered.length) {
+            magazynLista.innerHTML = emptyRowHtml;
+            updateSortButtons();
+            return;
         }
-    }
+        const rows = filtered.map((produkt) => {
+            const jestOlejem = Boolean(produkt.jestOlejem);
+            const { pojemnosc, typOleju } = parseOilMeta(produkt);
+            const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
+            const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
+            const iloscWLitrach = litersValue === null ? '—' : `${litersValue.toFixed(2)} <span class="unit-badge">L</span>`;
+            const klientDisplay = normalizeClientName(produkt.klient);
+            const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
+            return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-container="${pojemnosc || ''}">
+                    <td data-label="Index">${produkt.index}</td>
+                    <td data-label="Nazwa">${produkt.nazwa}</td>
+                    <td data-label="Klient">${klientDisplay}</td>
+                    <td data-label="Ilość (szt.)" class="num">${iloscFormatowana} <span class="unit-badge">szt</span></td>
+                    <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
+                    <td data-label="Ostatnia zmiana">${lastChange}</td>
+                    <td data-label="Akcje" class="actions-col"><button type="button" class="row-action-btn" data-action="details" aria-label="Szczegóły produktu">⋯</button></td>
+                </tr>`;
+        }).join('');
+        magazynLista.innerHTML = rows || emptyRowHtml;
+        updateSortButtons();
+    };
 
-    async function obslugaZmianyStanu(event) {
-        if (!stockModalForm) return;
+    const refreshMagazynFilters = () => {
+        if (!magazynFilterClient || !magazynFilterOilType || !magazynFilterContainer) return;
+        const prevClient = magazynFilterClient.value;
+        const prevOilType = magazynFilterOilType.value;
+        const prevContainer = magazynFilterContainer.value;
+        const clients = new Set();
+        const oilTypes = new Set();
+        const containers = new Set();
+        wszystkieProdukty.forEach(item => {
+            clients.add(normalizeClientName(item.klient));
+            const { typOleju, pojemnosc } = parseOilMeta(item);
+            if (typOleju) oilTypes.add(typOleju);
+            if (pojemnosc) containers.add(String(pojemnosc));
+        });
+        const clientOptions = [''].concat([...clients].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pl')));
+        magazynFilterClient.innerHTML = clientOptions.map(val => `<option value="${val}">${val || 'Wszyscy'}</option>`).join('');
+        const oilOptions = [''].concat([...oilTypes].filter(Boolean).sort());
+        magazynFilterOilType.innerHTML = oilOptions.map(val => `<option value="${val}">${val || 'Wszystkie'}</option>`).join('');
+        const containerOptions = [''].concat([...containers].filter(Boolean).sort((a, b) => Number(a) - Number(b)));
+        magazynFilterContainer.innerHTML = containerOptions.map(val => `<option value="${val}">${val ? `${val} L` : 'Wszystkie'}</option>`).join('');
+        if (clientOptions.includes(prevClient)) magazynFilterClient.value = prevClient;
+        if (oilOptions.includes(prevOilType)) magazynFilterOilType.value = prevOilType;
+        if (containerOptions.includes(prevContainer)) magazynFilterContainer.value = prevContainer;
+    };
+
+    const openProductDetailsModal = (produkt) => {
+        if (!produkt || !productDetailsModal) return;
+        activeWarehouseProduct = produkt;
+        const jestOlejem = Boolean(produkt.jestOlejem);
+        const { pojemnosc } = parseOilMeta(produkt);
+        const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
+        const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
+        if (productEditId) productEditId.value = produkt.id;
+        if (productEditIndex) productEditIndex.value = produkt.index || '';
+        if (productEditName) productEditName.value = produkt.nazwa || '';
+        if (productEditClient) productEditClient.value = normalizeClientName(produkt.klient) === 'Brak' ? '' : produkt.klient;
+        if (productCurrentQty) productCurrentQty.textContent = iloscFormatowana;
+        if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : `${litersValue.toFixed(2)} L`;
+        if (productLastChange) productLastChange.textContent = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
+        if (productChangeQtyInput) {
+            productChangeQtyInput.value = '';
+            productChangeQtyInput.step = jestOlejem ? '0.01' : '1';
+            productChangeQtyInput.placeholder = jestOlejem ? 'np. 0.5' : 'np. 2';
+        }
+        if (productChangeUnit) productChangeUnit.textContent = 'szt';
+        qtyToggleButtons?.forEach(btn => btn.classList.toggle('is-active', btn.dataset.op === 'add'));
+        stockChangeOperation = 'add';
+        openModal(productDetailsModal);
+    };
+
+    const getProductById = (id) => wszystkieProdukty.find(p => p.id === id);
+
+    const handleMagazynRowClick = (event) => {
+        const tr = event.target.closest('tr'); if (!tr || !tr.dataset.id) return;
+        const actionButton = event.target.closest('.row-action-btn');
+        if (actionButton || tr) {
+            const produkt = getProductById(tr.dataset.id);
+            if (produkt) openProductDetailsModal(produkt);
+        }
+    };
+
+    const updateStockOperation = (op) => {
+        stockChangeOperation = op;
+        qtyToggleButtons?.forEach(btn => btn.classList.toggle('is-active', btn.dataset.op === op));
+    };
+
+    const handleProductEditSubmit = async (event) => {
         event.preventDefault();
-        const docId = document.getElementById('stock-change-id').value;
-        const changeInput = document.getElementById('stock-change-qty');
-        if (!changeInput) return;
-        const changeQty = Number(changeInput.value);
-        if (!Number.isFinite(changeQty) || changeQty <= 0) { alert("Ilość musi być dodatnia liczbą."); return; }
+        if (!productEditId) return;
+        const docId = productEditId.value;
+        const index = productEditIndex?.value.trim();
+        const nazwa = productEditName?.value.trim();
+        const klient = productEditClient?.value.trim();
+        if (!index || !nazwa) { alert('Index i nazwa są wymagane.'); return; }
+        const duplicate = wszystkieProdukty.find(p => p.id !== docId && (p.index || '').toLowerCase() === index.toLowerCase());
+        if (duplicate) { alert('Index musi być unikalny.'); return; }
+        try {
+            await updateDoc(doc(db, "magazyn", docId), {
+                index,
+                nazwa,
+                klient: klient || '---',
+                updatedAt: new Date()
+            });
+        } catch (e) {
+            console.error("Błąd aktualizacji produktu: ", e);
+            alert(`Wystąpił błąd: ${e.message || e}`);
+        }
+    };
+
+    const handleStockChange = async (operation) => {
+        if (!productEditId || !productChangeQtyInput) return;
+        const docId = productEditId.value;
+        const changeQty = Number(productChangeQtyInput.value);
+        if (!Number.isFinite(changeQty) || changeQty <= 0) { alert("Ilość musi być dodatnią liczbą."); return; }
         const docRef = doc(db, "magazyn", docId);
         try {
             await runTransaction(db, async (t) => {
@@ -3693,55 +3996,52 @@ async function obslugaListyCzesci(event) {
                 if (!isOil && !Number.isInteger(changeQty)) {
                     throw "Dla tego produktu można podawać tylko liczby całkowite.";
                 }
-                let newQty = stockChangeOperation === 'add' ? currentQty + changeQty : currentQty - changeQty;
+                let newQty = operation === 'add' ? currentQty + changeQty : currentQty - changeQty;
                 if (isOil) {
                     newQty = Number(newQty.toFixed(2));
                 }
                 if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
-                t.update(docRef, { ilosc: newQty });
+                t.update(docRef, { ilosc: newQty, updatedAt: new Date() });
             });
-            if (stockModal) hideModal(stockModal);
-            stockModalForm.reset();
+            if (productDetailsModal) {
+                const updated = getProductById(docId);
+                if (updated) openProductDetailsModal(updated);
+            }
         } catch (e) {
             console.error("Błąd transakcji: ", e);
             alert(`Wystąpił błąd: ${e.message || e}`);
         }
-    }
+    };
+
+    const handleProductDelete = async () => {
+        if (!productEditId) return;
+        const docId = productEditId.value;
+        if (!docId) return;
+        if (confirm("Na pewno usunąć produkt?")) {
+            await deleteDoc(doc(db, "magazyn", docId));
+            if (productDetailsModal) hideModal(productDetailsModal);
+        }
+    };
 
     function wyswietlMagazyn() {
         if (!magazynLista) return;
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
-            let html = '';
-            const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="6">Magazyn pusty.</td></tr>';
             wszystkieProdukty = [];
-            if (snapshot.empty) { magazynLista.innerHTML = emptyRowHtml; return; }
+            if (snapshot.empty) {
+                refreshMagazynFilters();
+                renderMagazynTable();
+                return;
+            }
             snapshot.forEach((docSnap) => {
                 const produkt = docSnap.data();
                 produkt.id = docSnap.id;
-                 produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
+                produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
                 produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
-                const jestOlejem = Boolean(produkt.jestOlejem);
-                produkt.jestOlejem = jestOlejem;
-                const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
-                const iloscWLitrach = jestOlejem && produkt.pojemnosc
-                    ? (produkt.ilosc * produkt.pojemnosc).toFixed(2) + ' L'
-                    : '---';
-                const datasetQty = produkt.ilosc;               
+                produkt.jestOlejem = Boolean(produkt.jestOlejem);
                 wszystkieProdukty.push(produkt);
-                html += `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${datasetQty}" data-is-oil="${jestOlejem}">
-                    <td data-label="Index">${produkt.index}</td>
-                    <td data-label="Nazwa">${produkt.nazwa}</td>
-                    <td data-label="Ilość (szt.)">${iloscFormatowana} szt.</td>
-                    <td data-label="Ilość (Litry)">${iloscWLitrach}</td>
-                    <td data-label="Klient">${produkt.klient}</td>
-                    <td data-label="Akcje">
-                        <button class="add-stock-btn">Dodaj</button>
-                        <button class="remove-stock-btn">Zdejmij</button>
-                        <button class="delete-btn">Usuń</button>
-                    </td>
-                </tr>`;
             });
-            magazynLista.innerHTML = html || emptyRowHtml;
+            refreshMagazynFilters();
+            renderMagazynTable();
             renderMagazynWModalu();
         });
     }
@@ -3797,14 +4097,58 @@ async function obslugaListyCzesci(event) {
     // MAGAZYN
     if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
     if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
-    if (magazynLista) magazynLista.addEventListener('click', obslugaTabeliMagazynu);
+    if (bulkItemsInput) bulkItemsInput.addEventListener('input', renderBulkPreview);
+    if (magazynLista) magazynLista.addEventListener('click', handleMagazynRowClick);
+    if (magazynSearchInput) magazynSearchInput.addEventListener('input', renderMagazynTable);
+    if (magazynFilterClient) magazynFilterClient.addEventListener('change', renderMagazynTable);
+    if (magazynFilterOilType) magazynFilterOilType.addEventListener('change', renderMagazynTable);
+    if (magazynFilterContainer) magazynFilterContainer.addEventListener('change', renderMagazynTable);
+    if (magazynTable) {
+        magazynTable.addEventListener('click', (event) => {
+            const btn = event.target.closest('.sort-btn');
+            if (!btn) return;
+            const key = btn.dataset.sort;
+            if (!key) return;
+            if (magazynSort.key === key) {
+                magazynSort.dir = magazynSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                magazynSort = { key, dir: 'asc' };
+            }
+            renderMagazynTable();
+        });
+    }
+    if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
+    if (magazynAddBtnSide) magazynAddBtnSide.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
+    if (magazynBulkFocusBtn) magazynBulkFocusBtn.addEventListener('click', () => {
+        document.getElementById('bulk-add-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    if (itemIsOilCheckbox) {
+        itemIsOilCheckbox.addEventListener('change', () => setOilFieldsVisibility(itemIsOilCheckbox.checked));
+    }
+    if (productDetailsCloseButton && productDetailsModal) {
+        productDetailsCloseButton.onclick = () => { hideModal(productDetailsModal); };
+    }
+    if (productAddCloseButton && productAddModal) {
+        productAddCloseButton.onclick = () => { hideModal(productAddModal); };
+    }
+    qtyToggleButtons?.forEach(btn => {
+        btn.addEventListener('click', () => updateStockOperation(btn.dataset.op || 'add'));
+    });
+    if (productEditForm) productEditForm.addEventListener('submit', handleProductEditSubmit);
+    if (productAddBtn) productAddBtn.addEventListener('click', () => handleStockChange('add'));
+    if (productRemoveBtn) productRemoveBtn.addEventListener('click', () => handleStockChange('remove'));
+    if (productDeleteBtn) productDeleteBtn.addEventListener('click', handleProductDelete);
+    if (productChangeQtyInput) {
+        productChangeQtyInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleStockChange(stockChangeOperation || 'add');
+            }
+        });
+    }
 
     if (modalMagazynLista) modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
     if (partsToRemoveList) partsToRemoveList.addEventListener('click', obslugaListyCzesci);
-    if (stockModalForm) stockModalForm.addEventListener('submit', obslugaZmianyStanu);
-    if (stockModalCloseButton && stockModal) {
-        stockModalCloseButton.onclick = () => { hideModal(stockModal); };
-    }
 
     if (summaryYearSelect) {
         summaryYearSelect.addEventListener('change', () => {
