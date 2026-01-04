@@ -15,7 +15,10 @@ const normalizeDayKey = (value, context = '') => {
     if (typeof value === 'string') {
         key = value.slice(0, 10);
     } else if (value instanceof Date && !Number.isNaN(value.getTime())) {
-        key = value.toISOString().slice(0, 10);
+        const yyyy = value.getFullYear();
+        const mm = String(value.getMonth() + 1).padStart(2, '0');
+        const dd = String(value.getDate()).padStart(2, '0');
+        key = `${yyyy}-${mm}-${dd}`;
     }
     if (!key || key.length !== 10 || !DATE_KEY_RE.test(key)) {
         console.error('[calendar] invalid day key', { context, value, key });
@@ -24,7 +27,7 @@ const normalizeDayKey = (value, context = '') => {
     return key;
 };
 
-const isoDay = (d, context = 'isoDay') => normalizeDayKey(d, context) || '';
+const isoDay = (d, context = 'isoDay') => normalizeDayKey(d, context);
 
 const parsePlNumber = (v) => {
     if (v == null) return 0;
@@ -175,7 +178,7 @@ function initializeApp() {
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
     const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
-    const SHOW_ZERO_DAYS = true;
+    const SHOW_ZERO_DAYS = false;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -1007,7 +1010,11 @@ function initializeApp() {
             flags
         };
         try {
-            const dayKey = isoDay(data);
+            const dayKey = isoDay(data, 'obslugaZapisuGodzin');
+            if (!dayKey) {
+                console.error('[calendar] invalid save day key', { data });
+                return;
+            }
             const activeOrderIndex = buildActiveOrderIndex();
             const dayDocForTotals = buildDayDocForTotals({
                 ...normalizeDayRecord(dayKey, dane),
@@ -1067,7 +1074,6 @@ function initializeApp() {
             dayDocsByDay = new Map();
             leaveByDay = new Map();
             window.__lastDayDocs = {};
-            setDecorations({ summaryByDay: {}, leaveByDay: {} });
 
             const activeOrderIndex = buildActiveOrderIndex();
             snapshotGodziny.forEach((docSnap) => {
