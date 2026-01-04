@@ -1,11 +1,29 @@
-const dateKeyFromDate = (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+const normalizeDateKey = (value, context = '') => {
+  if (!value) return '';
+  let key = '';
+  if (typeof value === 'string') {
+    key = value.slice(0, 10);
+  } else if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    key = `${y}-${m}-${d}`;
+  } else if (typeof value === 'number') {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      key = `${y}-${m}-${d}`;
+    }
+  }
+  if (!key || !DATE_KEY_RE.test(key)) {
+    console.error('[calendar] invalid day key', { context, value, key });
+    return '';
+  }
+  return key;
 };
 
 const normalizeFlags = (flags = {}) => ({
@@ -26,8 +44,6 @@ const normalizeFlagType = (value) => {
   return null;
 };
 
-const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
 let dailyEntries = new Map();
 let dayFlags = new Map();
 let cachedEvents = [];
@@ -35,7 +51,7 @@ let cachedEvents = [];
 export function setDailyEntries(entries = []) {
   dailyEntries = new Map();
   (entries || []).forEach((entry) => {
-    const key = dateKeyFromDate(entry?.date || entry?.id);
+    const key = normalizeDateKey(entry?.date || entry?.id, 'setDailyEntries');
     if (!key) return;
     dailyEntries.set(key, {
       work: Number(entry.work) || 0,
@@ -49,7 +65,7 @@ export function setDailyEntries(entries = []) {
 export function setDayFlags(flags = []) {
   dayFlags = new Map();
   (flags || []).forEach((flag) => {
-    const key = flag?.date ? String(flag.date) : dateKeyFromDate(flag?.start);
+    const key = normalizeDateKey(flag?.date || flag?.start, 'setDayFlags');
     if (!key) return;
     const type = normalizeFlagType(flag?.type || flag?.kind || flag?.leaveKind);
     if (!type) return;
@@ -80,6 +96,14 @@ export function setCalendarEvents(events = []) {
         console.error('[calendar] invalid event start', { start, event });
         return;
       }
+      const yyyy = start.getFullYear();
+      const mm = String(start.getMonth() + 1).padStart(2, '0');
+      const dd = String(start.getDate()).padStart(2, '0');
+      start = `${yyyy}-${mm}-${dd}`;
+      if (!DATE_KEY_RE.test(start)) {
+        console.error('[calendar] invalid event start', { start, event });
+        return;
+      }
     } else {
       console.error('[calendar] invalid event start', { start, event });
       return;
@@ -94,14 +118,14 @@ export function setCalendarEvents(events = []) {
 }
 
 export function getDayFlagsSync(date) {
-  const key = typeof date === 'string' ? date : dateKeyFromDate(date);
+  const key = normalizeDateKey(date, 'getDayFlagsSync');
   if (!key) return null;
   return dayFlags.get(key) || dailyEntries.get(key)?.flags || null;
 }
 
 export async function getDailyTotals(date) {
   try {
-    const key = typeof date === 'string' ? date : dateKeyFromDate(date);
+    const key = normalizeDateKey(date, 'getDailyTotals');
     if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false };
     const flags = normalizeFlags(dayFlags.get(key) || dailyEntries.get(key)?.flags || {});
     if (flags.l4 || flags.urlop || flags.swieto) {

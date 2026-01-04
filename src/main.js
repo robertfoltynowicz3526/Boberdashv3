@@ -45,6 +45,7 @@ const setDecorations = (decorations) => {
     }
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
     try { window.__fcCalendar?.refetchEvents?.(); } catch (_) { }
+    try { window.__applyCalendarDecorations?.(); } catch (_) { }
 };
 
 
@@ -486,7 +487,6 @@ function initializeApp() {
         const view = calendar?.view || window.__fcCalendar?.view;
         const start = rangeStart || view?.currentStart || null;
         const end = rangeEnd || view?.currentEnd || null;
-        window.__calendarDecorations = { summaryByDay: {}, leaveByDay: {} };
         const summaryByDay = {};
         const leaveByDayOut = {};
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
