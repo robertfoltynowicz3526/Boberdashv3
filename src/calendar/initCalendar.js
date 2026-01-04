@@ -40,13 +40,16 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const planned = decorations.plannedLeaveByDay?.[dayKey];
 
   if (leave) {
-    const icon =
-      leave === 'L4' ? '🤒' :
-      (leave === 'SWIETO' ? '🎉' :
-      (leave === 'URL' ? '🏖️' : '⛔'));
+    const label =
+      leave === 'L4' ? 'L4' :
+      (leave === 'SWIETO' ? 'Święto' :
+      (leave === 'URL' ? 'Urlop' : 'Wolne'));
     const big = document.createElement('div');
     big.className = `cell-leave-icon cell-leave-icon--${leave}`;
-    big.textContent = icon;
+    const chip = document.createElement('span');
+    chip.className = 'leave-chip';
+    chip.textContent = label;
+    big.appendChild(chip);
     cellEl.appendChild(big);
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;

@@ -365,6 +365,10 @@ main {
   margin-top: 1rem;
 }
 
+#magazyn-summary:empty {
+  display: none;
+}
+
 .summary-container-subtle,
 .form-section,
 .search-section,
@@ -452,6 +456,25 @@ td.num {
   text-align: right;
 }
 
+#magazyn-table th.num,
+#magazyn-table td.num {
+  min-width: 120px;
+}
+
+.qty-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.qty-value {
+  display: inline-block;
+  min-width: 3.5ch;
+  text-align: right;
+}
+
 .unit-badge {
   display: inline-flex;
   align-items: center;
@@ -462,6 +485,20 @@ td.num {
   font-size: 0.75rem;
   margin-left: 0.35rem;
   color: var(--text-muted);
+}
+
+.qty-cell .unit-badge {
+  margin-left: 0;
+}
+
+.unit-badge--subtle {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(226, 232, 240, 0.8);
+  min-width: 2.2rem;
+  justify-content: center;
 }
 
 .form-group {

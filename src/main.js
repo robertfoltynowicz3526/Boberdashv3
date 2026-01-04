@@ -3874,14 +3874,17 @@ async function obslugaListyCzesci(event) {
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
-            const iloscWLitrach = litersValue === null ? '—' : `${litersValue.toFixed(2)} <span class="unit-badge">L</span>`;
+            const iloscWSztukach = `<span class="qty-cell"><span class="qty-value">${iloscFormatowana}</span><span class="unit-badge unit-badge--subtle">szt</span></span>`;
+            const iloscWLitrach = litersValue === null
+                ? '—'
+                : `<span class="qty-cell"><span class="qty-value">${formatujIloscMagazynu(litersValue)}</span><span class="unit-badge unit-badge--subtle">L</span></span>`;
             const klientDisplay = normalizeClientName(produkt.klient);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
             return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-container="${pojemnosc || ''}">
                     <td data-label="Index">${produkt.index}</td>
                     <td data-label="Nazwa">${produkt.nazwa}</td>
                     <td data-label="Klient">${klientDisplay}</td>
-                    <td data-label="Ilość (szt.)" class="num">${iloscFormatowana} <span class="unit-badge">szt</span></td>
+                    <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
                     <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
                     <td data-label="Ostatnia zmiana">${lastChange}</td>
                     <td data-label="Akcje" class="actions-col"><button type="button" class="row-action-btn" data-action="details" aria-label="Szczegóły produktu">⋯</button></td>
