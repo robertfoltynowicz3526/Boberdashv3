@@ -1,5 +1,5 @@
 import { db, auth } from './firebase-config.js';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, startAt, endBefore } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
 import './styles/desktop-only.css';
@@ -73,6 +73,71 @@ function initializeApp() {
         const d = new Date();
         return { y: d.getFullYear(), m: d.getMonth() + 1 };
     }
+    const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
+    const SELECTED_YEAR_URL_PARAM = 'summaryYear';
+    const getYearFromValue = (value) => {
+        if (!value) return null;
+        if (typeof value === 'string') {
+            const candidate = value.slice(0, 10);
+            if (DATE_KEY_RE.test(candidate)) {
+                return Number(candidate.slice(0, 4));
+            }
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
+        }
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value.getFullYear();
+        }
+        if (value.toDate && typeof value.toDate === 'function') {
+            const parsed = value.toDate();
+            return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
+        }
+        if (typeof value === 'number') {
+            const parsed = new Date(value);
+            return Number.isNaN(parsed.getTime()) ? null : parsed.getFullYear();
+        }
+        return null;
+    };
+    const getAvailableYears = (data = []) => {
+        const years = new Set();
+        (data || []).forEach((entry) => {
+            if (!entry) return;
+            const raw = entry?.date ?? entry?.id ?? entry?.dayStr ?? entry?.day ?? null;
+            const year = getYearFromValue(raw);
+            if (year) years.add(year);
+        });
+        return [...years];
+    };
+    const getYearsSortedDesc = (years = []) => [...new Set(years)].sort((a, b) => b - a);
+    const getSelectedYearFromUrl = () => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const raw = params.get(SELECTED_YEAR_URL_PARAM) || params.get('year');
+            const parsed = Number(raw);
+            return Number.isFinite(parsed) ? parsed : null;
+        } catch (_) {
+            return null;
+        }
+    };
+    const getSelectedYearFromStorage = () => {
+        const stored = localStorage.getItem(SELECTED_YEAR_STORAGE_KEY);
+        const parsed = Number(stored);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    const persistSelectedYear = (year) => {
+        if (!Number.isFinite(year)) return;
+        localStorage.setItem(SELECTED_YEAR_STORAGE_KEY, String(year));
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set(SELECTED_YEAR_URL_PARAM, String(year));
+            window.history.replaceState(null, '', url);
+        } catch (_) { }
+    };
+    const getYearRange = (year) => {
+        const startKey = `${year}-01-01`;
+        const endKey = `${year + 1}-01-01`;
+        return { startKey, endKey };
+    };
     function lastMonths(y, m, n = 3) {
         const out = [];
         for (let i = 1; i <= n; i++) {
@@ -208,8 +273,15 @@ function initializeApp() {
         yearlyGrouped: {},
         years: []
     };
-    let selectedSummaryYear = ymNow().y;
-    let selectedVacationYear = ymNow().y;
+    const currentYear = ymNow().y;
+    const initialSelectedYear = getSelectedYearFromUrl() ?? getSelectedYearFromStorage() ?? currentYear;
+    let selectedYear = initialSelectedYear;
+    let selectedYearEntries = [];
+    let selectedYearSummary = null;
+    let selectedYearTotals = null;
+    let selectedYearNeedsRefresh = true;
+    let selectedYearLoadedFor = null;
+    let availableSummaryYears = [currentYear];
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
@@ -1107,6 +1179,7 @@ function initializeApp() {
             });
 
             rebuildCalendarDecorations();
+            selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
         });
     }
@@ -1583,22 +1656,20 @@ function initializeApp() {
 
     function updateYearSelectOptions(selectEl, years, selectedValue) {
         if (!selectEl) return;
-        const uniqueYears = [...new Set(years)].sort((a, b) => a - b);
+        const uniqueYears = getYearsSortedDesc(years);
         selectEl.innerHTML = uniqueYears.map(y => `<option value="${y}">${y}</option>`).join('');
-        if (uniqueYears.length && (selectedValue == null || !uniqueYears.includes(Number(selectedValue)))) {
-            selectEl.value = uniqueYears[uniqueYears.length - 1];
-        } else if (selectedValue != null) {
-            selectEl.value = String(selectedValue);
-        }
+        if (!uniqueYears.length) return;
+        const resolved = uniqueYears.includes(Number(selectedValue)) ? Number(selectedValue) : uniqueYears[0];
+        selectEl.value = String(resolved);
     }
 
-    function getYearTotals(year) {
-        return (ostatnieZestawienieMiesieczne.sumyRocznePerRok || []).find(r => Number(r.rok) === Number(year)) || null;
+    function getSelectedYearTotals() {
+        return selectedYearTotals;
     }
 
     function renderL4Summary() {
         if (!l4SummaryContainer) return;
-        const yearData = (ostatnieZestawienieMiesieczne.years || []).find(y => Number(y.year) === Number(selectedSummaryYear)) || null;
+        const yearData = selectedYearSummary;
         if (!yearData || !yearData.months.length) {
             l4SummaryContainer.innerHTML = '<p>Brak danych dla wybranego roku.</p>';
             return;
@@ -1647,14 +1718,54 @@ function initializeApp() {
         await deleteDoc(doc(db, 'vacation_adjustments', String(year), 'items', id));
     }
 
+    async function fetchSelectedYearEntries(year) {
+        const { startKey, endKey } = getYearRange(year);
+        const q = query(
+            collection(db, "godziny_pracy"),
+            orderBy("__name__"),
+            startAt(startKey),
+            endBefore(endKey)
+        );
+        const snapshot = await getDocs(q);
+        const entries = [];
+        snapshot.forEach((docSnap) => {
+            const dane = docSnap.data();
+            const normalizedDay = normalizeDayRecord(docSnap.id, dane);
+            const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
+            entries.push({
+                ...normalizedDay,
+                billed: suma,
+                fakturowane: suma,
+                nadgodziny: Number(dane?.nadgodziny ?? 0) || 0,
+                zleceniaPowiazane: powiazane
+            });
+        });
+        if (year === 2026) {
+            console.info('[summary] selectedYear=2026 range', `${startKey}..${endKey}`, 'records', entries.length);
+        }
+        return entries;
+    }
+
+    async function ensureSelectedYearData() {
+        if (!selectedYearNeedsRefresh && selectedYearLoadedFor === selectedYear) {
+            return;
+        }
+        selectedYearNeedsRefresh = false;
+        selectedYearLoadedFor = selectedYear;
+        selectedYearEntries = await fetchSelectedYearEntries(selectedYear);
+        const summary = obliczPodsumowaniaMiesieczne(selectedYearEntries);
+        selectedYearSummary = (summary.years || []).find(y => Number(y.year) === Number(selectedYear)) || null;
+        selectedYearTotals = (summary.sumyRocznePerRok || []).find(r => Number(r.rok) === Number(selectedYear)) || null;
+    }
+
     async function renderVacationSummary() {
         if (!vacationAllowanceInput || !vacationUsedSpan || !vacationRemainingSpan || !vacationAdjustmentsDiv) return;
-        const allowance = await getVacationAllowance(selectedVacationYear);
+        const allowance = await getVacationAllowance(selectedYear);
         vacationAllowanceInput.value = allowance;
 
-        const adjustments = await listVacationAdjustments(selectedVacationYear);
+        const adjustments = await listVacationAdjustments(selectedYear);
         const adjustmentsSum = adjustments.reduce((acc, adj) => acc + (Number(adj.days) || 0), 0);
-        const yearTotals = getYearTotals(selectedVacationYear);
+        const yearTotals = getSelectedYearTotals();
         const usedFromCalendar = Number(yearTotals?.urlopDaysUsed) || 0;
         const remaining = calcVacationRemaining(allowance, usedFromCalendar, adjustmentsSum);
 
@@ -1672,9 +1783,20 @@ function initializeApp() {
     }
 
     async function renderPodsumowanie() {
+        await ensureSelectedYearData();
         renderRocznePodsumowanie();
         renderL4Summary();
         await renderVacationSummary();
+    }
+
+    async function applySelectedYear(nextYear) {
+        const parsed = Number(nextYear);
+        selectedYear = Number.isFinite(parsed) ? parsed : currentYear;
+        persistSelectedYear(selectedYear);
+        selectedYearNeedsRefresh = true;
+        updateYearSelectOptions(summaryYearSelect, availableSummaryYears, selectedYear);
+        updateYearSelectOptions(vacationYearSelect, availableSummaryYears, selectedYear);
+        await renderPodsumowanie();
     }
 
     function renderPulpit() {
@@ -1696,17 +1818,15 @@ function initializeApp() {
                 miesiacSummaryInput.value = miesiace[miesiace.length - 1].miesiac;
             }
         }
-        const lata = ostatnieZestawienieMiesieczne.lata.length ? ostatnieZestawienieMiesieczne.lata : [ymNow().y];
-        if (!lata.includes(selectedSummaryYear)) {
-            selectedSummaryYear = lata[lata.length - 1];
+        const yearsFromData = getAvailableYears(wszystkieWpisyKalendarza);
+        availableSummaryYears = getYearsSortedDesc([...yearsFromData, currentYear]);
+        if (!availableSummaryYears.includes(selectedYear)) {
+            selectedYear = currentYear;
+            persistSelectedYear(selectedYear);
+            selectedYearNeedsRefresh = true;
         }
-        if (!lata.includes(selectedVacationYear)) {
-            selectedVacationYear = lata[lata.length - 1];
-        }
-        updateYearSelectOptions(summaryYearSelect, lata, selectedSummaryYear);
-        updateYearSelectOptions(vacationYearSelect, lata, selectedVacationYear);
-        if (summaryYearSelect) summaryYearSelect.value = String(selectedSummaryYear);
-        if (vacationYearSelect) vacationYearSelect.value = String(selectedVacationYear);
+        updateYearSelectOptions(summaryYearSelect, availableSummaryYears, selectedYear);
+        updateYearSelectOptions(vacationYearSelect, availableSummaryYears, selectedYear);
         if (!skipRender) {
             await renderPodsumowanie();
         }
@@ -3427,22 +3547,20 @@ async function obslugaListyCzesci(event) {
 
     if (summaryYearSelect) {
         summaryYearSelect.addEventListener('change', () => {
-            selectedSummaryYear = Number(summaryYearSelect.value) || ymNow().y;
-            renderL4Summary();
+            applySelectedYear(summaryYearSelect.value);
         });
     }
 
     if (vacationYearSelect) {
         vacationYearSelect.addEventListener('change', () => {
-            selectedVacationYear = Number(vacationYearSelect.value) || ymNow().y;
-            renderVacationSummary();
+            applySelectedYear(vacationYearSelect.value);
         });
     }
 
     if (vacationAllowanceSaveBtn) {
         vacationAllowanceSaveBtn.addEventListener('click', async () => {
             const totalDays = Number(vacationAllowanceInput?.value) || DEFAULT_VACATION_ALLOWANCE;
-            await setVacationAllowance(selectedVacationYear, totalDays);
+            await setVacationAllowance(selectedYear, totalDays);
             await renderVacationSummary();
         });
     }
@@ -3452,7 +3570,7 @@ async function obslugaListyCzesci(event) {
             event.preventDefault();
             const days = Number(vacationAdjustmentDaysInput?.value);
             if (!Number.isFinite(days) || days === 0) { alert('Podaj liczbę dni (może być dodatnia lub ujemna).'); return; }
-            await addAdjustment(selectedVacationYear, {
+            await addAdjustment(selectedYear, {
                 date: vacationAdjustmentDateInput?.value || null,
                 days,
                 note: vacationAdjustmentNoteInput?.value || ''
@@ -3466,7 +3584,7 @@ async function obslugaListyCzesci(event) {
         vacationAdjustmentsDiv.addEventListener('click', async (event) => {
             const target = event.target.closest('.adjustment-remove');
             if (!target?.dataset?.id) return;
-            await removeAdjustment(target.dataset.id, selectedVacationYear);
+            await removeAdjustment(target.dataset.id, selectedYear);
             await renderVacationSummary();
         });
     }
