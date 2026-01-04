@@ -400,6 +400,41 @@ function initializeApp() {
         return true;
     };
 
+    const UI_STORAGE_KEYS = {
+        machinesExpanded: 'ui:machines:expandedClients',
+        machinesLast: 'ui:machines:lastClient',
+        clientsExpanded: 'ui:clients:expandedClients',
+        clientsLast: 'ui:clients:lastClient'
+    };
+
+    const readExpandedSet = (key) => {
+        try {
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return new Set(Array.isArray(parsed) ? parsed : []);
+        } catch (err) {
+            console.warn('[UI] Nie udało się wczytać stanu akordeonu:', err);
+            return new Set();
+        }
+    };
+
+    const persistExpandedSet = (key, set) => {
+        localStorage.setItem(key, JSON.stringify([...set]));
+    };
+
+    const readLastExpanded = (key) => localStorage.getItem(key) || '';
+
+    const updateExpandedState = (expandedKey, lastKey, id, isOpen) => {
+        const expanded = readExpandedSet(expandedKey);
+        if (isOpen) {
+            expanded.add(id);
+            localStorage.setItem(lastKey, id);
+        } else {
+            expanded.delete(id);
+        }
+        persistExpandedSet(expandedKey, expanded);
+    };
+
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
     const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
@@ -417,6 +452,7 @@ function initializeApp() {
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
     const maszynaKlientSelect = document.getElementById('maszyna-klient-select');
+    const maszynaClientFilterSelect = document.getElementById('maszyna-client-filter');
     const maszynaForm = document.getElementById('maszyna-form');
     const maszynaAddBtn = document.getElementById('maszyna-add-btn');
     const listaMaszynDiv = document.getElementById('lista-maszyn');
@@ -2346,15 +2382,23 @@ function wyswietlKlientow() {
       return;
     }
 
-    const frazaWyszukiwania = ((klientSearchInput && klientSearchInput.value) ? klientSearchInput.value : "").toLowerCase();
+    // DATA → AGREGACJA → RENDER
+    const frazaWyszukiwania = (klientSearchInput?.value || "").toLowerCase();
+    const wszyscyKlienci = _wszystkieKlienciCache || [];
+    const wszystkieMaszynyLocal = _wszystkieMaszynyCache || [];
     wszystkieKlienci = [];
 
-    let klienciHtml = "";
-    let selectHtml = '<option value="">-- Wybierz klienta --</option>';
-   
+    // AGREGACJA
+    const maszynyPoKliencie = new Map();
+    wszystkieMaszynyLocal.forEach(maszyna => {
+      if (!maszyna?.klientId) return;
+      if (!maszynyPoKliencie.has(maszyna.klientId)) {
+        maszynyPoKliencie.set(maszyna.klientId, []);
+      }
+      maszynyPoKliencie.get(maszyna.klientId).push(maszyna);
+    });
 
-    // Filtrowanie
-    const przefiltrowaniKlienci = (_wszystkieKlienciCache || []).filter(klient => {
+    const przefiltrowaniKlienci = wszyscyKlienci.filter(klient => {
       if (!frazaWyszukiwania) return true;
       const tekst = [
         klient.nazwa || "",
@@ -2365,71 +2409,72 @@ function wyswietlKlientow() {
       return tekst.includes(frazaWyszukiwania);
     });
 
-    przefiltrowaniKlienci.forEach(klient => {
+    const clientsView = przefiltrowaniKlienci.map(klient => {
+      const maszynyKlienta = maszynyPoKliencie.get(klient.id) || [];
+      return {
+        klient,
+        maszyny: maszynyKlienta,
+        liczbaMaszyn: maszynyKlienta.length
+      };
+    });
+
+    const expandedStored = readExpandedSet(UI_STORAGE_KEYS.clientsExpanded);
+    const validIds = new Set(clientsView.map(item => item.klient.id));
+    const expandedSet = new Set([...expandedStored].filter(id => validIds.has(id)));
+    const lastExpanded = readLastExpanded(UI_STORAGE_KEYS.clientsLast);
+    if (expandedSet.size === 0) {
+      const fallbackId = validIds.has(lastExpanded) ? lastExpanded : clientsView[0]?.klient?.id;
+      if (fallbackId) expandedSet.add(fallbackId);
+    }
+
+    const clientsForSelect = [...wszyscyKlienci].sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
+    let selectHtml = '<option value="">-- Wybierz klienta --</option>';
+    clientsForSelect.forEach(klient => {
+      selectHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
+    });
+
+    // RENDER
+    const klienciHtml = clientsView.map(({ klient, maszyny, liczbaMaszyn }) => {
       wszystkieKlienci.push(klient);
-
-      // Maszyny tego klienta
-      const maszynyKlienta = (_wszystkieMaszynyCache || []).filter(m => m.klientId === klient.id);
-
-      // ID kontenera maszyn
-      const maszynyListaId = "client-" + klient.id + "-machines";
-
-      // Kontener listy maszyn – domyślnie zwinięty
-      let maszynyKontenerHtml = '';
-      if (maszynyKlienta.length > 0) {
-        const liMaszyny = maszynyKlienta.map(m => {
-          const sn = (m.nrSeryjny && m.nrSeryjny !== '---') ? m.nrSeryjny : '---';
-          const naz = (m.typMaszyny || '') + ' ' + (m.model || '');
-          return `
-            <li data-id="${m.id}">
-              <span>${naz} (S/N: ${sn})</span>
-              <a href="#" class="machine-history-link" data-maszyna-id="${m.id}" data-maszyna-nazwa="${naz}">Pokaż historię</a>
-            </li>
-          `;
-        }).join("");
-
-        maszynyKontenerHtml = `
-          <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
-            <ul class="client-machine-list">
-              ${liMaszyny}
-            </ul>
-          </div>
-        `;
-      } else {
-        maszynyKontenerHtml = `
-          <div id="${maszynyListaId}" class="client-machine-list-container collapsed">
-            <p style="font-size: 0.8rem; margin-left: 0; padding: 5px 0; color: var(--text-color-light);">Brak maszyn</p>
-          </div>
-        `;
-      }
-
       const nipTxt = klient.nip && klient.nip !== '---' ? `NIP: ${klient.nip}` : 'NIP: —';
       const adresTxt = klient.adres && klient.adres !== '---' ? klient.adres : 'Brak adresu';
       const telTxt = klient.telefon && klient.telefon !== '---' ? klient.telefon : 'Brak telefonu';
-
-      klienciHtml += `
-        <div class="client-entry" data-id="${klient.id}">
-          <div class="entity-card client-card" data-id="${klient.id}">
-            <div class="entity-card-main">
-              <div class="entity-card-title">
+      const maszynyLinks = maszyny.length
+        ? maszyny.map(m => {
+          const sn = (m.nrSeryjny && m.nrSeryjny !== '---') ? m.nrSeryjny : '—';
+          const naz = `${m.typMaszyny || ''} ${m.model || ''}`.trim();
+          return `<button type="button" class="client-machine-link" data-maszyna-id="${m.id}" data-client-id="${klient.id}">${naz || 'Maszyna'} • S/N: ${sn}</button>`;
+        }).join('')
+        : '<span class="client-meta">Brak maszyn</span>';
+      const isOpen = expandedSet.has(klient.id);
+      return `
+        <div class="client-accordion ${isOpen ? 'is-open' : ''}" data-client-id="${klient.id}">
+          <div class="client-row">
+            <button type="button" class="client-main" data-client-id="${klient.id}">
+              <div class="client-title">
                 <strong>${klient.nazwa || '---'}</strong>
-                <span class="meta">${nipTxt}</span>
+                <span class="client-meta">${nipTxt}</span>
               </div>
-              <div class="entity-card-meta">${adresTxt} • ${telTxt}</div>
-            </div>
-            <div class="entity-card-actions">
-              <button type="button" class="machine-toggle collapsed" data-target="${maszynyListaId}" aria-expanded="false">
-                Maszyny <span class="chevron">▼</span>
-              </button>
+            </button>
+            <div class="client-actions">
+              <span class="accordion-badge">${liczbaMaszyn} maszyn</span>
+              <div class="row-action">
+                <button type="button" class="row-action-btn" data-client-action="menu" aria-label="Akcje">⋯</button>
+                <div class="row-action-menu" role="menu">
+                  <button type="button" data-client-action="edit" data-client-id="${klient.id}">Edytuj</button>
+                </div>
+              </div>
+              <button type="button" class="accordion-toggle" data-client-id="${klient.id}" aria-expanded="${String(isOpen)}">▼</button>
             </div>
           </div>
-          ${maszynyKontenerHtml}
+          <div class="client-body">
+            <div class="client-contact">${adresTxt}</div>
+            <div class="client-contact">${telTxt}</div>
+            <div class="client-machines">${maszynyLinks}</div>
+          </div>
         </div>
       `;
-
-      // selecty
-      selectHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
-    });
+    }).join('');
 
     if (listaKlientowDiv) {
       listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
@@ -2439,6 +2484,19 @@ function wyswietlKlientow() {
 
     const assignKlientSelect = document.getElementById('assign-klient-select');
     if (assignKlientSelect) assignKlientSelect.innerHTML = selectHtml;
+
+    if (maszynaClientFilterSelect) {
+      const currentValue = maszynaClientFilterSelect.value;
+      const options = [''].concat(clientsForSelect.map(klient => klient.id));
+      maszynaClientFilterSelect.innerHTML = options.map((id) => {
+        if (!id) return '<option value="">Wszyscy</option>';
+        const klient = clientsForSelect.find(item => item.id === id);
+        return `<option value="${id}">${klient?.nazwa || '(bez nazwy)'}</option>`;
+      }).join('');
+      if (options.includes(currentValue)) {
+        maszynaClientFilterSelect.value = currentValue;
+      }
+    }
 
   } catch (err) {
     console.error("wyswietlKlientow() — błąd:", err);
@@ -2484,35 +2542,59 @@ const setMachineDrawerMode = (mode) => {
     if (editMaszynaForm) editMaszynaForm.classList.toggle('is-hidden', !isEdit);
     openDrawer(machineDrawer);
 };
+const closeClientActionMenus = (except = null) => {
+    if (!listaKlientowDiv) return;
+    listaKlientowDiv.querySelectorAll('.row-action').forEach(menu => {
+        if (menu !== except) menu.classList.remove('is-open');
+    });
+};
 async function obslugaListyKlientow(event) {
-  const toggle = event.target.closest('.machine-toggle');
-  if (toggle) {
-    const targetId = toggle.getAttribute('data-target');
-    const kontener = document.getElementById(targetId);
-    if (!kontener) {
-      console.warn('[Klienci] Nie znaleziono kontenera maszyn dla', targetId);
-      return;
+  const menuTrigger = event.target.closest('[data-client-action="menu"]');
+  if (menuTrigger) {
+    const menu = menuTrigger.closest('.row-action');
+    const isOpen = menu?.classList.toggle('is-open');
+    closeClientActionMenus(isOpen ? menu : null);
+    return;
+  }
+
+  const menuAction = event.target.closest('[data-client-action]');
+  if (menuAction && menuAction.dataset.clientAction !== 'menu') {
+    const klientId = menuAction.dataset.clientId;
+    if (klientId && menuAction.dataset.clientAction === 'edit') {
+      localStorage.setItem(UI_STORAGE_KEYS.clientsLast, klientId);
+      otworzModalEdycjiKlienta(klientId);
     }
-    const isCollapsed = kontener.classList.toggle('collapsed');
-    toggle.classList.toggle('is-open', !isCollapsed);
-    toggle.setAttribute('aria-expanded', String(!isCollapsed));
+    closeClientActionMenus();
     return;
   }
 
-  const clientEntry = event.target.closest('.client-entry');
-  if (!clientEntry) return;
-  const klientId = clientEntry.dataset.id;
-
-  if (event.target.classList.contains('machine-history-link')) {
-    event.preventDefault();
-    const maszynaId = event.target.dataset.maszynaId;
-    const maszynaNazwa = event.target.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+  const toggle = event.target.closest('.accordion-toggle');
+  if (toggle) {
+    const klientId = toggle.dataset.clientId;
+    const accordion = toggle.closest('.client-accordion');
+    if (!accordion || !klientId) return;
+    const isOpen = accordion.classList.toggle('is-open');
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    updateExpandedState(UI_STORAGE_KEYS.clientsExpanded, UI_STORAGE_KEYS.clientsLast, klientId, isOpen);
     return;
   }
 
-  if (event.target.closest('.entity-card')) {
-    otworzModalEdycjiKlienta(klientId);
+  const machineLink = event.target.closest('.client-machine-link');
+  if (machineLink) {
+    const maszynaId = machineLink.dataset.maszynaId;
+    const klientId = machineLink.dataset.clientId;
+    if (klientId) localStorage.setItem(UI_STORAGE_KEYS.machinesLast, klientId);
+    if (maszynaId) otworzModalEdycjiMaszyny(maszynaId);
+    return;
+  }
+
+  const clientMain = event.target.closest('.client-main');
+  if (clientMain) {
+    const klientId = clientMain.dataset.clientId;
+    if (klientId) {
+      localStorage.setItem(UI_STORAGE_KEYS.clientsLast, klientId);
+      otworzModalEdycjiKlienta(klientId);
+    }
   }
 }
 
@@ -2703,28 +2785,53 @@ async function obslugaListyKlientow(event) {
             listaMaszynDiv.innerHTML = "<p>Ładowanie danych klientów...</p>";
             return;
         }
+        // DATA → AGREGACJA → RENDER
         const frazaWyszukiwania = (maszynaSearchInput?.value || '').toLowerCase();
+        const selectedClientId = maszynaClientFilterSelect?.value || '';
+        const wszystkieMaszynyLocal = _wszystkieMaszynyCache || [];
+        const wszystkieKlienciLocal = _wszystkieKlienciCache || [];
         wszystkieMaszyny = [];
 
-        const przefiltrowaneMaszyny = _wszystkieMaszynyCache.filter(maszyna => {
+        // AGREGACJA
+        const klientMap = new Map(wszystkieKlienciLocal.map(klient => [klient.id, klient]));
+        const przefiltrowaneMaszyny = wszystkieMaszynyLocal.filter(maszyna => {
+            if (selectedClientId && maszyna.klientId !== selectedClientId) return false;
             if (!frazaWyszukiwania) return true;
             const tekst = `${maszyna.klientNazwa} ${maszyna.typMaszyny} ${maszyna.model} ${maszyna.nrSeryjny}`.toLowerCase();
             return tekst.includes(frazaWyszukiwania);
         });
 
-        const pogrupowaneMaszyny = przefiltrowaneMaszyny.reduce((acc, maszyna) => {
-            (acc[maszyna.klientNazwa] = acc[maszyna.klientNazwa] || []).push(maszyna);
-            return acc;
-        }, {});
-        let maszynyHtml = '';
-        for (const klientNazwa in pogrupowaneMaszyny) {
-            const rows = pogrupowaneMaszyny[klientNazwa].map(maszyna => {
+        const pogrupowaneMaszyny = new Map();
+        przefiltrowaneMaszyny.forEach(maszyna => {
+            const klientId = maszyna.klientId || 'unknown';
+            const klient = klientMap.get(klientId);
+            const klientNazwa = klient?.nazwa || maszyna.klientNazwa || 'Nieznany klient';
+            if (!pogrupowaneMaszyny.has(klientId)) {
+                pogrupowaneMaszyny.set(klientId, { klientId, klientNazwa, maszyny: [] });
+            }
+            pogrupowaneMaszyny.get(klientId).maszyny.push(maszyna);
+        });
+
+        const grupyMaszyn = [...pogrupowaneMaszyny.values()].sort((a, b) => (a.klientNazwa || '').localeCompare(b.klientNazwa || ''));
+        const expandedStored = readExpandedSet(UI_STORAGE_KEYS.machinesExpanded);
+        const validIds = new Set(grupyMaszyn.map(group => group.klientId));
+        const expandedSet = new Set([...expandedStored].filter(id => validIds.has(id)));
+        const lastExpanded = readLastExpanded(UI_STORAGE_KEYS.machinesLast);
+        if (expandedSet.size === 0) {
+            const fallbackId = validIds.has(lastExpanded) ? lastExpanded : grupyMaszyn[0]?.klientId;
+            if (fallbackId) expandedSet.add(fallbackId);
+        }
+
+        // RENDER
+        const maszynyHtml = grupyMaszyn.map((group) => {
+            const isOpen = expandedSet.has(group.klientId);
+            const rows = group.maszyny.map(maszyna => {
                 const sn = (maszyna.nrSeryjny && maszyna.nrSeryjny !== '---') ? maszyna.nrSeryjny : '—';
                 const metaParts = [`S/N: ${sn}`];
                 if (maszyna.rokProdukcji) metaParts.push(`Rok: ${maszyna.rokProdukcji}`);
                 if (maszyna.motogodziny) metaParts.push(`MTH: ${maszyna.motogodziny}`);
                 return `
-                    <div class="machine-row" data-id="${maszyna.id}">
+                    <div class="machine-row" data-id="${maszyna.id}" data-client-id="${group.klientId}">
                         <div class="machine-row-main">
                             <strong>${maszyna.typMaszyny} ${maszyna.model}</strong>
                             <div class="machine-row-meta">${metaParts.join(' • ')}</div>
@@ -2735,15 +2842,21 @@ async function obslugaListyKlientow(event) {
                     </div>
                 `;
             }).join('');
-            maszynyHtml += `
-                <div class="entity-group">
-                    <div class="entity-group-title">${klientNazwa}</div>
-                    <div class="entity-group-list">
+            return `
+                <section class="accordion-section ${isOpen ? 'is-open' : ''}" data-client-id="${group.klientId}">
+                    <button type="button" class="accordion-header" data-client-id="${group.klientId}" aria-expanded="${String(isOpen)}">
+                        <div class="accordion-title">
+                            <span>${group.klientNazwa}</span>
+                            <span class="accordion-badge">${group.maszyny.length} maszyn</span>
+                        </div>
+                        <span class="accordion-chevron">▼</span>
+                    </button>
+                    <div class="accordion-body">
                         ${rows}
                     </div>
-                </div>
+                </section>
             `;
-        }
+        }).join('');
        if (listaMaszynDiv) {
             listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
         }
@@ -2812,6 +2925,17 @@ async function obslugaListyKlientow(event) {
     async function obslugaListyMaszyn(event) {
   const el = event.target;
 
+  const accordionHeader = el.closest('.accordion-header');
+  if (accordionHeader) {
+    const klientId = accordionHeader.dataset.clientId;
+    const section = accordionHeader.closest('.accordion-section');
+    if (!section || !klientId) return;
+    const isOpen = section.classList.toggle('is-open');
+    accordionHeader.setAttribute('aria-expanded', String(isOpen));
+    updateExpandedState(UI_STORAGE_KEYS.machinesExpanded, UI_STORAGE_KEYS.machinesLast, klientId, isOpen);
+    return;
+  }
+
   if (el.classList.contains('machine-history-link')) {
     event.preventDefault();
     const maszynaId = el.dataset.maszynaId;
@@ -2823,7 +2947,11 @@ async function obslugaListyKlientow(event) {
   const row = el.closest('.machine-row');
   if (!row) return;
   const maszynaId = row.dataset.id;
+  const klientId = row.dataset.clientId;
   if (!maszynaId) return;
+  if (klientId) {
+    updateExpandedState(UI_STORAGE_KEYS.machinesExpanded, UI_STORAGE_KEYS.machinesLast, klientId, true);
+  }
   otworzModalEdycjiMaszyny(maszynaId);
 }
 
@@ -4449,6 +4577,7 @@ async function obslugaListyCzesci(event) {
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.row-action')) {
             closeRowActionMenus();
+            closeClientActionMenus();
         }
         const exportTrigger = event.target.closest('.export-trigger');
         const exportItem = event.target.closest('.export-menu-item');
@@ -4581,6 +4710,7 @@ async function obslugaListyCzesci(event) {
     // WYSZUKIWANIA
     if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientowDebounced);
     if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszynyDebounced);
+    if (maszynaClientFilterSelect) maszynaClientFilterSelect.addEventListener('change', wyswietlMaszyny);
     if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZleceniaThrottled);
 
     // EDYCJE (modale)
