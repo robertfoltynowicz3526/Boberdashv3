@@ -7,6 +7,9 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
+import { loadYearReportingData } from './reporting/reportingData.js';
+import { computeYearReport } from './reporting/reportingAggregation.js';
+import { exportYearlyCsv, exportYearlyPdf } from './reporting/reportingRender.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const normalizeDayKey = (value, context = '') => {
@@ -309,6 +312,7 @@ function initializeApp() {
     let selectedYearTotals = null;
     let selectedYearNeedsRefresh = true;
     let selectedYearLoadedFor = null;
+    let isExportingYearReport = false;
     let availableSummaryYears = [currentYear];
     let openSummaryYears = new Set();
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
@@ -424,6 +428,8 @@ function initializeApp() {
     const annualSummaryContainer = document.getElementById('annual-summary');
     const l4SummaryContainer = document.getElementById('l4-summary');
     const summaryYearSelect = document.getElementById('summary-year-select');
+    const summaryExportCsvBtn = document.getElementById('summary-export-csv');
+    const summaryExportPdfBtn = document.getElementById('summary-export-pdf');
     const vacationYearSelect = document.getElementById('vacation-year');
     const vacationAllowanceInput = document.getElementById('vacation-allowance-input');
     const vacationAllowanceSaveBtn = document.getElementById('vacation-allowance-save');
@@ -2141,6 +2147,46 @@ function initializeApp() {
         link.click();
         document.body.removeChild(link);
     }
+
+    const setSummaryExportState = (isLoading) => {
+        [summaryExportCsvBtn, summaryExportPdfBtn].forEach((btn) => {
+            if (!btn) return;
+            if (!btn.dataset.defaultLabel) {
+                btn.dataset.defaultLabel = btn.textContent || '';
+            }
+            btn.disabled = isLoading;
+            btn.textContent = isLoading ? 'Generuję…' : btn.dataset.defaultLabel;
+        });
+    };
+
+    const resolveExportYear = () => (Number.isFinite(selectedYear) ? selectedYear : currentYear);
+
+    const runYearExport = async (type) => {
+        if (isExportingYearReport) return;
+        isExportingYearReport = true;
+        setSummaryExportState(true);
+        try {
+            const year = resolveExportYear();
+            const reportData = await loadYearReportingData({
+                db,
+                year,
+                orderIndex: buildOrderIndex(),
+                resolveClientName: resolveOrderClientName
+            });
+            const report = computeYearReport(reportData);
+            if (type === 'csv') {
+                exportYearlyCsv(report);
+            } else {
+                exportYearlyPdf(report);
+            }
+        } catch (error) {
+            console.error('[reporting] export failed', error);
+            alert('Nie udało się wygenerować raportu. Spróbuj ponownie.');
+        } finally {
+            setSummaryExportState(false);
+            isExportingYearReport = false;
+        }
+    };
 
     function inicjujCiemnyMotyw() {
         const savedTheme = localStorage.getItem('theme') || 'light';
@@ -4156,6 +4202,18 @@ async function obslugaListyCzesci(event) {
     if (summaryYearSelect) {
         summaryYearSelect.addEventListener('change', () => {
             applySelectedYear(summaryYearSelect.value);
+        });
+    }
+
+    if (summaryExportCsvBtn) {
+        summaryExportCsvBtn.addEventListener('click', () => {
+            runYearExport('csv');
+        });
+    }
+
+    if (summaryExportPdfBtn) {
+        summaryExportPdfBtn.addEventListener('click', () => {
+            runYearExport('pdf');
         });
     }
 
