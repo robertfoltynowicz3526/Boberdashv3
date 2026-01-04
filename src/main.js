@@ -9,7 +9,7 @@ import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
-import { exportYearlyCsv, exportYearlyPdf } from './reporting/reportingRender.js';
+import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const normalizeDayKey = (value, context = '') => {
@@ -428,8 +428,7 @@ function initializeApp() {
     const annualSummaryContainer = document.getElementById('annual-summary');
     const l4SummaryContainer = document.getElementById('l4-summary');
     const summaryYearSelect = document.getElementById('summary-year-select');
-    const summaryExportCsvBtn = document.getElementById('summary-export-csv');
-    const summaryExportPdfBtn = document.getElementById('summary-export-pdf');
+    const annualSummaryExportBtn = document.getElementById('annual-summary-export');
     const vacationYearSelect = document.getElementById('vacation-year');
     const vacationAllowanceInput = document.getElementById('vacation-allowance-input');
     const vacationAllowanceSaveBtn = document.getElementById('vacation-allowance-save');
@@ -463,8 +462,7 @@ function initializeApp() {
     const magazynFilterOilType = document.getElementById('magazyn-filter-oil-type');
     const magazynFilterContainer = document.getElementById('magazyn-filter-container');
     const magazynAddBtn = document.getElementById('magazyn-add-btn');
-    const magazynAddBtnSide = document.getElementById('magazyn-add-btn-side');
-    const magazynBulkFocusBtn = document.getElementById('magazyn-bulk-focus');
+    const magazynBulkBtn = document.getElementById('magazyn-bulk-btn');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const bulkItemsInput = document.getElementById('bulk-items');
@@ -489,6 +487,8 @@ function initializeApp() {
     const qtyToggleButtons = productDetailsModal ? productDetailsModal.querySelectorAll('.qty-toggle') : [];
     const productAddModal = document.getElementById('product-add-modal');
     const productAddCloseButton = productAddModal ? productAddModal.querySelector('.close-button') : null;
+    const bulkAddModal = document.getElementById('bulk-add-modal');
+    const bulkAddCloseButton = bulkAddModal ? bulkAddModal.querySelector('.close-button') : null;
     const itemIsOilCheckbox = document.getElementById('item-is-oil');
     const itemOilFields = document.getElementById('item-oil-fields');
     const itemOilTypeSelect = document.getElementById('item-oil-type');
@@ -1730,6 +1730,19 @@ function initializeApp() {
 
     const formatHours = (value) => `${(Number(value) || 0).toFixed(2)} h`;
 
+    const buildExportMenuMarkup = (year) => `
+        <div class="export-menu">
+          <button type="button" class="export-trigger" data-export-year="${year}" aria-haspopup="true" aria-expanded="false">
+            <span class="icon">⬇</span> Eksport
+          </button>
+          <div class="export-menu-panel" role="menu">
+            <button type="button" class="export-menu-item" data-export-action="summary-csv">CSV – Podsumowanie roczne</button>
+            <button type="button" class="export-menu-item" data-export-action="orders-csv">CSV – Zlecenia (rok)</button>
+            <button type="button" class="export-menu-item" data-export-action="pdf">PDF – Raport roczny</button>
+          </div>
+        </div>
+    `;
+
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
         const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
@@ -1741,20 +1754,23 @@ function initializeApp() {
         const openYears = ensureOpenSummaryYears(years.map(y => y.year));
         annualSummaryContainer.innerHTML = years.map(y => `
   <div class="year-section ${openYears.has(y.year) ? 'is-open' : ''}" data-year="${y.year}">
-    <button type="button" class="year-toggle" data-year="${y.year}" aria-expanded="${openYears.has(y.year)}" aria-controls="year-content-${y.year}">
-      <span class="chevron">${openYears.has(y.year) ? '▼' : '▶'}</span>
-      <span class="year-meta">
-        <span class="year-title">Rok ${y.year}</span>
-        <span class="year-quick-sums">
-          <span>Praca: ${formatHours(y.sum.work)}</span>
-          <span>Jazda: ${formatHours(y.sum.drive)}</span>
-          <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
-          <span>Absorpcja: ${Math.round(y.sum.absorpcja ?? (y.sum.billed/(168*12)*100))}%</span>
-          <span>L4: ${y.sum.l4Days} dni</span>
-          <span>Urlop: ${y.sum.urlopDays} dni</span>
+    <div class="year-header">
+      <button type="button" class="year-toggle" data-year="${y.year}" aria-expanded="${openYears.has(y.year)}" aria-controls="year-content-${y.year}">
+        <span class="chevron">${openYears.has(y.year) ? '▼' : '▶'}</span>
+        <span class="year-meta">
+          <span class="year-title">Rok ${y.year}</span>
+          <span class="year-quick-sums">
+            <span>Praca: ${formatHours(y.sum.work)}</span>
+            <span>Jazda: ${formatHours(y.sum.drive)}</span>
+            <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
+            <span>Absorpcja: ${Math.round(y.sum.absorpcja ?? (y.sum.billed/(168*12)*100))}%</span>
+            <span>L4: ${y.sum.l4Days} dni</span>
+            <span>Urlop: ${y.sum.urlopDays} dni</span>
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      ${buildExportMenuMarkup(y.year)}
+    </div>
     <div class="year-content" id="year-content-${y.year}">
       <table class="tbl">
         <thead><tr>
@@ -1788,6 +1804,10 @@ function initializeApp() {
     </div>
   </div>
 `).join('');
+        if (annualSummaryExportBtn) {
+            const latestYear = Math.max(...years.map(y => Number(y.year)).filter(Number.isFinite));
+            annualSummaryExportBtn.dataset.exportYear = Number.isFinite(latestYear) ? String(latestYear) : '';
+        }
     }
 
     const calcVacationRemaining = (allowance, usedFromCalendar, adjustmentsSum) => {
@@ -2149,37 +2169,30 @@ function initializeApp() {
     }
 
     const setSummaryExportState = (isLoading) => {
-        [summaryExportCsvBtn, summaryExportPdfBtn].forEach((btn) => {
-            if (!btn) return;
-            if (!btn.dataset.defaultLabel) {
-                btn.dataset.defaultLabel = btn.textContent || '';
-            }
+        document.querySelectorAll('.export-menu-item').forEach((btn) => {
             btn.disabled = isLoading;
-            btn.textContent = isLoading ? 'Generuję…' : btn.dataset.defaultLabel;
         });
     };
 
-    const resolveExportYear = () => (Number.isFinite(selectedYear) ? selectedYear : currentYear);
+    const resolveExportYear = (year) => (Number.isFinite(year) ? year : currentYear);
 
-    const runYearExport = async (type) => {
+    const runYearExport = async (type, year) => {
         if (isExportingYearReport) return;
         isExportingYearReport = true;
         setSummaryExportState(true);
         try {
             // Zasada na przyszłość: DATA → AGREGACJA → RENDER, bez skrótów.
-            const year = resolveExportYear();
+            const resolvedYear = resolveExportYear(year);
             const reportData = await loadYearReportingData({
                 db,
-                year,
+                year: resolvedYear,
                 orderIndex: buildOrderIndex(),
                 resolveClientName: resolveOrderClientName
             });
             const report = computeYearReport(reportData);
-            if (type === 'csv') {
-                exportYearlyCsv(report);
-            } else {
-                exportYearlyPdf(report);
-            }
+            if (type === 'summary-csv') exportYearlySummaryCsv(report);
+            if (type === 'orders-csv') exportYearlyOrdersCsv(report);
+            if (type === 'pdf') exportYearlyPdf(report);
         } catch (error) {
             console.error('[reporting] export failed', error);
             alert('Nie udało się wygenerować raportu. Spróbuj ponownie.');
@@ -3801,6 +3814,7 @@ async function obslugaListyCzesci(event) {
             bulkAddForm?.reset();
             if (bulkPreviewList) bulkPreviewList.innerHTML = '';
             if (bulkErrors) bulkErrors.textContent = '';
+            if (bulkAddModal) hideModal(bulkAddModal);
         } catch (error) {
             console.error("Błąd masowego dodawania:", error);
             alert("Wystąpił błąd.");
@@ -3921,10 +3935,10 @@ async function obslugaListyCzesci(event) {
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
-            const iloscWSztukach = `<span class="qty-cell"><span class="qty-value">${iloscFormatowana}</span><span class="unit-badge unit-badge--subtle">szt</span></span>`;
+            const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
             const iloscWLitrach = litersValue === null
                 ? '—'
-                : `<span class="qty-cell"><span class="qty-value">${formatujIloscMagazynu(litersValue)}</span><span class="unit-badge unit-badge--subtle">L</span></span>`;
+                : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
             const klientDisplay = normalizeClientName(produkt.klient);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
             return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-container="${pojemnosc || ''}">
@@ -4168,10 +4182,7 @@ async function obslugaListyCzesci(event) {
         });
     }
     if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
-    if (magazynAddBtnSide) magazynAddBtnSide.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
-    if (magazynBulkFocusBtn) magazynBulkFocusBtn.addEventListener('click', () => {
-        document.getElementById('bulk-add-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { openModal(bulkAddModal); });
     if (itemIsOilCheckbox) {
         itemIsOilCheckbox.addEventListener('change', () => setOilFieldsVisibility(itemIsOilCheckbox.checked));
     }
@@ -4180,6 +4191,9 @@ async function obslugaListyCzesci(event) {
     }
     if (productAddCloseButton && productAddModal) {
         productAddCloseButton.onclick = () => { hideModal(productAddModal); };
+    }
+    if (bulkAddCloseButton && bulkAddModal) {
+        bulkAddCloseButton.onclick = () => { hideModal(bulkAddModal); };
     }
     qtyToggleButtons?.forEach(btn => {
         btn.addEventListener('click', () => updateStockOperation(btn.dataset.op || 'add'));
@@ -4203,18 +4217,6 @@ async function obslugaListyCzesci(event) {
     if (summaryYearSelect) {
         summaryYearSelect.addEventListener('change', () => {
             applySelectedYear(summaryYearSelect.value);
-        });
-    }
-
-    if (summaryExportCsvBtn) {
-        summaryExportCsvBtn.addEventListener('click', () => {
-            runYearExport('csv');
-        });
-    }
-
-    if (summaryExportPdfBtn) {
-        summaryExportPdfBtn.addEventListener('click', () => {
-            runYearExport('pdf');
         });
     }
 
@@ -4276,6 +4278,34 @@ async function obslugaListyCzesci(event) {
             persistOpenYears([...openSummaryYears]);
         });
     }
+    document.addEventListener('click', (event) => {
+        const exportTrigger = event.target.closest('.export-trigger');
+        const exportItem = event.target.closest('.export-menu-item');
+        const openMenus = document.querySelectorAll('.export-menu.is-open');
+        const closeMenus = (except) => {
+            openMenus.forEach(menu => {
+                if (menu !== except) menu.classList.remove('is-open');
+            });
+        };
+        if (exportTrigger) {
+            const menu = exportTrigger.closest('.export-menu');
+            if (!menu) return;
+            const isOpen = menu.classList.toggle('is-open');
+            exportTrigger.setAttribute('aria-expanded', String(isOpen));
+            closeMenus(menu);
+            return;
+        }
+        if (exportItem) {
+            const menu = exportItem.closest('.export-menu');
+            const trigger = menu?.querySelector('.export-trigger');
+            const year = Number(trigger?.dataset.exportYear);
+            const action = exportItem.dataset.exportAction;
+            if (menu) menu.classList.remove('is-open');
+            if (action) runYearExport(action, year);
+            return;
+        }
+        if (openMenus.length) closeMenus();
+    });
 
     if (vacationTabs) {
         setActiveVacationTab(readVacationTabFromStorage());

@@ -30,18 +30,7 @@ const downloadBlob = (blob, filename) => {
   URL.revokeObjectURL(link.href);
 };
 
-export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [] }) => {
-  const summaryColumns = [
-    'Miesiąc',
-    'Praca(h)',
-    'Jazda(h)',
-    'Wyfakturowane(h)',
-    'Nadgodziny(h)',
-    'Absorpcja(%)',
-    'L4(dni)',
-    'Urlop(dni)'
-  ];
-
+const buildSummaryRows = ({ months = [], yearlyTotals }) => {
   const summaryRows = months.map((month) => ({
     'Miesiąc': month.monthKey,
     'Praca(h)': formatNumber(month.totals.work),
@@ -66,21 +55,11 @@ export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [] }
     });
   }
 
-  const summaryCsv = buildCsv(summaryColumns, summaryRows);
-  const summaryBlob = new Blob([`\uFEFF${summaryCsv}`], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(summaryBlob, `yearly_summary_${year}.csv`);
+  return summaryRows;
+};
 
-  const ordersColumns = [
-    'Data',
-    'Klient',
-    'Praca(h)',
-    'Jazda(h)',
-    'Wyfakturowane(h)',
-    'Nadgodziny(h)',
-    'Notatka'
-  ];
-
-  const ordersRows = orders.map((order) => ({
+const buildOrdersRows = ({ orders = [] }) =>
+  orders.map((order) => ({
     'Data': order.date,
     'Klient': order.clientName,
     'Praca(h)': formatNumber(order.workHours),
@@ -90,9 +69,42 @@ export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [] }
     'Notatka': order.note || ''
   }));
 
+export const exportYearlySummaryCsv = ({ year, months = [], yearlyTotals }) => {
+  const summaryColumns = [
+    'Miesiąc',
+    'Praca(h)',
+    'Jazda(h)',
+    'Wyfakturowane(h)',
+    'Nadgodziny(h)',
+    'Absorpcja(%)',
+    'L4(dni)',
+    'Urlop(dni)'
+  ];
+  const summaryRows = buildSummaryRows({ months, yearlyTotals });
+  const summaryCsv = buildCsv(summaryColumns, summaryRows);
+  const summaryBlob = new Blob([`\uFEFF${summaryCsv}`], { type: 'text/csv;charset=utf-8;' });
+  downloadBlob(summaryBlob, `yearly_summary_${year}.csv`);
+};
+
+export const exportYearlyOrdersCsv = ({ year, orders = [] }) => {
+  const ordersColumns = [
+    'Data',
+    'Klient',
+    'Praca(h)',
+    'Jazda(h)',
+    'Wyfakturowane(h)',
+    'Nadgodziny(h)',
+    'Notatka'
+  ];
+  const ordersRows = buildOrdersRows({ orders });
   const ordersCsv = buildCsv(ordersColumns, ordersRows);
   const ordersBlob = new Blob([`\uFEFF${ordersCsv}`], { type: 'text/csv;charset=utf-8;' });
   downloadBlob(ordersBlob, `orders_${year}.csv`);
+};
+
+export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [] }) => {
+  exportYearlySummaryCsv({ year, months, yearlyTotals });
+  exportYearlyOrdersCsv({ year, orders });
 };
 
 const drawTable = (doc, { startY, columns, rows }) => {
