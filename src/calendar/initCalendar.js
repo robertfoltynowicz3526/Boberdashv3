@@ -3,16 +3,22 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
-const normalizeDateKey = (value) => {
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const normalizeDateKey = (value, context = '') => {
   if (!value) return '';
-  if (typeof value === 'string') return value.slice(0, 10);
+  let key = '';
+  if (typeof value === 'string') key = value.slice(0, 10);
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     const yyyy = value.getFullYear();
     const mm = String(value.getMonth() + 1).padStart(2, '0');
     const dd = String(value.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    key = `${yyyy}-${mm}-${dd}`;
   }
-  return '';
+  if (!key || !DATE_KEY_RE.test(key)) {
+    console.error('[calendar] invalid day key', { context, value, key });
+    return '';
+  }
+  return key;
 };
 
 const isLeaveDay = (date) => {
@@ -79,14 +85,35 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return [];
     },
     dayCellDidMount: (arg) => {
-      arg.el.dataset.test = 'ok';
-      const day = normalizeDateKey(arg.date);
-      const deco = window.__calendarDecorations || {};
-      const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
-      const sum = deco.summaryByDay?.[day];     // {work,drive,billed,over} albo undefined
+      arg.el.dataset.daycellMounted = '1';
+      const day = normalizeDateKey(arg.date, 'dayCellDidMount');
+      const debugDayCells = window.__calendarDebugDayCells !== false;
+      const addDebugLabel = (label) => {
+        if (!debugDayCells) return;
+        const tag = document.createElement('div');
+        tag.className = 'cell-debug';
+        tag.textContent = label;
+        arg.el.appendChild(tag);
+      };
+      const deco = window.__calendarDecorations || null;
 
       // wyczyść poprzednie
-      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon').forEach(n => n.remove());
+      arg.el.querySelectorAll('.cell-sum, .cell-leave-icon, .cell-debug').forEach(n => n.remove());
+
+      if (!deco) {
+        addDebugLabel('NO-DECO');
+        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+        return;
+      }
+
+      if (!day) {
+        addDebugLabel('BAD-DATE');
+        if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
+        return;
+      }
+
+      const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
+      const sum = deco.summaryByDay?.[day];     // {work,drive,billed,over} albo undefined
 
       // 1) Dzień wolny -> TYLKO ikona, NIC więcej
       if (leave) {
@@ -104,9 +131,11 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
       // 2) Normalny dzień: kafel sumy tylko jeśli summaryByDay ma wpis
       if (!sum) {
+        addDebugLabel('NO-SUM');
         if (typeof extraDayCellDidMount === 'function') extraDayCellDidMount(arg);
         return;
       }
+      addDebugLabel('HAS-SUM');
 
       const work = Number(sum.work||0) || 0;
       const drive = Number(sum.drive||0) || 0;
