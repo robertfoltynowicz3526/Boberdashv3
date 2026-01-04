@@ -2166,6 +2166,7 @@ function initializeApp() {
         isExportingYearReport = true;
         setSummaryExportState(true);
         try {
+            // Zasada na przyszłość: DATA → AGREGACJA → RENDER, bez skrótów.
             const year = resolveExportYear();
             const reportData = await loadYearReportingData({
                 db,

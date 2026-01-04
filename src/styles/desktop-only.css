@@ -17,8 +17,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* Karta z kalendarzem – wyśrodkowana, bez rozciągania na boki */
 .calendar-card, [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
   width: 100% !important;
-  max-width: 1280px !important;
-  margin: 0 auto !important;
+  max-width: none !important;
+  margin: 0 !important;
   padding: 12px !important;
 }
 
@@ -87,8 +87,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 [data-section="kalendarz"] .card,
 #calendar-wrapper, .calendar-wrapper {
   width: 100% !important;
-  max-width: 1280px !important;
-  margin: 0 auto !important;
+  max-width: none !important;
+  margin: 0 !important;
   padding: 12px !important;
 }
 
@@ -139,8 +139,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #calendar-wrapper, .calendar-wrapper,
 [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
   width: 100% !important;
-  max-width: 1280px !important;
-  margin: 0 auto !important;
+  max-width: none !important;
+  margin: 0 !important;
   padding: 12px !important;
 }
 
