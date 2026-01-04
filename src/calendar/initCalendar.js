@@ -29,7 +29,7 @@ const isLeaveDay = (date) => {
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.cell-sum, .cell-leave-icon').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.cell-sum, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -37,6 +37,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   const leave = decorations.leaveByDay?.[dayKey];
   const sum = decorations.summaryByDay?.[dayKey];
+  const planned = decorations.plannedLeaveByDay?.[dayKey];
 
   if (leave) {
     const icon =
@@ -49,6 +50,13 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     cellEl.appendChild(big);
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
+  }
+
+  if (planned) {
+    const marker = document.createElement('div');
+    marker.className = 'cell-planned-leave';
+    marker.title = 'Zaplanowany urlop';
+    cellEl.appendChild(marker);
   }
 
   if (!sum) {

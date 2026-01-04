@@ -74,6 +74,8 @@ function initializeApp() {
         return { y: d.getFullYear(), m: d.getMonth() + 1 };
     }
     const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
+    const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
+    const VACATION_TAB_STORAGE_KEY = 'vacationTab';
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
     const getYearFromValue = (value) => {
         if (!value) return null;
@@ -131,6 +133,32 @@ function initializeApp() {
             const url = new URL(window.location.href);
             url.searchParams.set(SELECTED_YEAR_URL_PARAM, String(year));
             window.history.replaceState(null, '', url);
+        } catch (_) { }
+    };
+    const readOpenYearsFromStorage = () => {
+        try {
+            const raw = localStorage.getItem(SUMMARY_OPEN_YEARS_STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed.map(Number).filter(Number.isFinite) : [];
+        } catch (_) {
+            return [];
+        }
+    };
+    const persistOpenYears = (years = []) => {
+        const unique = [...new Set((years || []).map(Number).filter(Number.isFinite))];
+        localStorage.setItem(SUMMARY_OPEN_YEARS_STORAGE_KEY, JSON.stringify(unique));
+    };
+    const readVacationTabFromStorage = () => {
+        try {
+            return localStorage.getItem(VACATION_TAB_STORAGE_KEY) || 'used';
+        } catch (_) {
+            return 'used';
+        }
+    };
+    const persistVacationTab = (tab) => {
+        try {
+            localStorage.setItem(VACATION_TAB_STORAGE_KEY, tab);
         } catch (_) { }
     };
     const getYearRange = (year) => {
@@ -282,6 +310,7 @@ function initializeApp() {
     let selectedYearNeedsRefresh = true;
     let selectedYearLoadedFor = null;
     let availableSummaryYears = [currentYear];
+    let openSummaryYears = new Set();
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
@@ -302,6 +331,11 @@ function initializeApp() {
     let ordersByDay = new Map();
     let dayDocsByDay = new Map();
     let leaveByDay = new Map();
+    let plannedLeaveByDay = new Map();
+    let lastSummaryByDay = {};
+    let lastLeaveByDay = {};
+    let plannedLeaveEntries = [];
+    let plannedLeaveEditId = null;
     configureDayTotals({
         manualGetter: (dayKey) => manualByDay.get(dayKey) || null,
         ordersGetter: (dayKey) => ordersByDay.get(dayKey) || [],
@@ -394,11 +428,23 @@ function initializeApp() {
     const vacationUsedSpan = document.getElementById('vacation-used');
     const vacationRemainingSpan = document.getElementById('vacation-remaining');
     const vacationAdjustmentsTotalSpan = document.getElementById('vacation-adjustments-total');
+    const vacationTabs = document.getElementById('vacation-tabs');
+    const vacationUsedList = document.getElementById('vacation-used-list');
     const vacationAdjustmentForm = document.getElementById('vacation-adjustment-form');
     const vacationAdjustmentDateInput = document.getElementById('vacation-adjustment-date');
     const vacationAdjustmentDaysInput = document.getElementById('vacation-adjustment-days');
     const vacationAdjustmentNoteInput = document.getElementById('vacation-adjustment-note');
     const vacationAdjustmentsDiv = document.getElementById('vacation-adjustments');
+    const plannedLeaveForm = document.getElementById('planned-leave-form');
+    const plannedLeaveStartInput = document.getElementById('planned-leave-start');
+    const plannedLeaveEndInput = document.getElementById('planned-leave-end');
+    const plannedLeaveTypeSelect = document.getElementById('planned-leave-type');
+    const plannedLeaveNoteInput = document.getElementById('planned-leave-note');
+    const plannedLeaveWorkingDaysInput = document.getElementById('planned-leave-working-days');
+    const plannedLeaveSubmitBtn = document.getElementById('planned-leave-submit');
+    const plannedLeaveCancelBtn = document.getElementById('planned-leave-cancel');
+    const plannedLeaveList = document.getElementById('planned-leave-list');
+    const plannedLeaveTotalSpan = document.getElementById('planned-leave-total');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
@@ -511,6 +557,28 @@ function initializeApp() {
         return days;
     };
 
+    const listDaysInclusive = (start, end) => {
+        const startDate = normalizeAllDayDate(start);
+        const endDate = normalizeAllDayDate(end);
+        if (!startDate || !endDate) return [];
+        const [from, to] = startDate <= endDate ? [startDate, endDate] : [endDate, startDate];
+        const days = [];
+        let cursor = new Date(from.getTime());
+        while (cursor <= to) {
+            days.push(formatDateForStorage(cursor));
+            cursor = addDaysToDate(cursor, 1);
+            if (!cursor) break;
+        }
+        return days;
+    };
+
+    const isWeekendDay = (dayStr) => {
+        const date = toDateSafe(dayStr);
+        if (!date) return false;
+        const day = date.getDay();
+        return day === 0 || day === 6;
+    };
+
     const buildOrderIndex = () => new Map(
         _wszystkieZleceniaCache.map(order => [order.id, order])
     );
@@ -596,7 +664,9 @@ function initializeApp() {
             }
         });
 
-        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
+        lastSummaryByDay = summaryByDay;
+        lastLeaveByDay = leaveByDayOut;
+        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
         workEvents = orderEvents;
         updateCalendarData(calendar, workEvents, []);
@@ -1606,6 +1676,18 @@ function initializeApp() {
         renderFH3M(document.getElementById('fh3m-zlecenia'), y, m);
     }
 
+    const ensureOpenSummaryYears = (years = []) => {
+        const available = new Set((years || []).map(Number).filter(Number.isFinite));
+        const stored = readOpenYearsFromStorage().filter(year => available.has(year));
+        const next = stored.length ? stored : [currentYear].filter(year => available.has(year));
+        if (!next.length && years.length) next.push(Number(years[0]));
+        openSummaryYears = new Set(next);
+        persistOpenYears([...openSummaryYears]);
+        return openSummaryYears;
+    };
+
+    const formatHours = (value) => `${(Number(value) || 0).toFixed(2)} h`;
+
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
         const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
@@ -1614,38 +1696,54 @@ function initializeApp() {
             return;
         }
 
+        const openYears = ensureOpenSummaryYears(years.map(y => y.year));
         annualSummaryContainer.innerHTML = years.map(y => `
-  <div class="year-section">
-    <div class="year-title">Rok ${y.year}</div>
-    <table class="tbl">
-      <thead><tr>
-        <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-        <th>Wyfakturowane</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
-      </tr></thead>
-      <tbody>
-        ${y.months.map(m=>`
+  <div class="year-section ${openYears.has(y.year) ? 'is-open' : ''}" data-year="${y.year}">
+    <button type="button" class="year-toggle" data-year="${y.year}" aria-expanded="${openYears.has(y.year)}" aria-controls="year-content-${y.year}">
+      <span class="chevron">${openYears.has(y.year) ? '▼' : '▶'}</span>
+      <span class="year-meta">
+        <span class="year-title">Rok ${y.year}</span>
+        <span class="year-quick-sums">
+          <span>Praca: ${formatHours(y.sum.work)}</span>
+          <span>Jazda: ${formatHours(y.sum.drive)}</span>
+          <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
+          <span>Absorpcja: ${Math.round(y.sum.absorpcja ?? (y.sum.billed/(168*12)*100))}%</span>
+          <span>L4: ${y.sum.l4Days} dni</span>
+          <span>Urlop: ${y.sum.urlopDays} dni</span>
+        </span>
+      </span>
+    </button>
+    <div class="year-content" id="year-content-${y.year}">
+      <table class="tbl">
+        <thead><tr>
+          <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
+          <th>Wyfakturowane</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+        </tr></thead>
+        <tbody>
+          ${y.months.map(m=>`
+            <tr>
+              <td>${m.label}</td>
+              <td>${m.work.toFixed(2)} h</td>
+              <td>${m.drive.toFixed(2)} h</td>
+              <td>${m.billed.toFixed(2)} h</td>
+              <td><span class="badge-value">${Math.round(m.billed/168*100)}%</span></td>
+              <td>${m.l4Days}</td>
+              <td>${m.urlopDays}</td>
+            </tr>`).join('')}
+        </tbody>
+        <tfoot>
           <tr>
-            <td>${m.label}</td>
-            <td>${m.work.toFixed(2)} h</td>
-            <td>${m.drive.toFixed(2)} h</td>
-            <td>${m.billed.toFixed(2)} h</td>
-            <td><span class="badge-value">${Math.round(m.billed/168*100)}%</span></td>
-            <td>${m.l4Days}</td>
-            <td>${m.urlopDays}</td>
-          </tr>`).join('')}
-      </tbody>
-      <tfoot>
-        <tr>
-          <td>Razem</td>
-          <td>${y.sum.work.toFixed(2)} h</td>
-          <td>${y.sum.drive.toFixed(2)} h</td>
-          <td>${y.sum.billed.toFixed(2)} h</td>
-          <td><span class="badge-value">${Math.round(y.sum.billed/(168*12)*100)}%</span></td>
-          <td>${y.sum.l4Days}</td>
-          <td>${y.sum.urlopDays}</td>
-        </tr>
-      </tfoot>
-    </table>
+            <td>Razem</td>
+            <td>${y.sum.work.toFixed(2)} h</td>
+            <td>${y.sum.drive.toFixed(2)} h</td>
+            <td>${y.sum.billed.toFixed(2)} h</td>
+            <td><span class="badge-value">${Math.round(y.sum.billed/(168*12)*100)}%</span></td>
+            <td>${y.sum.l4Days}</td>
+            <td>${y.sum.urlopDays}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
 `).join('');
     }
@@ -1682,6 +1780,166 @@ function initializeApp() {
                 <tbody>${rows}</tbody>
                 <tfoot><tr><td>Suma roczna</td><td class="num">${total}</td></tr></tfoot>
             </table>`;
+    }
+
+    const getUsedLeaveDays = (entries = [], year) => {
+        const days = new Set();
+        (entries || []).forEach(entry => {
+            const normalized = normalizeDayRecord(entry.id || entry.date, entry);
+            const isLeave = normalized.flags?.urlop || normalized.leaveKind === 'URL';
+            if (!isLeave) return;
+            const key = normalizeDayKey(normalized.date || normalized.id, 'vacation.used');
+            if (!key) return;
+            if (Number(key.slice(0, 4)) !== Number(year)) return;
+            days.add(key);
+        });
+        return [...days].sort();
+    };
+
+    const groupDatesByMonth = (dates = []) => {
+        const groups = new Map();
+        (dates || []).forEach(dateStr => {
+            const monthKey = dateStr.slice(0, 7);
+            if (!groups.has(monthKey)) groups.set(monthKey, []);
+            groups.get(monthKey).push(dateStr);
+        });
+        return groups;
+    };
+
+    const formatDateLabel = (value, fallback = '—') => {
+        const date = toDateSafe(value);
+        if (!date) return fallback;
+        return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const countDaysInRange = (startDate, endDate, workingOnly = false) => {
+        const days = listDaysInclusive(startDate, endDate);
+        if (!workingOnly) return days.length;
+        return days.filter(day => !isWeekendDay(day)).length;
+    };
+
+    const renderUsedLeaveList = () => {
+        if (!vacationUsedList) return;
+        const usedDays = getUsedLeaveDays(selectedYearEntries, selectedYear);
+        if (!usedDays.length) {
+            vacationUsedList.innerHTML = '<p>Brak wykorzystanych dni urlopu w wybranym roku.</p>';
+            return;
+        }
+        const grouped = groupDatesByMonth(usedDays);
+        const blocks = [];
+        grouped.forEach((dates, monthKey) => {
+            const label = formatujMiesiac(monthKey);
+            const items = dates.map(day => `<li>${formatDateLabel(day)}</li>`).join('');
+            blocks.push(`
+                <div class="month-group">
+                    <h5>${label}</h5>
+                    <ul>${items}</ul>
+                </div>
+            `);
+        });
+        vacationUsedList.innerHTML = blocks.join('');
+    };
+
+    const setActiveVacationTab = (tabId = 'used') => {
+        if (!vacationTabs) return;
+        const target = tabId || 'used';
+        vacationTabs.querySelectorAll('[data-vacation-tab]').forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.vacationTab === target);
+        });
+        document.querySelectorAll('[data-vacation-panel]').forEach(panel => {
+            panel.classList.toggle('is-active', panel.dataset.vacationPanel === target);
+        });
+        persistVacationTab(target);
+    };
+
+    const getPlannedLeaveCollection = () => collection(db, 'plannedLeave');
+
+    const normalizePlannedLeaveEntry = (docSnap) => {
+        const data = docSnap.data() || {};
+        const startDate = normalizeDayKey(data.startDate || data.start || data.from || data.startAt || data.start_date, 'plannedLeave.start');
+        const endDate = normalizeDayKey(data.endDate || data.end || data.to || data.endAt || data.end_date, 'plannedLeave.end');
+        const resolvedYear = Number(data.year) || getYearFromValue(startDate) || selectedYear;
+        return {
+            id: docSnap.id,
+            year: resolvedYear,
+            startDate: startDate || '',
+            endDate: endDate || startDate || '',
+            note: data.note || '',
+            type: data.type || 'Urlop planowany',
+            countWorkingDays: Boolean(data.countWorkingDays),
+            createdAt: data.createdAt || null
+        };
+    };
+
+    async function listPlannedLeave(year) {
+        const snap = await getDocs(query(getPlannedLeaveCollection(), where('year', '==', Number(year))));
+        return snap.docs.map(normalizePlannedLeaveEntry)
+            .sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+    }
+
+    const setPlannedLeaveFormState = (entry = null) => {
+        const isEditing = Boolean(entry);
+        plannedLeaveEditId = entry ? entry.id : null;
+        if (plannedLeaveSubmitBtn) plannedLeaveSubmitBtn.textContent = isEditing ? 'Zapisz plan' : 'Dodaj plan';
+        if (plannedLeaveCancelBtn) plannedLeaveCancelBtn.style.display = isEditing ? 'inline-flex' : 'none';
+        if (!plannedLeaveForm) return;
+        if (!entry) return;
+        if (plannedLeaveStartInput) plannedLeaveStartInput.value = entry.startDate || '';
+        if (plannedLeaveEndInput) plannedLeaveEndInput.value = entry.endDate || '';
+        if (plannedLeaveTypeSelect) plannedLeaveTypeSelect.value = entry.type || 'Urlop planowany';
+        if (plannedLeaveNoteInput) plannedLeaveNoteInput.value = entry.note || '';
+        if (plannedLeaveWorkingDaysInput) plannedLeaveWorkingDaysInput.checked = Boolean(entry.countWorkingDays);
+    };
+
+    const clearPlannedLeaveForm = () => {
+        if (plannedLeaveForm) plannedLeaveForm.reset();
+        setPlannedLeaveFormState(null);
+    };
+
+    const refreshPlannedLeaveDecorations = () => {
+        plannedLeaveByDay = new Map();
+        plannedLeaveEntries.forEach(entry => {
+            const days = listDaysInclusive(entry.startDate, entry.endDate);
+            days.forEach(day => plannedLeaveByDay.set(day, entry.type || 'PLAN'));
+        });
+        setDecorations({ summaryByDay: lastSummaryByDay, leaveByDay: lastLeaveByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
+    };
+
+    const renderPlannedLeaveList = () => {
+        if (!plannedLeaveList || !plannedLeaveTotalSpan) return;
+        if (!plannedLeaveEntries.length) {
+            plannedLeaveList.innerHTML = '<p>Brak zaplanowanych urlopów w wybranym roku.</p>';
+            plannedLeaveTotalSpan.textContent = '0';
+            refreshPlannedLeaveDecorations();
+            return;
+        }
+        const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays), 0);
+        plannedLeaveTotalSpan.textContent = formatujLiczbe(totalDays);
+        plannedLeaveList.innerHTML = plannedLeaveEntries.map(entry => {
+            const rangeLabel = `${entry.startDate || '—'} → ${entry.endDate || '—'}`;
+            const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays);
+            const metaBits = [
+                `${formatujLiczbe(count)} dni`,
+                entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'
+            ];
+            if (entry.note) metaBits.push(entry.note);
+            return `
+                <div class="planned-leave-item" data-id="${entry.id}">
+                    <div><strong>${rangeLabel}</strong></div>
+                    <div class="meta">${metaBits.map(bit => `<span>${bit}</span>`).join('')}</div>
+                    <div class="actions">
+                        <button type="button" class="btn-secondary" data-action="edit" data-id="${entry.id}">Edytuj</button>
+                        <button type="button" class="btn-remove" data-action="delete" data-id="${entry.id}">Usuń</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        refreshPlannedLeaveDecorations();
+    };
+
+    async function refreshPlannedLeaveEntries() {
+        plannedLeaveEntries = await listPlannedLeave(selectedYear);
+        renderPlannedLeaveList();
     }
 
     async function getVacationAllowance(year) {
@@ -1780,6 +2038,9 @@ function initializeApp() {
                     <button type="button" class="btn-remove adjustment-remove" data-id="${adj.id}">Usuń</button>
                 </li>`).join('')}</ul>`
             : '<p>Brak korekt urlopu.</p>';
+
+        renderUsedLeaveList();
+        await refreshPlannedLeaveEntries();
     }
 
     async function renderPodsumowanie() {
@@ -3586,6 +3847,89 @@ async function obslugaListyCzesci(event) {
             if (!target?.dataset?.id) return;
             await removeAdjustment(target.dataset.id, selectedYear);
             await renderVacationSummary();
+        });
+    }
+
+    if (annualSummaryContainer) {
+        annualSummaryContainer.addEventListener('click', (event) => {
+            const toggle = event.target.closest('.year-toggle');
+            if (!toggle) return;
+            const year = Number(toggle.dataset.year);
+            if (!Number.isFinite(year)) return;
+            const section = annualSummaryContainer.querySelector(`.year-section[data-year="${year}"]`);
+            if (!section) return;
+            const isOpen = section.classList.toggle('is-open');
+            toggle.setAttribute('aria-expanded', String(isOpen));
+            const chevron = toggle.querySelector('.chevron');
+            if (chevron) chevron.textContent = isOpen ? '▼' : '▶';
+            if (isOpen) {
+                openSummaryYears.add(year);
+            } else {
+                openSummaryYears.delete(year);
+            }
+            persistOpenYears([...openSummaryYears]);
+        });
+    }
+
+    if (vacationTabs) {
+        setActiveVacationTab(readVacationTabFromStorage());
+        vacationTabs.addEventListener('click', (event) => {
+            const tabBtn = event.target.closest('[data-vacation-tab]');
+            if (!tabBtn) return;
+            setActiveVacationTab(tabBtn.dataset.vacationTab);
+        });
+    }
+
+    if (plannedLeaveCancelBtn) {
+        plannedLeaveCancelBtn.addEventListener('click', () => {
+            clearPlannedLeaveForm();
+        });
+    }
+
+    if (plannedLeaveForm) {
+        setPlannedLeaveFormState(null);
+        plannedLeaveForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const startDate = plannedLeaveStartInput?.value || '';
+            const endDate = plannedLeaveEndInput?.value || '';
+            const startParsed = toDateSafe(startDate);
+            const endParsed = toDateSafe(endDate);
+            if (!startParsed || !endParsed) { alert('Wybierz poprawny zakres dat.'); return; }
+            if (startParsed > endParsed) { alert('Data końcowa nie może być wcześniejsza niż początkowa.'); return; }
+            const payload = {
+                year: Number(selectedYear),
+                startDate,
+                endDate,
+                type: plannedLeaveTypeSelect?.value || 'Urlop planowany',
+                note: plannedLeaveNoteInput?.value || '',
+                countWorkingDays: Boolean(plannedLeaveWorkingDaysInput?.checked)
+            };
+            if (plannedLeaveEditId) {
+                await updateDoc(doc(db, 'plannedLeave', plannedLeaveEditId), {
+                    ...payload,
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                await addDoc(getPlannedLeaveCollection(), { ...payload, createdAt: serverTimestamp() });
+            }
+            clearPlannedLeaveForm();
+            await refreshPlannedLeaveEntries();
+        });
+    }
+
+    if (plannedLeaveList) {
+        plannedLeaveList.addEventListener('click', async (event) => {
+            const btn = event.target.closest('[data-action]');
+            if (!btn?.dataset?.id) return;
+            const entry = plannedLeaveEntries.find(item => item.id === btn.dataset.id);
+            if (!entry) return;
+            if (btn.dataset.action === 'edit') {
+                setPlannedLeaveFormState(entry);
+            } else if (btn.dataset.action === 'delete') {
+                if (!confirm('Usunąć zaplanowany urlop?')) return;
+                await deleteDoc(doc(db, 'plannedLeave', entry.id));
+                await refreshPlannedLeaveEntries();
+            }
         });
     }
 

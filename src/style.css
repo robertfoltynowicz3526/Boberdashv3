@@ -1785,6 +1785,17 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   background:transparent;
   color:inherit;
 }
+.year-section{ border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.03); }
+.year-section + .year-section{ margin-top:16px; }
+.year-toggle{ width:100%; border:none; background:transparent; color:inherit; padding:14px 16px; display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center; cursor:pointer; text-align:left; }
+.year-toggle .chevron{ font-size:1rem; transition:transform .2s ease; }
+.year-toggle .year-meta{ display:grid; gap:6px; }
+.year-toggle .year-title{ font-size:1rem; font-weight:700; }
+.year-toggle .year-quick-sums{ display:flex; flex-wrap:wrap; gap:8px 12px; font-size:.85rem; opacity:.85; }
+.year-toggle .year-quick-sums span{ white-space:nowrap; }
+.year-content{ max-height:0; opacity:0; overflow:hidden; transition:max-height .25s ease, opacity .2s ease; padding:0 16px; }
+.year-section.is-open .year-content{ max-height:2000px; opacity:1; padding-bottom:16px; }
+.year-content table{ margin-top:8px; }
 
 /* Sekcja "Zakończone zlecenia" jako dwa rzędy: kafle + wykres */
 .orders-summary{
@@ -2009,6 +2020,27 @@ main,
 .vacation-adjustment-form .form-inline{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
 .vacation-adjustment-form input, .vacation-adjustment-form button, .vacation-adjustment-form label{ flex:1 1 auto; min-width:120px; }
 .vacation-adjustment-form label{ flex-basis:100px; min-width:80px; }
+.vacation-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 8px; }
+.vacation-tab{ border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06); color:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; font-size:.9rem; transition:all .2s ease; }
+.vacation-tab.is-active{ background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.5); font-weight:600; }
+.vacation-tab-panels{ display:grid; gap:16px; }
+.vacation-tab-panel{ display:none; }
+.vacation-tab-panel.is-active{ display:block; }
+.vacation-used-list{ display:grid; gap:12px; }
+.vacation-used-list .month-group{ padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+.vacation-used-list .month-group h5{ margin:0 0 8px; text-transform:capitalize; }
+.vacation-used-list ul{ margin:0; padding-left:18px; display:grid; gap:4px; }
+.planned-leave-form .form-inline{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+.planned-leave-form input, .planned-leave-form select, .planned-leave-form button, .planned-leave-form label{ flex:1 1 auto; min-width:120px; }
+.planned-leave-form label{ flex-basis:80px; }
+.planned-leave-form .planned-leave-working{ flex:1 1 220px; display:flex; align-items:center; gap:6px; }
+.planned-leave-summary{ font-weight:600; margin-top:8px; }
+.planned-leave-list{ display:grid; gap:12px; }
+.planned-leave-item{ padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); display:grid; gap:8px; }
+.planned-leave-item .meta{ display:flex; flex-wrap:wrap; gap:12px; font-size:.9rem; opacity:.8; }
+.planned-leave-item .actions{ display:flex; flex-wrap:wrap; gap:8px; }
+.planned-leave-item .actions button{ padding:4px 10px; border-radius:8px; }
+.btn-secondary{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); color:inherit; }
 .adjustments-list{ list-style:none; padding:0; margin:0; display:grid; gap:8px; }
 .adjustments-list li{ display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--border-color, #e5e7eb); border-radius:10px; }
 
@@ -2044,6 +2076,16 @@ main,
 .leave-flag{
   position:absolute; inset:0; display:grid; place-items:center;
   font-size:30px; opacity:.9; pointer-events:none;
+}
+.cell-planned-leave{
+  position:absolute;
+  top:6px;
+  right:6px;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#7aa2ff;
+  box-shadow:0 0 0 2px rgba(0,0,0,.25);
 }
 
 /* popover FullCalendar – ciemny, kontrastowy */

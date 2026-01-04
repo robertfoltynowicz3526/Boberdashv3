@@ -219,6 +219,41 @@
                         <p>Korekty ręczne: <strong id="vacation-adjustments-total">0</strong> dni</p>
                         <p>Pozostało: <strong id="vacation-remaining">0</strong> dni</p>
                     </div>
+                    <div class="vacation-tabs" id="vacation-tabs">
+                        <button type="button" class="vacation-tab is-active" data-vacation-tab="used">Wykorzystany</button>
+                        <button type="button" class="vacation-tab" data-vacation-tab="planned">Zaplanowany</button>
+                    </div>
+                    <div class="vacation-tab-panels">
+                        <section class="vacation-tab-panel is-active" data-vacation-panel="used">
+                            <h4>Wykorzystane dni urlopu (z kalendarza)</h4>
+                            <div id="vacation-used-list" class="vacation-used-list"></div>
+                        </section>
+                        <section class="vacation-tab-panel" data-vacation-panel="planned">
+                            <h4>Zaplanowany urlop</h4>
+                            <form id="planned-leave-form" class="planned-leave-form">
+                                <div class="form-inline">
+                                    <label for="planned-leave-start">Od</label>
+                                    <input type="date" id="planned-leave-start" required>
+                                    <label for="planned-leave-end">Do</label>
+                                    <input type="date" id="planned-leave-end" required>
+                                    <label for="planned-leave-type">Typ</label>
+                                    <select id="planned-leave-type">
+                                        <option value="Urlop planowany">Urlop planowany</option>
+                                    </select>
+                                    <label for="planned-leave-note">Notatka</label>
+                                    <input type="text" id="planned-leave-note" placeholder="Opcjonalna notatka">
+                                    <label class="planned-leave-working">
+                                        <input type="checkbox" id="planned-leave-working-days">
+                                        Licz tylko dni robocze
+                                    </label>
+                                    <button type="submit" id="planned-leave-submit">Dodaj plan</button>
+                                    <button type="button" id="planned-leave-cancel" class="btn-secondary">Anuluj</button>
+                                </div>
+                            </form>
+                            <div class="planned-leave-summary">Zaplanowano: <strong id="planned-leave-total">0</strong> dni</div>
+                            <div id="planned-leave-list" class="planned-leave-list"></div>
+                        </section>
+                    </div>
                     <form id="vacation-adjustment-form" class="vacation-adjustment-form">
                         <div class="form-inline">
                             <label for="vacation-adjustment-date">Data</label>
