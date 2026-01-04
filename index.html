@@ -51,69 +51,31 @@
         </div>
         <div id="klienci" class="tab-content page-wide">
             <h2>Baza Klientów</h2>
-            <div class="section-grid">
-                <div class="side">
-                    <div class="form-section">
-                        <h3>Dodaj nowego klienta</h3>
-                        <form id="klient-form">
-                            <div class="form-group"><label for="klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="klient-nazwa" required></div>
-                            <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
-                            <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
-                            <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon" inputmode="tel"></div>
-                            <button type="submit">Dodaj Klienta</button>
-                        </form>
-                    </div>
+            <div class="base-toolbar">
+                <div class="form-group">
+                    <label for="klient-search-input">Wyszukaj klienta</label>
+                    <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres...">
                 </div>
-                <div class="main">
-                    <div class="search-section">
-                        <div class="form-group">
-                            <label for="klient-search-input">Wyszukaj klienta</label>
-                            <input type="search" id="klient-search-input" placeholder="Wpisz nazwę, NIP, adres...">
-                        </div>
-                    </div>
-                    <div class="table-section">
-                        <h3 id="lista-klientow-header" class="collapsible-header">Lista Klientów <span class="arrow">▼</span></h3>
-                        <div id="lista-klientow-content" class="collapsible-content">
-                            <div id="clients-list" class="clients-list section-scroll scroll-y">
-                                <div id="lista-klientow"></div>
-                            </div>
-                        </div>
-                    </div>
+                <button type="button" id="klient-add-btn" class="btn-add">Dodaj klienta</button>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="clients-list" class="clients-list section-scroll scroll-y">
+                    <div id="lista-klientow"></div>
                 </div>
             </div>
         </div>
         <div id="maszyny" class="tab-content page-wide">
             <h2>Baza Maszyn</h2>
-            <div class="section-grid">
-                <div class="side">
-                    <div class="form-section">
-                        <h3>Dodaj nową maszynę</h3>
-                        <form id="maszyna-form">
-                            <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
-                            <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
-                            <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
-                            <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
-                            <div class="form-group"><label for="maszyna-rok">Rok produkcji:</label><input type="number" id="maszyna-rok" inputmode="numeric"></div>
-                            <div class="form-group"><label for="maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="maszyna-mth" inputmode="decimal"></div>
-                            <button type="submit">Dodaj Maszynę</button>
-                        </form>
-                    </div>
+            <div class="base-toolbar">
+                <div class="form-group">
+                    <label for="maszyna-search-input">Wyszukaj maszynę</label>
+                    <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta...">
                 </div>
-                <div class="main">
-                    <div class="search-section">
-                        <div class="form-group">
-                            <label for="maszyna-search-input">Wyszukaj maszynę</label>
-                            <input type="search" id="maszyna-search-input" placeholder="Wpisz typ, model, S/N, klienta...">
-                        </div>
-                    </div>
-                    <div class="table-section">
-                        <h3 id="lista-maszyn-header" class="collapsible-header">Lista Maszyn <span class="arrow">▼</span></h3>
-                        <div id="lista-maszyn-content" class="collapsible-content">
-                            <div id="machines-list" class="machines-list section-scroll scroll-y">
-                                <div id="lista-maszyn"></div>
-                            </div>
-                        </div>
-                    </div>
+                <button type="button" id="maszyna-add-btn" class="btn-add">Dodaj maszynę</button>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="machines-list" class="machines-list section-scroll scroll-y">
+                    <div id="lista-maszyn"></div>
                 </div>
             </div>
         </div>
@@ -194,6 +156,7 @@
                     <div class="warehouse-actions">
                         <button type="button" id="magazyn-add-btn" class="btn-add">Dodaj produkt</button>
                         <button type="button" id="magazyn-bulk-btn" class="btn-secondary">Masowe dodawanie</button>
+                        <button type="button" id="magazyn-oil-tools-btn" class="btn-secondary">Narzędzia oleju</button>
                     </div>
                 </div>
                 <div class="warehouse-table">
@@ -208,7 +171,7 @@
                                         <th><button type="button" class="sort-btn" data-sort="klient">Klient</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button></th>
-                                        <th><button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button></th>
+                                        <th class="date-col"><button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button></th>
                                         <th class="actions-col">Akcje</th>
                                     </tr>
                                 </thead>
@@ -440,30 +403,6 @@
                 </div>
                 <div class="modal-actions"><button type="submit">Dodaj produkt</button></div>
             </form>
-            <div class="modal-section">
-                <h3>Olej — szybkie dodanie</h3>
-                <div class="form-grid form-grid-2">
-                    <div class="form-group">
-                        <label for="oil-type">Typ oleju</label>
-                        <select id="oil-type"><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="oil-container-size">Pojemnik (L)</label>
-                        <select id="oil-container-size"><option value="209">209L</option><option value="55">55L</option><option value="20">20L</option></select>
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" id="add-oil-btn" class="btn-add">Dodaj olej</button>
-                </div>
-                <div class="oil-converter">
-                    <h4>Przelicznik</h4>
-                    <div class="form-group"><label for="converter-litry">Litry</label><input type="number" step="0.01" id="converter-litry" inputmode="decimal"></div>
-                    <p>Wynik: <strong id="result-sztuki">0.00 szt.</strong></p>
-                    <hr style="margin-top:1rem; margin-bottom: 1rem;">
-                    <div class="form-group"><label for="converter-sztuki">Sztuki</label><input type="number" step="0.01" id="converter-sztuki" inputmode="decimal"></div>
-                    <p>Wynik: <strong id="result-litry">0.00 L</strong></p>
-                </div>
-            </div>
         </div>
     </div>
     <div id="bulk-add-modal" class="modal">
@@ -511,38 +450,143 @@
             </form>
         </div>
     </div>
-    <div id="edit-klient-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Edytuj Klienta</h2>
-            <form id="edit-klient-form" class="modal-body">
-                <input type="hidden" id="edit-klient-id">
-                <div class="form-group"><label for="edit-klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="edit-klient-nazwa" required></div>
-                <div class="form-group"><label for="edit-klient-nip">NIP:</label><input type="text" id="edit-klient-nip"></div>
-                <div class="form-group"><label for="edit-klient-adres">Adres:</label><input type="text" id="edit-klient-adres"></div>
-                <div class="form-group"><label for="edit-klient-telefon">Telefon:</label><input type="text" id="edit-klient-telefon"></div>
-                <div class="modal-actions">
-                    <button type="submit" class="btn-add">Zapisz Zmiany</button>
+    <div id="oil-tools-drawer" class="drawer" aria-hidden="true">
+        <div class="drawer-backdrop" data-drawer-close></div>
+        <div class="drawer-panel">
+            <div class="drawer-header">
+                <div>
+                    <p class="drawer-eyebrow">Magazyn</p>
+                    <h3>Narzędzia oleju</h3>
                 </div>
-            </form>
+                <button type="button" class="drawer-close" data-drawer-close aria-label="Zamknij">×</button>
+            </div>
+            <div class="drawer-tabs">
+                <button type="button" class="drawer-tab is-active" data-drawer-tab="converter">Przelicznik</button>
+                <button type="button" class="drawer-tab" data-drawer-tab="quick-add">Szybkie dodawanie oleju</button>
+            </div>
+            <div class="drawer-body">
+                <section class="drawer-tab-panel is-active" data-drawer-panel="converter">
+                    <div class="form-group">
+                        <label for="oil-converter-container">Pojemnik (L)</label>
+                        <select id="oil-converter-container"></select>
+                    </div>
+                    <div class="form-grid form-grid-2">
+                        <div class="form-group">
+                            <label for="oil-converter-liters">Litry</label>
+                            <input type="number" step="0.01" id="oil-converter-liters" inputmode="decimal">
+                        </div>
+                        <div class="form-group">
+                            <label for="oil-converter-units">Sztuki</label>
+                            <input type="number" step="0.01" id="oil-converter-units" inputmode="decimal">
+                        </div>
+                    </div>
+                    <p class="drawer-hint">Wpis w jednym polu automatycznie przeliczy drugie.</p>
+                </section>
+                <section class="drawer-tab-panel" data-drawer-panel="quick-add">
+                    <div class="form-grid form-grid-2">
+                        <div class="form-group">
+                            <label for="oil-quick-type">Typ oleju</label>
+                            <select id="oil-quick-type"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="oil-quick-container">Pojemnik (L)</label>
+                            <select id="oil-quick-container"></select>
+                        </div>
+                    </div>
+                    <div class="form-grid form-grid-2">
+                        <div class="form-group">
+                            <label for="oil-quick-quantity">Ilość</label>
+                            <input type="number" step="0.01" id="oil-quick-quantity" inputmode="decimal" placeholder="np. 2">
+                        </div>
+                        <div class="form-group">
+                            <label for="oil-quick-unit">Jednostka</label>
+                            <select id="oil-quick-unit">
+                                <option value="szt">szt.</option>
+                                <option value="L">L</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="oil-quick-client">Klient (opcjonalnie)</label>
+                        <input type="text" id="oil-quick-client" placeholder="Nazwa klienta">
+                    </div>
+                    <div class="drawer-actions">
+                        <button type="button" id="oil-quick-submit" class="btn-add">Dodaj</button>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
-    <div id="edit-maszyna-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Edytuj Maszynę</h2>
-            <form id="edit-maszyna-form" class="modal-body">
-                <input type="hidden" id="edit-maszyna-id">
-                <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
-                <div class="form-group"><label for="edit-maszyna-typ">Typ Maszyny:</label><select id="edit-maszyna-typ" required><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
-                <div class="form-group"><label for="edit-maszyna-model">Model:</label><input type="text" id="edit-maszyna-model" required></div>
-                <div class="form-group"><label for="edit-maszyna-serial">Numer seryjny:</label><input type="text" id="edit-maszyna-serial"></div>
-                <div class="form-group"><label for="edit-maszyna-rok">Rok produkcji:</label><input type="number" id="edit-maszyna-rok" inputmode="numeric"></div>
-                <div class="form-group"><label for="edit-maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="edit-maszyna-mth" inputmode="decimal"></div>
-                <div class="modal-actions">
-                    <button type="submit" class="btn-add">Zapisz Zmiany</button>
+    <div id="client-drawer" class="drawer" aria-hidden="true">
+        <div class="drawer-backdrop" data-drawer-close></div>
+        <div class="drawer-panel">
+            <div class="drawer-header">
+                <div>
+                    <p class="drawer-eyebrow">Klienci</p>
+                    <h3 id="client-drawer-title">Dodaj klienta</h3>
                 </div>
-            </form>
+                <button type="button" class="drawer-close" data-drawer-close aria-label="Zamknij">×</button>
+            </div>
+            <div class="drawer-body">
+                <form id="klient-form" class="drawer-form">
+                    <div class="form-group"><label for="klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="klient-nazwa" required></div>
+                    <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
+                    <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
+                    <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon" inputmode="tel"></div>
+                    <div class="drawer-actions">
+                        <button type="submit" class="btn-add">Dodaj klienta</button>
+                    </div>
+                </form>
+                <form id="edit-klient-form" class="drawer-form is-hidden">
+                    <input type="hidden" id="edit-klient-id">
+                    <div class="form-group"><label for="edit-klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="edit-klient-nazwa" required></div>
+                    <div class="form-group"><label for="edit-klient-nip">NIP:</label><input type="text" id="edit-klient-nip"></div>
+                    <div class="form-group"><label for="edit-klient-adres">Adres:</label><input type="text" id="edit-klient-adres"></div>
+                    <div class="form-group"><label for="edit-klient-telefon">Telefon:</label><input type="text" id="edit-klient-telefon"></div>
+                    <div class="drawer-actions">
+                        <button type="submit" class="btn-add">Zapisz zmiany</button>
+                        <button type="button" id="client-delete-btn" class="btn-danger">Usuń klienta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="machine-drawer" class="drawer" aria-hidden="true">
+        <div class="drawer-backdrop" data-drawer-close></div>
+        <div class="drawer-panel">
+            <div class="drawer-header">
+                <div>
+                    <p class="drawer-eyebrow">Maszyny</p>
+                    <h3 id="machine-drawer-title">Dodaj maszynę</h3>
+                </div>
+                <button type="button" class="drawer-close" data-drawer-close aria-label="Zamknij">×</button>
+            </div>
+            <div class="drawer-body">
+                <form id="maszyna-form" class="drawer-form">
+                    <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
+                    <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
+                    <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
+                    <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
+                    <div class="form-group"><label for="maszyna-rok">Rok produkcji:</label><input type="number" id="maszyna-rok" inputmode="numeric"></div>
+                    <div class="form-group"><label for="maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="maszyna-mth" inputmode="decimal"></div>
+                    <div class="drawer-actions">
+                        <button type="submit" class="btn-add">Dodaj maszynę</button>
+                    </div>
+                </form>
+                <form id="edit-maszyna-form" class="drawer-form is-hidden">
+                    <input type="hidden" id="edit-maszyna-id">
+                    <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
+                    <div class="form-group"><label for="edit-maszyna-typ">Typ Maszyny:</label><select id="edit-maszyna-typ" required><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
+                    <div class="form-group"><label for="edit-maszyna-model">Model:</label><input type="text" id="edit-maszyna-model" required></div>
+                    <div class="form-group"><label for="edit-maszyna-serial">Numer seryjny:</label><input type="text" id="edit-maszyna-serial"></div>
+                    <div class="form-group"><label for="edit-maszyna-rok">Rok produkcji:</label><input type="number" id="edit-maszyna-rok" inputmode="numeric"></div>
+                    <div class="form-group"><label for="edit-maszyna-mth">Aktualne motogodziny:</label><input type="number" step="0.1" id="edit-maszyna-mth" inputmode="decimal"></div>
+                    <div class="drawer-actions">
+                        <button type="submit" class="btn-add">Zapisz zmiany</button>
+                        <button type="button" id="machine-delete-btn" class="btn-danger">Usuń maszynę</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     <div id="details-zlecenie-modal" class="modal">

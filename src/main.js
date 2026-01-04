@@ -57,6 +57,7 @@ window.addEventListener('DOMContentLoaded', initializeApp);
 
 
 function initializeApp() {
+    // ZASADA: 3 warstwy i żadnych skrótów → DATA → AGREGACJA → RENDER.
     // --- STAŁE I ZMIENNE GLOBALNE ---
     const STAWKI = {
         S: { nazwa: "Wyjazdowe", stawka: 45 },
@@ -413,9 +414,11 @@ function initializeApp() {
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
+    const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
     const maszynaKlientSelect = document.getElementById('maszyna-klient-select');
     const maszynaForm = document.getElementById('maszyna-form');
+    const maszynaAddBtn = document.getElementById('maszyna-add-btn');
     const listaMaszynDiv = document.getElementById('lista-maszyn');
     const zlecenieForm = document.getElementById('zlecenie-form');
     const aktywneZleceniaLista = document.getElementById('aktywne-zlecenia-lista');
@@ -463,6 +466,7 @@ function initializeApp() {
     const magazynFilterContainer = document.getElementById('magazyn-filter-container');
     const magazynAddBtn = document.getElementById('magazyn-add-btn');
     const magazynBulkBtn = document.getElementById('magazyn-bulk-btn');
+    const magazynOilToolsBtn = document.getElementById('magazyn-oil-tools-btn');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const bulkItemsInput = document.getElementById('bulk-items');
@@ -493,13 +497,18 @@ function initializeApp() {
     const itemOilFields = document.getElementById('item-oil-fields');
     const itemOilTypeSelect = document.getElementById('item-oil-type');
     const itemOilContainerSelect = document.getElementById('item-oil-container');
-    const addOilBtn = document.getElementById('add-oil-btn');
-    const oilTypeSelect = document.getElementById('oil-type');
-    const oilContainerSizeSelect = document.getElementById('oil-container-size');
-    const converterLitryInput = document.getElementById('converter-litry');
-    const converterSztukiInput = document.getElementById('converter-sztuki');
-    const resultSztuki = document.getElementById('result-sztuki');
-    const resultLitry = document.getElementById('result-litry');
+    const oilToolsDrawer = document.getElementById('oil-tools-drawer');
+    const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
+    const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
+    const oilConverterContainer = document.getElementById('oil-converter-container');
+    const oilConverterLitersInput = document.getElementById('oil-converter-liters');
+    const oilConverterUnitsInput = document.getElementById('oil-converter-units');
+    const oilQuickTypeSelect = document.getElementById('oil-quick-type');
+    const oilQuickContainerSelect = document.getElementById('oil-quick-container');
+    const oilQuickQuantityInput = document.getElementById('oil-quick-quantity');
+    const oilQuickUnitSelect = document.getElementById('oil-quick-unit');
+    const oilQuickClientInput = document.getElementById('oil-quick-client');
+    const oilQuickSubmitBtn = document.getElementById('oil-quick-submit');
     const themeToggle = document.getElementById('theme-toggle');
     const zakonczoneZleceniaHeader = document.getElementById('zakonczone-zlecenia-header');
     const zlecenieSearchInput = document.getElementById('zlecenie-search-input');
@@ -508,20 +517,18 @@ function initializeApp() {
     const kalendarzMultiHoursInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-fh') : null;
     const kalendarzMultiAddButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-add') : null;
     const kalendarzMultiList = document.getElementById('kalendarz-zlecenia-list');
-    const editKlientModal = document.getElementById('edit-klient-modal');
+    const clientDrawer = document.getElementById('client-drawer');
+    const clientDrawerTitle = document.getElementById('client-drawer-title');
+    const clientDeleteBtn = document.getElementById('client-delete-btn');
     const editKlientForm = document.getElementById('edit-klient-form');
-    const editMaszynaModal = document.getElementById('edit-maszyna-modal');
+    const machineDrawer = document.getElementById('machine-drawer');
+    const machineDrawerTitle = document.getElementById('machine-drawer-title');
+    const machineDeleteBtn = document.getElementById('machine-delete-btn');
     const editMaszynaForm = document.getElementById('edit-maszyna-form');
     const detailsZlecenieModal = document.getElementById('details-zlecenie-modal');
-    const editKlientCloseButton = editKlientModal ? editKlientModal.querySelector('.close-button') : null;
-    const editMaszynaCloseButton = editMaszynaModal ? editMaszynaModal.querySelector('.close-button') : null;
     const detailsZlecenieCloseButton = detailsZlecenieModal ? detailsZlecenieModal.querySelector('.close-button') : null;
     const klientSearchInput = document.getElementById('klient-search-input');
     const maszynaSearchInput = document.getElementById('maszyna-search-input');
-    const listaKlientowHeader = document.getElementById('lista-klientow-header');
-    const listaKlientowContent = document.getElementById('lista-klientow-content');
-    const listaMaszynHeader = document.getElementById('lista-maszyn-header');
-    const listaMaszynContent = document.getElementById('lista-maszyn-content');
     const editZlecenieModal = document.getElementById('edit-zlecenie-modal');
     const editZlecenieForm = document.getElementById('edit-zlecenie-form');
     const machineHistoryModal = document.getElementById('machine-history-modal');
@@ -743,7 +750,7 @@ function initializeApp() {
     }
 
     const trackedModals = [];
-    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, editKlientModal, editMaszynaModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
+    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
         .forEach(modal => { if (modal) trackedModals.push(modal); });
 
     const modalBackdrop = document.createElement('div');
@@ -804,6 +811,23 @@ function initializeApp() {
     };
 
     modalBackdrop.addEventListener('click', () => closeAllModals());
+
+    const trackedDrawers = [clientDrawer, machineDrawer, oilToolsDrawer].filter(Boolean);
+    const isAnyDrawerOpen = () => trackedDrawers.some(drawer => drawer.classList.contains('is-open'));
+    const openDrawer = (drawer) => {
+        if (!drawer) return;
+        drawer.classList.add('is-open');
+        drawer.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('drawer-open');
+    };
+    const closeDrawer = (drawer) => {
+        if (!drawer) return;
+        drawer.classList.remove('is-open');
+        drawer.setAttribute('aria-hidden', 'true');
+        if (!isAnyDrawerOpen()) {
+            document.body.classList.remove('drawer-open');
+        }
+    };
 
     const debounce = (fn, wait = 200) => {
         let timeout;
@@ -2229,25 +2253,6 @@ function initializeApp() {
     }, { passive: true });
   }
 
-  // Klienci (zwijana cała sekcja „Lista Klientów”)
-  if (listaKlientowHeader && listaKlientowContent) {
-    listaKlientowHeader.classList.add('collapsed');
-    listaKlientowContent.classList.add('collapsed');
-    listaKlientowHeader.addEventListener('click', () => {
-      listaKlientowHeader.classList.toggle('collapsed');
-      listaKlientowContent.classList.toggle('collapsed');
-    }, { passive: true });
-  }
-
-  // Maszyny (zwijana cała sekcja „Lista Maszyn”)
-  if (listaMaszynHeader && listaMaszynContent) {
-    listaMaszynHeader.classList.add('collapsed');
-    listaMaszynContent.classList.add('collapsed');
-    listaMaszynHeader.addEventListener('click', () => {
-      listaMaszynHeader.classList.toggle('collapsed');
-      listaMaszynContent.classList.toggle('collapsed');
-    }, { passive: true });
-  }
 }
 
 
@@ -2282,7 +2287,11 @@ function initializeApp() {
             telefon: klientForm['klient-telefon'].value || '---',
             createdAt: new Date()
         };
-        try { await addDoc(collection(db, "klienci"), dane); klientForm.reset(); }
+        try {
+            await addDoc(collection(db, "klienci"), dane);
+            klientForm.reset();
+            closeDrawer(clientDrawer);
+        }
         catch (e) { console.error("Błąd dodawania klienta: ", e); }
     }
 
@@ -2394,21 +2403,24 @@ function wyswietlKlientow() {
         `;
       }
 
-      // Strzałka toggle + nagłówek klienta
-      const strzalkaHtml = `<span class="toggle-machines-arrow collapsed" data-target="${maszynyListaId}">▼</span>`;
-      const nipTxt = klient.nip ? ` (NIP: ${klient.nip})` : "";
+      const nipTxt = klient.nip && klient.nip !== '---' ? `NIP: ${klient.nip}` : 'NIP: —';
+      const adresTxt = klient.adres && klient.adres !== '---' ? klient.adres : 'Brak adresu';
+      const telTxt = klient.telefon && klient.telefon !== '---' ? klient.telefon : 'Brak telefonu';
 
       klienciHtml += `
-        <div class="client-group" data-id="${klient.id}">
-          <div class="client-header-item">
-            <div class="client-header-text">
-              <strong>${klient.nazwa || '---'}</strong>${nipTxt}<br>
-              <small>${klient.adres || '---'} | ${klient.telefon || '---'}</small>
+        <div class="client-entry" data-id="${klient.id}">
+          <div class="entity-card client-card" data-id="${klient.id}">
+            <div class="entity-card-main">
+              <div class="entity-card-title">
+                <strong>${klient.nazwa || '---'}</strong>
+                <span class="meta">${nipTxt}</span>
+              </div>
+              <div class="entity-card-meta">${adresTxt} • ${telTxt}</div>
             </div>
-            ${strzalkaHtml}
-            <div class="client-header-actions">             
-              <button class="btn-edit edit-klient-btn">Edytuj</button>
-              <button class="delete-btn">Usuń</button>
+            <div class="entity-card-actions">
+              <button type="button" class="machine-toggle collapsed" data-target="${maszynyListaId}" aria-expanded="false">
+                Maszyny <span class="chevron">▼</span>
+              </button>
             </div>
           </div>
           ${maszynyKontenerHtml}
@@ -2450,47 +2462,46 @@ function nasluchujNaKlientow() {
     }
   );
 }
+
+const setClientDrawerMode = (mode) => {
+    if (!clientDrawer) return;
+    const isEdit = mode === 'edit';
+    if (clientDrawerTitle) {
+        clientDrawerTitle.textContent = isEdit ? 'Edytuj klienta' : 'Dodaj klienta';
+    }
+    if (klientForm) klientForm.classList.toggle('is-hidden', isEdit);
+    if (editKlientForm) editKlientForm.classList.toggle('is-hidden', !isEdit);
+    openDrawer(clientDrawer);
+};
+
+const setMachineDrawerMode = (mode) => {
+    if (!machineDrawer) return;
+    const isEdit = mode === 'edit';
+    if (machineDrawerTitle) {
+        machineDrawerTitle.textContent = isEdit ? 'Edytuj maszynę' : 'Dodaj maszynę';
+    }
+    if (maszynaForm) maszynaForm.classList.toggle('is-hidden', isEdit);
+    if (editMaszynaForm) editMaszynaForm.classList.toggle('is-hidden', !isEdit);
+    openDrawer(machineDrawer);
+};
 async function obslugaListyKlientow(event) {
-  // 1) próbujemy znaleźć klikniętą strzałkę albo jej rodzica z data-target
-  const arrow = event.target.closest('.toggle-machines-arrow');
-  if (arrow) {
-    const targetId = arrow.getAttribute('data-target');
+  const toggle = event.target.closest('.machine-toggle');
+  if (toggle) {
+    const targetId = toggle.getAttribute('data-target');
     const kontener = document.getElementById(targetId);
     if (!kontener) {
-      console.warn('[KLienci] Nie znaleziono kontenera maszyn dla', targetId);
+      console.warn('[Klienci] Nie znaleziono kontenera maszyn dla', targetId);
       return;
     }
-    arrow.classList.toggle('collapsed');
-    kontener.classList.toggle('collapsed');
-    // log pomocniczy:
-    console.log('[Klienci] toggle', { targetId, collapsed: kontener.classList.contains('collapsed') });
+    const isCollapsed = kontener.classList.toggle('collapsed');
+    toggle.classList.toggle('is-open', !isCollapsed);
+    toggle.setAttribute('aria-expanded', String(!isCollapsed));
     return;
   }
 
-  // 2) klik w cały nagłówek wiersza klienta (poza przyciskami)
-  const headerItem = event.target.closest('.client-header-item');
-  if (headerItem &&
-      !event.target.classList.contains('edit-klient-btn') &&
-      !event.target.classList.contains('delete-btn')) {
-    const arrow2 = headerItem.querySelector('.toggle-machines-arrow');
-    if (arrow2) {
-      const targetId2 = arrow2.getAttribute('data-target');
-      const kontener2 = document.getElementById(targetId2);
-      if (!kontener2) {
-        console.warn('[Klienci] (header) brak kontenera', targetId2);
-        return;
-      }
-      arrow2.classList.toggle('collapsed');
-      kontener2.classList.toggle('collapsed');
-      console.log('[Klienci] (header) toggle', { targetId: targetId2, collapsed: kontener2.classList.contains('collapsed') });
-    }
-    return;
-  }
-
-  // 3) przyciski akcji
-  const clientGroup = event.target.closest('.client-group');
-  if (!clientGroup) return;
-  const klientId = clientGroup.dataset.id;
+  const clientEntry = event.target.closest('.client-entry');
+  if (!clientEntry) return;
+  const klientId = clientEntry.dataset.id;
 
   if (event.target.classList.contains('machine-history-link')) {
     event.preventDefault();
@@ -2500,17 +2511,8 @@ async function obslugaListyKlientow(event) {
     return;
   }
 
-  if (event.target.classList.contains('delete-btn')) {
-    if (confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "klienci", klientId));
-      wyswietlMaszyny();
-    }
-    return;
-  }
-
-  if (event.target.classList.contains('edit-klient-btn')) {
+  if (event.target.closest('.entity-card')) {
     otworzModalEdycjiKlienta(klientId);
-    return;
   }
 }
 
@@ -2591,7 +2593,7 @@ async function obslugaListyKlientow(event) {
         editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
         editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
         editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
-        openModal(editKlientModal);
+        setClientDrawerMode('edit');
     }
 
     async function zapiszEdycjeKlienta(event) {
@@ -2649,12 +2651,27 @@ async function obslugaListyKlientow(event) {
                 }
             }
 
-            hideModal(editKlientModal);
+            closeDrawer(clientDrawer);
         } catch (e) {
             console.error("Błąd aktualizacji klienta lub powiązanych dokumentów:", e);
             alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
         }
     }
+
+    const usunKlienta = async () => {
+        if (!editKlientForm) return;
+        const klientId = editKlientForm['edit-klient-id'].value;
+        if (!klientId) return;
+        if (!confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) return;
+        try {
+            await deleteDoc(doc(db, "klienci", klientId));
+            closeDrawer(clientDrawer);
+            wyswietlMaszyny();
+        } catch (error) {
+            console.error("Błąd usuwania klienta:", error);
+            alert("Nie udało się usunąć klienta.");
+        }
+    };
 
     // --- MASZYNY ---
     async function dodajMaszyne(event) {
@@ -2673,7 +2690,11 @@ async function obslugaListyKlientow(event) {
             motogodziny: Number(maszynaForm['maszyna-mth'].value) || 0,
             createdAt: new Date()
         };
-        try { await addDoc(collection(db, "maszyny"), dane); maszynaForm.reset(); }
+        try {
+            await addDoc(collection(db, "maszyny"), dane);
+            maszynaForm.reset();
+            closeDrawer(machineDrawer);
+        }
         catch (e) { console.error("Błąd dodawania maszyny: ", e); }
     }
 
@@ -2697,19 +2718,31 @@ async function obslugaListyKlientow(event) {
         }, {});
         let maszynyHtml = '';
         for (const klientNazwa in pogrupowaneMaszyny) {
-            maszynyHtml += `<div class="client-group">
-                <div class="client-header"><h4>${klientNazwa}</h4><span class="arrow">▶</span></div>
-                <ul class="machine-list">
-                    ${pogrupowaneMaszyny[klientNazwa].map(maszyna =>
-                        `<li data-id="${maszyna.id}">
-                            <span>${maszyna.typMaszyny} ${maszyna.model} (S/N: ${maszyna.nrSeryjny})</span>
-                            <div>
-                                <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">Historia</a>
-                                <button class="btn-edit edit-maszyna-btn">Edytuj</button>
-                                <button class="delete-btn">Usuń</button>
-                            </div>
-                        </li>`).join('')}
-                </ul></div>`;
+            const rows = pogrupowaneMaszyny[klientNazwa].map(maszyna => {
+                const sn = (maszyna.nrSeryjny && maszyna.nrSeryjny !== '---') ? maszyna.nrSeryjny : '—';
+                const metaParts = [`S/N: ${sn}`];
+                if (maszyna.rokProdukcji) metaParts.push(`Rok: ${maszyna.rokProdukcji}`);
+                if (maszyna.motogodziny) metaParts.push(`MTH: ${maszyna.motogodziny}`);
+                return `
+                    <div class="machine-row" data-id="${maszyna.id}">
+                        <div class="machine-row-main">
+                            <strong>${maszyna.typMaszyny} ${maszyna.model}</strong>
+                            <div class="machine-row-meta">${metaParts.join(' • ')}</div>
+                        </div>
+                        <div class="machine-row-actions">
+                            <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">Historia</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            maszynyHtml += `
+                <div class="entity-group">
+                    <div class="entity-group-title">${klientNazwa}</div>
+                    <div class="entity-group-list">
+                        ${rows}
+                    </div>
+                </div>
+            `;
         }
        if (listaMaszynDiv) {
             listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
@@ -2779,17 +2812,6 @@ async function obslugaListyKlientow(event) {
     async function obslugaListyMaszyn(event) {
   const el = event.target;
 
-  // Klik w pasek .client-header (grupa maszyn danego klienta)
-  const header = el.closest('.client-header');
-  if (header) {
-    header.classList.toggle('open');
-    const list = header.nextElementSibling; // powinno być ul.machine-list
-    if (list && list.classList.contains('machine-list')) {
-      list.classList.toggle('open');
-    }
-    return;
-  }
-
   if (el.classList.contains('machine-history-link')) {
     event.preventDefault();
     const maszynaId = el.dataset.maszynaId;
@@ -2798,26 +2820,15 @@ async function obslugaListyKlientow(event) {
     return;
   }
 
-  const li = el.closest('li');
-  if (!li) return;
-  const maszynaId = li.dataset.id;
-
-  if (el.classList.contains('delete-btn')) {
-    if (confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) {
-      await deleteDoc(doc(db, "maszyny", maszynaId));
-      wyswietlKlientow();
-    }
-    return;
-  }
-
-  if (el.classList.contains('edit-maszyna-btn')) {
-    otworzModalEdycjiMaszyny(maszynaId);
-    return;
-  }
+  const row = el.closest('.machine-row');
+  if (!row) return;
+  const maszynaId = row.dataset.id;
+  if (!maszynaId) return;
+  otworzModalEdycjiMaszyny(maszynaId);
 }
 
 function otworzModalEdycjiMaszyny(maszynaId) {
-    if (!editMaszynaForm || !editMaszynaModal) return;
+    if (!editMaszynaForm) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
     if (!maszyna) return;
     editMaszynaForm['edit-maszyna-id'].value = maszyna.id;
@@ -2827,7 +2838,7 @@ function otworzModalEdycjiMaszyny(maszynaId) {
     editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : maszyna.nrSeryjny;
     editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji || '';
     editMaszynaForm['edit-maszyna-mth'].value = maszyna.motogodziny || 0;
-    openModal(editMaszynaModal);
+    setMachineDrawerMode('edit');
 }
 
 async function zapiszEdycjeMaszyny(event) {
@@ -2863,12 +2874,27 @@ async function zapiszEdycjeMaszyny(event) {
             });
         }
 
-        hideModal(editMaszynaModal);
+        closeDrawer(machineDrawer);
     } catch (e) {
         console.error("Błąd aktualizacji maszyny lub powiązanych zleceń:", e);
         alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
     }
 }
+
+const usunMaszyne = async () => {
+    if (!editMaszynaForm) return;
+    const maszynaId = editMaszynaForm['edit-maszyna-id'].value;
+    if (!maszynaId) return;
+    if (!confirm("Usunięcie maszyny usunie też jej zlecenia. Kontynuować?")) return;
+    try {
+        await deleteDoc(doc(db, "maszyny", maszynaId));
+        closeDrawer(machineDrawer);
+        wyswietlKlientow();
+    } catch (error) {
+        console.error("Błąd usuwania maszyny:", error);
+        alert("Nie udało się usunąć maszyny.");
+    }
+};
 
 // --- PRZEJAZDY (placeholdery) ---
 function wyswietlPrzejazdy() {}
@@ -3821,51 +3847,143 @@ async function obslugaListyCzesci(event) {
         }
     }
 
-    async function dodajOlej() {
-        if (!oilTypeSelect || !oilContainerSizeSelect) return;
-        const typ = oilTypeSelect.value;
-        const pojemnosc = Number(oilContainerSizeSelect.value);
-        if (!Number.isFinite(pojemnosc) || pojemnosc <= 0) { alert("Wybierz poprawną pojemność."); return; }
-        const dane = {
-            index: `OLEJ-${typ}-${pojemnosc}L`,
-            nazwa: `Olej ${typ} ${pojemnosc}L`,
-            ilosc: 1,
-            klient: '---',
-            jestOlejem: true,
-            typOleju: typ,
-            pojemnosc,
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
-        try {
-            await addDoc(collection(db, "magazyn"), dane);
-        } catch (e) {
-            console.error("Błąd dodawania oleju: ", e);
-        }
-    }
+    const OIL_TYPE_DEFAULTS = ['HYGARD', 'PLUS50', 'COOLGARD', 'EXTGARD'];
+    const OIL_CONTAINER_DEFAULTS = [20, 55, 209];
 
-    function przeliczOlej(event) {
-        if (!oilContainerSizeSelect || !resultLitry || !resultSztuki) return;
-        const pojemnosc = Number(oilContainerSizeSelect.value);
-        if (isNaN(pojemnosc) || pojemnosc <= 0) return;
-        const source = event.target;
-        if (source.id === 'converter-litry') {
-            if (converterSztukiInput) converterSztukiInput.value = '';
-            const litry = Number(source.value);
-            resultSztuki.textContent = litry > 0 ? `${(litry / pojemnosc).toFixed(3)} szt.` : '0.00 szt.';
-            resultLitry.textContent = litry > 0 ? source.value + ' L' : '0.00 L';
-        } else if (source.id === 'converter-sztuki') {
-            if (converterLitryInput) converterLitryInput.value = '';
-            const sztuki = Number(source.value);
-            resultLitry.textContent = sztuki > 0 ? `${(sztuki * pojemnosc).toFixed(2)} L` : '0.00 L';
-            resultSztuki.textContent = sztuki > 0 ? source.value + ' szt.' : '0.00 szt.';
-        } else {
-            if (converterLitryInput) converterLitryInput.value = '';
-            if (converterSztukiInput) converterSztukiInput.value = '';
-            resultLitry.textContent = '0.00 L';
-            resultSztuki.textContent = '0.00 szt.';
+    const buildOilProductData = ({ typ, pojemnosc, klient, ilosc }) => ({
+        index: `OLEJ-${typ}-${pojemnosc}L`,
+        nazwa: `Olej ${typ} ${pojemnosc}L`,
+        ilosc,
+        klient: klient || '---',
+        jestOlejem: true,
+        typOleju: typ,
+        pojemnosc,
+        createdAt: new Date(),
+        updatedAt: new Date()
+    });
+
+    const syncOilToolOptions = () => {
+        const types = new Set(OIL_TYPE_DEFAULTS);
+        const containers = new Set(OIL_CONTAINER_DEFAULTS.map(String));
+        wszystkieProdukty.forEach((produkt) => {
+            const { typOleju, pojemnosc } = parseOilMeta(produkt);
+            if (typOleju) types.add(typOleju);
+            if (pojemnosc) containers.add(String(pojemnosc));
+        });
+        const prevType = oilQuickTypeSelect?.value || '';
+        const prevQuickContainer = oilQuickContainerSelect?.value || '';
+        const prevConverterContainer = oilConverterContainer?.value || '';
+        const typeOptions = [...types].filter(Boolean).sort();
+        const containerOptions = [...containers]
+            .filter(Boolean)
+            .map(val => Number(val))
+            .filter(Number.isFinite)
+            .sort((a, b) => a - b)
+            .map(val => String(val));
+        const optionHtml = (items, formatter = (v) => v) => items.map(val => `<option value="${val}">${formatter(val)}</option>`).join('');
+        if (oilQuickTypeSelect) oilQuickTypeSelect.innerHTML = optionHtml(typeOptions);
+        if (oilQuickContainerSelect) oilQuickContainerSelect.innerHTML = optionHtml(containerOptions, v => `${v} L`);
+        if (oilConverterContainer) oilConverterContainer.innerHTML = optionHtml(containerOptions, v => `${v} L`);
+        if (oilQuickTypeSelect && typeOptions.includes(prevType)) oilQuickTypeSelect.value = prevType;
+        if (oilQuickContainerSelect && containerOptions.includes(prevQuickContainer)) oilQuickContainerSelect.value = prevQuickContainer;
+        if (oilConverterContainer && containerOptions.includes(prevConverterContainer)) oilConverterContainer.value = prevConverterContainer;
+    };
+
+    const updateOilConverter = (source) => {
+        if (!oilConverterContainer || !oilConverterLitersInput || !oilConverterUnitsInput) return;
+        const pojemnosc = Number(oilConverterContainer.value);
+        if (!Number.isFinite(pojemnosc) || pojemnosc <= 0) return;
+        if (source.value === '') {
+            if (source === oilConverterLitersInput) oilConverterUnitsInput.value = '';
+            if (source === oilConverterUnitsInput) oilConverterLitersInput.value = '';
+            return;
         }
-    }
+        const isLiters = source === oilConverterLitersInput;
+        const rawValue = Number(source.value);
+        if (!Number.isFinite(rawValue)) {
+            if (isLiters) oilConverterUnitsInput.value = '';
+            if (!isLiters) oilConverterLitersInput.value = '';
+            return;
+        }
+        if (isLiters) {
+            const units = rawValue / pojemnosc;
+            oilConverterUnitsInput.value = Number.isFinite(units) ? units.toFixed(2) : '';
+        } else {
+            const liters = rawValue * pojemnosc;
+            oilConverterLitersInput.value = Number.isFinite(liters) ? liters.toFixed(2) : '';
+        }
+    };
+
+    const setOilToolsTab = (tabId) => {
+        oilToolsTabs?.forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.drawerTab === tabId);
+        });
+        oilToolsPanels?.forEach(panel => {
+            panel.classList.toggle('is-active', panel.dataset.drawerPanel === tabId);
+        });
+    };
+
+    const adjustWarehouseStock = async ({ docId, changeQty, operation }) => {
+        if (!docId) return;
+        const docRef = doc(db, "magazyn", docId);
+        await runTransaction(db, async (t) => {
+            const sfDoc = await t.get(docRef);
+            if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
+            const produktData = sfDoc.data();
+            const currentQty = Number(produktData.ilosc) || 0;
+            const isOil = Boolean(produktData.jestOlejem);
+            if (!isOil && !Number.isInteger(changeQty)) {
+                throw "Dla tego produktu można podawać tylko liczby całkowite.";
+            }
+            let newQty = operation === 'add' ? currentQty + changeQty : currentQty - changeQty;
+            if (isOil) {
+                newQty = Number(newQty.toFixed(2));
+            }
+            if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
+            t.update(docRef, { ilosc: newQty, updatedAt: new Date() });
+        });
+    };
+
+    const findOilProduct = ({ typ, pojemnosc, klient }) => {
+        return wszystkieProdukty.find((produkt) => {
+            const meta = parseOilMeta(produkt);
+            const clientMatch = klient ? normalizeClientName(produkt.klient) === normalizeClientName(klient) : true;
+            return meta.typOleju === typ && Number(meta.pojemnosc) === Number(pojemnosc) && clientMatch;
+        });
+    };
+
+    const handleOilQuickAdd = async () => {
+        if (!oilQuickTypeSelect || !oilQuickContainerSelect || !oilQuickQuantityInput || !oilQuickUnitSelect) return;
+        const typ = oilQuickTypeSelect.value;
+        const pojemnosc = Number(oilQuickContainerSelect.value);
+        const unit = oilQuickUnitSelect.value;
+        const rawQty = Number(oilQuickQuantityInput.value);
+        const klient = oilQuickClientInput?.value.trim();
+        if (!typ || !Number.isFinite(pojemnosc) || pojemnosc <= 0) { alert("Uzupełnij typ i pojemność."); return; }
+        if (!Number.isFinite(rawQty) || rawQty <= 0) { alert("Podaj poprawną ilość."); return; }
+        const qtyInUnits = unit === 'L' ? rawQty / pojemnosc : rawQty;
+        const normalizedQty = Number(qtyInUnits.toFixed(2));
+        if (!Number.isFinite(normalizedQty) || normalizedQty <= 0) { alert("Ilość po przeliczeniu jest nieprawidłowa."); return; }
+
+        const existing = findOilProduct({ typ, pojemnosc, klient });
+        try {
+            if (existing) {
+                await adjustWarehouseStock({ docId: existing.id, changeQty: normalizedQty, operation: 'add' });
+            } else {
+                await addDoc(collection(db, "magazyn"), buildOilProductData({
+                    typ,
+                    pojemnosc,
+                    klient,
+                    ilosc: normalizedQty
+                }));
+            }
+            if (oilQuickQuantityInput) oilQuickQuantityInput.value = '';
+            if (oilQuickClientInput) oilQuickClientInput.value = '';
+        } catch (e) {
+            console.error("Błąd szybkiego dodawania oleju: ", e);
+            alert(`Wystąpił błąd: ${e.message || e}`);
+        }
+    };
 
     const updateSortButtons = () => {
         if (!magazynTable) return;
@@ -3941,14 +4059,28 @@ async function obslugaListyCzesci(event) {
                 : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
             const klientDisplay = normalizeClientName(produkt.klient);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
+            const oilActions = jestOlejem ? `
+                <button type="button" data-action="add-oil">Dodaj olej</button>
+                <button type="button" data-action="remove-oil">Zdejmij olej</button>
+            ` : '';
             return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-container="${pojemnosc || ''}">
                     <td data-label="Index">${produkt.index}</td>
                     <td data-label="Nazwa">${produkt.nazwa}</td>
                     <td data-label="Klient">${klientDisplay}</td>
                     <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
                     <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
-                    <td data-label="Ostatnia zmiana">${lastChange}</td>
-                    <td data-label="Akcje" class="actions-col"><button type="button" class="row-action-btn" data-action="details" aria-label="Szczegóły produktu">⋯</button></td>
+                    <td data-label="Ostatnia zmiana" class="date-col">${lastChange}</td>
+                    <td data-label="Akcje" class="actions-col">
+                        <div class="row-action">
+                            <button type="button" class="row-action-btn" data-action="menu" aria-label="Akcje">⋯</button>
+                            <div class="row-action-menu" role="menu">
+                                <button type="button" data-action="details">Szczegóły</button>
+                                <button type="button" data-action="add">Dodaj</button>
+                                <button type="button" data-action="remove">Zdejmij</button>
+                                ${oilActions}
+                            </div>
+                        </div>
+                    </td>
                 </tr>`;
         }).join('');
         magazynLista.innerHTML = rows || emptyRowHtml;
@@ -3978,9 +4110,10 @@ async function obslugaListyCzesci(event) {
         if (clientOptions.includes(prevClient)) magazynFilterClient.value = prevClient;
         if (oilOptions.includes(prevOilType)) magazynFilterOilType.value = prevOilType;
         if (containerOptions.includes(prevContainer)) magazynFilterContainer.value = prevContainer;
+        syncOilToolOptions();
     };
 
-    const openProductDetailsModal = (produkt) => {
+    const openProductDetailsModal = (produkt, operation = 'add') => {
         if (!produkt || !productDetailsModal) return;
         activeWarehouseProduct = produkt;
         const jestOlejem = Boolean(produkt.jestOlejem);
@@ -4000,20 +4133,52 @@ async function obslugaListyCzesci(event) {
             productChangeQtyInput.placeholder = jestOlejem ? 'np. 0.5' : 'np. 2';
         }
         if (productChangeUnit) productChangeUnit.textContent = 'szt';
-        qtyToggleButtons?.forEach(btn => btn.classList.toggle('is-active', btn.dataset.op === 'add'));
-        stockChangeOperation = 'add';
+        qtyToggleButtons?.forEach(btn => btn.classList.toggle('is-active', btn.dataset.op === operation));
+        stockChangeOperation = operation;
         openModal(productDetailsModal);
     };
 
     const getProductById = (id) => wszystkieProdukty.find(p => p.id === id);
 
+    const closeRowActionMenus = (except = null) => {
+        if (!magazynTable) return;
+        magazynTable.querySelectorAll('.row-action').forEach(menu => {
+            if (menu !== except) menu.classList.remove('is-open');
+        });
+    };
+
     const handleMagazynRowClick = (event) => {
-        const tr = event.target.closest('tr'); if (!tr || !tr.dataset.id) return;
-        const actionButton = event.target.closest('.row-action-btn');
-        if (actionButton || tr) {
-            const produkt = getProductById(tr.dataset.id);
-            if (produkt) openProductDetailsModal(produkt);
+        const tr = event.target.closest('tr');
+        if (!tr || !tr.dataset.id) return;
+        const produkt = getProductById(tr.dataset.id);
+        if (!produkt) return;
+
+        const actionButton = event.target.closest('[data-action]');
+        if (actionButton) {
+            const action = actionButton.dataset.action;
+            const actionMenu = actionButton.closest('.row-action');
+            if (action === 'menu') {
+                const isOpen = actionMenu?.classList.toggle('is-open');
+                closeRowActionMenus(isOpen ? actionMenu : null);
+                return;
+            }
+            closeRowActionMenus();
+            if (action === 'details') {
+                openProductDetailsModal(produkt, 'add');
+                return;
+            }
+            if (action === 'add' || action === 'add-oil') {
+                openProductDetailsModal(produkt, 'add');
+                return;
+            }
+            if (action === 'remove' || action === 'remove-oil') {
+                openProductDetailsModal(produkt, 'remove');
+                return;
+            }
         }
+
+        closeRowActionMenus();
+        openProductDetailsModal(produkt, 'add');
     };
 
     const updateStockOperation = (op) => {
@@ -4049,27 +4214,11 @@ async function obslugaListyCzesci(event) {
         const docId = productEditId.value;
         const changeQty = Number(productChangeQtyInput.value);
         if (!Number.isFinite(changeQty) || changeQty <= 0) { alert("Ilość musi być dodatnią liczbą."); return; }
-        const docRef = doc(db, "magazyn", docId);
         try {
-            await runTransaction(db, async (t) => {
-                const sfDoc = await t.get(docRef);
-                if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
-                const produktData = sfDoc.data();
-                const currentQty = Number(produktData.ilosc) || 0;
-                const isOil = Boolean(produktData.jestOlejem);
-                if (!isOil && !Number.isInteger(changeQty)) {
-                    throw "Dla tego produktu można podawać tylko liczby całkowite.";
-                }
-                let newQty = operation === 'add' ? currentQty + changeQty : currentQty - changeQty;
-                if (isOil) {
-                    newQty = Number(newQty.toFixed(2));
-                }
-                if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
-                t.update(docRef, { ilosc: newQty, updatedAt: new Date() });
-            });
+            await adjustWarehouseStock({ docId, changeQty, operation });
             if (productDetailsModal) {
                 const updated = getProductById(docId);
-                if (updated) openProductDetailsModal(updated);
+                if (updated) openProductDetailsModal(updated, operation);
             }
         } catch (e) {
             console.error("Błąd transakcji: ", e);
@@ -4112,9 +4261,21 @@ async function obslugaListyCzesci(event) {
 
    // --- PODPIĘCIE EVENTÓW ---
     if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
+    if (klientAddBtn) {
+        klientAddBtn.addEventListener('click', () => {
+            klientForm?.reset();
+            setClientDrawerMode('add');
+        });
+    }
     if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
 
     if (maszynaForm) maszynaForm.addEventListener('submit', dodajMaszyne);
+    if (maszynaAddBtn) {
+        maszynaAddBtn.addEventListener('click', () => {
+            maszynaForm?.reset();
+            setMachineDrawerMode('add');
+        });
+    }
     if (listaMaszynDiv) listaMaszynDiv.addEventListener('click', obslugaListyMaszyn);
 
     // ZLECENIA
@@ -4183,6 +4344,13 @@ async function obslugaListyCzesci(event) {
     }
     if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
     if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { openModal(bulkAddModal); });
+    if (magazynOilToolsBtn) {
+        magazynOilToolsBtn.addEventListener('click', () => {
+            syncOilToolOptions();
+            setOilToolsTab('converter');
+            openDrawer(oilToolsDrawer);
+        });
+    }
     if (itemIsOilCheckbox) {
         itemIsOilCheckbox.addEventListener('change', () => setOilFieldsVisibility(itemIsOilCheckbox.checked));
     }
@@ -4279,6 +4447,9 @@ async function obslugaListyCzesci(event) {
         });
     }
     document.addEventListener('click', (event) => {
+        if (!event.target.closest('.row-action')) {
+            closeRowActionMenus();
+        }
         const exportTrigger = event.target.closest('.export-trigger');
         const exportItem = event.target.closest('.export-menu-item');
         const openMenus = document.querySelectorAll('.export-menu.is-open');
@@ -4369,12 +4540,23 @@ async function obslugaListyCzesci(event) {
         });
     }
 
-    if (addOilBtn) addOilBtn.addEventListener('click', dodajOlej);
-    if (converterLitryInput) converterLitryInput.addEventListener('input', przeliczOlej);
-    if (converterSztukiInput) converterSztukiInput.addEventListener('input', przeliczOlej);
-    if (oilContainerSizeSelect) {
-        oilContainerSizeSelect.addEventListener('change', () => { przeliczOlej({ target: { id: '' } }); });
+    if (oilToolsTabs) {
+        oilToolsTabs.forEach(btn => {
+            btn.addEventListener('click', () => setOilToolsTab(btn.dataset.drawerTab));
+        });
     }
+    if (oilConverterLitersInput) oilConverterLitersInput.addEventListener('input', () => updateOilConverter(oilConverterLitersInput));
+    if (oilConverterUnitsInput) oilConverterUnitsInput.addEventListener('input', () => updateOilConverter(oilConverterUnitsInput));
+    if (oilConverterContainer) {
+        oilConverterContainer.addEventListener('change', () => {
+            if (oilConverterLitersInput?.value) {
+                updateOilConverter(oilConverterLitersInput);
+            } else if (oilConverterUnitsInput?.value) {
+                updateOilConverter(oilConverterUnitsInput);
+            }
+        });
+    }
+    if (oilQuickSubmitBtn) oilQuickSubmitBtn.addEventListener('click', handleOilQuickAdd);
 
     // KALENDARZ (modal + klik w kalendarzu)
     if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
@@ -4406,12 +4588,8 @@ async function obslugaListyCzesci(event) {
     if (editMaszynaForm) editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
     if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
-    if (editKlientCloseButton && editKlientModal) {
-        editKlientCloseButton.onclick = () => { hideModal(editKlientModal); };
-    }
-    if (editMaszynaCloseButton && editMaszynaModal) {
-        editMaszynaCloseButton.onclick = () => { hideModal(editMaszynaModal); };
-    }
+    if (clientDeleteBtn) clientDeleteBtn.addEventListener('click', usunKlienta);
+    if (machineDeleteBtn) machineDeleteBtn.addEventListener('click', usunMaszyne);
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
         detailsZlecenieCloseButton.onclick = () => { hideModal(detailsZlecenieModal); };
     }
@@ -4421,6 +4599,12 @@ async function obslugaListyCzesci(event) {
     if (machineHistoryCloseButton && machineHistoryModal) {
         machineHistoryCloseButton.onclick = () => { hideModal(machineHistoryModal); };
     }
+
+    [clientDrawer, machineDrawer, oilToolsDrawer].forEach((drawer) => {
+        drawer?.querySelectorAll('[data-drawer-close]').forEach(btn => {
+            btn.addEventListener('click', () => closeDrawer(drawer));
+        });
+    });
 
     // Klik poza modal zamyka go
     window.onclick = (event) => {
