@@ -310,6 +310,7 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   setCalendarEvents(events);
   setDayFlags(flags);
+  try { calendar.removeAllEvents?.(); } catch (_) {}
   calendar.refetchEvents();
   try { calendar.rerenderDates?.(); } catch (_) {}
 }

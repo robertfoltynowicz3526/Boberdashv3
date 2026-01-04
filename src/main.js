@@ -1091,11 +1091,11 @@ function initializeApp() {
                         const eventDay = normalizeDayKey(dayStr, 'order-event');
                         if (!eventDay) return;
                         events.push({
-                            id: `order_${order.orderId}`,
+                            id: `order_${order.orderId}_${eventDay}`,
                             start: eventDay,
                             allDay: true,
                             title: order.clientName || 'Zlecenie',
-                            className: ['order-event'],
+                            classNames: ['order-event'],
                             extendedProps: { day: eventDay, orderId: order.orderId }
                         });
                     });
@@ -1103,6 +1103,8 @@ function initializeApp() {
             });
 
             rebuildCalendarDecorations();
+
+            console.log('orderEvents:', events.length, events.slice(0, 3));
 
             workEvents = events;
             przerysujZdarzeniaKalendarza();
