@@ -439,11 +439,19 @@ function initializeApp() {
         return days;
     };
 
-    const isOrderActive = (order) => order && (order.status === 'aktywne' || order.status === 'nieprzypisane');
-
-    const buildActiveOrderIndex = () => new Map(
-        _wszystkieZleceniaCache.filter(isOrderActive).map(order => [order.id, order])
+    const buildOrderIndex = () => new Map(
+        _wszystkieZleceniaCache.map(order => [order.id, order])
     );
+
+    const hashString = (value) => {
+        const source = String(value || '');
+        let hash = 0;
+        for (let i = 0; i < source.length; i += 1) {
+            hash = ((hash << 5) - hash) + source.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash).toString(36);
+    };
 
     const resolveOrderClientName = (orderId, entryClientName, orderIndex) => {
         if (entryClientName) return entryClientName;
@@ -460,27 +468,16 @@ function initializeApp() {
         over: parsePlNumber(dayDoc?.nadgodziny ?? 0),
     });
 
-    const buildOrdersForDay = (dayDoc = {}, activeOrderIndex) => {
-        const entries = Array.isArray(dayDoc?.zleceniaPowiazane)
-            ? dayDoc.zleceniaPowiazane.filter(entry => entry?.zlecenieId)
-            : [];
-        if (!entries.length && dayDoc?.zlecenieId) {
-            entries.push({
-                zlecenieId: dayDoc.zlecenieId,
-                klientNazwa: dayDoc.klientNazwa || null,
-                fakturowane: dayDoc.fakturowane ?? 0
-            });
-        }
-        return entries
-            .filter(entry => activeOrderIndex.has(entry.zlecenieId))
-            .map(entry => ({
-                orderId: entry.zlecenieId,
-                clientName: resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, activeOrderIndex),
-                work: parsePlNumber(entry?.work ?? 0),
-                drive: parsePlNumber(entry?.drive ?? 0),
-                billed: parsePlNumber(entry?.fakturowane ?? 0),
-                over: parsePlNumber(entry?.over ?? 0),
-            }));
+    const buildOrdersForDay = (dayDoc = {}, orderIndex) => {
+        const { powiazane } = normalizujPowiazaneZlecenia(dayDoc || {});
+        return powiazane.map(entry => ({
+            orderId: entry.zlecenieId,
+            clientName: resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex),
+            work: parsePlNumber(entry?.work ?? 0),
+            drive: parsePlNumber(entry?.drive ?? 0),
+            billed: parsePlNumber(entry?.fakturowane ?? 0),
+            over: parsePlNumber(entry?.over ?? 0),
+        }));
     };
 
     const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
@@ -489,10 +486,13 @@ function initializeApp() {
         const end = rangeEnd || view?.currentEnd || null;
         const summaryByDay = {};
         const leaveByDayOut = {};
+        const orderEvents = [];
+        const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
             ...manualByDay.keys(),
             ...ordersByDay.keys(),
-            ...leaveByDay.keys()
+            ...leaveByDay.keys(),
+            ...dayDocsByDay.keys()
         ]));
 
         daysToRender.forEach((dayStr) => {
@@ -503,12 +503,31 @@ function initializeApp() {
                 leaveByDayOut[normalizedDay] = leaveKind;
                 return;
             }
+            const dayDoc = dayDocsByDay.get(normalizedDay);
+            if (dayDoc) {
+                const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
+                powiazane.forEach((entry) => {
+                    const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
+                    const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
+                    orderEvents.push({
+                        id: `client_${normalizedDay}_${idSuffix}`,
+                        start: normalizedDay,
+                        allDay: true,
+                        title: clientName || 'Zlecenie',
+                        classNames: ['order-event'],
+                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null }
+                    });
+                });
+            }
             if (SHOW_ZERO_DAYS || hasData) {
                 summaryByDay[normalizedDay] = totals;
             }
         });
 
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
+        console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
+        workEvents = orderEvents;
+        updateCalendarData(calendar, workEvents, []);
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -998,14 +1017,14 @@ function initializeApp() {
                 console.error('[calendar] invalid save day key', { data });
                 return;
             }
-            const activeOrderIndex = buildActiveOrderIndex();
+            const orderIndex = buildOrderIndex();
             const dayDocForTotals = buildDayDocForTotals({
                 ...normalizeDayRecord(dayKey, dane),
                 zleceniaPowiazane: normalizujPowiazaneZlecenia(dane).powiazane
             });
             dayDocsByDay.set(dayKey, dayDocForTotals);
             manualByDay.set(dayKey, buildManualDayDoc(dayDocForTotals));
-            ordersByDay.set(dayKey, buildOrdersForDay(dayDocForTotals, activeOrderIndex));
+            ordersByDay.set(dayKey, buildOrdersForDay(dayDocForTotals, orderIndex));
             const leaveKindNormalized = normalizeDayLeaveValue(selectedLeaveKind || '');
             if (leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE) {
                 leaveByDay.set(dayKey, leaveKindNormalized);
@@ -1051,14 +1070,13 @@ function initializeApp() {
         }
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
             wszystkieWpisyKalendarza = [];
-            const events = [];
             manualByDay = new Map();
             ordersByDay = new Map();
             dayDocsByDay = new Map();
             leaveByDay = new Map();
             window.__lastDayDocs = {};
 
-            const activeOrderIndex = buildActiveOrderIndex();
+            const orderIndex = buildOrderIndex();
             snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
@@ -1078,36 +1096,17 @@ function initializeApp() {
                 const dayDocForTotals = buildDayDocForTotals({ ...normalizedDay, zleceniaPowiazane: powiazane });
                 dayDocsByDay.set(dayStr, dayDocForTotals);
                 manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
-                const ordersForDay = buildOrdersForDay(dayDocForTotals, activeOrderIndex);
+                const ordersForDay = buildOrdersForDay(dayDocForTotals, orderIndex);
                 ordersByDay.set(dayStr, ordersForDay);
                 const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null);
                 if (leaveKind) {
                     leaveByDay.set(dayStr, leaveKind);
                 }
 
-                const { isLeave } = computeDayTotals(dayStr);
-                if (!isLeave && ordersForDay.length) {
-                    ordersForDay.forEach((order) => {
-                        const eventDay = normalizeDayKey(dayStr, 'order-event');
-                        if (!eventDay) return;
-                        events.push({
-                            id: `order_${order.orderId}_${eventDay}`,
-                            start: eventDay,
-                            allDay: true,
-                            title: order.clientName || 'Zlecenie',
-                            classNames: ['order-event'],
-                            extendedProps: { day: eventDay, orderId: order.orderId }
-                        });
-                    });
-                }
+                computeDayTotals(dayStr);
             });
 
             rebuildCalendarDecorations();
-
-            console.log('orderEvents:', events.length, events.slice(0, 3));
-
-            workEvents = events;
-            przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
         });
     }

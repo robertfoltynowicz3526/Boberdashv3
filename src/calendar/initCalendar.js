@@ -311,6 +311,16 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   setCalendarEvents(events);
   setDayFlags(flags);
   try { calendar.removeAllEvents?.(); } catch (_) {}
+  try { calendar.removeAllEventSources?.(); } catch (_) {}
+  try {
+    if (typeof calendar.addEventSource === 'function') {
+      calendar.addEventSource(Array.isArray(events) ? events : []);
+    } else if (typeof calendar.setOption === 'function') {
+      calendar.setOption('events', Array.isArray(events) ? events : []);
+    }
+  } catch (e) {
+    console.warn('[calendar] failed to add event source', e);
+  }
   calendar.refetchEvents();
   try { calendar.rerenderDates?.(); } catch (_) {}
 }

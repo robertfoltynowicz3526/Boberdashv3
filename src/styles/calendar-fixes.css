@@ -135,7 +135,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 /* Zostaw miejsce na kafel sumy (żeby eventy nie nachodziły) */
-.fc .fc-daygrid-day-events { padding-bottom: 38px; }
+.fc .fc-daygrid-day-events { padding-bottom: 44px; }
 
 /* DUŻA IKONA WOLNEGO – tylko ona w dniu wolnym */
 .fc .cell-leave-icon{
