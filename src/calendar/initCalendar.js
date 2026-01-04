@@ -79,6 +79,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return [];
     },
     dayCellDidMount: (arg) => {
+      arg.el.dataset.test = 'ok';
       const day = normalizeDateKey(arg.date);
       const deco = window.__calendarDecorations || {};
       const leave = deco.leaveByDay?.[day];     // 'L4'|'SWIETO'|'URL'|undefined
@@ -261,6 +262,7 @@ export function initCalendar(hostEl, events = [], flags = [], extraOptions = {})
   const calendar = bootCalendar(extraOptions, hostEl);
   if (calendar) {
     calendar.refetchEvents();
+    try { calendar.rerenderDates?.(); } catch (_) {}
   }
   return calendar;
 }
@@ -270,4 +272,5 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   setCalendarEvents(events);
   setDayFlags(flags);
   calendar.refetchEvents();
+  try { calendar.rerenderDates?.(); } catch (_) {}
 }

@@ -26,6 +26,8 @@ const normalizeFlagType = (value) => {
   return null;
 };
 
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 let dailyEntries = new Map();
 let dayFlags = new Map();
 let cachedEvents = [];
@@ -62,7 +64,33 @@ export function setDayFlags(flags = []) {
 }
 
 export function setCalendarEvents(events = []) {
-  cachedEvents = Array.isArray(events) ? [...events] : [];
+  const normalized = [];
+  (Array.isArray(events) ? events : []).forEach((event) => {
+    if (!event) return;
+    let start = event.start ?? event.date;
+    if (typeof start === 'string') {
+      const trimmed = start.slice(0, 10);
+      if (!DATE_KEY_RE.test(trimmed)) {
+        console.error('[calendar] invalid event start', { start, event });
+        return;
+      }
+      start = trimmed;
+    } else if (start instanceof Date) {
+      if (Number.isNaN(start.getTime())) {
+        console.error('[calendar] invalid event start', { start, event });
+        return;
+      }
+    } else {
+      console.error('[calendar] invalid event start', { start, event });
+      return;
+    }
+    normalized.push({
+      ...event,
+      start,
+      allDay: event.allDay ?? true,
+    });
+  });
+  cachedEvents = normalized;
 }
 
 export function getDayFlagsSync(date) {

@@ -8,7 +8,23 @@ import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { computeDayTotals } from './calendar/computeDayTotals.js';
 
-const isoDay = (d) => (typeof d === 'string' ? d.slice(0, 10) : new Date(d).toISOString().slice(0, 10));
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const normalizeDayKey = (value, context = '') => {
+    if (!value) return null;
+    let key = null;
+    if (typeof value === 'string') {
+        key = value.slice(0, 10);
+    } else if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        key = value.toISOString().slice(0, 10);
+    }
+    if (!key || key.length !== 10 || !DATE_KEY_RE.test(key)) {
+        console.error('[calendar] invalid day key', { context, value, key });
+        return null;
+    }
+    return key;
+};
+
+const isoDay = (d, context = 'isoDay') => normalizeDayKey(d, context) || '';
 
 const parsePlNumber = (v) => {
     if (v == null) return 0;
@@ -25,6 +41,8 @@ const setDecorations = (decorations) => {
         window.__fcCalendar = window.calendar;
     }
     try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
+    try { window.__fcCalendar?.refetchEvents?.(); } catch (_) { }
+    console.log('calendar?', !!window.__fcCalendar);
 };
 
 
@@ -480,15 +498,17 @@ function initializeApp() {
         ]));
 
         daysToRender.forEach((dayStr) => {
-            const leaveKind = leaveByDay.get(dayStr);
+            const normalizedDay = normalizeDayKey(dayStr, 'rebuildCalendarDecorations');
+            if (!normalizedDay) return;
+            const leaveKind = leaveByDay.get(normalizedDay);
             if (leaveKind) {
-                leaveByDayOut[dayStr] = leaveKind;
-                logDebugDayTotals(dayStr, dayDocsByDay.get(dayStr) || null, null, false);
+                leaveByDayOut[normalizedDay] = leaveKind;
+                logDebugDayTotals(normalizedDay, dayDocsByDay.get(normalizedDay) || null, null, false);
                 return;
             }
-            const manualDayDoc = manualByDay.get(dayStr) || { work: 0, drive: 0, billed: 0, over: 0 };
-            const ordersForDay = ordersByDay.get(dayStr) || [];
-            const totals = computeDayTotals(dayStr, manualDayDoc, ordersForDay);
+            const manualDayDoc = manualByDay.get(normalizedDay) || { work: 0, drive: 0, billed: 0, over: 0 };
+            const ordersForDay = ordersByDay.get(normalizedDay) || [];
+            const totals = computeDayTotals(normalizedDay, manualDayDoc, ordersForDay);
             const hasAny =
                 ordersForDay.length > 0 ||
                 totals.work !== 0 ||
@@ -496,12 +516,13 @@ function initializeApp() {
                 totals.billed !== 0 ||
                 totals.over !== 0;
             if (SHOW_ZERO_DAYS || hasAny) {
-                summaryByDay[dayStr] = totals;
+                summaryByDay[normalizedDay] = totals;
             }
-            logDebugDayTotals(dayStr, dayDocsByDay.get(dayStr) || null, totals, Boolean(summaryByDay[dayStr]));
+            logDebugDayTotals(normalizedDay, dayDocsByDay.get(normalizedDay) || null, totals, Boolean(summaryByDay[normalizedDay]));
         });
 
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut });
+        console.log('summary days:', Object.keys(summaryByDay).length);
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -662,12 +683,6 @@ function initializeApp() {
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
     const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
     const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
-    function normalizeDayKey(value) {
-        if (!value) return null;
-        if (typeof value === 'string') return value.slice(0, 10);
-        if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
-        return null;
-    }
 
     const openEwidencja = (dateStr) => {
         const normalized = dateStr || '';
@@ -1058,7 +1073,8 @@ function initializeApp() {
             snapshotGodziny.forEach((docSnap) => {
                 const dane = docSnap.data();
                 const id = docSnap.id;
-                const dayStr = isoDay(id);
+                const dayStr = normalizeDayKey(id, 'godziny_pracy.id');
+                if (!dayStr) return;
                 window.__lastDayDocs[dayStr] = dane;
                 const normalizedDay = normalizeDayRecord(id, dane);
                 const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
@@ -1082,13 +1098,15 @@ function initializeApp() {
 
                 if (!leaveKind && ordersForDay.length) {
                     ordersForDay.forEach((order) => {
+                        const eventDay = normalizeDayKey(dayStr, 'order-event');
+                        if (!eventDay) return;
                         events.push({
                             id: `order_${order.orderId}`,
-                            start: dayStr,
+                            start: eventDay,
                             allDay: true,
                             title: order.clientName || 'Zlecenie',
                             className: ['order-event'],
-                            extendedProps: { day: dayStr, orderId: order.orderId }
+                            extendedProps: { day: eventDay, orderId: order.orderId }
                         });
                     });
                 }
@@ -1122,6 +1140,7 @@ function initializeApp() {
             rebuildCalendarDecorations();
 
             workEvents = events;
+            console.log('events:', workEvents.length);
             przerysujZdarzeniaKalendarza();
             odswiezPodsumowania();
         });
