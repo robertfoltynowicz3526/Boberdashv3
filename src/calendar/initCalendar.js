@@ -4,6 +4,13 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
+const SUMMARY_DISPLAY_MODES = new Set(['auto', 'full', 'short']);
+const SUMMARY_DISPLAY_BREAKPOINT = 1200;
+const SUMMARY_DISPLAY_DEFAULT = 'auto';
+let summaryDisplayMode = SUMMARY_DISPLAY_DEFAULT;
+let summaryDisplayEffective = null;
+let summaryDisplayCalendarEl = null;
 const normalizeDateKey = (value, context = '') => {
   if (!value) return '';
   let key = '';
@@ -20,6 +27,93 @@ const normalizeDateKey = (value, context = '') => {
   }
   return key;
 };
+
+const getStoredSummaryDisplayMode = () => {
+  if (typeof window === 'undefined') return SUMMARY_DISPLAY_DEFAULT;
+  try {
+    const stored = window.localStorage?.getItem?.(SUMMARY_DISPLAY_STORAGE_KEY);
+    return SUMMARY_DISPLAY_MODES.has(stored) ? stored : SUMMARY_DISPLAY_DEFAULT;
+  } catch (_) {
+    return SUMMARY_DISPLAY_DEFAULT;
+  }
+};
+
+const resolveSummaryDisplayMode = () => {
+  if (summaryDisplayMode === 'auto') {
+    if (typeof window === 'undefined') return 'full';
+    return window.innerWidth < SUMMARY_DISPLAY_BREAKPOINT ? 'short' : 'full';
+  }
+  return summaryDisplayMode;
+};
+
+const applySummaryDisplayAttributes = (calendarEl) => {
+  const effective = resolveSummaryDisplayMode();
+  summaryDisplayEffective = effective;
+  const target = calendarEl?.closest?.('#calendar-shell') || calendarEl;
+  if (target) {
+    target.dataset.summaryDisplay = effective;
+    target.dataset.summaryDisplayPref = summaryDisplayMode;
+  }
+  return effective;
+};
+
+const getEffectiveSummaryDisplayMode = () => summaryDisplayEffective || resolveSummaryDisplayMode();
+
+const setSummaryDisplayMode = (mode) => {
+  summaryDisplayMode = SUMMARY_DISPLAY_MODES.has(mode) ? mode : SUMMARY_DISPLAY_DEFAULT;
+  try {
+    window.localStorage?.setItem?.(SUMMARY_DISPLAY_STORAGE_KEY, summaryDisplayMode);
+  } catch (_) {}
+};
+
+const refreshCalendarSummaries = (calendarEl) => {
+  try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
+  try { applyDecorationsFromPlaceholders(calendarEl?.ownerDocument || document); } catch (_) {}
+};
+
+const ensureSummaryDisplayControl = (calendarEl) => {
+  if (!calendarEl) return;
+  const toolbar = calendarEl.querySelector('.fc-header-toolbar') || calendarEl.querySelector('.fc-toolbar');
+  if (!toolbar) return;
+  const rightChunk = toolbar.querySelector('.fc-toolbar-chunk:last-child') || toolbar;
+  let wrapper = toolbar.querySelector('.summary-display-control');
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'summary-display-control';
+    const select = document.createElement('select');
+    select.className = 'summary-display-select';
+    select.setAttribute('aria-label', 'Tryb podsumowania dnia');
+    select.title = 'Tryb podsumowania dnia';
+    select.innerHTML = `
+      <option value="auto">Auto</option>
+      <option value="full">Pełne</option>
+      <option value="short">Skróty</option>
+    `;
+    select.value = summaryDisplayMode;
+    select.addEventListener('change', () => {
+      setSummaryDisplayMode(select.value);
+      applySummaryDisplayAttributes(calendarEl);
+      refreshCalendarSummaries(calendarEl);
+    });
+    wrapper.appendChild(select);
+    rightChunk.appendChild(wrapper);
+  } else {
+    const select = wrapper.querySelector('select');
+    if (select && select.value !== summaryDisplayMode) {
+      select.value = summaryDisplayMode;
+    }
+  }
+};
+
+const handleSummaryDisplayResize = () => {
+  if (!summaryDisplayCalendarEl || summaryDisplayMode !== 'auto') return;
+  const next = resolveSummaryDisplayMode();
+  if (next === summaryDisplayEffective) return;
+  applySummaryDisplayAttributes(summaryDisplayCalendarEl);
+  refreshCalendarSummaries(summaryDisplayCalendarEl);
+};
+
+summaryDisplayMode = getStoredSummaryDisplayMode();
 
 const isLeaveDay = (date) => {
   const key = normalizeDateKey(date);
@@ -70,13 +164,19 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   if (summary) {
     const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
     const footer = document.createElement('div');
-    footer.className = 'day-summary';
+    const displayMode = getEffectiveSummaryDisplayMode();
+    footer.className = `day-summary day-summary--${displayMode}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
-    row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
     const row2 = document.createElement('div');
     row2.className = 'day-summary-row';
-    row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+    if (displayMode === 'short') {
+      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
+      row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+    } else {
+      row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
+      row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+    }
     footer.appendChild(row1);
     footer.appendChild(row2);
     frame.appendChild(footer);
@@ -248,6 +348,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (typeof extraDatesSet === 'function') extraDatesSet(...args);
       try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
       try { applyDecorationsFromPlaceholders(); } catch (_) {}
+      try { ensureSummaryDisplayControl(window.__fcCalendar?.el); } catch (_) {}
     },
     eventsSet: (...args) => {
       if (typeof extraEventsSet === 'function') extraEventsSet(...args);
@@ -280,6 +381,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     calendar = new Calendar(el, resourceOptions);
     window.__fcCalendar = calendar;
     calendar.render();
+    summaryDisplayCalendarEl = calendar.el;
+    applySummaryDisplayAttributes(calendar.el);
+    ensureSummaryDisplayControl(calendar.el);
     window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
     try { applyDecorationsFromPlaceholders(); } catch (_) {}
   } catch (e) {
@@ -291,6 +395,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         calendar = new Calendar(el, fallbackOptions);
         window.__fcCalendar = calendar;
         calendar.render();
+        summaryDisplayCalendarEl = calendar.el;
+        applySummaryDisplayAttributes(calendar.el);
+        ensureSummaryDisplayControl(calendar.el);
         window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
         try { applyDecorationsFromPlaceholders(); } catch (_) {}
         const noteId = 'calendar-fallback-note';
@@ -320,6 +427,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
   }
   if (!ro) {
     window.addEventListener('resize', () => window.__fcCalendar?.updateSize?.());
+  }
+  if (typeof window !== 'undefined' && !window.__summaryDisplayResizeBound) {
+    window.__summaryDisplayResizeBound = true;
+    window.addEventListener('resize', handleSummaryDisplayResize);
   }
 
   document.getElementById('btnPrev')?.addEventListener('click', () => calendar.prev());
