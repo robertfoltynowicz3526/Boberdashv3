@@ -916,8 +916,11 @@ select {
   padding: 4px 6px;
   line-height: 1.2;
   max-height: 2.4em;
+  max-width: 100%;
   overflow: hidden;
   white-space: normal;
+  box-sizing: border-box;
+  z-index: 4;
 }
 
 .fc .day-summary .day-summary-row {

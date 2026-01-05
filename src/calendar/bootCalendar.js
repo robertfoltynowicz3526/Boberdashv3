@@ -7,6 +7,43 @@ export function bootCalendar() {
   const host = document.getElementById('calendar');
   if (!host) return;
 
+  const fetchDailyTotals = async (date) => {
+    try {
+      return await getDailyTotals(date);
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  };
+
+  const buildSummaryModel = (totals) => {
+    if (!totals || totals.l4 || totals.urlop || totals.swieto) return null;
+    const work = Number(totals.work ?? 0);
+    const drive = Number(totals.drive ?? 0);
+    const billed = Number(totals.billed ?? 0);
+    if (work + drive + billed === 0) return null;
+    return {
+      work,
+      drive,
+      billed,
+    };
+  };
+
+  const renderDaySummary = (cellEl, model) => {
+    if (!cellEl || !model) return;
+    const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+    const footer = document.createElement('div');
+    footer.className = 'day-summary';
+    const row = document.createElement('div');
+    row.className = 'day-summary-row';
+    row.innerHTML =
+      `Praca: <b>${model.work.toFixed(1)}h</b> • ` +
+      `Jazda: <b>${model.drive.toFixed(1)}h</b> • ` +
+      `Fakturowane: <b>${model.billed.toFixed(1)}h</b>`;
+    footer.appendChild(row);
+    frame.appendChild(footer);
+  };
+
   const cal = new Calendar(host, {
     plugins: [dayGridPlugin, interactionPlugin],
     initialView: 'dayGridMonth',
@@ -30,20 +67,9 @@ export function bootCalendar() {
 
     dayCellDidMount: (arg) => {
       (async () => {
-        try {
-          const t = await getDailyTotals(arg.date);
-          if (!t || t.l4 || t.urlop || t.swieto) return; // NIE pokazuj sum w dniach wolnych
-          if ((t.work ?? 0) + (t.drive ?? 0) + (t.billed ?? 0) === 0) return;
-          const frame = arg.el.querySelector('.fc-daygrid-day-frame');
-          if (!frame) return;
-          const footer = document.createElement('div');
-          footer.style.cssText = 'margin-top:4px;font-size:12px;opacity:.95;';
-          footer.innerHTML =
-            `• Praca: <b>${(t.work ?? 0).toFixed(1)}h</b>&nbsp;` +
-            `• Jazda: <b>${(t.drive ?? 0).toFixed(1)}h</b>&nbsp;` +
-            `• Fakturowane: <b>${(t.billed ?? 0).toFixed(1)}h</b>`;
-          frame.appendChild(footer);
-        } catch {}
+        const totals = await fetchDailyTotals(arg.date);
+        const model = buildSummaryModel(totals);
+        renderDaySummary(arg.el, model);
       })();
     },
   });
