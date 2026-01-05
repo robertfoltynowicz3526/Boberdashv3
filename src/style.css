@@ -922,6 +922,19 @@ select {
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
 }
 
+#calendar-shell[data-summary-display="short"] .fc {
+  --day-summary-space: 52px;
+}
+
+.fc .day-summary.day-summary--short {
+  font-size: 10px;
+  line-height: 1.1;
+}
+
+.fc .day-summary.day-summary--full {
+  font-size: 11px;
+}
+
 .fc .day-summary .day-summary-row {
   display: block;
   white-space: nowrap;
