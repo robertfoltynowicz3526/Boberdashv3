@@ -138,6 +138,18 @@ export const computeDayTotals = (dayStr) => {
   return { totals, isLeave, hasData, leaveKind };
 };
 
+export const aggregateDayData = (dayStr) => {
+  const { totals, hasData, leaveKind } = computeDayTotals(dayStr);
+  return {
+    praca: totals.work,
+    jazda: totals.drive,
+    fakturowane: totals.billed,
+    nadgodziny: totals.over,
+    status: leaveKind || null,
+    hasAnyData: hasData,
+  };
+};
+
 export const __testables = {
   normalizeDayKey,
   parsePlNumber,
