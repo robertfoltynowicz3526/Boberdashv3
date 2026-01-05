@@ -552,6 +552,27 @@
                         <button type="submit" class="btn-add">Dodaj klienta</button>
                     </div>
                 </form>
+                <div id="client-view" class="drawer-form is-hidden">
+                    <div class="form-group">
+                        <label>Nazwa / Imię i nazwisko:</label>
+                        <p id="client-view-name">—</p>
+                    </div>
+                    <div class="form-group">
+                        <label>NIP:</label>
+                        <p id="client-view-nip">—</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Adres:</label>
+                        <p id="client-view-address">—</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Telefon:</label>
+                        <p id="client-view-phone">—</p>
+                    </div>
+                    <div class="drawer-actions">
+                        <button type="button" id="client-view-edit-btn" class="btn-edit">Edytuj</button>
+                    </div>
+                </div>
                 <form id="edit-klient-form" class="drawer-form is-hidden">
                     <input type="hidden" id="edit-klient-id">
                     <div class="form-group"><label for="edit-klient-nazwa">Nazwa / Imię i nazwisko:</label><input type="text" id="edit-klient-nazwa" required></div>
@@ -560,6 +581,7 @@
                     <div class="form-group"><label for="edit-klient-telefon">Telefon:</label><input type="text" id="edit-klient-telefon"></div>
                     <div class="drawer-actions">
                         <button type="submit" class="btn-add">Zapisz zmiany</button>
+                        <button type="button" id="client-edit-cancel-btn" class="btn-secondary">Anuluj</button>
                         <button type="button" id="client-delete-btn" class="btn-danger">Usuń klienta</button>
                     </div>
                 </form>
