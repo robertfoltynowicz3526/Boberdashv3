@@ -577,6 +577,13 @@ function initializeApp() {
     const detailsZlecenieModal = document.getElementById('details-zlecenie-modal');
     const detailsZlecenieCloseButton = detailsZlecenieModal ? detailsZlecenieModal.querySelector('.close-button') : null;
     const klientSearchInput = document.getElementById('klient-search-input');
+    const clientViewPanel = document.getElementById('client-view');
+    const clientViewName = document.getElementById('client-view-name');
+    const clientViewNip = document.getElementById('client-view-nip');
+    const clientViewAddress = document.getElementById('client-view-address');
+    const clientViewPhone = document.getElementById('client-view-phone');
+    const clientViewEditBtn = document.getElementById('client-view-edit-btn');
+    const clientEditCancelBtn = document.getElementById('client-edit-cancel-btn');
     const maszynaSearchInput = document.getElementById('maszyna-search-input');
     const editZlecenieModal = document.getElementById('edit-zlecenie-modal');
     const editZlecenieForm = document.getElementById('edit-zlecenie-form');
@@ -2638,7 +2645,7 @@ function initializeApp() {
         try {
             await addDoc(collection(db, "klienci"), dane);
             klientForm.reset();
-            closeDrawer(clientDrawer);
+            closeClientDrawer();
         }
         catch (e) { console.error("Błąd dodawania klienta: ", e); }
     }
@@ -2730,9 +2737,7 @@ function wyswietlKlientow() {
       };
     });
 
-    const expandedStored = readExpandedSet(UI_STORAGE_KEYS.clientsExpanded);
-    const validIds = new Set(clientsView.map(item => item.klient.id));
-    const expandedSet = new Set([...expandedStored].filter(id => validIds.has(id)));
+    const expandedSet = new Set();
 
     const clientsForSelect = [...wszyscyKlienci].sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
     let selectHtml = '<option value="">-- Wybierz klienta --</option>';
@@ -2828,15 +2833,77 @@ function nasluchujNaKlientow() {
   );
 }
 
+let clientDrawerOpen = false;
+let selectedClientId = null;
+let clientDrawerMode = 'view';
+
+const renderClientView = (klient) => {
+    if (!clientViewPanel) return;
+    const name = klient?.nazwa || '—';
+    const nip = klient?.nip && klient.nip !== '---' ? klient.nip : '—';
+    const address = klient?.adres && klient.adres !== '---' ? klient.adres : '—';
+    const phone = klient?.telefon && klient.telefon !== '---' ? klient.telefon : '—';
+    if (clientViewName) clientViewName.textContent = name;
+    if (clientViewNip) clientViewNip.textContent = nip;
+    if (clientViewAddress) clientViewAddress.textContent = address;
+    if (clientViewPhone) clientViewPhone.textContent = phone;
+};
+
+const fillClientEditForm = (klient) => {
+    if (!editKlientForm || !klient) return;
+    editKlientForm['edit-klient-id'].value = klient.id;
+    editKlientForm['edit-klient-nazwa'].value = klient.nazwa;
+    editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
+    editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
+    editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
+};
+
 const setClientDrawerMode = (mode) => {
     if (!clientDrawer) return;
+    clientDrawerMode = mode;
+    const isAdd = mode === 'add';
     const isEdit = mode === 'edit';
+    const isView = mode === 'view';
     if (clientDrawerTitle) {
-        clientDrawerTitle.textContent = isEdit ? 'Edytuj klienta' : 'Dodaj klienta';
+        clientDrawerTitle.textContent = isAdd
+            ? 'Dodaj klienta'
+            : (isEdit ? 'Edytuj klienta' : 'Szczegóły klienta');
     }
-    if (klientForm) klientForm.classList.toggle('is-hidden', isEdit);
+    if (klientForm) klientForm.classList.toggle('is-hidden', !isAdd);
     if (editKlientForm) editKlientForm.classList.toggle('is-hidden', !isEdit);
+    if (clientViewPanel) clientViewPanel.classList.toggle('is-hidden', !isView);
+    if (isView) {
+        const klient = _wszystkieKlienciCache.find(k => k.id === selectedClientId);
+        renderClientView(klient);
+    }
+};
+
+const openClientDrawer = (clientId = null, mode = 'view') => {
+    if (!clientDrawer) return;
+    selectedClientId = clientId;
+    if (mode === 'add') {
+        selectedClientId = null;
+        klientForm?.reset();
+    }
+    if (mode === 'edit') {
+        const klient = _wszystkieKlienciCache.find(k => k.id === selectedClientId);
+        fillClientEditForm(klient);
+    }
+    if (mode === 'view') {
+        const klient = _wszystkieKlienciCache.find(k => k.id === selectedClientId);
+        renderClientView(klient);
+    }
+    setClientDrawerMode(mode);
+    clientDrawerOpen = true;
     openDrawer(clientDrawer);
+};
+
+const closeClientDrawer = () => {
+    if (!clientDrawer) return;
+    clientDrawerOpen = false;
+    selectedClientId = null;
+    clientDrawerMode = 'view';
+    closeDrawer(clientDrawer);
 };
 
 const setMachineDrawerMode = (mode) => {
@@ -2866,10 +2933,10 @@ async function obslugaListyKlientow(event) {
 
   const menuAction = event.target.closest('[data-client-action]');
   if (menuAction && menuAction.dataset.clientAction !== 'menu') {
+    event.stopPropagation();
     const klientId = menuAction.dataset.clientId;
     if (klientId && menuAction.dataset.clientAction === 'edit') {
-      localStorage.setItem(UI_STORAGE_KEYS.clientsLast, klientId);
-      otworzModalEdycjiKlienta(klientId);
+      openClientDrawer(klientId, 'edit');
     }
     closeClientActionMenus();
     return;
@@ -2882,7 +2949,6 @@ async function obslugaListyKlientow(event) {
     if (!accordion || !klientId) return;
     const isOpen = accordion.classList.toggle('is-open');
     toggle.setAttribute('aria-expanded', String(isOpen));
-    updateExpandedState(UI_STORAGE_KEYS.clientsExpanded, UI_STORAGE_KEYS.clientsLast, klientId, isOpen);
     return;
   }
 
@@ -2899,8 +2965,7 @@ async function obslugaListyKlientow(event) {
   if (clientMain) {
     const klientId = clientMain.dataset.clientId;
     if (klientId) {
-      localStorage.setItem(UI_STORAGE_KEYS.clientsLast, klientId);
-      otworzModalEdycjiKlienta(klientId);
+      openClientDrawer(klientId, 'view');
     }
   }
 }
@@ -2973,18 +3038,6 @@ async function obslugaListyKlientow(event) {
         }
     }
 
-    function otworzModalEdycjiKlienta(klientId) {
-        if (!editKlientForm) return;
-        const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
-        if (!klient) return;
-        editKlientForm['edit-klient-id'].value = klient.id;
-        editKlientForm['edit-klient-nazwa'].value = klient.nazwa;
-        editKlientForm['edit-klient-nip'].value = klient.nip === '---' ? '' : klient.nip;
-        editKlientForm['edit-klient-adres'].value = klient.adres === '---' ? '' : klient.adres;
-        editKlientForm['edit-klient-telefon'].value = klient.telefon === '---' ? '' : klient.telefon;
-        setClientDrawerMode('edit');
-    }
-
     async function zapiszEdycjeKlienta(event) {
         event.preventDefault();
         const klientId = editKlientForm['edit-klient-id'].value;
@@ -3040,7 +3093,13 @@ async function obslugaListyKlientow(event) {
                 }
             }
 
-            closeDrawer(clientDrawer);
+            const updatedClient = { ...stareDane, ...dane, id: klientId };
+            const cacheIndex = _wszystkieKlienciCache.findIndex(k => k.id === klientId);
+            if (cacheIndex >= 0) {
+                _wszystkieKlienciCache[cacheIndex] = updatedClient;
+            }
+            renderClientView(updatedClient);
+            setClientDrawerMode('view');
         } catch (e) {
             console.error("Błąd aktualizacji klienta lub powiązanych dokumentów:", e);
             alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
@@ -3054,7 +3113,7 @@ async function obslugaListyKlientow(event) {
         if (!confirm("Usunięcie klienta usunie też wszystkie jego maszyny i zlecenia. Kontynuować?")) return;
         try {
             await deleteDoc(doc(db, "klienci", klientId));
-            closeDrawer(clientDrawer);
+            closeClientDrawer();
             wyswietlMaszyny();
         } catch (error) {
             console.error("Błąd usuwania klienta:", error);
@@ -4700,8 +4759,7 @@ async function obslugaListyCzesci(event) {
     if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
     if (klientAddBtn) {
         klientAddBtn.addEventListener('click', () => {
-            klientForm?.reset();
-            setClientDrawerMode('add');
+            openClientDrawer(null, 'add');
         });
     }
     if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
@@ -5032,6 +5090,18 @@ async function obslugaListyCzesci(event) {
     if (editMaszynaForm) editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
     if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
+    if (clientViewEditBtn) {
+        clientViewEditBtn.addEventListener('click', () => {
+            if (!selectedClientId) return;
+            openClientDrawer(selectedClientId, 'edit');
+        });
+    }
+    if (clientEditCancelBtn) {
+        clientEditCancelBtn.addEventListener('click', () => {
+            setClientDrawerMode('view');
+        });
+    }
+
     if (clientDeleteBtn) clientDeleteBtn.addEventListener('click', usunKlienta);
     if (machineDeleteBtn) machineDeleteBtn.addEventListener('click', usunMaszyne);
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
@@ -5046,7 +5116,13 @@ async function obslugaListyCzesci(event) {
 
     [clientDrawer, machineDrawer, oilToolsDrawer].forEach((drawer) => {
         drawer?.querySelectorAll('[data-drawer-close]').forEach(btn => {
-            btn.addEventListener('click', () => closeDrawer(drawer));
+            btn.addEventListener('click', () => {
+                if (drawer === clientDrawer) {
+                    closeClientDrawer();
+                    return;
+                }
+                closeDrawer(drawer);
+            });
         });
     });
 
