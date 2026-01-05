@@ -844,19 +844,6 @@ function initializeApp() {
         }));
     };
 
-    const buildSummaryText = (totals = {}) => {
-        const work = Number(totals.work || 0) || 0;
-        const drive = Number(totals.drive || 0) || 0;
-        const billed = Number(totals.billed || 0) || 0;
-        const over = Number(totals.over || 0) || 0;
-        return [
-            `Praca: ${work.toFixed(1)}h`,
-            `Jazda: ${drive.toFixed(1)}h`,
-            `Fakturowane: ${billed.toFixed(1)}h`,
-            `Nadgodziny: ${over.toFixed(1)}h`,
-        ].join(' • ');
-    };
-
     const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
         const view = calendar?.view || window.__fcCalendar?.view;
         const start = rangeStart || view?.currentStart || null;
@@ -864,7 +851,6 @@ function initializeApp() {
         const summaryByDay = {};
         const leaveByDayOut = {};
         const orderEvents = [];
-        const summaryEvents = [];
         const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
             ...manualByDay.keys(),
@@ -882,6 +868,9 @@ function initializeApp() {
                 return;
             }
             const dayDoc = dayDocsByDay.get(normalizedDay);
+            const ordersForDay = Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : [];
+            const hasOrders = ordersForDay.length > 0;
+            const hasManualEntry = dayDocsByDay.has(normalizedDay);
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
                 powiazane.forEach((entry) => {
@@ -892,23 +881,25 @@ function initializeApp() {
                         start: normalizedDay,
                         allDay: true,
                         title: clientName || 'Zlecenie',
-                        classNames: ['order-event', 'fc-client-chip', 'bober-chip', 'bober-chip--client'],
+                        classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
                         extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
                         sortOrder: 1
                     });
                 });
             }
-            if (SHOW_ZERO_DAYS || hasData) {
-                summaryByDay[normalizedDay] = totals;
-                summaryEvents.push({
-                    id: `summary_${normalizedDay}`,
-                    start: normalizedDay,
-                    allDay: true,
-                    title: buildSummaryText(totals),
-                    classNames: ['bober-chip', 'bober-chip--summary', 'fc-summary-chip'],
-                    extendedProps: { day: normalizedDay, type: 'summary' },
-                    sortOrder: 99
-                });
+            const totalsNonZero =
+                totals.work !== 0 ||
+                totals.drive !== 0 ||
+                totals.billed !== 0 ||
+                totals.over !== 0;
+            const shouldRenderSummary = totalsNonZero || hasOrders || hasManualEntry || (SHOW_ZERO_DAYS && hasData);
+            if (shouldRenderSummary) {
+                summaryByDay[normalizedDay] = {
+                    praca: totals.work,
+                    jazda: totals.drive,
+                    fakturowane: totals.billed,
+                    nadgodziny: totals.over,
+                };
             }
         });
 
@@ -916,7 +907,7 @@ function initializeApp() {
         lastLeaveByDay = leaveByDayOut;
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
-        workEvents = [...orderEvents, ...summaryEvents];
+        workEvents = [...orderEvents];
         updateCalendarData(calendar, workEvents, []);
     };
 
@@ -1300,7 +1291,9 @@ function initializeApp() {
                 },
                 eventClassNames(info) {
                     const eventType = info?.event?.extendedProps?.type;
-                    return eventType === 'client' ? ['fc-client-chip', 'bober-chip', 'bober-chip--client'] : [];
+                    return eventType === 'client'
+                        ? ['fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client']
+                        : [];
                 },
                 dateClick: (info) => openEwidencja(info.dateStr),
                 select(info) {

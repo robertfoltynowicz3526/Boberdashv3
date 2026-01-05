@@ -904,16 +904,24 @@ select {
 }
 
 .fc .day-summary {
-  background: #3b82f6 !important;
-  border: none !important;
-  color: #fff !important;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(59, 130, 246, 0.18) !important;
+  border: 1px solid rgba(255,255,255,0.18) !important;
+  color: #eaf2ff !important;
   font-weight: 700;
   border-radius: 10px;
+  padding: 4px 6px;
+  line-height: 1.2;
+  max-height: 2.4em;
+  overflow: hidden;
+  white-space: normal;
 }
 
-.fc .day-summary .fc-event-title {
-  white-space: normal;
-  line-height: 1.2;
+.fc .day-summary .day-summary-row {
+  display: block;
 }
 
 .fc-event.leave-event {
@@ -2211,7 +2219,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .fc .fc-daygrid-day-frame{ overflow:hidden; }
 .fc .bober-chip.fc-event{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.35; padding:3px 8px; border-radius:8px; }
 .fc .bober-chip.fc-event .fc-event-main{ display:block; overflow:hidden; }
-.fc .fc-daygrid-day-events{ margin-top:2px; }
+.fc .fc-daygrid-day-events{ margin-top:2px; padding-bottom:52px; }
 .fc .fc-daygrid-day-number{ padding:6px 8px; }
 .fc-day-badge{ margin-left:.35rem; padding:.05rem .35rem; border-radius:9999px; font-size:.7rem; background:rgba(56,189,248,.25); }
 

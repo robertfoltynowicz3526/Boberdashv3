@@ -27,9 +27,14 @@ const isLeaveDay = (date) => {
   return Boolean(window.__calendarDecorations?.leaveByDay?.[key]);
 };
 
+const formatSummaryValue = (value) => {
+  const num = Number(value || 0) || 0;
+  return num.toFixed(1);
+};
+
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.cell-sum, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -59,6 +64,22 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     marker.className = 'cell-planned-leave';
     marker.title = 'Zaplanowany urlop';
     cellEl.appendChild(marker);
+  }
+
+  const summary = decorations.summaryByDay?.[dayKey];
+  if (summary) {
+    const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+    const footer = document.createElement('div');
+    footer.className = 'day-summary';
+    const row1 = document.createElement('div');
+    row1.className = 'day-summary-row';
+    row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
+    const row2 = document.createElement('div');
+    row2.className = 'day-summary-row';
+    row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+    footer.appendChild(row1);
+    footer.appendChild(row2);
+    frame.appendChild(footer);
   }
 
   if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
@@ -131,7 +152,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: true,
-    dayMaxEventRows: 4,
+    dayMaxEventRows: 3,
     showNonCurrentDates: true,
     moreLinkClick: 'popover',
     eventOverlap: false,
@@ -200,26 +221,26 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     eventContent: (info) => {
       if (typeof extraEventContent === 'function') return extraEventContent(info);
-      return { html: `<div class="fc-title-only">${info.event.title || ''}</div>` };
+      const eventType = info?.event?.extendedProps?.type;
+      const isClientChip =
+        eventType === 'client' ||
+        info?.event?.classNames?.includes?.('client-chip') ||
+        info?.event?.classNames?.includes?.('fc-client-chip');
+      const title = info.event.title || '';
+      if (isClientChip) {
+        return { html: `<div class="fc-title-only client-chip-title">${title}</div>` };
+      }
+      return { html: `<div class="fc-title-only">${title}</div>` };
     },
     eventDidMount: (info) => {
       const eventType = info?.event?.extendedProps?.type;
       const isClientChip =
         eventType === 'client' ||
         info?.el?.classList?.contains?.('bober-chip--client') ||
-        info?.el?.classList?.contains?.('fc-client-chip');
-      const isSummaryChip =
-        eventType === 'summary' ||
-        info?.el?.classList?.contains?.('bober-chip--summary') ||
-        info?.el?.classList?.contains?.('fc-summary-chip');
+        info?.el?.classList?.contains?.('fc-client-chip') ||
+        info?.el?.classList?.contains?.('client-chip');
       if (isClientChip && info?.event?.title) {
         info.el.title = info.event.title;
-      }
-      if (isSummaryChip) {
-        info.el.classList.add('fc-summary-event');
-        info.el.style.display = 'block';
-        const harness = info.el.closest('.fc-daygrid-event-harness');
-        harness?.classList.add('fc-summary-harness');
       }
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },
