@@ -23,6 +23,7 @@ export const getLeaveKind = (dayDoc) => {
   if (s === 'L4') return 'L4';
   if (s === 'ŚWIĘTO' || s === 'SWIETO') return 'SWIETO';
   if (s === 'URLOP') return 'URL';
+  if (s === 'WOLNE') return 'WOLNE';
   if (s === 'BRAK' || s === '') return null;
 
   // jeśli masz inne statusy wolnego, dodaj tu mapowanie

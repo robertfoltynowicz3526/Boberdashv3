@@ -198,6 +198,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   color: #fff7d1;
 }
 
+.fc .cell-leave-icon--WOLNE .leave-chip{
+  background: rgba(120, 170, 255, 0.18);
+  border-color: rgba(120, 170, 255, 0.45);
+  color: #e2eeff;
+}
+
 .fc .cell-debug {
   position: absolute;
   top: 4px;

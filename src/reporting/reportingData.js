@@ -30,9 +30,9 @@ const normalizeDayKey = (value, context = '') => {
 const normalizeLeaveKind = (value) => {
   const upper = (value ?? '').toString().trim().toUpperCase();
   if (!upper) return null;
-  if (upper === 'WOLNE') return 'URL';
   if (upper === 'BRAK' || upper === 'NONE') return null;
   if (upper === 'URL' || upper === 'URLOP') return 'URL';
+  if (upper === 'WOLNE') return 'WOLNE';
   if (upper === 'L4') return 'L4';
   if (upper === 'SWIETO' || upper === 'ŚWIĘTO') return 'SWIETO';
   return null;
@@ -43,7 +43,8 @@ const normalizeDayFlags = (flags = {}, leaveKind = null) => {
   return {
     urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
     l4: Boolean(flags.l4) || normalizedKind === 'L4',
-    swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO'
+    swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO',
+    wolne: Boolean(flags.wolne) || normalizedKind === 'WOLNE'
   };
 };
 
@@ -123,7 +124,7 @@ const readOrderEntries = (dayDoc = {}, orderIndex, resolver) => {
 const normalizeDayDoc = (dayStr, rawDoc = {}, orderIndex, resolver) => {
   const leaveKindRaw = normalizeLeaveKind(rawDoc?.leaveKind ?? rawDoc?.dayLeave ?? null);
   const flags = normalizeDayFlags(rawDoc?.flags ?? {}, leaveKindRaw);
-  const leaveKind = leaveKindRaw || (flags.urlop ? 'URL' : flags.l4 ? 'L4' : flags.swieto ? 'SWIETO' : null);
+  const leaveKind = leaveKindRaw || (flags.urlop ? 'URL' : flags.l4 ? 'L4' : flags.swieto ? 'SWIETO' : flags.wolne ? 'WOLNE' : null);
   return {
     dayStr,
     manual: readManualTotals(rawDoc),

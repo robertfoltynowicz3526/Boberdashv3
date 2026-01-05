@@ -9,8 +9,8 @@ const parsePlNumber = (value) => {
 const normalizeDayLeaveValue = (value) => {
   const upper = (value ?? '').toString().trim().toUpperCase();
   if (!upper) return null;
-  if (upper === 'WOLNE') return 'URL';
   if (upper === 'NONE' || upper === 'BRAK') return null;
+  if (upper === 'WOLNE') return 'WOLNE';
   if (upper === 'URL' || upper === 'L4' || upper === 'SWIETO') return upper;
   return null;
 };
@@ -19,6 +19,7 @@ const getLeaveKind = (dayDoc) => {
   const direct = normalizeDayLeaveValue(dayDoc?.leaveKind ?? dayDoc?.dayLeave ?? null);
   if (direct) return direct;
   if (dayDoc?.flags?.urlop) return 'URL';
+  if (dayDoc?.flags?.wolne) return 'WOLNE';
   if (dayDoc?.flags?.l4) return 'L4';
   if (dayDoc?.flags?.swieto) return 'SWIETO';
   return null;
