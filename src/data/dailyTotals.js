@@ -45,6 +45,15 @@ const normalizeFlagType = (value) => {
   return null;
 };
 
+const isSummaryEvent = (event) => {
+  const classNames = [
+    ...(Array.isArray(event?.classNames) ? event.classNames : []),
+    ...(Array.isArray(event?.className) ? event.className : (typeof event?.className === 'string' ? event.className.split(/\s+/) : [])),
+  ].filter(Boolean);
+  if (event?.extendedProps?.type === 'summary') return true;
+  return classNames.includes('bober-chip--summary') || classNames.includes('summary-event') || classNames.includes('fc-summary-chip');
+};
+
 let dailyEntries = new Map();
 let dayFlags = new Map();
 let cachedEvents = [];
@@ -84,6 +93,7 @@ export function setCalendarEvents(events = []) {
   const normalized = [];
   (Array.isArray(events) ? events : []).forEach((event) => {
     if (!event) return;
+    if (isSummaryEvent(event)) return;
     let start = event.start ?? event.date;
     if (typeof start === 'string') {
       const trimmed = start.slice(0, 10);

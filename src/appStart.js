@@ -6,7 +6,7 @@ import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
+import { aggregateDayData, computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
@@ -277,7 +277,6 @@ function initializeApp() {
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
     const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'WOLNE', 'L4', 'SWIETO'];
-    const SHOW_ZERO_DAYS = false;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -862,15 +861,13 @@ function initializeApp() {
         daysToRender.forEach((dayStr) => {
             const normalizedDay = normalizeDayKey(dayStr, 'rebuildCalendarDecorations');
             if (!normalizedDay) return;
-            const { totals, isLeave, hasData, leaveKind } = computeDayTotals(normalizedDay);
-            if (isLeave) {
-                leaveByDayOut[normalizedDay] = leaveKind;
+            const { praca, jazda, fakturowane, nadgodziny, status, hasAnyData } = aggregateDayData(normalizedDay);
+            if (status) {
+                leaveByDayOut[normalizedDay] = status;
                 return;
             }
             const dayDoc = dayDocsByDay.get(normalizedDay);
             const ordersForDay = Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : [];
-            const hasOrders = ordersForDay.length > 0;
-            const hasManualEntry = dayDocsByDay.has(normalizedDay);
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
                 powiazane.forEach((entry) => {
@@ -887,18 +884,12 @@ function initializeApp() {
                     });
                 });
             }
-            const totalsNonZero =
-                totals.work !== 0 ||
-                totals.drive !== 0 ||
-                totals.billed !== 0 ||
-                totals.over !== 0;
-            const shouldRenderSummary = totalsNonZero || hasOrders || hasManualEntry || (SHOW_ZERO_DAYS && hasData);
-            if (shouldRenderSummary) {
+            if (hasAnyData) {
                 summaryByDay[normalizedDay] = {
-                    praca: totals.work,
-                    jazda: totals.drive,
-                    fakturowane: totals.billed,
-                    nadgodziny: totals.over,
+                    praca,
+                    jazda,
+                    fakturowane,
+                    nadgodziny,
                 };
             }
         });
