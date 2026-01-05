@@ -1,14 +1,37 @@
 const SESSION_KEY = 'appLock.session';
 const DEFAULT_TTL_HOURS = 12;
 
+const normalizePasswordValue = (value) => {
+  if (value == null) return '';
+  let normalized = String(value).trim();
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+  return normalized;
+};
+
 export const getAppLockConfig = () => {
-  const enabled = String(import.meta.env.VITE_APP_LOCK_ENABLED || '0') === '1';
-  const passwordHash = String(import.meta.env.VITE_APP_LOCK_PASSWORD_HASH || '').toLowerCase();
+  const enabledRaw = String(import.meta.env.VITE_APP_LOCK_ENABLED || '0').trim().toLowerCase();
+  const enabled = enabledRaw === '1' || enabledRaw === 'true';
+  const password = normalizePasswordValue(import.meta.env.VITE_APP_LOCK_PASSWORD);
   const ttlHoursRaw = Number(import.meta.env.VITE_APP_LOCK_TTL_HOURS || DEFAULT_TTL_HOURS);
   const ttlHours = Number.isFinite(ttlHoursRaw) && ttlHoursRaw > 0 ? ttlHoursRaw : DEFAULT_TTL_HOURS;
+  const passwordConfigured = password.length > 0;
+  let effectiveEnabled = enabled;
+
+  if (enabled && !passwordConfigured) {
+    console.warn('[appLock] enabled but no password configured; disabling lock.');
+    effectiveEnabled = false;
+  }
+
+  console.info('[appLock] config', { enabled: effectiveEnabled, passwordConfigured });
+
   return {
-    enabled,
-    passwordHash,
+    enabled: effectiveEnabled,
+    password,
     ttlMs: ttlHours * 60 * 60 * 1000
   };
 };
@@ -49,19 +72,12 @@ export const clearAppLockSession = () => {
   sessionStorage.removeItem(SESSION_KEY);
 };
 
-const sha256Hex = async (value) => {
-  const data = new TextEncoder().encode(value);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-};
-
 export const unlockWithPassword = async (password, config = getAppLockConfig()) => {
   if (!config.enabled) return true;
-  if (!password || !config.passwordHash) return false;
-  const computed = (await sha256Hex(password)).toLowerCase();
-  const ok = computed === config.passwordHash;
+  const normalizedInput = normalizePasswordValue(password);
+  const normalizedEnv = normalizePasswordValue(config.password);
+  if (!normalizedInput || !normalizedEnv) return false;
+  const ok = normalizedInput === normalizedEnv;
   if (ok) {
     persistSession(config);
   }
