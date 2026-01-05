@@ -878,7 +878,7 @@ function initializeApp() {
                         start: normalizedDay,
                         allDay: true,
                         title: clientName || 'Zlecenie',
-                        classNames: ['order-event', 'fc-client-chip'],
+                        classNames: ['order-event', 'fc-client-chip', 'bober-chip', 'bober-chip--client'],
                         extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' }
                     });
                 });
@@ -1276,7 +1276,7 @@ function initializeApp() {
                 },
                 eventClassNames(info) {
                     const eventType = info?.event?.extendedProps?.type;
-                    return eventType === 'client' ? ['fc-client-chip'] : [];
+                    return eventType === 'client' ? ['fc-client-chip', 'bober-chip', 'bober-chip--client'] : [];
                 },
                 dateClick: (info) => openEwidencja(info.dateStr),
                 select(info) {
