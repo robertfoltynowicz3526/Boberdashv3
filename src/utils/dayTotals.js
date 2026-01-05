@@ -10,9 +10,9 @@ export const parsePlNumber = (v) => {
 const normalizeLeaveKind = (value) => {
   const upper = (value ?? '').toString().trim().toUpperCase();
   if (!upper) return null;
-  if (upper === 'WOLNE') return 'URL';
   if (upper === 'BRAK' || upper === 'NONE') return null;
   if (upper === 'URL' || upper === 'URLOP') return 'URL';
+  if (upper === 'WOLNE') return 'WOLNE';
   if (upper === 'L4') return 'L4';
   if (upper === 'SWIETO' || upper === 'ŚWIĘTO') return 'SWIETO';
   return null;
@@ -23,6 +23,7 @@ export const getLeaveKind = (dayDoc) => {
   const direct = normalizeLeaveKind(dayDoc?.leaveKind ?? dayDoc?.dayLeave ?? null);
   if (direct) return direct;
   if (dayDoc?.flags?.urlop) return 'URL';
+  if (dayDoc?.flags?.wolne) return 'WOLNE';
   if (dayDoc?.flags?.l4) return 'L4';
   if (dayDoc?.flags?.swieto) return 'SWIETO';
   return null;

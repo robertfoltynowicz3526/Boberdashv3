@@ -40,7 +40,8 @@ const normalizeFlagType = (value) => {
   if (raw.startsWith('leave_')) return normalizeFlagType(raw.replace('leave_', ''));
   if (raw === 'l4') return 'l4';
   if (raw === 'urlop' || raw === 'url' || raw === 'leave') return 'urlop';
-  if (raw === 'wolne' || raw === 'free' || raw === 'holiday' || raw === 'swieto' || raw === 'święto') return 'wolne';
+  if (raw === 'wolne' || raw === 'free') return 'wolne';
+  if (raw === 'swieto' || raw === 'święto' || raw === 'holiday') return 'swieto';
   return null;
 };
 
@@ -71,8 +72,8 @@ export function setDayFlags(flags = []) {
     if (!type) return;
     dayFlags.set(key, {
       l4: type === 'l4',
-      urlop: type === 'urlop' || type === 'wolne',
-      swieto: type === 'swieto' || type === 'święto' || type === 'holiday' || type === 'wolne',
+      urlop: type === 'urlop',
+      swieto: type === 'swieto' || type === 'święto' || type === 'holiday',
       wolne: type === 'wolne',
       kind: type,
     });
@@ -126,9 +127,9 @@ export function getDayFlagsSync(date) {
 export async function getDailyTotals(date) {
   try {
     const key = normalizeDateKey(date, 'getDailyTotals');
-    if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false };
+    if (!key) return { work: 0, drive: 0, billed: 0, l4: false, urlop: false, swieto: false, wolne: false };
     const flags = normalizeFlags(dayFlags.get(key) || dailyEntries.get(key)?.flags || {});
-    if (flags.l4 || flags.urlop || flags.swieto) {
+    if (flags.l4 || flags.urlop || flags.swieto || flags.wolne) {
       return { work: 0, drive: 0, billed: 0, ...flags };
     }
     const day = dailyEntries.get(key);

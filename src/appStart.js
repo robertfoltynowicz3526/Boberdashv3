@@ -276,7 +276,7 @@ function initializeApp() {
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
-    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'L4', 'SWIETO'];
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'WOLNE', 'L4', 'SWIETO'];
     const SHOW_ZERO_DAYS = false;
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
@@ -612,7 +612,6 @@ function initializeApp() {
     const normalizeDayLeaveValue = (value) => {
         const upper = (value ?? '').toString().trim().toUpperCase();
         if (!upper) return DAY_LEAVE_NONE;
-        if (upper === 'WOLNE') return 'URL';
         return DAY_LEAVE_VALUES.includes(upper) ? upper : DAY_LEAVE_NONE;
     };
 
@@ -675,6 +674,8 @@ function initializeApp() {
         return day === 0 || day === 6;
     };
 
+    const isWeekend = (dayStr) => isWeekendDay(dayStr);
+
     const isOnOrAfterMinDate = (dayKey) => Boolean(dayKey) && dayKey >= MIN_DATE;
 
     const getChecklistRange = () => {
@@ -694,19 +695,66 @@ function initializeApp() {
     const buildUnfinishedSummary = () => {
         const { start: checklistStart, end: checklistEnd } = getChecklistRange();
         const daysInRange = checklistStart && checklistEnd ? listDaysInRange(checklistStart, checklistEnd) : [];
-        const daysWithoutSummary = daysInRange.filter((dayKey) => {
-            if (!isOnOrAfterMinDate(dayKey)) return false;
-            const { isLeave } = computeDayTotals(dayKey);
-            if (isLeave) return false;
+        const isDayOffStatus = (status) => ['L4', 'URL', 'SWIETO', 'WOLNE'].includes(status);
+        const resolveDayStatus = (dayKey) => {
+            const direct = leaveByDay.get(dayKey);
+            if (direct) return direct;
+            const dayDoc = dayDocsByDay.get(dayKey);
+            if (!dayDoc) return null;
+            const normalizedKind = normalizeDayLeaveValue(dayDoc?.leaveKind || dayDoc?.dayLeave || '');
+            if (normalizedKind && normalizedKind !== DAY_LEAVE_NONE) return normalizedKind;
+            const flags = dayDoc?.flags || {};
+            if (flags.l4) return 'L4';
+            if (flags.urlop) return 'URL';
+            if (flags.swieto) return 'SWIETO';
+            if (flags.wolne) return 'WOLNE';
+            return null;
+        };
+        const hasAnyActivity = (dayKey) => {
             const ordersForDay = Array.isArray(ordersByDay.get(dayKey)) ? ordersByDay.get(dayKey) : [];
-            if (ordersForDay.length > 0) return false;
+            if (ordersForDay.length > 0) return true;
             const manualTotals = manualByDay.get(dayKey) || {};
             const manualValue = Number(manualTotals.work || 0)
                 + Number(manualTotals.drive || 0)
                 + Number(manualTotals.billed || 0)
                 + Number(manualTotals.over || 0);
-            return manualValue === 0;
-        });
+            if (manualValue !== 0) return true;
+            const dayDoc = dayDocsByDay.get(dayKey);
+            const note = (dayDoc?.notatka || dayDoc?.note || '').toString().trim();
+            return note.length > 0;
+        };
+        const buildDayData = (dayKey) => {
+            const ordersForDay = Array.isArray(ordersByDay.get(dayKey)) ? ordersByDay.get(dayKey) : [];
+            const manualTotals = manualByDay.get(dayKey) || {};
+            const manualValue = Number(manualTotals.work || 0)
+                + Number(manualTotals.drive || 0)
+                + Number(manualTotals.billed || 0)
+                + Number(manualTotals.over || 0);
+            const orderValue = ordersForDay.reduce((acc, entry) => {
+                const work = Number(entry?.work || 0);
+                const drive = Number(entry?.drive || 0);
+                const billed = Number(entry?.billed || 0);
+                const over = Number(entry?.over || 0);
+                return acc + work + drive + billed + over;
+            }, 0);
+            return {
+                dayStr: dayKey,
+                status: resolveDayStatus(dayKey),
+                hasOrders: ordersForDay.length > 0,
+                hasManualValue: manualValue !== 0,
+                hasOrderValue: orderValue !== 0,
+                hasAnyActivity: hasAnyActivity(dayKey),
+            };
+        };
+        const dayData = daysInRange.map(buildDayData);
+        const daysWithoutSummary = dayData.filter((day) => {
+            if (!isOnOrAfterMinDate(day.dayStr)) return false;
+            const eligible = !isWeekend(day.dayStr) || (isWeekend(day.dayStr) && day.hasAnyActivity);
+            if (!eligible) return false;
+            if (isDayOffStatus(day.status)) return false;
+            const hasSummaryData = day.hasManualValue || day.hasOrderValue;
+            return !hasSummaryData;
+        }).map(day => day.dayStr);
 
         const ordersWithActivitySinceMinDate = new Set();
         ordersByDay.forEach((ordersForDay, dayKey) => {
@@ -731,7 +779,7 @@ function initializeApp() {
         const plannedLeaveWithoutCalendar = plannedLeaveEntries
             .filter((entry) => {
                 const days = listDaysInclusive(entry.startDate, entry.endDate)
-                    .filter(day => isOnOrAfterMinDate(day));
+                    .filter(day => isOnOrAfterMinDate(day) && !isWeekend(day));
                 if (!days.length) return false;
                 const hasCalendarEntry = days.some(day => leaveByDay.has(day));
                 return !hasCalendarEntry;
@@ -1320,7 +1368,7 @@ function initializeApp() {
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
                 }
-                const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : DAY_LEAVE_NONE);
+                const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : normalized.flags?.wolne ? 'WOLNE' : DAY_LEAVE_NONE);
                 setDayLeaveValue(leaveToSet || DAY_LEAVE_NONE);
             }
         } catch (error) {
@@ -1494,7 +1542,8 @@ function initializeApp() {
         const flags = {
             urlop: selectedLeaveKind === 'URL',
             l4: selectedLeaveKind === 'L4',
-            swieto: selectedLeaveKind === 'SWIETO'
+            swieto: selectedLeaveKind === 'SWIETO',
+            wolne: selectedLeaveKind === 'WOLNE'
         };
         const dane = {
             date: data,
@@ -1600,7 +1649,7 @@ function initializeApp() {
                 manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
                 const ordersForDay = buildOrdersForDay(dayDocForTotals, orderIndex);
                 ordersByDay.set(dayStr, ordersForDay);
-                const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : null);
+                const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : normalizedDay.flags?.wolne ? 'WOLNE' : null);
                 if (leaveKind) {
                     leaveByDay.set(dayStr, leaveKind);
                 }
@@ -1630,7 +1679,7 @@ function initializeApp() {
             if (wpis?.leaveKind) {
                 return acc;
             }
-            if (wpis?.flags?.urlop || wpis?.flags?.l4 || wpis?.flags?.swieto) {
+            if (wpis?.flags?.urlop || wpis?.flags?.l4 || wpis?.flags?.swieto || wpis?.flags?.wolne) {
                 return acc;
             }
             if (typeof wpisType === 'string' && wpisType.startsWith('LEAVE')) {
@@ -1786,7 +1835,8 @@ function initializeApp() {
         return {
             urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
             l4: Boolean(flags.l4) || normalizedKind === 'L4',
-            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO'
+            swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO',
+            wolne: Boolean(flags.wolne) || normalizedKind === 'WOLNE'
         };
     };
 
