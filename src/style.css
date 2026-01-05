@@ -1733,6 +1733,69 @@ select {
   display: flex;
 }
 
+.drawer--unfinished .drawer-panel {
+  width: min(420px, 100%);
+}
+
+.unfinished-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.unfinished-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-color);
+  text-align: left;
+  cursor: pointer;
+}
+
+.unfinished-item:hover {
+  border-color: rgba(255, 222, 0, 0.35);
+  background: rgba(255, 222, 0, 0.06);
+}
+
+.unfinished-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.unfinished-item-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.unfinished-item-count {
+  min-width: 32px;
+  text-align: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 222, 0, 0.18);
+  border: 1px solid rgba(255, 222, 0, 0.35);
+  color: #fef08a;
+  font-size: 0.75rem;
+}
+
+.unfinished-item-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.unfinished-empty {
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .drawer-hint {
   font-size: 0.85rem;
   color: var(--text-muted);
@@ -2962,6 +3025,52 @@ main,
 
 /* Mniej powietrza nad/po bokach; w dół – dynamiczna wysokość względem okna */
 [data-section="pulpit"] .card.kalendarz { padding: 12px; }
+
+.pulpit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.unfinished-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 222, 0, 0.4);
+  background: rgba(255, 222, 0, 0.1);
+  color: var(--text-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.unfinished-button:hover {
+  background: rgba(255, 222, 0, 0.2);
+}
+
+.unfinished-button-icon {
+  font-size: 1rem;
+}
+
+.unfinished-badge {
+  min-width: 20px;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 222, 0, 0.25);
+  border: 1px solid rgba(255, 222, 0, 0.4);
+  font-size: 0.7rem;
+  text-align: center;
+  color: #fef08a;
+}
+
+.unfinished-badge.is-empty {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--text-muted);
+}
 #kalendarz {
   height: auto;
   min-height: auto;

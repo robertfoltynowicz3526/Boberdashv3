@@ -344,6 +344,16 @@ function initializeApp() {
     let lastLeaveByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
+    let unfinishedDrawerOpen = false;
+    let unfinishedSummary = {
+        daysWithoutSummary: [],
+        ordersWithoutBilling: [],
+        plannedLeaveWithoutCalendar: [],
+        total: 0
+    };
+    let ordersFilterMode = null;
+    let unfinishedDrawer = null;
+    let unfinishedButton = null;
     configureDayTotals({
         manualGetter: (dayKey) => manualByDay.get(dayKey) || null,
         ordersGetter: (dayKey) => ordersByDay.get(dayKey) || [],
@@ -447,6 +457,7 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const unfinishedButtonSlot = document.getElementById('unfinished-button-slot');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
     const klientForm = document.getElementById('klient-form');
@@ -663,6 +674,45 @@ function initializeApp() {
         return day === 0 || day === 6;
     };
 
+    const buildUnfinishedSummary = () => {
+        const daysWithoutSummary = Array.from(dayDocsByDay.keys()).filter((dayKey) => {
+            const { totals, isLeave } = computeDayTotals(dayKey);
+            if (isLeave) return false;
+            const totalValue = Number(totals.work || 0)
+                + Number(totals.drive || 0)
+                + Number(totals.billed || 0)
+                + Number(totals.over || 0);
+            return totalValue === 0;
+        });
+
+        const ordersWithoutBilling = _wszystkieZleceniaCache
+            .filter((order) => {
+                const status = order?.status;
+                if (!(status === 'ukończone' || status === 'ukonczone')) return false;
+                const billed = Number(order?.wyfakturowaneGodziny ?? order?.wyfakturowane ?? 0) || 0;
+                return billed <= 0;
+            })
+            .map(order => order.id);
+
+        const plannedLeaveWithoutCalendar = plannedLeaveEntries
+            .filter((entry) => {
+                const days = listDaysInclusive(entry.startDate, entry.endDate);
+                if (!days.length) return false;
+                const hasCalendarEntry = days.some(day => leaveByDay.has(day));
+                return !hasCalendarEntry;
+            })
+            .map(entry => entry.id);
+
+        const total = daysWithoutSummary.length + ordersWithoutBilling.length + plannedLeaveWithoutCalendar.length;
+
+        return {
+            daysWithoutSummary,
+            ordersWithoutBilling,
+            plannedLeaveWithoutCalendar,
+            total
+        };
+    };
+
     const buildOrderIndex = () => new Map(
         _wszystkieZleceniaCache.map(order => [order.id, order])
     );
@@ -866,6 +916,173 @@ function initializeApp() {
         }
     };
 
+    const showTab = (tabName) => {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+        const target = document.getElementById(tabName);
+        if (target) target.style.display = 'block';
+        const trigger = document.querySelector(`.tab-button[onclick*="'${tabName}'"]`);
+        if (trigger) trigger.classList.add('active');
+        if (tabName === 'magazyn') {
+            ensureMagazynSummaryPlacement();
+        }
+    };
+
+    const createUnfinishedButton = () => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'unfinished-button';
+        button.setAttribute('aria-haspopup', 'dialog');
+        button.setAttribute('aria-expanded', 'false');
+        button.innerHTML = `
+            <span class="unfinished-button-icon">⏳</span>
+            <span class="unfinished-button-label">Niedokończone</span>
+            <span class="unfinished-badge">0</span>
+        `;
+        button.addEventListener('click', () => setUnfinishedDrawerOpen(true));
+        return button;
+    };
+
+    const createUnfinishedDrawer = () => {
+        const drawer = document.createElement('div');
+        drawer.id = 'unfinished-drawer';
+        drawer.className = 'drawer drawer--unfinished';
+        drawer.setAttribute('aria-hidden', 'true');
+        drawer.innerHTML = `
+            <div class="drawer-backdrop" data-drawer-close></div>
+            <div class="drawer-panel" role="dialog" aria-label="Niedokończone zadania">
+                <div class="drawer-header">
+                    <div>
+                        <p class="drawer-eyebrow">Pulpit</p>
+                        <h3>Niedokończone</h3>
+                    </div>
+                    <button type="button" class="drawer-close" data-drawer-close aria-label="Zamknij">×</button>
+                </div>
+                <div class="drawer-body">
+                    <div class="unfinished-list" data-unfinished-list></div>
+                    <div class="unfinished-empty" data-unfinished-empty>OK / Brak zaległości</div>
+                </div>
+            </div>
+        `;
+        return drawer;
+    };
+
+    const renderUnfinishedButton = () => {
+        if (!unfinishedButton) return;
+        const badge = unfinishedButton.querySelector('.unfinished-badge');
+        if (!badge) return;
+        badge.textContent = String(unfinishedSummary.total || 0);
+        badge.classList.toggle('is-empty', (unfinishedSummary.total || 0) === 0);
+    };
+
+    const getUnfinishedItemConfig = () => ([
+        {
+            key: 'daysWithoutSummary',
+            title: 'Dni bez podsumowania',
+            description: 'Dni z wpisem bez wypełnionego podsumowania.',
+            count: unfinishedSummary.daysWithoutSummary.length
+        },
+        {
+            key: 'ordersWithoutBilling',
+            title: 'Zlecenia bez fakturowania',
+            description: 'Ukończone zlecenia bez wpisanych godzin fakturowanych.',
+            count: unfinishedSummary.ordersWithoutBilling.length
+        },
+        {
+            key: 'plannedLeaveWithoutCalendar',
+            title: 'Planowany urlop bez wpisu do kalendarza',
+            description: 'Plany urlopów nieodzwierciedlone w kalendarzu.',
+            count: unfinishedSummary.plannedLeaveWithoutCalendar.length
+        }
+    ]);
+
+    const renderUnfinishedDrawer = () => {
+        if (!unfinishedDrawer) return;
+        const list = unfinishedDrawer.querySelector('[data-unfinished-list]');
+        const empty = unfinishedDrawer.querySelector('[data-unfinished-empty]');
+        if (!list || !empty) return;
+        const items = getUnfinishedItemConfig();
+        list.innerHTML = items.map(item => `
+            <button type="button" class="unfinished-item" data-unfinished-item="${item.key}">
+                <div class="unfinished-item-header">
+                    <span class="unfinished-item-title">${item.title}</span>
+                    <span class="unfinished-item-count">${item.count}</span>
+                </div>
+                <div class="unfinished-item-desc">${item.description}</div>
+            </button>
+        `).join('');
+        const isEmpty = (unfinishedSummary.total || 0) === 0;
+        empty.style.display = isEmpty ? 'block' : 'none';
+        list.style.display = isEmpty ? 'none' : 'grid';
+    };
+
+    const setUnfinishedDrawerOpen = (isOpen) => {
+        unfinishedDrawerOpen = Boolean(isOpen);
+        if (!unfinishedDrawer) return;
+        if (unfinishedButton) {
+            unfinishedButton.setAttribute('aria-expanded', String(unfinishedDrawerOpen));
+        }
+        if (unfinishedDrawerOpen) {
+            openDrawer(unfinishedDrawer);
+        } else {
+            closeDrawer(unfinishedDrawer);
+        }
+    };
+
+    const handleUnfinishedItemClick = (key) => {
+        if (!key) return;
+        if (key !== 'ordersWithoutBilling') {
+            ordersFilterMode = null;
+        }
+        if (key === 'daysWithoutSummary') {
+            showTab('pulpit');
+            const target = unfinishedSummary.daysWithoutSummary[0];
+            if (target && calendar?.gotoDate) {
+                calendar.gotoDate(target);
+            }
+        }
+        if (key === 'ordersWithoutBilling') {
+            ordersFilterMode = 'unbilled';
+            showTab('zlecenia');
+            wyswietlZlecenia();
+        }
+        if (key === 'plannedLeaveWithoutCalendar') {
+            showTab('podsumowanie');
+            setActiveVacationTab('planned');
+            plannedLeaveList?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        setUnfinishedDrawerOpen(false);
+    };
+
+    const updateUnfinishedSummary = () => {
+        unfinishedSummary = buildUnfinishedSummary();
+        renderUnfinishedButton();
+        renderUnfinishedDrawer();
+    };
+
+    const setupUnfinishedUI = () => {
+        if (!unfinishedButtonSlot) return;
+        unfinishedButton = createUnfinishedButton();
+        unfinishedButtonSlot.appendChild(unfinishedButton);
+        unfinishedDrawer = createUnfinishedDrawer();
+        document.body.appendChild(unfinishedDrawer);
+        trackedDrawers.push(unfinishedDrawer);
+        unfinishedDrawer.querySelectorAll('[data-drawer-close]').forEach(btn => {
+            btn.addEventListener('click', () => setUnfinishedDrawerOpen(false));
+        });
+        unfinishedDrawer.addEventListener('click', (event) => {
+            const target = event.target.closest('[data-unfinished-item]');
+            if (!target) return;
+            handleUnfinishedItemClick(target.dataset.unfinishedItem);
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && unfinishedDrawerOpen) {
+                setUnfinishedDrawerOpen(false);
+            }
+        });
+        updateUnfinishedSummary();
+    };
+
     const debounce = (fn, wait = 200) => {
         let timeout;
         return (...args) => {
@@ -898,6 +1115,7 @@ function initializeApp() {
     };
 
     ensureMagazynSummaryPlacement();
+    setupUnfinishedUI();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
     window.openTab = (evt, tabName) => {
@@ -1275,6 +1493,7 @@ function initializeApp() {
                 leaveByDay.delete(dayKey);
             }
             rebuildCalendarDecorations();
+            updateUnfinishedSummary();
 
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
@@ -1350,6 +1569,7 @@ function initializeApp() {
             });
 
             rebuildCalendarDecorations();
+            updateUnfinishedSummary();
             selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
         });
@@ -2063,6 +2283,7 @@ function initializeApp() {
     async function refreshPlannedLeaveEntries() {
         plannedLeaveEntries = await listPlannedLeave(selectedYear);
         renderPlannedLeaveList();
+        updateUnfinishedSummary();
     }
 
     async function getVacationAllowance(year) {
@@ -3072,6 +3293,12 @@ function wyswietlZlecenia() {
     const ukonczoneElements = [];
 
     const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => {
+        if (ordersFilterMode === 'unbilled') {
+            const status = zlecenie?.status;
+            if (!(status === 'ukończone' || status === 'ukonczone')) return false;
+            const billed = Number(zlecenie?.wyfakturowaneGodziny ?? zlecenie?.wyfakturowane ?? 0) || 0;
+            if (billed > 0) return false;
+        }
         if (!frazaWyszukiwania) return true;
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
@@ -3164,6 +3391,7 @@ function nasluchujNaZlecenia() {
         wyswietlZlecenia();
         odswiezPodsumowania();
         rebuildCalendarDecorations();
+        updateUnfinishedSummary();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
     });
 }
@@ -4702,7 +4930,12 @@ async function obslugaListyCzesci(event) {
     if (klientSearchInput) klientSearchInput.addEventListener('input', wyswietlKlientowDebounced);
     if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszynyDebounced);
     if (maszynaClientFilterSelect) maszynaClientFilterSelect.addEventListener('change', wyswietlMaszyny);
-    if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZleceniaThrottled);
+    if (zlecenieSearchInput) {
+        zlecenieSearchInput.addEventListener('input', () => {
+            ordersFilterMode = null;
+            wyswietlZleceniaThrottled();
+        });
+    }
 
     // EDYCJE (modale)
     if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
