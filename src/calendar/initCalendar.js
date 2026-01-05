@@ -27,6 +27,17 @@ const isLeaveDay = (date) => {
   return Boolean(window.__calendarDecorations?.leaveByDay?.[key]);
 };
 
+const isHighlightedDay = (dayKey) => {
+  if (!dayKey) return false;
+  const highlight = window.__calendarHighlight || null;
+  if (!highlight?.mode || !highlight?.days) return false;
+  const days = highlight.days;
+  if (days instanceof Set) return days.has(dayKey);
+  if (Array.isArray(days)) return days.includes(dayKey);
+  if (typeof days === 'object') return Boolean(days[dayKey]);
+  return false;
+};
+
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
   cellEl.querySelectorAll('.cell-sum, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
@@ -159,11 +170,14 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     eventDisplay: 'block',
     eventOrder: 'sortOrder,title',
     dayCellClassNames: (arg) => {
+      const day = normalizeDateKey(arg.date, 'dayCellClassNames');
+      const classes = [];
+      if (isHighlightedDay(day)) classes.push('calendar-highlight-missing');
       if (typeof extraDayCellClassNames === 'function') {
         const extra = extraDayCellClassNames(arg);
-        return Array.isArray(extra) ? extra : [];
+        if (Array.isArray(extra)) classes.push(...extra);
       }
-      return [];
+      return classes;
     },
     dayCellDidMount: (arg) => {
       arg.el.dataset.daycellMounted = '1';

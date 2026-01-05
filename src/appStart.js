@@ -10,6 +10,8 @@ import { computeDayTotals, configureDayTotals } from './calendar/computeDayTotal
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
+import { buildDashboardChecklistData } from './data/dashboardChecklistData.js';
+import { getMissingSummaryDays, getPlannedLeaveMissingCalendar, getUnbilledOrders } from './aggregation/dashboardChecklistAggregation.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const normalizeDayKey = (value, context = '') => {
@@ -344,6 +346,21 @@ function initializeApp() {
     let lastLeaveByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
+    let dashboardChecklistDataVersion = 0;
+    let dashboardChecklistCacheKey = '';
+    let dashboardChecklistState = {
+        missingSummary: { count: 0, days: [] },
+        unbilledOrders: { count: 0, ids: [] },
+        plannedLeaveMissing: { count: 0, dates: [], byEntry: {} }
+    };
+    let dashboardChecklistOrdersFilter = {
+        unbilledOnly: false,
+        ids: new Set()
+    };
+    let dashboardChecklistHighlight = {
+        mode: null,
+        days: new Set()
+    };
     configureDayTotals({
         manualGetter: (dayKey) => manualByDay.get(dayKey) || null,
         ordersGetter: (dayKey) => ordersByDay.get(dayKey) || [],
@@ -661,6 +678,195 @@ function initializeApp() {
         if (!date) return false;
         const day = date.getDay();
         return day === 0 || day === 6;
+    };
+
+    const getChecklistMonthRange = () => {
+        const baseDate = calendar?.getDate?.() || new Date();
+        const monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+        const monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+        return {
+            monthStart: formatDateForStorage(monthStart),
+            monthEnd: formatDateForStorage(monthEnd)
+        };
+    };
+
+    const setCalendarHighlight = (mode, days) => {
+        dashboardChecklistHighlight.mode = mode || null;
+        dashboardChecklistHighlight.days = new Set(days || []);
+        window.__calendarHighlight = {
+            mode: dashboardChecklistHighlight.mode,
+            days: dashboardChecklistHighlight.days
+        };
+        try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
+    };
+
+    const buildChecklistCacheKey = (monthStart, monthEnd) =>
+        `${dashboardChecklistDataVersion}:${monthStart || ''}:${monthEnd || ''}`;
+
+    const ensureOrdersFilterBar = () => {
+        const search = document.querySelector('#orders-search');
+        if (!search) return null;
+        let bar = search.querySelector('.orders-filter-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.className = 'orders-filter-bar';
+            search.appendChild(bar);
+        }
+        return bar;
+    };
+
+    const renderOrdersFilterBar = () => {
+        const bar = ensureOrdersFilterBar();
+        if (!bar) return;
+        if (!dashboardChecklistOrdersFilter.unbilledOnly) {
+            bar.innerHTML = '';
+            return;
+        }
+        bar.innerHTML = `
+            <span class="filter-chip">
+                Tylko niefakturowane
+                <button type="button" class="filter-chip-clear" data-action="clear-unbilled">×</button>
+            </span>
+        `;
+    };
+
+    const setUnbilledOrdersFilter = (enabled, ids = []) => {
+        dashboardChecklistOrdersFilter.unbilledOnly = Boolean(enabled);
+        dashboardChecklistOrdersFilter.ids = new Set(ids || []);
+        renderOrdersFilterBar();
+        wyswietlZlecenia();
+    };
+
+    const renderDashboardChecklistCard = () => {
+        const host = document.getElementById('dashboard-checklist');
+        if (!host) return;
+        const { missingSummary, unbilledOrders, plannedLeaveMissing } = dashboardChecklistState;
+        const allClear = !missingSummary.count && !unbilledOrders.count && !plannedLeaveMissing.count;
+        const rows = [
+            {
+                key: 'missing-summary',
+                label: 'Dni bez podsumowania',
+                count: missingSummary.count,
+                description: missingSummary.count ? 'Brak wpisów w kalendarzu' : 'Brak zaległości',
+                action: 'missing-summary'
+            },
+            {
+                key: 'unbilled-orders',
+                label: 'Zlecenia bez fakturowania',
+                count: unbilledOrders.count,
+                description: unbilledOrders.count ? 'Zakończone bez faktury' : 'Brak zaległości',
+                action: 'unbilled-orders'
+            },
+            {
+                key: 'planned-leave',
+                label: 'Planowany urlop bez wpisu do kalendarza',
+                count: plannedLeaveMissing.count,
+                description: plannedLeaveMissing.count ? 'Brak statusu Urlop' : 'Brak zaległości',
+                action: 'planned-leave'
+            }
+        ];
+
+        host.innerHTML = `
+            <div class="dashboard-checklist-card">
+                <div class="checklist-header">
+                    <div>
+                        <h4>Niedokończone</h4>
+                        <p>Krótka lista rzeczy do domknięcia</p>
+                    </div>
+                    <div class="checklist-status ${allClear ? 'is-ok' : 'is-alert'}">
+                        <span class="dot"></span>
+                        <span>${allClear ? 'Brak zaległości' : 'Do sprawdzenia'}</span>
+                    </div>
+                </div>
+                <div class="checklist-rows">
+                    ${rows.map(row => `
+                        <button type="button" class="checklist-row ${row.count ? 'is-alert' : 'is-ok'}" data-checklist-action="${row.action}">
+                            <span class="checklist-badge">${row.count}</span>
+                            <span class="checklist-text">
+                                <strong>${row.label}</strong>
+                                <small>${row.description}</small>
+                            </span>
+                            <span class="checklist-chevron">›</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        host.querySelectorAll('[data-checklist-action]').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                const action = btn.dataset.checklistAction;
+                if (action === 'missing-summary') {
+                    const tabBtn = document.querySelector('.tab-button[onclick*="pulpit"]');
+                    tabBtn?.click();
+                    setCalendarHighlight('missingSummary', dashboardChecklistState.missingSummary.days);
+                    setUnbilledOrdersFilter(false);
+                    return;
+                }
+                if (action === 'unbilled-orders') {
+                    const tabBtn = document.querySelector('.tab-button[onclick*="zlecenia"]');
+                    tabBtn?.click();
+                    setCalendarHighlight(null, []);
+                    setUnbilledOrdersFilter(true, dashboardChecklistState.unbilledOrders.ids);
+                    return;
+                }
+                if (action === 'planned-leave') {
+                    const tabBtn = document.querySelector('.tab-button[onclick*="podsumowanie"]');
+                    tabBtn?.click();
+                    setCalendarHighlight(null, []);
+                    const plannedTabBtn = document.querySelector('[data-vacation-tab="planned"]');
+                    plannedTabBtn?.click();
+                    const plannedPanel = document.querySelector('[data-vacation-panel="planned"]');
+                    plannedPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setUnbilledOrdersFilter(false);
+                    return;
+                }
+            });
+        });
+    };
+
+    const refreshDashboardChecklist = () => {
+        const { monthStart, monthEnd } = getChecklistMonthRange();
+        const nextKey = buildChecklistCacheKey(monthStart, monthEnd);
+        if (nextKey === dashboardChecklistCacheKey) {
+            if (dashboardChecklistHighlight.mode === 'missingSummary') {
+                setCalendarHighlight('missingSummary', dashboardChecklistState.missingSummary.days);
+            }
+            return;
+        }
+        const data = buildDashboardChecklistData({
+            manualByDay,
+            ordersByDay,
+            leaveByDay,
+            plannedLeaveEntries,
+            orders: _wszystkieZleceniaCache
+        });
+        const missingSummary = getMissingSummaryDays({
+            monthStart,
+            monthEnd,
+            manualByDay: data.manualByDay,
+            ordersByDay: data.ordersByDay,
+            leaveByDay: data.leaveByDay,
+            countWorkingDays: true
+        });
+        const unbilledOrders = getUnbilledOrders({ orders: data.orders });
+        const plannedLeaveMissing = getPlannedLeaveMissingCalendar({
+            plannedLeaveEntries: data.plannedLeaveEntries,
+            leaveByDay: data.leaveByDay
+        });
+
+        dashboardChecklistState = { missingSummary, unbilledOrders, plannedLeaveMissing };
+        dashboardChecklistCacheKey = nextKey;
+
+        if (dashboardChecklistHighlight.mode === 'missingSummary') {
+            setCalendarHighlight('missingSummary', missingSummary.days);
+        }
+        if (dashboardChecklistOrdersFilter.unbilledOnly) {
+            dashboardChecklistOrdersFilter.ids = new Set(unbilledOrders.ids || []);
+        }
+        renderDashboardChecklistCard();
+        renderOrdersFilterBar();
     };
 
     const buildOrderIndex = () => new Map(
@@ -1352,6 +1558,8 @@ function initializeApp() {
             rebuildCalendarDecorations();
             selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
+            dashboardChecklistDataVersion += 1;
+            refreshDashboardChecklist();
         });
     }
 
@@ -1395,10 +1603,14 @@ function initializeApp() {
         kalendarzPodsumowanieDiv.innerHTML = `
   <div class="metrics-row">
     <div class="metrics-left"><div class="metrics-grid">${metricsHTML}</div></div>
-    <div class="metrics-right"><div id="fh3m-pulpit"></div></div>
+    <div class="metrics-right">
+        <div id="fh3m-pulpit"></div>
+        <div id="dashboard-checklist"></div>
+    </div>
   </div>`;
         const { y, m } = ymFromMonthInput();
         renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
+        refreshDashboardChecklist();
     }
 
     async function obslugaKalendarza(event) {
@@ -2036,18 +2248,22 @@ function initializeApp() {
             refreshPlannedLeaveDecorations();
             return;
         }
+        const missingByEntry = dashboardChecklistState?.plannedLeaveMissing?.byEntry || {};
         const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays), 0);
         plannedLeaveTotalSpan.textContent = formatujLiczbe(totalDays);
         plannedLeaveList.innerHTML = plannedLeaveEntries.map(entry => {
             const rangeLabel = `${entry.startDate || '—'} → ${entry.endDate || '—'}`;
             const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays);
+            const missingDays = missingByEntry[entry.id] || [];
+            const missingLabel = missingDays.length ? `Braki w kalendarzu: ${missingDays.length} dni` : '';
             const metaBits = [
                 `${formatujLiczbe(count)} dni`,
                 entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'
             ];
+            if (missingLabel) metaBits.push(missingLabel);
             if (entry.note) metaBits.push(entry.note);
             return `
-                <div class="planned-leave-item" data-id="${entry.id}">
+                <div class="planned-leave-item ${missingDays.length ? 'planned-leave-item--missing' : ''}" data-id="${entry.id}">
                     <div><strong>${rangeLabel}</strong></div>
                     <div class="meta">${metaBits.map(bit => `<span>${bit}</span>`).join('')}</div>
                     <div class="actions">
@@ -2062,6 +2278,8 @@ function initializeApp() {
 
     async function refreshPlannedLeaveEntries() {
         plannedLeaveEntries = await listPlannedLeave(selectedYear);
+        dashboardChecklistDataVersion += 1;
+        refreshDashboardChecklist();
         renderPlannedLeaveList();
     }
 
@@ -3067,11 +3285,14 @@ function wyswietlZlecenia() {
 
     const frazaWyszukiwania = (zlecenieSearchInput?.value || '').toLowerCase();
     const selectedMonth = getSelectedMonth();
+    const unbilledOnly = dashboardChecklistOrdersFilter.unbilledOnly;
+    const unbilledIds = dashboardChecklistOrdersFilter.ids;
     wszystkieZlecenia = [];
     const aktywneElements = [];
     const ukonczoneElements = [];
 
     const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => {
+        if (unbilledOnly && (!unbilledIds || !unbilledIds.has(zlecenie.id))) return false;
         if (!frazaWyszukiwania) return true;
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
@@ -3108,7 +3329,7 @@ function wyswietlZlecenia() {
             ));
         } else if (zlecenie.status === 'ukończone') {
             const dataUkonczenia = zlecenie.dataUkonczenia || '';
-            if (!dataUkonczenia.startsWith(selectedMonth)) {
+            if (!unbilledOnly && !dataUkonczenia.startsWith(selectedMonth)) {
                 return;
             }
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
@@ -3164,6 +3385,8 @@ function nasluchujNaZlecenia() {
         wyswietlZlecenia();
         odswiezPodsumowania();
         rebuildCalendarDecorations();
+        dashboardChecklistDataVersion += 1;
+        refreshDashboardChecklist();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
     });
 }
@@ -4703,6 +4926,15 @@ async function obslugaListyCzesci(event) {
     if (maszynaSearchInput) maszynaSearchInput.addEventListener('input', wyswietlMaszynyDebounced);
     if (maszynaClientFilterSelect) maszynaClientFilterSelect.addEventListener('change', wyswietlMaszyny);
     if (zlecenieSearchInput) zlecenieSearchInput.addEventListener('input', wyswietlZleceniaThrottled);
+    const ordersSearch = document.querySelector('#orders-search');
+    if (ordersSearch) {
+        ordersSearch.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="clear-unbilled"]');
+            if (!button) return;
+            event.preventDefault();
+            setUnbilledOrdersFilter(false);
+        });
+    }
 
     // EDYCJE (modale)
     if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
