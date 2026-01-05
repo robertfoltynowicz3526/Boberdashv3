@@ -36,7 +36,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   }
 
   const leave = decorations.leaveByDay?.[dayKey];
-  const sum = decorations.summaryByDay?.[dayKey];
   const planned = decorations.plannedLeaveByDay?.[dayKey];
 
   if (leave) {
@@ -62,28 +61,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     cellEl.appendChild(marker);
   }
 
-  if (!sum) {
-    if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
-    return;
-  }
-
-  const work = Number(sum.work || 0) || 0;
-  const drive = Number(sum.drive || 0) || 0;
-  const billed = Number(sum.billed || 0) || 0;
-  const over = Number(sum.over || 0) || 0;
-  const parts = [
-    `Praca: ${work.toFixed(1)}h`,
-    `Jazda: ${drive.toFixed(1)}h`,
-    `Fakturowane: ${billed.toFixed(1)}h`,
-    `Nadgodziny: ${over.toFixed(1)}h`,
-  ];
-
-  const box = document.createElement('div');
-  box.className = 'cell-sum bober-chip bober-chip--summary';
-  box.textContent = parts.join(' • ');
-  box.title = box.textContent;
-  const target = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
-  target.appendChild(box);
   if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
 };
 
@@ -154,6 +131,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     handleWindowResize: true,
     fixedWeekCount: false,
     dayMaxEvents: true,
+    dayMaxEventRows: 4,
     showNonCurrentDates: true,
     moreLinkClick: 'popover',
     eventOverlap: false,
@@ -189,6 +167,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
           ].filter(Boolean);
           const extendedProps = { ...(e.extendedProps || {}) };
           const classNames = rawClassNames.length ? rawClassNames : ['order-event'];
+          if (!extendedProps.type) {
+            if (classNames.includes('bober-chip--summary') || classNames.includes('summary-event') || classNames.includes('fc-summary-chip')) {
+              extendedProps.type = 'summary';
+            } else if (classNames.includes('bober-chip--client') || classNames.includes('fc-client-chip') || classNames.includes('order-event')) {
+              extendedProps.type = 'client';
+            }
+          }
           return {
             ...e,
             title: e.title || extendedProps.clientName || extendedProps.client || '',
@@ -223,8 +208,18 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         eventType === 'client' ||
         info?.el?.classList?.contains?.('bober-chip--client') ||
         info?.el?.classList?.contains?.('fc-client-chip');
+      const isSummaryChip =
+        eventType === 'summary' ||
+        info?.el?.classList?.contains?.('bober-chip--summary') ||
+        info?.el?.classList?.contains?.('fc-summary-chip');
       if (isClientChip && info?.event?.title) {
         info.el.title = info.event.title;
+      }
+      if (isSummaryChip) {
+        info.el.classList.add('fc-summary-event');
+        info.el.style.display = 'block';
+        const harness = info.el.closest('.fc-daygrid-event-harness');
+        harness?.classList.add('fc-summary-harness');
       }
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },

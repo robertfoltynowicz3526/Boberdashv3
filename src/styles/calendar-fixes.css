@@ -122,7 +122,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .fc .fc-title-only { font-weight: 700; }
 
 /* Stabilny layout naszych chipów */
-.fc .bober-chip {
+.fc .bober-chip--client,
+.fc .fc-client-chip {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -131,18 +132,26 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   line-height: 1.35;
   min-height: 20px;
 }
-.fc .bober-chip .fc-event-title {
+.fc .bober-chip--client .fc-event-title,
+.fc .fc-client-chip .fc-event-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.fc .bober-chip--summary {
+.fc .bober-chip--summary,
+.fc .fc-summary-chip {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  line-height: 1.25;
+}
+.fc .bober-chip--summary .fc-event-title,
+.fc .fc-summary-chip .fc-event-title {
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.25;
 }
 
 @media (max-width: 1400px) {
@@ -174,6 +183,11 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   width: fit-content;
   max-width: 100%;
 }
+.fc .bober-chip--summary.fc-event,
+.fc .fc-summary-chip.fc-event {
+  display: block;
+  width: 100%;
+}
 .fc .bober-chip--client .fc-event-main,
 .fc .bober-chip--client .fc-event-main-frame,
 .fc .bober-chip--client .fc-event-title-container,
@@ -188,6 +202,17 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.fc .fc-summary-harness {
+  width: 100%;
+}
+.fc .fc-summary-harness .fc-event-main,
+.fc .fc-summary-harness .fc-event-main-frame,
+.fc .fc-summary-harness .fc-event-title-container,
+.fc .fc-summary-harness .fc-summary-event {
+  width: 100%;
+  display: block;
 }
 
 /* Komórka dnia musi być relative, żeby “dół” działał */
