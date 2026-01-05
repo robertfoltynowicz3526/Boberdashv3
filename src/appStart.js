@@ -12,6 +12,7 @@ import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MIN_DATE = '2026-01-01';
 const normalizeDayKey = (value, context = '') => {
     if (!value) return null;
     let key = null;
@@ -674,21 +675,54 @@ function initializeApp() {
         return day === 0 || day === 6;
     };
 
+    const isOnOrAfterMinDate = (dayKey) => Boolean(dayKey) && dayKey >= MIN_DATE;
+
+    const getChecklistRange = () => {
+        const view = calendar?.view || window.__fcCalendar?.view;
+        const today = normalizeAllDayDate(new Date());
+        if (!today) return { start: null, end: null };
+        const todayEnd = addDaysToDate(today, 1);
+        const fallbackStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        const viewStart = normalizeAllDayDate(view?.currentStart) || fallbackStart;
+        const viewEnd = normalizeAllDayDate(view?.currentEnd) || todayEnd;
+        const minDate = normalizeAllDayDate(MIN_DATE);
+        const start = minDate && viewStart < minDate ? minDate : viewStart;
+        const end = todayEnd && viewEnd > todayEnd ? todayEnd : viewEnd;
+        return { start, end };
+    };
+
     const buildUnfinishedSummary = () => {
-        const daysWithoutSummary = Array.from(dayDocsByDay.keys()).filter((dayKey) => {
-            const { totals, isLeave } = computeDayTotals(dayKey);
+        const { start: checklistStart, end: checklistEnd } = getChecklistRange();
+        const daysInRange = checklistStart && checklistEnd ? listDaysInRange(checklistStart, checklistEnd) : [];
+        const daysWithoutSummary = daysInRange.filter((dayKey) => {
+            if (!isOnOrAfterMinDate(dayKey)) return false;
+            const { isLeave } = computeDayTotals(dayKey);
             if (isLeave) return false;
-            const totalValue = Number(totals.work || 0)
-                + Number(totals.drive || 0)
-                + Number(totals.billed || 0)
-                + Number(totals.over || 0);
-            return totalValue === 0;
+            const ordersForDay = Array.isArray(ordersByDay.get(dayKey)) ? ordersByDay.get(dayKey) : [];
+            if (ordersForDay.length > 0) return false;
+            const manualTotals = manualByDay.get(dayKey) || {};
+            const manualValue = Number(manualTotals.work || 0)
+                + Number(manualTotals.drive || 0)
+                + Number(manualTotals.billed || 0)
+                + Number(manualTotals.over || 0);
+            return manualValue === 0;
+        });
+
+        const ordersWithActivitySinceMinDate = new Set();
+        ordersByDay.forEach((ordersForDay, dayKey) => {
+            const normalizedDay = normalizeDayKey(dayKey, 'ordersByDay');
+            if (!normalizedDay || !isOnOrAfterMinDate(normalizedDay)) return;
+            (ordersForDay || []).forEach((entry) => {
+                const orderId = entry?.orderId || entry?.zlecenieId || entry?.id || null;
+                if (orderId) ordersWithActivitySinceMinDate.add(orderId);
+            });
         });
 
         const ordersWithoutBilling = _wszystkieZleceniaCache
             .filter((order) => {
                 const status = order?.status;
                 if (!(status === 'ukończone' || status === 'ukonczone')) return false;
+                if (!ordersWithActivitySinceMinDate.has(order.id)) return false;
                 const billed = Number(order?.wyfakturowaneGodziny ?? order?.wyfakturowane ?? 0) || 0;
                 return billed <= 0;
             })
@@ -696,7 +730,8 @@ function initializeApp() {
 
         const plannedLeaveWithoutCalendar = plannedLeaveEntries
             .filter((entry) => {
-                const days = listDaysInclusive(entry.startDate, entry.endDate);
+                const days = listDaysInclusive(entry.startDate, entry.endDate)
+                    .filter(day => isOnOrAfterMinDate(day));
                 if (!days.length) return false;
                 const hasCalendarEntry = days.some(day => leaveByDay.has(day));
                 return !hasCalendarEntry;
@@ -788,8 +823,8 @@ function initializeApp() {
                         start: normalizedDay,
                         allDay: true,
                         title: clientName || 'Zlecenie',
-                        classNames: ['order-event'],
-                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null }
+                        classNames: ['order-event', 'fc-client-chip'],
+                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' }
                     });
                 });
             }
@@ -955,6 +990,7 @@ function initializeApp() {
                     <div>
                         <p class="drawer-eyebrow">Pulpit</p>
                         <h3>Niedokończone</h3>
+                        <p class="unfinished-note">Liczone od 01.01.2026</p>
                     </div>
                     <button type="button" class="drawer-close" data-drawer-close aria-label="Zamknij">×</button>
                 </div>
@@ -1182,6 +1218,10 @@ function initializeApp() {
                         event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
                     }
                     return event;
+                },
+                eventClassNames(info) {
+                    const eventType = info?.event?.extendedProps?.type;
+                    return eventType === 'client' ? ['fc-client-chip'] : [];
                 },
                 dateClick: (info) => openEwidencja(info.dateStr),
                 select(info) {

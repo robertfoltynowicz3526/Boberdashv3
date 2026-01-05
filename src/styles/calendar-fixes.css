@@ -113,6 +113,23 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .fc .order-event .fc-event-main { padding: 0 !important; }
 .fc .fc-title-only { font-weight: 700; }
 
+.fc .fc-client-chip.fc-event {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+}
+.fc .fc-client-chip .fc-event-main,
+.fc .fc-client-chip .fc-event-main-frame,
+.fc .fc-client-chip .fc-event-title-container {
+  display: inline-flex;
+  max-width: 100%;
+}
+.fc .fc-client-chip .fc-event-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Komórka dnia musi być relative, żeby “dół” działał */
 .fc .fc-daygrid-day-frame { position: relative; }
 

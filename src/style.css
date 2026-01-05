@@ -1736,6 +1736,11 @@ select {
 .drawer--unfinished .drawer-panel {
   width: min(420px, 100%);
 }
+.drawer--unfinished .unfinished-note {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
 
 .unfinished-list {
   display: grid;
