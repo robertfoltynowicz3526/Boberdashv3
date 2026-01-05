@@ -844,6 +844,19 @@ function initializeApp() {
         }));
     };
 
+    const buildSummaryText = (totals = {}) => {
+        const work = Number(totals.work || 0) || 0;
+        const drive = Number(totals.drive || 0) || 0;
+        const billed = Number(totals.billed || 0) || 0;
+        const over = Number(totals.over || 0) || 0;
+        return [
+            `Praca: ${work.toFixed(1)}h`,
+            `Jazda: ${drive.toFixed(1)}h`,
+            `Fakturowane: ${billed.toFixed(1)}h`,
+            `Nadgodziny: ${over.toFixed(1)}h`,
+        ].join(' • ');
+    };
+
     const rebuildCalendarDecorations = (rangeStart, rangeEnd) => {
         const view = calendar?.view || window.__fcCalendar?.view;
         const start = rangeStart || view?.currentStart || null;
@@ -851,6 +864,7 @@ function initializeApp() {
         const summaryByDay = {};
         const leaveByDayOut = {};
         const orderEvents = [];
+        const summaryEvents = [];
         const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
             ...manualByDay.keys(),
@@ -879,12 +893,22 @@ function initializeApp() {
                         allDay: true,
                         title: clientName || 'Zlecenie',
                         classNames: ['order-event', 'fc-client-chip', 'bober-chip', 'bober-chip--client'],
-                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' }
+                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
+                        sortOrder: 1
                     });
                 });
             }
             if (SHOW_ZERO_DAYS || hasData) {
                 summaryByDay[normalizedDay] = totals;
+                summaryEvents.push({
+                    id: `summary_${normalizedDay}`,
+                    start: normalizedDay,
+                    allDay: true,
+                    title: buildSummaryText(totals),
+                    classNames: ['bober-chip', 'bober-chip--summary', 'fc-summary-chip'],
+                    extendedProps: { day: normalizedDay, type: 'summary' },
+                    sortOrder: 99
+                });
             }
         });
 
@@ -892,7 +916,7 @@ function initializeApp() {
         lastLeaveByDay = leaveByDayOut;
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
-        workEvents = orderEvents;
+        workEvents = [...orderEvents, ...summaryEvents];
         updateCalendarData(calendar, workEvents, []);
     };
 

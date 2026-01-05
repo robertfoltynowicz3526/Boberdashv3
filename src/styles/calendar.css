@@ -80,8 +80,8 @@
 /* Lekki JD theme dla dayCell */
 .fc-daygrid-day-number{ color:#d8e7b1; }
 
-/* Usuń cokolwiek, co stylowało “podsumowanie” jako niebieski bar u góry */
-.fc-event.summary-event { display:none !important; }
+/* Podsumowanie dnia renderowane jako event */
+.fc-event.summary-event { display: block; }
 
 /* Ogólne poprawki wyglądu kalendarza */
 .fc{--fc-border-color: var(--jd-border); --fc-page-bg-color: transparent}
