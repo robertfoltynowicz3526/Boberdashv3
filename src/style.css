@@ -1582,14 +1582,19 @@ select {
   border-color: rgba(255, 222, 0, 0.4);
 }
 
-.machine-history-link {
+.machine-edit-link {
+  background: none;
+  border: 0;
+  padding: 0;
   color: var(--accent-color);
   font-size: 0.82rem;
   text-decoration: none;
+  cursor: pointer;
+  font: inherit;
   transition: color 0.2s ease;
 }
 
-.machine-history-link:hover {
+.machine-edit-link:hover {
   color: var(--accent-hover);
 }
 
@@ -2759,6 +2764,7 @@ main,
 .vacation-adjustment-form .form-inline{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
 .vacation-adjustment-form input, .vacation-adjustment-form button, .vacation-adjustment-form label{ flex:1 1 auto; min-width:120px; }
 .vacation-adjustment-form label{ flex-basis:100px; min-width:80px; }
+.vacation-adjustment-form button{ flex:0 0 auto; width:fit-content; }
 .vacation-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 8px; }
 .vacation-tab{ border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06); color:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; font-size:.9rem; transition:all .2s ease; }
 .vacation-tab.is-active{ background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.5); font-weight:600; }

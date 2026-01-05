@@ -3192,13 +3192,13 @@ async function obslugaListyKlientow(event) {
                 if (maszyna.rokProdukcji) metaParts.push(`Rok: ${maszyna.rokProdukcji}`);
                 if (maszyna.motogodziny) metaParts.push(`MTH: ${maszyna.motogodziny}`);
                 return `
-                    <div class="machine-row" data-id="${maszyna.id}" data-client-id="${group.klientId}">
+                    <div class="machine-row" data-id="${maszyna.id}" data-client-id="${group.klientId}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">
                         <div class="machine-row-main">
                             <strong>${maszyna.typMaszyny} ${maszyna.model}</strong>
                             <div class="machine-row-meta">${metaParts.join(' • ')}</div>
                         </div>
                         <div class="machine-row-actions">
-                            <a href="#" class="machine-history-link" data-maszyna-id="${maszyna.id}" data-maszyna-nazwa="${maszyna.typMaszyny} ${maszyna.model}">Historia</a>
+                            <button type="button" class="machine-edit-link" data-maszyna-id="${maszyna.id}">Edytuj</button>
                         </div>
                     </div>
                 `;
@@ -3297,11 +3297,12 @@ async function obslugaListyKlientow(event) {
     return;
   }
 
-  if (el.classList.contains('machine-history-link')) {
+  if (el.classList.contains('machine-edit-link')) {
     event.preventDefault();
+    event.stopPropagation();
     const maszynaId = el.dataset.maszynaId;
-    const maszynaNazwa = el.dataset.maszynaNazwa;
-    pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
+    if (!maszynaId) return;
+    otworzModalEdycjiMaszyny(maszynaId);
     return;
   }
 
@@ -3309,11 +3310,12 @@ async function obslugaListyKlientow(event) {
   if (!row) return;
   const maszynaId = row.dataset.id;
   const klientId = row.dataset.clientId;
+  const maszynaNazwa = row.dataset.maszynaNazwa;
   if (!maszynaId) return;
   if (klientId) {
     updateExpandedState(UI_STORAGE_KEYS.machinesExpanded, UI_STORAGE_KEYS.machinesLast, klientId, true);
   }
-  otworzModalEdycjiMaszyny(maszynaId);
+  pokazHistorieSerwisowaMaszyny(maszynaId, maszynaNazwa);
 }
 
 function otworzModalEdycjiMaszyny(maszynaId) {
