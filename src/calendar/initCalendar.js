@@ -79,9 +79,11 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   ];
 
   const box = document.createElement('div');
-  box.className = 'cell-sum';
+  box.className = 'cell-sum bober-chip bober-chip--summary';
   box.textContent = parts.join(' • ');
-  cellEl.appendChild(box);
+  box.title = box.textContent;
+  const target = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  target.appendChild(box);
   if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
 };
 
@@ -216,6 +218,14 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       return { html: `<div class="fc-title-only">${info.event.title || ''}</div>` };
     },
     eventDidMount: (info) => {
+      const eventType = info?.event?.extendedProps?.type;
+      const isClientChip =
+        eventType === 'client' ||
+        info?.el?.classList?.contains?.('bober-chip--client') ||
+        info?.el?.classList?.contains?.('fc-client-chip');
+      if (isClientChip && info?.event?.title) {
+        info.el.title = info.event.title;
+      }
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },
     datesSet: (...args) => {
