@@ -91,18 +91,11 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .calendar-shell .day-summary {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  font-weight: 400;
-  margin: 0;
-}
-
-.calendar-shell .day-summary .fc-event-title {
-  white-space: normal;
-  line-height: 1.25;
-  font-size: 12px;
+  background: rgba(80, 120, 255, 0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  padding: 4px 6px;
+  font-weight: 600;
 }
 
 /* Opcjonalny panel scrollowalny do list */
@@ -123,7 +116,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
 /* Stabilny layout naszych chipów */
 .fc .bober-chip--client,
-.fc .fc-client-chip {
+.fc .fc-client-chip,
+.fc .client-chip {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -133,25 +127,14 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   min-height: 20px;
 }
 .fc .bober-chip--client .fc-event-title,
-.fc .fc-client-chip .fc-event-title {
+.fc .fc-client-chip .fc-event-title,
+.fc .client-chip .fc-event-title,
+.fc .bober-chip--client .fc-title-only,
+.fc .fc-client-chip .fc-title-only,
+.fc .client-chip .fc-title-only {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.fc .bober-chip--summary,
-.fc .fc-summary-chip {
-  display: block;
-  width: 100%;
-  padding: 4px 8px;
-  line-height: 1.25;
-}
-.fc .bober-chip--summary .fc-event-title,
-.fc .fc-summary-chip .fc-event-title {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 @media (max-width: 1400px) {
@@ -159,7 +142,6 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
     padding: 2px 6px;
     font-size: 11px;
   }
-  .fc .bober-chip--summary { font-size: 11px; }
 }
 
 @media (max-width: 1100px) {
@@ -167,7 +149,6 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
     padding: 2px 5px;
     font-size: 10px;
   }
-  .fc .bober-chip--summary { font-size: 10px; }
 }
 
 .fc .fc-daygrid-day-events,
@@ -178,22 +159,21 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .fc .bober-chip--client.fc-event,
-.fc .fc-client-chip.fc-event {
+.fc .fc-client-chip.fc-event,
+.fc .client-chip.fc-event {
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
-}
-.fc .bober-chip--summary.fc-event,
-.fc .fc-summary-chip.fc-event {
-  display: block;
-  width: 100%;
 }
 .fc .bober-chip--client .fc-event-main,
 .fc .bober-chip--client .fc-event-main-frame,
 .fc .bober-chip--client .fc-event-title-container,
 .fc .fc-client-chip .fc-event-main,
 .fc .fc-client-chip .fc-event-main-frame,
-.fc .fc-client-chip .fc-event-title-container {
+.fc .fc-client-chip .fc-event-title-container,
+.fc .client-chip .fc-event-main,
+.fc .client-chip .fc-event-main-frame,
+.fc .client-chip .fc-event-title-container {
   display: inline-flex;
   max-width: 100%;
 }
@@ -204,39 +184,11 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   text-overflow: ellipsis;
 }
 
-.fc .fc-summary-harness {
-  width: 100%;
-}
-.fc .fc-summary-harness .fc-event-main,
-.fc .fc-summary-harness .fc-event-main-frame,
-.fc .fc-summary-harness .fc-event-title-container,
-.fc .fc-summary-harness .fc-summary-event {
-  width: 100%;
-  display: block;
-}
-
 /* Komórka dnia musi być relative, żeby “dół” działał */
 .fc .fc-daygrid-day-frame { position: relative; }
 
-/* NIEBIESKI kafel podsumowania na dole komórki */
-.fc .cell-sum{
-  position: static;
-  margin: 4px 6px 6px;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  line-height: 1.25;
-  font-weight: 700;
-  background: rgba(80, 120, 255, 0.95);
-  border: 1px solid rgba(255,255,255,0.22);
-  color: #fff;
-  pointer-events: none;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-/* Zostaw miejsce na kafel sumy przez naturalny flow */
-.fc .fc-daygrid-day-events { padding-bottom: 0; }
+/* Zostaw miejsce na stopkę podsumowania */
+.fc .fc-daygrid-day-events { padding-bottom: 52px; }
 
 /* DUŻA IKONA WOLNEGO – tylko ona w dniu wolnym */
 .fc .cell-leave-icon{

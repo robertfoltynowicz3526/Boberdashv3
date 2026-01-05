@@ -57,21 +57,29 @@
 
 /* Stopka z podsumowaniem dnia (nie jest eventem) */
 .day-summary{
-  margin-top: 6px;
-  border-top: 1px dashed rgba(255,255,255,.15);
-  padding: 4px 4px 2px;
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  padding: 4px 6px;
+  border-radius: 10px;
   font-size: 11px;
-  color: #cfe2ff;
+  line-height: 1.2;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #eaf2ff;
+  max-height: 2.4em;
+  overflow: hidden;
+  white-space: normal;
 }
 .day-summary-row{
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  display: block;
 }
 
 /* Upewnij się, że podsumowanie nie wchodzi pod karty */
 .fc-daygrid-day-events{
   margin-bottom: 2px;
+  padding-bottom: 52px;
 }
 
 /* More-link */
@@ -80,8 +88,7 @@
 /* Lekki JD theme dla dayCell */
 .fc-daygrid-day-number{ color:#d8e7b1; }
 
-/* Podsumowanie dnia renderowane jako event */
-.fc-event.summary-event { display: block; }
+/* Podsumowanie dnia nie jest eventem */
 
 /* Ogólne poprawki wyglądu kalendarza */
 .fc{--fc-border-color: var(--jd-border); --fc-page-bg-color: transparent}
