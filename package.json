@@ -10,6 +10,7 @@
     "preinstall": "bash tools/ci-precheck.sh",
     "dev": "vite",
     "build": "vite build",
+    "ci:check": "pnpm install --frozen-lockfile && pnpm run build",
     "preview": "vite preview"
   },
   "devDependencies": {

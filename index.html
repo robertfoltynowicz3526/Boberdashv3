@@ -36,8 +36,10 @@
         <div class="sidebar-footer">
             <p class="sidebar-label">Motyw interfejsu</p>
             <div class="theme-switcher">
-                <input type="checkbox" id="theme-toggle" class="theme-toggle-checkbox">
-                <label for="theme-toggle" class="theme-toggle-label"></label>
+                <select id="theme-select" class="theme-select" aria-label="Wybierz motyw interfejsu">
+                    <option value="jd-dark">John Deere (ciemny, lekki)</option>
+                    <option value="jd-contrast">John Deere (kontrastowy)</option>
+                </select>
             </div>
             <button type="button" id="app-lock-button" class="btn-secondary app-lock-button">Zablokuj</button>
         </div>
@@ -49,6 +51,18 @@
                 <div id="unfinished-button-slot"></div>
             </div>
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
+            <div id="calendar-toolbar" class="calendar-toolbar" role="toolbar" aria-label="Sterowanie kalendarzem">
+                <div class="calendar-toolbar-group">
+                    <button type="button" class="btn-secondary" data-calendar-view="day">Dzień</button>
+                    <button type="button" class="btn-secondary" data-calendar-view="week">Tydzień</button>
+                    <button type="button" class="btn-secondary" data-calendar-view="month">Miesiąc</button>
+                </div>
+                <div class="calendar-toolbar-group">
+                    <button type="button" id="calendar-focus-btn" class="btn-ghost">Pokaż dzień</button>
+                    <button type="button" id="calendar-today-btn" class="btn-secondary">Dziś</button>
+                    <button type="button" id="calendar-back-btn" class="btn-ghost" disabled>Wróć</button>
+                </div>
+            </div>
             <div id="calendar-shell" class="calendar-wrap">
                 <div id="kalendarz" class="calendar-container"></div>
             </div>

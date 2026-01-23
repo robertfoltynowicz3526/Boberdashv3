@@ -1,38 +1,38 @@
 :root {
-  --jd-green: #1b4d2a;
-  --jd-green-2: #224f2d;
-  --jd-yellow: #ffd600;
-  --jd-blue: #4f86ff;
-  --jd-green-900: #0e1a0f;
-  --jd-green-800: #152417;
-  --jd-green-700: #1b2e1e;
-  --jd-green-600: #24561d;
-  --jd-green-500: #367c2b;    /* John Deere green */
-  --jd-green-400: #47a23c;
+  --jd-green: var(--color-primary);
+  --jd-green-2: var(--color-primary-hover);
+  --jd-yellow: var(--color-accent);
+  --jd-blue: #5a8dff;
+  --jd-green-900: var(--color-background);
+  --jd-green-800: var(--color-surface);
+  --jd-green-700: var(--color-surface-2);
+  --jd-green-600: var(--color-primary-hover);
+  --jd-green-500: var(--color-primary);
+  --jd-green-400: #51a645;
 
-  --jd-yellow-500: #fcd116;   /* John Deere yellow */
-  --jd-yellow-600: #c9a300;
+  --jd-yellow-500: var(--color-accent);
+  --jd-yellow-600: #d3a816;
 
-  --jd-blue-300:  #73a7ff;    /* linki (opcjonalnie) */
+  --jd-blue-300: #8ab2ff;
 
-  --jd-text-100:  #ffffff;
-  --jd-text-300:  #e7f2e9;
-  --jd-text-500:  #cfe4d6;
-  --jd-line-600:  #28422c;
+  --jd-text-100: var(--color-text);
+  --jd-text-300: var(--color-text);
+  --jd-text-500: var(--color-muted-text);
+  --jd-line-600: var(--color-border);
 
-  --bg-app:   var(--jd-green-900);
-  --bg-panel: radial-gradient(1000px 600px at 70% 0%, #1a2c1d 0%, var(--jd-green-900) 70%);
-  --surface:  var(--jd-green-800);
-  --card:     var(--jd-green-700);
+  --bg-app: var(--color-background);
+  --bg-panel: radial-gradient(1000px 600px at 70% 0%, rgba(29, 44, 29, 0.85) 0%, var(--color-background) 70%);
+  --surface: var(--color-surface);
+  --card: var(--color-surface-2);
 
-  --brand:        var(--jd-green-500);
-  --brand-strong: var(--jd-green-600);
-  --brand-soft:   rgba(54,124,43,0.18);
-  --accent:       var(--jd-yellow-500);
-  --accent-strong:var(--jd-yellow-600);
+  --brand: var(--color-primary);
+  --brand-strong: var(--color-primary-hover);
+  --brand-soft: rgba(54, 124, 43, 0.14);
+  --accent: var(--color-accent);
+  --accent-strong: #d3a816;
 
-  --shadow-1: 0 6px 20px rgba(0,0,0,0.35);
-  --shadow-2: 0 10px 28px rgba(0,0,0,0.45);
+  --shadow-1: 0 6px 20px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 
 html, body {
@@ -64,9 +64,9 @@ h1,h2,h3{color:var(--jd-text-100)}
 
 /* Przyciski */
 .btn{border-radius:12px;border:1px solid transparent;padding:10px 16px;font-weight:600}
-.btn-primary{background:var(--brand);color:#0b1a0b;border-color:var(--brand-strong)}
+.btn-primary{background:var(--brand);color:var(--text-inverted);border-color:var(--brand-strong)}
 .btn-primary:hover{background:var(--brand-strong)}
-.btn-warning{background:var(--accent);color:#222;border-color:var(--accent-strong)}
+.btn-warning{background:var(--accent);color:var(--text-inverted);border-color:var(--accent-strong)}
 .btn-warning:hover{background:var(--accent-strong)}
 .btn-ghost{background:transparent;color:var(--jd-text-100);border-color:var(--jd-line-600)}
 .btn-ghost:hover{background:var(--brand-soft)}
@@ -83,7 +83,7 @@ h1,h2,h3{color:var(--jd-text-100)}
 .modal{background:var(--surface);border:1px solid var(--jd-line-600);box-shadow:var(--shadow-2)}
 
 /* Linki */
-a{color:var(--jd-blue-300)} a:hover{color:#9bc0ff}
+a{color:var(--jd-blue-300)} a:hover{color:var(--color-accent)}
 
 /* Inputy */
 input,select,textarea{
@@ -107,7 +107,7 @@ input::placeholder{color:var(--jd-text-500)}
 .fc .fc-toolbar-title{color:var(--jd-text-100)}
 .fc .fc-button{
   background:var(--brand);border:1px solid var(--brand-strong);
-  color:#0b1a0b;border-radius:10px}
+  color:var(--text-inverted);border-radius:10px}
 .fc .fc-button:hover{background:var(--brand-strong)}
 .fc-theme-standard .fc-scrollgrid{border-color:var(--jd-line-600);background:var(--surface)}
 .fc-theme-standard td,.fc-theme-standard th{border-color:var(--jd-line-600)}
@@ -117,7 +117,7 @@ input::placeholder{color:var(--jd-text-500)}
 .fc .bober-chip.fc-event{
   background:linear-gradient(180deg,var(--brand) 0%,var(--brand-strong) 100%);
   border:1px solid rgba(0,0,0,0.25);
-  color:#0b1a0b;border-radius:10px;padding:2px 6px;
+  color:var(--text-inverted);border-radius:10px;padding:2px 6px;
   box-shadow:0 2px 6px rgba(0,0,0,0.35)
 }
 
@@ -136,7 +136,7 @@ input::placeholder{color:var(--jd-text-500)}
   box-shadow:0 4px 12px rgba(0,0,0,0.35)}
 .day-flag--urlop .pill{background:rgba(252,209,22,0.18);border:2px solid var(--accent)}
 .day-flag--wolne .pill{background:rgba(71,162,60,0.18);border:2px solid var(--jd-green-400)}
-.day-flag--l4    .pill{background:rgba(255,88,88,0.15);border:2px solid #ff6b6b}
+.day-flag--l4    .pill{background:rgba(224,106,106,0.15);border:2px solid var(--color-error)}
 
 /* Kalendarz zawsze w ramie – nic nie wystaje */
 .calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:hidden}

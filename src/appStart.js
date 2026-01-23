@@ -82,6 +82,10 @@ function initializeApp() {
     const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
+    const CALENDAR_VIEW_STORAGE_KEY = 'lastCalendarView';
+    const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
+    const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
+    const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
     const getYearFromValue = (value) => {
         if (!value) return null;
@@ -165,6 +169,76 @@ function initializeApp() {
     const persistVacationTab = (tab) => {
         try {
             localStorage.setItem(VACATION_TAB_STORAGE_KEY, tab);
+        } catch (_) { }
+    };
+    const calendarViewKeyToFc = (viewKey) => {
+        switch (viewKey) {
+            case 'day':
+                return 'dayGridDay';
+            case 'month':
+                return 'dayGridMonth';
+            case 'week':
+            default:
+                return 'dayGridWeek';
+        }
+    };
+    const fcViewToCalendarKey = (viewType) => {
+        if (viewType?.includes?.('Day')) return 'day';
+        if (viewType?.includes?.('Week')) return 'week';
+        return 'month';
+    };
+    const readCalendarViewFromStorage = () => {
+        try {
+            const stored = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+            return stored === 'day' || stored === 'week' || stored === 'month' ? stored : null;
+        } catch (_) {
+            return null;
+        }
+    };
+    const readCalendarDateFromStorage = () => {
+        try {
+            const stored = localStorage.getItem(CALENDAR_DATE_STORAGE_KEY);
+            return DATE_KEY_RE.test(stored || '') ? stored : null;
+        } catch (_) {
+            return null;
+        }
+    };
+    const persistCalendarView = (viewKey) => {
+        if (!viewKey) return;
+        try {
+            localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, viewKey);
+        } catch (_) { }
+    };
+    const persistCalendarDate = (dateStr) => {
+        if (!DATE_KEY_RE.test(dateStr || '')) return;
+        try {
+            localStorage.setItem(CALENDAR_DATE_STORAGE_KEY, dateStr);
+        } catch (_) { }
+    };
+    const persistCalendarReturnState = (viewKey, dateStr) => {
+        if (viewKey) {
+            try { localStorage.setItem(CALENDAR_RETURN_VIEW_KEY, viewKey); } catch (_) { }
+        }
+        if (DATE_KEY_RE.test(dateStr || '')) {
+            try { localStorage.setItem(CALENDAR_RETURN_DATE_KEY, dateStr); } catch (_) { }
+        }
+    };
+    const readCalendarReturnState = () => {
+        try {
+            const viewKey = localStorage.getItem(CALENDAR_RETURN_VIEW_KEY) || null;
+            const dateStr = localStorage.getItem(CALENDAR_RETURN_DATE_KEY) || null;
+            return {
+                viewKey: viewKey === 'day' || viewKey === 'week' || viewKey === 'month' ? viewKey : null,
+                dateStr: DATE_KEY_RE.test(dateStr || '') ? dateStr : null
+            };
+        } catch (_) {
+            return { viewKey: null, dateStr: null };
+        }
+    };
+    const clearCalendarReturnState = () => {
+        try {
+            localStorage.removeItem(CALENDAR_RETURN_VIEW_KEY);
+            localStorage.removeItem(CALENDAR_RETURN_DATE_KEY);
         } catch (_) { }
     };
     const getYearRange = (year) => {
@@ -457,6 +531,11 @@ function initializeApp() {
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const calendarToolbar = document.getElementById('calendar-toolbar');
+    const calendarViewButtons = calendarToolbar ? calendarToolbar.querySelectorAll('[data-calendar-view]') : [];
+    const calendarTodayBtn = document.getElementById('calendar-today-btn');
+    const calendarBackBtn = document.getElementById('calendar-back-btn');
+    const calendarFocusBtn = document.getElementById('calendar-focus-btn');
     const unfinishedButtonSlot = document.getElementById('unfinished-button-slot');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
@@ -560,7 +639,7 @@ function initializeApp() {
     const oilQuickUnitSelect = document.getElementById('oil-quick-unit');
     const oilQuickClientInput = document.getElementById('oil-quick-client');
     const oilQuickSubmitBtn = document.getElementById('oil-quick-submit');
-    const themeToggle = document.getElementById('theme-toggle');
+    const themeSelect = document.getElementById('theme-select');
     const zakonczoneZleceniaHeader = document.getElementById('zakonczone-zlecenia-header');
     const zlecenieSearchInput = document.getElementById('zlecenie-search-input');
     const kalendarzMultiWrapper = document.getElementById('kalendarz-zlecenia-multi');
@@ -1240,7 +1319,7 @@ function initializeApp() {
     if (firstTabButton) {
         firstTabButton.click(); // Otwórz pierwszą zakładkę
     }
-    inicjujCiemnyMotyw();
+    inicjujMotywJohnDeere();
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
 
@@ -1253,6 +1332,77 @@ function initializeApp() {
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
     const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
     const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
+    const todayKey = formatDateForStorage(new Date());
+    let calendarReturnState = readCalendarReturnState();
+
+    const updateCalendarToolbarState = () => {
+        if (!calendarToolbar || !calendar) return;
+        const viewKey = fcViewToCalendarKey(calendar.view?.type);
+        calendarViewButtons.forEach((button) => {
+            const isActive = button.dataset.calendarView === viewKey;
+            button.classList.toggle('is-active', isActive);
+        });
+        if (calendarBackBtn) {
+            const hasReturn = Boolean(calendarReturnState?.viewKey && calendarReturnState?.dateStr);
+            calendarBackBtn.disabled = !hasReturn;
+            calendarBackBtn.textContent = viewKey === 'day' ? 'Wróć do tygodnia' : 'Wróć';
+        }
+        if (calendarFocusBtn) {
+            calendarFocusBtn.disabled = viewKey === 'day';
+        }
+    };
+
+    const focusCalendarDay = (dateStr, sourceViewKey = null) => {
+        if (!calendar || !dateStr) return;
+        const currentViewKey = sourceViewKey || fcViewToCalendarKey(calendar.view?.type);
+        if (currentViewKey !== 'day') {
+            calendarReturnState = { viewKey: currentViewKey, dateStr };
+            persistCalendarReturnState(currentViewKey, dateStr);
+        }
+        persistCalendarDate(dateStr);
+        calendar.changeView(calendarViewKeyToFc('day'), dateStr);
+        updateCalendarToolbarState();
+    };
+
+    const setCalendarView = (viewKey, dateStr) => {
+        if (!calendar) return;
+        const targetView = calendarViewKeyToFc(viewKey);
+        const targetDate = dateStr || calendar.getDate?.() || new Date();
+        calendar.changeView(targetView, targetDate);
+        persistCalendarView(viewKey);
+        if (dateStr) persistCalendarDate(dateStr);
+        updateCalendarToolbarState();
+    };
+
+    const bindCalendarToolbar = () => {
+        if (!calendarToolbar) return;
+        calendarViewButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const viewKey = button.dataset.calendarView;
+                if (viewKey) {
+                    const focusDate = readCalendarDateFromStorage() || todayKey;
+                    setCalendarView(viewKey, focusDate);
+                }
+            });
+        });
+        calendarTodayBtn?.addEventListener('click', () => {
+            if (!calendar) return;
+            calendar.today();
+            persistCalendarDate(todayKey);
+            updateCalendarToolbarState();
+        });
+        calendarFocusBtn?.addEventListener('click', () => {
+            const focusDate = readCalendarDateFromStorage() || todayKey;
+            focusCalendarDay(focusDate);
+        });
+        calendarBackBtn?.addEventListener('click', () => {
+            if (!calendarReturnState?.viewKey || !calendarReturnState?.dateStr) return;
+            setCalendarView(calendarReturnState.viewKey, calendarReturnState.dateStr);
+            calendarReturnState = { viewKey: null, dateStr: null };
+            clearCalendarReturnState();
+            updateCalendarToolbarState();
+        });
+    };
 
     const openEwidencja = (dateStr) => {
         const normalized = dateStr || '';
@@ -1267,6 +1417,8 @@ function initializeApp() {
     // --- KALENDARZ ---
     function inicjalizujKalendarz() {
         if (!kalendarzContainer) return;
+        const storedViewKey = readCalendarViewFromStorage() || 'week';
+        const storedDateKey = readCalendarDateFromStorage() || todayKey;
         calendar = initCalendar(
             kalendarzContainer,
             workEvents,
@@ -1275,6 +1427,8 @@ function initializeApp() {
                 plugins: calendarPlugins,
                 timeZone: 'local',
                 firstDay: 1,
+                initialView: calendarViewKeyToFc(storedViewKey),
+                initialDate: storedDateKey,
                 selectable: true,
                 selectMirror: true,
                 unselectAuto: true,
@@ -1293,11 +1447,18 @@ function initializeApp() {
                         ? ['fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client']
                         : [];
                 },
-                dateClick: (info) => openEwidencja(info.dateStr),
+                dateClick: (info) => {
+                    const targetDate = info?.dateStr;
+                    if (targetDate) {
+                        focusCalendarDay(targetDate);
+                    }
+                    openEwidencja(targetDate);
+                },
                 select(info) {
                     const startDate = normalizeAllDayDate(info?.start);
                     const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
                     if (normalized) {
+                        focusCalendarDay(normalized);
                         otworzModalGodzin(normalized);
                     }
                     if (calendar && typeof calendar.unselect === 'function') {
@@ -1309,10 +1470,17 @@ function initializeApp() {
                         obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                         rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                     }
+                    const viewKey = fcViewToCalendarKey(viewInfo?.view?.type);
+                    persistCalendarView(viewKey);
+                    const focusDate = calendar?.getDate?.();
+                    const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
+                    if (focusKey) persistCalendarDate(focusKey);
+                    updateCalendarToolbarState();
                 }
             }
         );
         window.calendar = calendar;
+        updateCalendarToolbarState();
         const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
         if (calendarShell) {
             const applySize = () => handleCalendarResize();
@@ -2596,21 +2764,24 @@ function initializeApp() {
         }
     };
 
-    function inicjujCiemnyMotyw() {
-        const savedTheme = localStorage.getItem('theme') || 'light';
+    function inicjujMotywJohnDeere() {
+        const savedTheme = localStorage.getItem('theme') || 'jd-dark';
         applyTheme(savedTheme);
-        if (themeToggle) {
-            themeToggle.checked = (savedTheme === 'dark');
-            themeToggle.addEventListener('change', () => {
-                const newTheme = themeToggle.checked ? 'dark' : 'light';
+        if (themeSelect) {
+            themeSelect.value = savedTheme;
+            themeSelect.addEventListener('change', () => {
+                const newTheme = themeSelect.value || 'jd-dark';
                 applyTheme(newTheme);
                 localStorage.setItem('theme', newTheme);
             });
         } else {
-            console.error("Nie znaleziono przełącznika motywu (themeToggle)");
+            console.error("Nie znaleziono przełącznika motywu (themeSelect)");
         }
     }
-    function applyTheme(theme) { if (theme === 'dark') { document.body.dataset.theme = 'dark'; } else { delete document.body.dataset.theme; } }
+    function applyTheme(theme) {
+        const resolved = theme === 'jd-contrast' ? 'jd-contrast' : 'jd-dark';
+        document.body.dataset.theme = resolved;
+    }
 
     function inicjujZwijanie() {
   // Zakończone zlecenia
@@ -5441,6 +5612,7 @@ async function obslugaListyCzesci(event) {
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
     inicjalizujKalendarz();
+    bindCalendarToolbar();
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();
