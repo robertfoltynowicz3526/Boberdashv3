@@ -749,12 +749,12 @@ textarea {
   right: 0;
   max-height: 240px;
   overflow-y: auto;
-  background: var(--panel-bg);
-  border: 1px solid var(--input-border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
   padding: 0.4rem;
-  z-index: 30;
-  box-shadow: 0 18px 30px -22px rgba(0, 0, 0, 0.8);
+  z-index: 2000;
+  box-shadow: 0 18px 30px -18px rgba(0, 0, 0, 0.7);
   opacity: 0;
   visibility: hidden;
   transform: translateY(-6px);
@@ -804,6 +804,13 @@ textarea {
   padding: 0.6rem 0.75rem;
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.loading-state {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-style: italic;
+  padding: 0.35rem 0;
 }
 
 input:focus,
@@ -1014,6 +1021,30 @@ select {
 #calendar-shell .fc-daygrid-body,
 #calendar-shell .fc-daygrid-body-unbalanced {
   height: auto !important;
+}
+
+#calendar-shell.view-week .fc .bober-chip.fc-event,
+#calendar-shell.view-day .fc .bober-chip.fc-event {
+  padding: 6px 12px;
+  border-radius: 10px;
+}
+
+#calendar-shell.view-week .fc .bober-chip .fc-event-title,
+#calendar-shell.view-day .fc .bober-chip .fc-event-title {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+#calendar-shell.view-week .fc .day-summary,
+#calendar-shell.view-day .fc .day-summary {
+  font-size: 12px;
+  padding: 6px 8px;
+  line-height: 1.25;
+}
+
+#calendar-shell.view-week .fc .fc-timegrid-slot,
+#calendar-shell.view-day .fc .fc-timegrid-slot {
+  min-height: 48px;
 }
 
 .fc .day-summary {
