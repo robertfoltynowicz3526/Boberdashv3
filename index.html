@@ -600,7 +600,17 @@
             </div>
             <div class="drawer-body">
                 <form id="maszyna-form" class="drawer-form">
-                    <div class="form-group"><label for="maszyna-klient-select">Wybierz klienta:</label><select id="maszyna-klient-select" required><option value="">-- Najpierw dodaj klienta --</option></select></div>
+                    <div class="form-group">
+                        <label for="maszyna-klient-input">Klient</label>
+                        <div class="combobox" data-combobox="machine-client-add">
+                            <div class="combobox-input">
+                                <input type="text" id="maszyna-klient-input" autocomplete="off" placeholder="Wybierz klienta">
+                                <button type="button" class="combobox-clear" aria-label="Wyczyść">×</button>
+                            </div>
+                            <input type="hidden" id="maszyna-klient-id">
+                            <div id="maszyna-klient-dropdown" class="combobox-dropdown" role="listbox"></div>
+                        </div>
+                    </div>
                     <div class="form-group"><label for="maszyna-typ">Typ Maszyny:</label><select id="maszyna-typ" required><option value="">-- Wybierz typ --</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
                     <div class="form-group"><label for="maszyna-model">Model:</label><input type="text" id="maszyna-model" placeholder="Np. 6155M" required></div>
                     <div class="form-group"><label for="maszyna-serial">Numer seryjny:</label><input type="text" id="maszyna-serial"></div>
@@ -612,7 +622,17 @@
                 </form>
                 <form id="edit-maszyna-form" class="drawer-form is-hidden">
                     <input type="hidden" id="edit-maszyna-id">
-                    <p><strong>Klient:</strong> <span id="edit-maszyna-klient-nazwa"></span></p>
+                    <div class="form-group">
+                        <label for="edit-maszyna-klient-input">Klient</label>
+                        <div class="combobox" data-combobox="machine-client-edit">
+                            <div class="combobox-input">
+                                <input type="text" id="edit-maszyna-klient-input" autocomplete="off" placeholder="Wybierz klienta">
+                                <button type="button" class="combobox-clear" aria-label="Wyczyść">×</button>
+                            </div>
+                            <input type="hidden" id="edit-maszyna-klient-id">
+                            <div id="edit-maszyna-klient-dropdown" class="combobox-dropdown" role="listbox"></div>
+                        </div>
+                    </div>
                     <div class="form-group"><label for="edit-maszyna-typ">Typ Maszyny:</label><select id="edit-maszyna-typ" required><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Sieczkarnia">Sieczkarnia</option><option value="Opryskiwacz">Opryskiwacz</option><option value="Inna">Inna</option></select></div>
                     <div class="form-group"><label for="edit-maszyna-model">Model:</label><input type="text" id="edit-maszyna-model" required></div>
                     <div class="form-group"><label for="edit-maszyna-serial">Numer seryjny:</label><input type="text" id="edit-maszyna-serial"></div>
