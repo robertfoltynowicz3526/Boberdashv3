@@ -88,6 +88,7 @@ function initializeApp() {
     const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
     const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
     const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
+    const CALENDAR_DAYGRID_VIEWS = new Set(['dayGridDay', 'dayGridWeek', 'dayGridMonth']);
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
     const getYearFromValue = (value) => {
         if (!value) return null;
@@ -189,10 +190,11 @@ function initializeApp() {
         if (viewType?.includes?.('Week')) return 'week';
         return 'month';
     };
+    const normalizeCalendarViewType = (viewType) => (CALENDAR_DAYGRID_VIEWS.has(viewType) ? viewType : null);
     const readCalendarViewFromStorage = () => {
         try {
             const stored = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
-            return stored === 'day' || stored === 'week' || stored === 'month' ? stored : null;
+            return normalizeCalendarViewType(stored);
         } catch (_) {
             return null;
         }
@@ -205,10 +207,11 @@ function initializeApp() {
             return null;
         }
     };
-    const persistCalendarView = (viewKey) => {
-        if (!viewKey) return;
+    const persistCalendarView = (viewType) => {
+        const normalized = normalizeCalendarViewType(viewType);
+        if (!normalized) return;
         try {
-            localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, viewKey);
+            localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, normalized);
         } catch (_) { }
     };
     const persistCalendarDate = (dateStr) => {
@@ -414,6 +417,8 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
+    let stockStatus = 'loading';
+    let hasLoadedStockOnce = false;
     let activeWarehouseProduct = null;
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
@@ -689,6 +694,25 @@ function initializeApp() {
     const magazynTab = document.getElementById('magazyn');
     const magazynSummaryBox = document.getElementById('magazyn-summary');
 
+    const getStockUiState = () => ({
+        isStockLoading: stockStatus === 'loading' && !hasLoadedStockOnce,
+        isStockReady: stockStatus === 'ready'
+    });
+
+    const renderMagazynSummary = () => {
+        if (!magazynSummaryBox) return;
+        const { isStockLoading } = getStockUiState();
+        if (isStockLoading) {
+            magazynSummaryBox.innerHTML = '<p class="loading-state">Ładowanie magazynu...</p>';
+            return;
+        }
+        if (stockStatus === 'error') {
+            magazynSummaryBox.innerHTML = '<p class="loading-state">Nie udało się załadować magazynu.</p>';
+            return;
+        }
+        magazynSummaryBox.innerHTML = '';
+    };
+
     const setBootstrapLoadingState = () => {
         if (listaKlientowDiv) listaKlientowDiv.innerHTML = '<p class="loading-state">Ładowanie klientów...</p>';
         if (listaMaszynDiv) listaMaszynDiv.innerHTML = '<p class="loading-state">Ładowanie maszyn...</p>';
@@ -698,8 +722,10 @@ function initializeApp() {
         if (zakonczoneSummaryContainer) zakonczoneSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         if (annualSummaryContainer) annualSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         if (l4SummaryContainer) l4SummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
-        if (magazynSummaryBox) magazynSummaryBox.innerHTML = '<p class="loading-state">Ładowanie magazynu...</p>';
-        if (magazynLista) magazynLista.innerHTML = '<tr><td colspan="7" class="loading-state">Ładowanie magazynu...</td></tr>';
+        renderMagazynSummary();
+        if (magazynLista && getStockUiState().isStockLoading) {
+            magazynLista.innerHTML = '<tr><td colspan="7" class="loading-state">Ładowanie magazynu...</td></tr>';
+        }
     };
 
     setBootstrapLoadingState();
@@ -1435,7 +1461,7 @@ function initializeApp() {
         const targetView = calendarViewKeyToFc(viewKey);
         const targetDate = dateStr || api.getDate?.() || new Date();
         api.changeView(targetView, targetDate);
-        persistCalendarView(viewKey);
+        persistCalendarView(targetView);
         if (dateStr) persistCalendarDate(dateStr);
         updateCalendarToolbarState();
     };
@@ -1498,7 +1524,7 @@ function initializeApp() {
 
     async function inicjalizujKalendarz() {
         const calendarTarget = kalendarzContainer || '#kalendarz';
-        const storedViewKey = readCalendarViewFromStorage() || 'week';
+        const storedViewType = readCalendarViewFromStorage() || 'dayGridWeek';
         const storedDateKey = readCalendarDateFromStorage() || todayKey;
         try {
             const result = await initCalendar(
@@ -1509,11 +1535,16 @@ function initializeApp() {
                     plugins: calendarPlugins,
                     timeZone: 'local',
                     firstDay: 1,
-                    initialView: calendarViewKeyToFc(storedViewKey),
+                    initialView: storedViewType,
                     initialDate: storedDateKey,
                     selectable: true,
                     selectMirror: true,
                     unselectAuto: true,
+                    height: '100%',
+                    contentHeight: '100%',
+                    expandRows: true,
+                    dayMaxEvents: true,
+                    dayMaxEventRows: 5,
                     eventDataTransform(event) {
                         if (event && typeof event.title === 'string') {
                             event.title = stripEwidencjaPrefix(event.title);
@@ -1554,7 +1585,7 @@ function initializeApp() {
                             rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
                         }
                         const viewKey = fcViewToCalendarKey(viewInfo?.view?.type);
-                        persistCalendarView(viewKey);
+                        persistCalendarView(viewInfo?.view?.type);
                         const focusDate = getCalendarApi()?.getDate?.();
                         const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
                         if (focusKey) persistCalendarDate(focusKey);
@@ -5110,8 +5141,20 @@ async function obslugaListyCzesci(event) {
 
     const renderMagazynTable = () => {
         if (!magazynLista) return;
+        renderMagazynSummary();
+        const { isStockLoading } = getStockUiState();
+        if (isStockLoading) {
+            magazynLista.innerHTML = '<tr><td colspan="7" class="loading-state">Ładowanie magazynu...</td></tr>';
+            updateSortButtons();
+            return;
+        }
+        if (stockStatus === 'error' && !wszystkieProdukty.length) {
+            magazynLista.innerHTML = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Nie udało się załadować magazynu.</td></tr>';
+            updateSortButtons();
+            return;
+        }
         const filtered = sortMagazynItems(applyMagazynFilters(wszystkieProdukty));
-        const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Magazyn pusty.</td></tr>';
+        const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Brak pozycji w magazynie.</td></tr>';
         if (!filtered.length) {
             magazynLista.innerHTML = emptyRowHtml;
             updateSortButtons();
@@ -5307,7 +5350,13 @@ async function obslugaListyCzesci(event) {
 
     function wyswietlMagazyn() {
         if (!magazynLista) return;
+        stockStatus = 'loading';
+        hasLoadedStockOnce = false;
+        renderMagazynSummary();
+        renderMagazynTable();
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
+            hasLoadedStockOnce = true;
+            stockStatus = 'ready';
             wszystkieProdukty = [];
             if (snapshot.empty) {
                 refreshMagazynFilters();
@@ -5325,6 +5374,12 @@ async function obslugaListyCzesci(event) {
             refreshMagazynFilters();
             renderMagazynTable();
             renderMagazynWModalu();
+        }, (error) => {
+            console.error('Błąd ładowania magazynu:', error);
+            hasLoadedStockOnce = true;
+            stockStatus = 'error';
+            renderMagazynSummary();
+            renderMagazynTable();
         });
     }
 
