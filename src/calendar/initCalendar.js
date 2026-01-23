@@ -74,8 +74,13 @@ const refreshCalendarSummaries = (calendarEl) => {
 const ensureSummaryDisplayControl = (calendarEl) => {
   if (!calendarEl) return;
   const toolbar = calendarEl.querySelector('.fc-header-toolbar') || calendarEl.querySelector('.fc-toolbar');
-  if (!toolbar) return;
-  const rightChunk = toolbar.querySelector('.fc-toolbar-chunk:last-child') || toolbar;
+  const fallbackToolbar = calendarEl?.ownerDocument?.getElementById?.('calendar-toolbar');
+  if (!toolbar && !fallbackToolbar) return;
+  const rightChunk =
+    toolbar?.querySelector?.('.fc-toolbar-chunk:last-child') ||
+    fallbackToolbar?.querySelector?.('.calendar-toolbar-group:last-child') ||
+    toolbar ||
+    fallbackToolbar;
   let wrapper = toolbar.querySelector('.summary-display-control');
   if (!wrapper) {
     wrapper = document.createElement('div');
@@ -236,13 +241,14 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
   const baseOptions = {
     plugins,
-    initialView: 'dayGridMonth',
-    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+    initialView: 'dayGridWeek',
+    headerToolbar: false,
     locale: 'pl',
     buttonText: {
       today: 'Dziś',
       month: 'Miesiąc',
       week: 'Tydzień',
+      day: 'Dzień'
     },
     titleFormat: { year: 'numeric', month: 'long' },
     navLinks: true,
