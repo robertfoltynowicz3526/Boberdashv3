@@ -175,16 +175,14 @@ function initializeApp() {
         } catch (_) { }
     };
     const calendarViewKeyToFc = (viewKey) => {
-        const dayView = hasTimeGrid ? 'timeGridDay' : 'dayGridDay';
-        const weekView = hasTimeGrid ? 'timeGridWeek' : 'dayGridWeek';
         switch (viewKey) {
             case 'day':
-                return dayView;
+                return 'timeGridDay';
             case 'month':
                 return 'dayGridMonth';
             case 'week':
             default:
-                return weekView;
+                return 'timeGridWeek';
         }
     };
     const fcViewToCalendarKey = (viewType) => {
@@ -401,9 +399,16 @@ function initializeApp() {
     const NISKI_STAN_MAGAZYNOWY = 5;
     let calendar;
     window.calendar = null;
+    window.__calendarApi = null;
+    const getCalendarApi = () => calendar || window.__calendarApi || null;
+    const setCalendarApi = (api) => {
+        calendar = api || null;
+        window.calendar = calendar;
+        window.__calendarApi = calendar;
+    };
     const handleCalendarResize = () => {
         try {
-            calendar?.updateSize();
+            getCalendarApi()?.updateSize();
         } catch (_) { }
     };
     let workEvents = [];
@@ -1366,9 +1371,39 @@ function initializeApp() {
         }
     };
 
+    const setCalendarToolbarDisabled = (disabled, tooltip = '') => {
+        calendarViewButtons.forEach((button) => {
+            button.disabled = disabled;
+            if (disabled) {
+                button.title = tooltip;
+            } else if (button.title === tooltip) {
+                button.title = '';
+            }
+        });
+        if (calendarTodayBtn) {
+            calendarTodayBtn.disabled = disabled;
+            calendarTodayBtn.title = disabled ? tooltip : '';
+        }
+        if (calendarFocusBtn) {
+            calendarFocusBtn.disabled = disabled;
+            calendarFocusBtn.title = disabled ? tooltip : '';
+        }
+        if (calendarBackBtn) {
+            calendarBackBtn.disabled = disabled;
+            calendarBackBtn.title = disabled ? tooltip : '';
+        }
+    };
+
     const updateCalendarToolbarState = () => {
-        if (!calendarToolbar || !calendar) return;
-        const viewKey = fcViewToCalendarKey(calendar.view?.type);
+        if (!calendarToolbar) return;
+        const api = getCalendarApi();
+        if (!api) {
+            setCalendarViewClass(null);
+            setCalendarToolbarDisabled(true, 'Kalendarz się ładuje');
+            return;
+        }
+        setCalendarToolbarDisabled(false);
+        const viewKey = fcViewToCalendarKey(api.view?.type);
         setCalendarViewClass(viewKey);
         calendarViewButtons.forEach((button) => {
             const isActive = button.dataset.calendarView === viewKey;
@@ -1385,22 +1420,24 @@ function initializeApp() {
     };
 
     const focusCalendarDay = (dateStr, sourceViewKey = null) => {
-        if (!calendar || !dateStr) return;
-        const currentViewKey = sourceViewKey || fcViewToCalendarKey(calendar.view?.type);
+        const api = getCalendarApi();
+        if (!api || !dateStr) return;
+        const currentViewKey = sourceViewKey || fcViewToCalendarKey(api.view?.type);
         if (currentViewKey !== 'day') {
             calendarReturnState = { viewKey: currentViewKey, dateStr };
             persistCalendarReturnState(currentViewKey, dateStr);
         }
         persistCalendarDate(dateStr);
-        calendar.changeView(calendarViewKeyToFc('day'), dateStr);
+        api.changeView(calendarViewKeyToFc('day'), dateStr);
         updateCalendarToolbarState();
     };
 
     const setCalendarView = (viewKey, dateStr) => {
-        if (!calendar) return;
+        const api = getCalendarApi();
+        if (!api) return;
         const targetView = calendarViewKeyToFc(viewKey);
-        const targetDate = dateStr || calendar.getDate?.() || new Date();
-        calendar.changeView(targetView, targetDate);
+        const targetDate = dateStr || api.getDate?.() || new Date();
+        api.changeView(targetView, targetDate);
         persistCalendarView(viewKey);
         if (dateStr) persistCalendarDate(dateStr);
         updateCalendarToolbarState();
@@ -1418,8 +1455,9 @@ function initializeApp() {
             });
         });
         calendarTodayBtn?.addEventListener('click', () => {
-            if (!calendar) return;
-            calendar.today();
+            const api = getCalendarApi();
+            if (!api) return;
+            api.today();
             persistCalendarDate(todayKey);
             updateCalendarToolbarState();
         });
@@ -1447,71 +1485,102 @@ function initializeApp() {
     };
 
     // --- KALENDARZ ---
-    function inicjalizujKalendarz() {
-        if (!kalendarzContainer) return;
+    const renderCalendarUnavailable = (message) => {
+        const container = kalendarzContainer || document.getElementById('kalendarz');
+        if (!container) return;
+        let note = container.querySelector('.calendar-unavailable');
+        if (!note) {
+            note = document.createElement('div');
+            note.className = 'calendar-unavailable';
+            note.style.cssText = 'margin:12px;padding:12px;border-radius:10px;background:rgba(0,0,0,0.1);font-size:14px;';
+            container.innerHTML = '';
+            container.appendChild(note);
+        }
+        note.textContent = message;
+    };
+
+    async function inicjalizujKalendarz() {
+        const calendarTarget = kalendarzContainer || '#kalendarz';
         const storedViewKey = readCalendarViewFromStorage() || 'week';
         const storedDateKey = readCalendarDateFromStorage() || todayKey;
-        calendar = initCalendar(
-            kalendarzContainer,
-            workEvents,
-            [],
-            {
-                plugins: calendarPlugins,
-                timeZone: 'local',
-                firstDay: 1,
-                initialView: calendarViewKeyToFc(storedViewKey),
-                initialDate: storedDateKey,
-                selectable: true,
-                selectMirror: true,
-                unselectAuto: true,
-                eventDataTransform(event) {
-                    if (event && typeof event.title === 'string') {
-                        event.title = stripEwidencjaPrefix(event.title);
+        try {
+            const result = await initCalendar(
+                calendarTarget,
+                workEvents,
+                [],
+                {
+                    plugins: calendarPlugins,
+                    timeZone: 'local',
+                    firstDay: 1,
+                    initialView: calendarViewKeyToFc(storedViewKey),
+                    initialDate: storedDateKey,
+                    selectable: true,
+                    selectMirror: true,
+                    unselectAuto: true,
+                    eventDataTransform(event) {
+                        if (event && typeof event.title === 'string') {
+                            event.title = stripEwidencjaPrefix(event.title);
+                        }
+                        if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
+                            event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
+                        }
+                        return event;
+                    },
+                    eventClassNames(info) {
+                        const eventType = info?.event?.extendedProps?.type;
+                        return eventType === 'client'
+                            ? ['fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client']
+                            : [];
+                    },
+                    dateClick: (info) => {
+                        const targetDate = info?.dateStr;
+                        if (targetDate) {
+                            focusCalendarDay(targetDate);
+                        }
+                        openEwidencja(targetDate);
+                    },
+                    select(info) {
+                        const startDate = normalizeAllDayDate(info?.start);
+                        const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
+                        if (normalized) {
+                            focusCalendarDay(normalized);
+                            otworzModalGodzin(normalized);
+                        }
+                        const api = getCalendarApi();
+                        if (api && typeof api.unselect === 'function') {
+                            api.unselect();
+                        }
+                    },
+                    datesSet(viewInfo) {
+                        if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
+                            obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
+                            rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
+                        }
+                        const viewKey = fcViewToCalendarKey(viewInfo?.view?.type);
+                        persistCalendarView(viewKey);
+                        const focusDate = getCalendarApi()?.getDate?.();
+                        const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
+                        if (focusKey) persistCalendarDate(focusKey);
+                        updateCalendarToolbarState();
                     }
-                    if (event?.extendedProps?.client && typeof event.extendedProps.client === 'string') {
-                        event.extendedProps.client = stripEwidencjaPrefix(event.extendedProps.client);
-                    }
-                    return event;
-                },
-                eventClassNames(info) {
-                    const eventType = info?.event?.extendedProps?.type;
-                    return eventType === 'client'
-                        ? ['fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client']
-                        : [];
-                },
-                dateClick: (info) => {
-                    const targetDate = info?.dateStr;
-                    if (targetDate) {
-                        focusCalendarDay(targetDate);
-                    }
-                    openEwidencja(targetDate);
-                },
-                select(info) {
-                    const startDate = normalizeAllDayDate(info?.start);
-                    const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
-                    if (normalized) {
-                        focusCalendarDay(normalized);
-                        otworzModalGodzin(normalized);
-                    }
-                    if (calendar && typeof calendar.unselect === 'function') {
-                        calendar.unselect();
-                    }
-                },
-                datesSet(viewInfo) {
-                    if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
-                        obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                        rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                    }
-                    const viewKey = fcViewToCalendarKey(viewInfo?.view?.type);
-                    persistCalendarView(viewKey);
-                    const focusDate = calendar?.getDate?.();
-                    const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
-                    if (focusKey) persistCalendarDate(focusKey);
-                    updateCalendarToolbarState();
                 }
+            );
+            if (!result?.ok || !result?.calendar) {
+                console.info('[calendar] init failed', result?.message || 'unknown error');
+                setCalendarApi(null);
+                updateCalendarToolbarState();
+                renderCalendarUnavailable('Kalendarz chwilowo niedostępny (odśwież / przejdź na inną zakładkę)');
+                return;
             }
-        );
-        window.calendar = calendar;
+            setCalendarApi(result.calendar);
+            console.info('[calendar] init ok');
+        } catch (error) {
+            console.error('[calendar] init failed', error);
+            setCalendarApi(null);
+            updateCalendarToolbarState();
+            renderCalendarUnavailable('Kalendarz chwilowo niedostępny (odśwież / przejdź na inną zakładkę)');
+            return;
+        }
         updateCalendarToolbarState();
         const calendarShellEl = calendarShell || kalendarzContainer;
         if (calendarShellEl) {
@@ -5643,8 +5712,6 @@ async function obslugaListyCzesci(event) {
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
-    inicjalizujKalendarz();
-    bindCalendarToolbar();
     wyswietlWpisyKalendarza();
     nasluchujNaUrlopy();
     nasluchujNaKlientow();
@@ -5653,5 +5720,8 @@ async function obslugaListyCzesci(event) {
     wyswietlPrzejazdy(); // puste – OK
     wyswietlMagazyn();
     console.info('Subscriptions started: clients/machines/orders/stock/dayEntries');
+    bindCalendarToolbar();
+    updateCalendarToolbarState();
+    void inicjalizujKalendarz();
 
 } // koniec initializeApp()
