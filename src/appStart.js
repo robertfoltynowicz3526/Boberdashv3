@@ -89,7 +89,6 @@ function initializeApp() {
     const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
     const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
-    let hasTimeGrid = false;
     const getYearFromValue = (value) => {
         if (!value) return null;
         if (typeof value === 'string') {
@@ -177,12 +176,12 @@ function initializeApp() {
     const calendarViewKeyToFc = (viewKey) => {
         switch (viewKey) {
             case 'day':
-                return 'timeGridDay';
+                return 'dayGridDay';
             case 'month':
                 return 'dayGridMonth';
             case 'week':
             default:
-                return 'timeGridWeek';
+                return 'dayGridWeek';
         }
     };
     const fcViewToCalendarKey = (viewType) => {
@@ -1356,10 +1355,8 @@ function initializeApp() {
     odswiezSelectKlientaDoZlecenia();
 
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
-    const timeGridPlugin = (window.timeGrid && window.timeGrid.default) || FullCalendar?.timeGridPlugin || FullCalendar?.timeGrid;
     const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
-    const calendarPlugins = [dayGridPlugin, timeGridPlugin, interactionPlugin].filter(Boolean);
-    hasTimeGrid = Boolean(timeGridPlugin);
+    const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
     const todayKey = formatDateForStorage(new Date());
     let calendarReturnState = readCalendarReturnState();
 
