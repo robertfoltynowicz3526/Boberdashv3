@@ -1,4 +1,4 @@
-import { Calendar, dayGridPlugin, interactionPlugin, timeGridPlugin } from '../fullcalendar-shims/core.js';
+import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -274,9 +274,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
   const plugins = (extraOptions?.plugins?.length
     ? extraOptions.plugins
-    : [dayGridPlugin, timeGridPlugin, interactionPlugin]
+    : [dayGridPlugin, interactionPlugin]
   ).filter(Boolean);
-  const defaultView = timeGridPlugin ? 'timeGridWeek' : 'dayGridWeek';
+  const defaultView = 'dayGridWeek';
 
   const baseOptions = {
     plugins,
