@@ -999,18 +999,31 @@ select {
 }
 
 /* Kalendarz wypełnia kartę i nie wychodzi poza nią */
+#pulpit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 #calendar-shell {
   width: 100%;
   max-width: none;
   margin: 0;
-  height: auto;
-  min-height: auto;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #calendar-shell #kalendarz {
-  height: auto;
-  min-height: auto;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   overflow: clip;
+  display: flex;
+  flex-direction: column;
 }
 
 #calendar-shell .fc,
@@ -1020,7 +1033,8 @@ select {
 #calendar-shell .fc-scrollgrid,
 #calendar-shell .fc-daygrid-body,
 #calendar-shell .fc-daygrid-body-unbalanced {
-  height: auto !important;
+  height: 100% !important;
+  min-height: 0;
 }
 
 #calendar-shell.view-week .fc .bober-chip.fc-event,
@@ -1037,9 +1051,20 @@ select {
 
 #calendar-shell.view-week .fc .day-summary,
 #calendar-shell.view-day .fc .day-summary {
-  font-size: 12px;
-  padding: 6px 8px;
+  font-size: 13px;
+  padding: 8px 10px;
   line-height: 1.25;
+}
+
+#calendar-shell.view-week .fc-daygrid-day-frame,
+#calendar-shell.view-day .fc-daygrid-day-frame {
+  padding: 8px;
+}
+
+#calendar-shell.view-week .fc-daygrid-day-number,
+#calendar-shell.view-day .fc-daygrid-day-number {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 #calendar-shell.view-week .fc .fc-timegrid-slot,
@@ -2898,7 +2923,7 @@ main,
   max-width: none;
   margin: 0;
 }
-#kalendarz { height: auto; min-height: auto; }
+#kalendarz { height: 100%; min-height: 0; }
 /* Komórki zostają, ale chipy w środku nie wychodzą poza kratkę */
 .fc-daygrid-day { position: relative; overflow: hidden; }
 /* Opisy dnia (Praca/Jazda/Fakturowane) – widoczne bez popoutów */
@@ -3146,7 +3171,7 @@ main,
 .page-section, .card { padding: 12px; }
 
 /* === Kalendarz – pełna wysokość karty === */
-#kalendarz { height: auto; min-height: auto; }
+#kalendarz { height: 100%; min-height: 0; }
 
 /* Kratki dnia wysokość automatyczna */
 .fc-daygrid-day-frame { min-height: auto; }
