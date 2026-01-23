@@ -79,7 +79,9 @@ const ensureSummaryDisplayControl = (calendarEl) => {
     fallbackToolbar?.querySelector?.('.calendar-toolbar-group:last-child') ||
     toolbar ||
     fallbackToolbar;
-  let wrapper = toolbar.querySelector('.summary-display-control');
+  const wrapperRoot = toolbar || fallbackToolbar;
+  if (!wrapperRoot) return;
+  let wrapper = wrapperRoot.querySelector('.summary-display-control');
   if (!wrapper) {
     wrapper = document.createElement('div');
     wrapper.className = 'summary-display-control';
@@ -204,12 +206,42 @@ const applyDecorationsFromPlaceholders = (root = document) => {
   });
 };
 
+const isElement = (value) => Boolean(value && typeof value === 'object' && value.nodeType === 1);
+
+export const waitForElement = (selector, timeout = 2000, root = document) => new Promise((resolve) => {
+  if (!selector || !root?.querySelector) {
+    resolve(null);
+    return;
+  }
+  const existing = root.querySelector(selector);
+  if (existing) {
+    resolve(existing);
+    return;
+  }
+  let timeoutId = null;
+  const observer = new MutationObserver(() => {
+    const found = root.querySelector(selector);
+    if (found) {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      observer.disconnect();
+      resolve(found);
+    }
+  });
+  try {
+    observer.observe(root.body || root.documentElement || root, { childList: true, subtree: true });
+  } catch (_) {
+    observer.disconnect();
+    resolve(null);
+    return;
+  }
+  timeoutId = window.setTimeout(() => {
+    observer.disconnect();
+    resolve(null);
+  }, timeout);
+});
+
 export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
-  const el =
-    hostEl ||
-    document.getElementById('kalendarz') ||
-    document.getElementById('calendar') ||
-    document.getElementById('kalendarz-container');
+  const el = hostEl;
 
   if (!el) throw new Error('Nie znaleziono kontenera kalendarza (#kalendarz / #calendar).');
 
@@ -463,15 +495,42 @@ export function bootCalendar(extraOptions = {}, hostEl = null) {
   return inicjalizujKalendarz(extraOptions, hostEl);
 }
 
-export function initCalendar(hostEl, events = [], flags = [], extraOptions = {}) {
+export async function initCalendar(hostEl, events = [], flags = [], extraOptions = {}) {
   setCalendarEvents(events);
   setDayFlags(flags);
-  const calendar = bootCalendar(extraOptions, hostEl);
+  const timeout = Number(extraOptions?.waitForElementTimeoutMs ?? 2500) || 2500;
+  const resolvedEl = isElement(hostEl)
+    ? hostEl
+    : (typeof hostEl === 'string' ? await waitForElement(hostEl, timeout) : null);
+  if (!resolvedEl) {
+    return {
+      ok: false,
+      message: 'Nie znaleziono kontenera kalendarza.',
+      calendar: null,
+    };
+  }
+  let calendar = null;
+  try {
+    calendar = bootCalendar(extraOptions, resolvedEl);
+  } catch (error) {
+    return {
+      ok: false,
+      message: 'Nie udało się zainicjalizować kalendarza.',
+      error,
+      calendar: null,
+    };
+  }
   if (calendar) {
     calendar.refetchEvents();
     try { calendar.rerenderDates?.(); } catch (_) {}
+    window.__calendarApi = calendar;
+    return { ok: true, calendar };
   }
-  return calendar;
+  return {
+    ok: false,
+    message: 'Nie udało się zainicjalizować kalendarza.',
+    calendar: null,
+  };
 }
 
 export function updateCalendarData(calendar, events = [], flags = []) {
