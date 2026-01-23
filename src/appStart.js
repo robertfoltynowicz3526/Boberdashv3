@@ -463,7 +463,10 @@ function initializeApp() {
     const klientForm = document.getElementById('klient-form');
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
-    const maszynaKlientSelect = document.getElementById('maszyna-klient-select');
+    const maszynaKlientInput = document.getElementById('maszyna-klient-input');
+    const maszynaKlientIdInput = document.getElementById('maszyna-klient-id');
+    const maszynaKlientDropdown = document.getElementById('maszyna-klient-dropdown');
+    const maszynaKlientClearBtn = maszynaKlientInput?.closest('.combobox')?.querySelector('.combobox-clear');
     const maszynaClientFilterSelect = document.getElementById('maszyna-client-filter');
     const maszynaForm = document.getElementById('maszyna-form');
     const maszynaAddBtn = document.getElementById('maszyna-add-btn');
@@ -573,6 +576,10 @@ function initializeApp() {
     const machineDrawerTitle = document.getElementById('machine-drawer-title');
     const machineDeleteBtn = document.getElementById('machine-delete-btn');
     const editMaszynaForm = document.getElementById('edit-maszyna-form');
+    const editMaszynaKlientInput = document.getElementById('edit-maszyna-klient-input');
+    const editMaszynaKlientIdInput = document.getElementById('edit-maszyna-klient-id');
+    const editMaszynaKlientDropdown = document.getElementById('edit-maszyna-klient-dropdown');
+    const editMaszynaKlientClearBtn = editMaszynaKlientInput?.closest('.combobox')?.querySelector('.combobox-clear');
     const detailsZlecenieModal = document.getElementById('details-zlecenie-modal');
     const detailsZlecenieCloseButton = detailsZlecenieModal ? detailsZlecenieModal.querySelector('.close-button') : null;
     const klientSearchInput = document.getElementById('klient-search-input');
@@ -2799,7 +2806,8 @@ function wyswietlKlientow() {
     if (listaKlientowDiv) {
       listaKlientowDiv.innerHTML = klienciHtml || "<p>Brak klientów w bazie lub pasujących do wyszukiwania.</p>";
     }
-    if (maszynaKlientSelect) maszynaKlientSelect.innerHTML = selectHtml;
+    addMachineClientCombobox?.refresh();
+    editMachineClientCombobox?.refresh();
     odswiezSelectKlientaDoZlecenia();
 
     const assignKlientSelect = document.getElementById('assign-klient-select');
@@ -3129,16 +3137,282 @@ async function obslugaListyKlientow(event) {
         }
     };
 
+    const MACHINE_CLIENT_RECENT_KEY = 'machineForm.recentClients';
+    const MACHINE_CLIENT_RECENT_LIMIT = 5;
+
+    const readRecentMachineClients = () => {
+        try {
+            const raw = localStorage.getItem(MACHINE_CLIENT_RECENT_KEY);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (err) {
+            console.warn('[machines] Nie udało się wczytać ostatnich klientów:', err);
+            return [];
+        }
+    };
+
+    const writeRecentMachineClients = (clientIds) => {
+        localStorage.setItem(MACHINE_CLIENT_RECENT_KEY, JSON.stringify(clientIds));
+    };
+
+    const pushRecentMachineClient = (clientId) => {
+        if (!clientId) return;
+        const current = readRecentMachineClients();
+        const next = [clientId, ...current.filter(id => id !== clientId)].slice(0, MACHINE_CLIENT_RECENT_LIMIT);
+        writeRecentMachineClients(next);
+    };
+
+    const getMachineClientOptions = () => {
+        return (_wszystkieKlienciCache || []).map((client) => ({
+            id: client.id,
+            name: client.nazwa || '(bez nazwy)',
+            nip: client.nip && client.nip !== '---' ? client.nip : ''
+        }));
+    };
+
+    const createMachineClientCombobox = ({ input, hiddenInput, dropdown, clearBtn }) => {
+        if (!input || !hiddenInput || !dropdown) return null;
+        const state = {
+            isOpen: false,
+            activeIndex: -1,
+            items: [],
+            selectedName: ''
+        };
+
+        const updateClearButton = () => {
+            if (!clearBtn) return;
+            clearBtn.classList.toggle('is-visible', Boolean(input.value));
+        };
+
+        const closeDropdown = () => {
+            dropdown.classList.remove('is-open');
+            state.isOpen = false;
+            state.activeIndex = -1;
+        };
+
+        const openDropdown = () => {
+            dropdown.classList.add('is-open');
+            state.isOpen = true;
+        };
+
+        const setActiveIndex = (index) => {
+            state.activeIndex = index;
+            const options = [...dropdown.querySelectorAll('.combobox-option')];
+            options.forEach((option, idx) => {
+                option.classList.toggle('is-active', idx === state.activeIndex);
+            });
+            const activeOption = options[state.activeIndex];
+            if (activeOption) {
+                activeOption.scrollIntoView({ block: 'nearest' });
+            }
+        };
+
+        const applySelection = (client, { trackRecent = true } = {}) => {
+            if (!client) return;
+            hiddenInput.value = client.id;
+            input.value = client.name;
+            state.selectedName = client.name;
+            updateClearButton();
+            if (trackRecent) {
+                pushRecentMachineClient(client.id);
+            }
+            closeDropdown();
+        };
+
+        const selectClient = (client) => applySelection(client, { trackRecent: true });
+
+        const clearSelection = () => {
+            hiddenInput.value = '';
+            input.value = '';
+            state.selectedName = '';
+            updateClearButton();
+            closeDropdown();
+        };
+
+        const renderDropdown = () => {
+            // DATA
+            const query = input.value.trim();
+            const queryLower = query.toLowerCase();
+            const clients = getMachineClientOptions();
+            const recentIds = readRecentMachineClients();
+
+            // AGREGACJA
+            const matches = clients.filter((client) => {
+                if (!queryLower) return true;
+                const haystack = `${client.name} ${client.nip}`.toLowerCase();
+                return haystack.includes(queryLower);
+            });
+            const startsWith = matches.filter((client) => client.name.toLowerCase().startsWith(queryLower));
+            const contains = matches.filter((client) => !client.name.toLowerCase().startsWith(queryLower));
+            let sortedMatches = [...startsWith, ...contains];
+
+            const recentClients = !queryLower
+                ? recentIds
+                    .map(id => clients.find(client => client.id === id))
+                    .filter(Boolean)
+                : [];
+
+            if (!queryLower && recentClients.length) {
+                const recentSet = new Set(recentClients.map(client => client.id));
+                sortedMatches = sortedMatches.filter(client => !recentSet.has(client.id));
+            }
+
+            // RENDER
+            dropdown.innerHTML = '';
+            state.items = [];
+            let itemIndex = 0;
+            const fragment = document.createDocumentFragment();
+
+            const appendSection = (title) => {
+                const section = document.createElement('div');
+                section.className = 'combobox-section';
+                section.textContent = title;
+                fragment.appendChild(section);
+            };
+
+            const appendItems = (items) => {
+                items.forEach((client) => {
+                    const option = document.createElement('button');
+                    option.type = 'button';
+                    option.className = 'combobox-option';
+                    option.dataset.index = String(itemIndex);
+                    option.innerHTML = `
+                        <span>${client.name}</span>
+                        ${client.nip ? `<small>NIP: ${client.nip}</small>` : ''}
+                    `;
+                    option.addEventListener('click', () => selectClient(client));
+                    fragment.appendChild(option);
+                    state.items.push(client);
+                    itemIndex += 1;
+                });
+            };
+
+            if (recentClients.length) {
+                appendSection('Ostatnio używani');
+                appendItems(recentClients);
+            }
+
+            if (sortedMatches.length) {
+                if (recentClients.length) {
+                    appendSection('Wszyscy klienci');
+                }
+                appendItems(sortedMatches);
+            } else if (!recentClients.length) {
+                const empty = document.createElement('div');
+                empty.className = 'combobox-empty';
+                empty.textContent = 'Brak wyników';
+                fragment.appendChild(empty);
+            }
+
+            dropdown.appendChild(fragment);
+            if (state.items.length) {
+                setActiveIndex(0);
+            } else {
+                state.activeIndex = -1;
+            }
+        };
+
+        const handleInput = () => {
+            if (hiddenInput.value) {
+                hiddenInput.value = '';
+                state.selectedName = '';
+            }
+            openDropdown();
+            renderDropdown();
+            updateClearButton();
+        };
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!state.isOpen) {
+                    openDropdown();
+                    renderDropdown();
+                }
+                if (!state.items.length) return;
+                const nextIndex = Math.min(state.items.length - 1, state.activeIndex + 1);
+                setActiveIndex(Math.max(nextIndex, 0));
+            }
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!state.isOpen) {
+                    openDropdown();
+                    renderDropdown();
+                }
+                if (!state.items.length) return;
+                const prevIndex = Math.max(0, state.activeIndex - 1);
+                setActiveIndex(prevIndex);
+            }
+            if (event.key === 'Enter') {
+                if (!state.isOpen) return;
+                event.preventDefault();
+                const selected = state.items[state.activeIndex] || state.items[0];
+                if (selected) selectClient(selected);
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeDropdown();
+            }
+        };
+
+        const root = input.closest('.combobox');
+
+        input.addEventListener('input', handleInput);
+        input.addEventListener('focus', () => {
+            openDropdown();
+            renderDropdown();
+        });
+        input.addEventListener('click', () => {
+            openDropdown();
+            renderDropdown();
+        });
+        input.addEventListener('keydown', handleKeyDown);
+        clearBtn?.addEventListener('click', clearSelection);
+
+        document.addEventListener('click', (event) => {
+            if (!root?.contains(event.target)) {
+                closeDropdown();
+            }
+        });
+
+        updateClearButton();
+
+        return {
+            clear: clearSelection,
+            selectClient,
+            refresh: () => {
+                if (state.isOpen) renderDropdown();
+            },
+            getSelectedId: () => hiddenInput.value,
+            setSelection: (client) => applySelection(client, { trackRecent: false })
+        };
+    };
+
+    const addMachineClientCombobox = createMachineClientCombobox({
+        input: maszynaKlientInput,
+        hiddenInput: maszynaKlientIdInput,
+        dropdown: maszynaKlientDropdown,
+        clearBtn: maszynaKlientClearBtn
+    });
+
+    const editMachineClientCombobox = createMachineClientCombobox({
+        input: editMaszynaKlientInput,
+        hiddenInput: editMaszynaKlientIdInput,
+        dropdown: editMaszynaKlientDropdown,
+        clearBtn: editMaszynaKlientClearBtn
+    });
+
     // --- MASZYNY ---
     async function dodajMaszyne(event) {
         event.preventDefault();
-        const wybranyKlientId = maszynaKlientSelect.value;
+        const wybranyKlientId = maszynaKlientIdInput?.value || '';
         if (!wybranyKlientId) { alert("Proszę wybrać klienta!"); return; }
         const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
         if (!klient) { alert("Błąd: Nie znaleziono danych wybranego klienta."); return; }
 
         const dane = {
-            klientId: wybranyKlientId, klientNazwa: klient.nazwa,
+            klientId: wybranyKlientId,
+            klientNazwa: klient.nazwa || '(bez nazwy)',
             typMaszyny: maszynaForm['maszyna-typ'].value,
             model: maszynaForm['maszyna-model'].value,
             nrSeryjny: maszynaForm['maszyna-serial'].value || '---',
@@ -3149,6 +3423,7 @@ async function obslugaListyKlientow(event) {
         try {
             await addDoc(collection(db, "maszyny"), dane);
             maszynaForm.reset();
+            addMachineClientCombobox?.clear();
             closeDrawer(machineDrawer);
         }
         catch (e) { console.error("Błąd dodawania maszyny: ", e); }
@@ -3330,8 +3605,15 @@ function otworzModalEdycjiMaszyny(maszynaId) {
     if (!editMaszynaForm) return;
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
     if (!maszyna) return;
+    const klient = _wszystkieKlienciCache.find(k => k.id === maszyna.klientId);
+    const klientNazwa = klient?.nazwa || maszyna.klientNazwa || '(bez nazwy)';
+    const klientNip = klient?.nip && klient.nip !== '---' ? klient.nip : '';
     editMaszynaForm['edit-maszyna-id'].value = maszyna.id;
-    document.getElementById('edit-maszyna-klient-nazwa').textContent = maszyna.klientNazwa;
+    editMachineClientCombobox?.setSelection({
+        id: maszyna.klientId,
+        name: klientNazwa,
+        nip: klientNip
+    });
     editMaszynaForm['edit-maszyna-typ'].value = maszyna.typMaszyny;
     editMaszynaForm['edit-maszyna-model'].value = maszyna.model;
     editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : maszyna.nrSeryjny;
@@ -3352,8 +3634,20 @@ async function zapiszEdycjeMaszyny(event) {
     }
     const nowyModel = editMaszynaForm['edit-maszyna-model'].value;
     const nowyTyp = editMaszynaForm['edit-maszyna-typ'].value;
+    const wybranyKlientId = editMaszynaKlientIdInput?.value || '';
+    if (!wybranyKlientId) {
+        alert("Proszę wybrać klienta!");
+        return;
+    }
+    const klient = _wszystkieKlienciCache.find(k => k.id === wybranyKlientId);
+    if (!klient) {
+        alert("Błąd: Nie znaleziono danych wybranego klienta.");
+        return;
+    }
 
     const dane = {
+        klientId: wybranyKlientId,
+        klientNazwa: klient.nazwa || '(bez nazwy)',
         typMaszyny: nowyTyp,
         model: nowyModel,
         nrSeryjny: editMaszynaForm['edit-maszyna-serial'].value || '---',
@@ -4778,6 +5072,7 @@ async function obslugaListyCzesci(event) {
     if (maszynaAddBtn) {
         maszynaAddBtn.addEventListener('click', () => {
             maszynaForm?.reset();
+            addMachineClientCombobox?.clear();
             setMachineDrawerMode('add');
         });
     }
