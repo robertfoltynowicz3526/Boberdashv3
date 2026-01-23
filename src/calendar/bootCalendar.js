@@ -1,11 +1,13 @@
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadCalendarEvents, getDailyTotals } from './data';
 
 export function bootCalendar() {
   const host = document.getElementById('calendar');
   if (!host) return;
+  if (!Calendar) {
+    console.error('[calendar] FullCalendar not available.');
+    return;
+  }
 
   const fetchDailyTotals = async (date) => {
     try {

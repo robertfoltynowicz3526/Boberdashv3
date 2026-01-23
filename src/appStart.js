@@ -59,6 +59,8 @@ export const startApp = () => {
 
 
 function initializeApp() {
+    console.info('App bootstrap start');
+    console.info('Firebase initialized:', Boolean(db && auth));
     // ZASADA: 3 warstwy i żadnych skrótów → DATA → AGREGACJA → RENDER.
     // --- STAŁE I ZMIENNE GLOBALNE ---
     const STAWKI = {
@@ -87,6 +89,7 @@ function initializeApp() {
     const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
     const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
+    let hasTimeGrid = false;
     const getYearFromValue = (value) => {
         if (!value) return null;
         if (typeof value === 'string') {
@@ -172,14 +175,16 @@ function initializeApp() {
         } catch (_) { }
     };
     const calendarViewKeyToFc = (viewKey) => {
+        const dayView = hasTimeGrid ? 'timeGridDay' : 'dayGridDay';
+        const weekView = hasTimeGrid ? 'timeGridWeek' : 'dayGridWeek';
         switch (viewKey) {
             case 'day':
-                return 'dayGridDay';
+                return dayView;
             case 'month':
                 return 'dayGridMonth';
             case 'week':
             default:
-                return 'dayGridWeek';
+                return weekView;
         }
     };
     const fcViewToCalendarKey = (viewType) => {
@@ -526,6 +531,7 @@ function initializeApp() {
     const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
+    const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
     const kalendarzModal = document.getElementById('kalendarz-modal');
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
@@ -678,6 +684,21 @@ function initializeApp() {
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
     const magazynTab = document.getElementById('magazyn');
     const magazynSummaryBox = document.getElementById('magazyn-summary');
+
+    const setBootstrapLoadingState = () => {
+        if (listaKlientowDiv) listaKlientowDiv.innerHTML = '<p class="loading-state">Ładowanie klientów...</p>';
+        if (listaMaszynDiv) listaMaszynDiv.innerHTML = '<p class="loading-state">Ładowanie maszyn...</p>';
+        if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = '<p class="loading-state">Ładowanie zleceń...</p>';
+        if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = '<p class="loading-state">Ładowanie zleceń...</p>';
+        if (kalendarzPodsumowanieDiv) kalendarzPodsumowanieDiv.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (zakonczoneSummaryContainer) zakonczoneSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (annualSummaryContainer) annualSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (l4SummaryContainer) l4SummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (magazynSummaryBox) magazynSummaryBox.innerHTML = '<p class="loading-state">Ładowanie magazynu...</p>';
+        if (magazynLista) magazynLista.innerHTML = '<tr><td colspan="7" class="loading-state">Ładowanie magazynu...</td></tr>';
+    };
+
+    setBootstrapLoadingState();
 
     const normalizeAllDayDate = (value) => {
         if (!value) return null;
@@ -1330,14 +1351,25 @@ function initializeApp() {
     odswiezSelectKlientaDoZlecenia();
 
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
+    const timeGridPlugin = (window.timeGrid && window.timeGrid.default) || FullCalendar?.timeGridPlugin || FullCalendar?.timeGrid;
     const interactionPlugin = (window.interaction && window.interaction.default) || FullCalendar?.interactionPlugin || FullCalendar?.interaction;
-    const calendarPlugins = [dayGridPlugin, interactionPlugin].filter(Boolean);
+    const calendarPlugins = [dayGridPlugin, timeGridPlugin, interactionPlugin].filter(Boolean);
+    hasTimeGrid = Boolean(timeGridPlugin);
     const todayKey = formatDateForStorage(new Date());
     let calendarReturnState = readCalendarReturnState();
+
+    const setCalendarViewClass = (viewKey) => {
+        if (!calendarShell) return;
+        calendarShell.classList.remove('view-day', 'view-week', 'view-month');
+        if (viewKey) {
+            calendarShell.classList.add(`view-${viewKey}`);
+        }
+    };
 
     const updateCalendarToolbarState = () => {
         if (!calendarToolbar || !calendar) return;
         const viewKey = fcViewToCalendarKey(calendar.view?.type);
+        setCalendarViewClass(viewKey);
         calendarViewButtons.forEach((button) => {
             const isActive = button.dataset.calendarView === viewKey;
             button.classList.toggle('is-active', isActive);
@@ -1481,14 +1513,14 @@ function initializeApp() {
         );
         window.calendar = calendar;
         updateCalendarToolbarState();
-        const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
-        if (calendarShell) {
+        const calendarShellEl = calendarShell || kalendarzContainer;
+        if (calendarShellEl) {
             const applySize = () => handleCalendarResize();
             applySize();
             let ro = null;
             if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
                 ro = new window.ResizeObserver(() => applySize());
-                ro.observe(calendarShell);
+                ro.observe(calendarShellEl);
             } else {
                 // Fallback dla starszych przeglądarek/środowisk: nasłuchuj resize
                 const onResize = () => applySize();
@@ -1497,14 +1529,14 @@ function initializeApp() {
                 const observer = new MutationObserver((mutations) => {
                     for (const m of mutations) {
                         m.removedNodes && m.removedNodes.forEach((n) => {
-                            if (n === calendarShell || (n.contains && n.contains(calendarShell))) {
+                            if (n === calendarShellEl || (n.contains && n.contains(calendarShellEl))) {
                                 window.removeEventListener('resize', onResize);
                                 observer.disconnect();
                             }
                         });
                     }
                 });
-                observer.observe(calendarShell.parentNode || document.body, { childList: true });
+                observer.observe(calendarShellEl.parentNode || document.body, { childList: true });
             }
         }
         setTimeout(() => {
@@ -5620,5 +5652,6 @@ async function obslugaListyCzesci(event) {
     nasluchujNaZlecenia();
     wyswietlPrzejazdy(); // puste – OK
     wyswietlMagazyn();
+    console.info('Subscriptions started: clients/machines/orders/stock/dayEntries');
 
 } // koniec initializeApp()

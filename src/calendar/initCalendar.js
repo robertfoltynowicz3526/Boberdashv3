@@ -1,6 +1,4 @@
-import { Calendar } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import { Calendar, dayGridPlugin, interactionPlugin, timeGridPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -215,6 +213,11 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
   if (!el) throw new Error('Nie znaleziono kontenera kalendarza (#kalendarz / #calendar).');
 
+  if (!Calendar) {
+    console.error('[calendar] FullCalendar not available.');
+    return null;
+  }
+
   if (window.__fcCalendar) {
     try {
       window.__fcCalendar.destroy();
@@ -237,11 +240,15 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     ...restExtraOptions
   } = extraOptions || {};
 
-  const plugins = (extraOptions?.plugins?.length ? extraOptions.plugins : [dayGridPlugin, interactionPlugin]).filter(Boolean);
+  const plugins = (extraOptions?.plugins?.length
+    ? extraOptions.plugins
+    : [dayGridPlugin, timeGridPlugin, interactionPlugin]
+  ).filter(Boolean);
+  const defaultView = timeGridPlugin ? 'timeGridWeek' : 'dayGridWeek';
 
   const baseOptions = {
     plugins,
-    initialView: 'dayGridWeek',
+    initialView: defaultView,
     headerToolbar: false,
     locale: 'pl',
     buttonText: {
