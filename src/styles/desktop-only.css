@@ -26,7 +26,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #calendar,
 #kalendarz { height: auto !important; min-height: auto !important; }
 .fc-view-harness { min-height: auto !important; }
-.fc-daygrid-day-frame { min-height: auto !important; }
+.fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
 
 /* Pop-over „+X więcej” – zostaje */
 .fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
@@ -101,7 +101,7 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #calendar,
 #kalendarz { height: auto !important; min-height: auto !important; }
 .fc-view-harness { min-height: auto !important; }
-.fc-daygrid-day-frame { min-height: auto !important; }
+.fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
 
 /* === LISTY – PRZEWIJANIE (ZAKOŃCZONE, MASZYNY, KLIENCI) === */
 [data-section="zlecenia"] .closed-list,

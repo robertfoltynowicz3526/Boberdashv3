@@ -7,6 +7,7 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
+import { buildDayDetailsModel, renderDayDetailsPanel } from './calendar/dayDetailsPanel.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
@@ -408,10 +409,114 @@ function initializeApp() {
         window.calendar = calendar;
         window.__calendarApi = calendar;
     };
+    const CALENDAR_PANEL_PINNED_STORAGE_KEY = 'calendarDayPanelPinned';
+    const CALENDAR_BREAKPOINTS = {
+        desktop: 1440,
+        laptop: 1024,
+        tablet: 768
+    };
+    const getCalendarBreakpoint = () => {
+        const width = window.innerWidth || 0;
+        if (width >= CALENDAR_BREAKPOINTS.desktop) return 'desktop';
+        if (width >= CALENDAR_BREAKPOINTS.laptop) return 'laptop';
+        if (width >= CALENDAR_BREAKPOINTS.tablet) return 'tablet';
+        return 'mobile';
+    };
+    const isDesktopBreakpoint = () => getCalendarBreakpoint() === 'desktop';
+    const isLaptopBreakpoint = () => getCalendarBreakpoint() === 'laptop';
+    const isTabletBreakpoint = () => getCalendarBreakpoint() === 'tablet';
+    const readPinnedPanelState = () => {
+        try {
+            return localStorage.getItem(CALENDAR_PANEL_PINNED_STORAGE_KEY) === 'true';
+        } catch (_) {
+            return false;
+        }
+    };
+    const persistPinnedPanelState = (value) => {
+        try {
+            localStorage.setItem(CALENDAR_PANEL_PINNED_STORAGE_KEY, value ? 'true' : 'false');
+        } catch (_) { }
+    };
+
+    let selectedDayPanelKey = null;
+    let dayPanelOpen = false;
+    let dayPanelPinned = readPinnedPanelState();
+
+    const getSummaryDisplayMode = () => calendarShell?.dataset?.summaryDisplay || 'short';
+
+    const applyDayPanelState = () => {
+        if (!calendarShell || !calendarDayPanel) return;
+        const pinActive = isLaptopBreakpoint() && dayPanelPinned;
+        const shouldBeOpen = isDesktopBreakpoint() || dayPanelOpen || pinActive;
+        calendarShell.dataset.panelOpen = shouldBeOpen ? 'true' : 'false';
+        calendarShell.dataset.panelPinned = pinActive ? 'true' : 'false';
+        calendarDayPanel.dataset.panelPinned = pinActive ? 'true' : 'false';
+    };
+
+    const buildDayPanelData = (dayKey) => ({
+        dayKey,
+        dayDoc: dayDocsByDay.get(dayKey) || null,
+        orders: Array.isArray(ordersByDay.get(dayKey)) ? ordersByDay.get(dayKey) : [],
+        manual: manualByDay.get(dayKey) || {}
+    });
+
+    const renderDayPanel = () => {
+        if (!calendarDayPanel) return;
+        if (!selectedDayPanelKey) {
+            renderDayDetailsPanel(calendarDayPanel, null);
+            return;
+        }
+        const data = buildDayPanelData(selectedDayPanelKey);
+        const model = buildDayDetailsModel({
+            ...data,
+            summaryMode: getSummaryDisplayMode()
+        });
+        renderDayDetailsPanel(calendarDayPanel, model);
+        const pinButton = calendarDayPanel.querySelector('[data-panel-action="pin"]');
+        if (pinButton) {
+            pinButton.setAttribute('aria-pressed', dayPanelPinned ? 'true' : 'false');
+        }
+    };
+
+    const openDayPanel = (dayKey) => {
+        if (!dayKey) return;
+        selectedDayPanelKey = dayKey;
+        dayPanelOpen = true;
+        applyDayPanelState();
+        renderDayPanel();
+    };
+
+    const closeDayPanel = () => {
+        if (isDesktopBreakpoint() || dayPanelPinned) return;
+        dayPanelOpen = false;
+        applyDayPanelState();
+    };
+
+    const toggleDayPanelPin = () => {
+        if (!isLaptopBreakpoint()) return;
+        dayPanelPinned = !dayPanelPinned;
+        persistPinnedPanelState(dayPanelPinned);
+        applyDayPanelState();
+        renderDayPanel();
+    };
+
+    const applyCalendarResponsiveOptions = () => {
+        const api = getCalendarApi();
+        if (!api) return;
+        const viewKey = fcViewToCalendarKey(api.view?.type);
+        const width = window.innerWidth || 0;
+        const rows = width >= CALENDAR_BREAKPOINTS.desktop ? 3 : width >= CALENDAR_BREAKPOINTS.laptop ? 2 : 1;
+        const shouldLimit = viewKey === 'week' || viewKey === 'month';
+        api.setOption('dayMaxEvents', shouldLimit);
+        api.setOption('dayMaxEventRows', shouldLimit ? rows : false);
+    };
+
     const handleCalendarResize = () => {
         try {
             getCalendarApi()?.updateSize();
         } catch (_) { }
+        applyCalendarResponsiveOptions();
+        applyDayPanelState();
     };
     let workEvents = [];
     let edytowanyPrzejazdId = null;
@@ -589,6 +694,8 @@ function initializeApp() {
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const calendarToolbar = document.getElementById('calendar-toolbar');
+    const calendarDayPanel = document.getElementById('calendar-day-panel');
+    const calendarDayPanelBackdrop = document.getElementById('calendar-day-panel-backdrop');
     const calendarViewButtons = calendarToolbar ? calendarToolbar.querySelectorAll('[data-calendar-view]') : [];
     const calendarTodayBtn = document.getElementById('calendar-today-btn');
     const calendarBackBtn = document.getElementById('calendar-back-btn');
@@ -1087,6 +1194,7 @@ function initializeApp() {
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
         workEvents = [...orderEvents];
         updateCalendarData(calendar, workEvents, []);
+        renderDayPanel();
     };
 
     const getLeaveEventDocId = (dateKey) => `${LEAVE_EVENT_PREFIX}${dateKey}`;
@@ -1495,6 +1603,7 @@ function initializeApp() {
         if (calendarFocusBtn) {
             calendarFocusBtn.disabled = viewKey === 'day';
         }
+        applyDayPanelState();
     };
 
     const focusCalendarDay = (dateStr, sourceViewKey = null) => {
@@ -1562,6 +1671,34 @@ function initializeApp() {
         }
     };
 
+    const bindDayPanelEvents = () => {
+        if (!calendarShell || !calendarDayPanel) return;
+        calendarShell.addEventListener('click', (event) => {
+            const actionEl = event.target.closest('[data-panel-action]');
+            if (!actionEl || !calendarShell.contains(actionEl)) return;
+            const action = actionEl.dataset.panelAction;
+            if (!action) return;
+            if (action === 'close') {
+                closeDayPanel();
+                return;
+            }
+            if (action === 'pin') {
+                toggleDayPanelPin();
+                return;
+            }
+            if (action === 'add' || action === 'edit') {
+                if (selectedDayPanelKey) {
+                    otworzModalGodzin(selectedDayPanelKey);
+                }
+            }
+        });
+        calendarDayPanelBackdrop?.addEventListener('click', () => closeDayPanel());
+    };
+
+    window.addEventListener('calendar:summary-display-change', () => {
+        renderDayPanel();
+    });
+
     // --- KALENDARZ ---
     const getCalendarDom = () => {
         const container = document.getElementById('kalendarz');
@@ -1610,7 +1747,7 @@ function initializeApp() {
                     contentHeight: '100%',
                     expandRows: true,
                     dayMaxEvents: true,
-                    dayMaxEventRows: 5,
+                    dayMaxEventRows: 3,
                     eventDataTransform(event) {
                         if (event && typeof event.title === 'string') {
                             event.title = stripEwidencjaPrefix(event.title);
@@ -1628,10 +1765,15 @@ function initializeApp() {
                     },
                     dateClick: (info) => {
                         const targetDate = info?.dateStr;
+                        const viewKey = fcViewToCalendarKey(info?.view?.type || getCalendarApi()?.view?.type);
+                        if (targetDate && (viewKey === 'week' || viewKey === 'month')) {
+                            openDayPanel(targetDate);
+                            return;
+                        }
                         if (targetDate) {
                             focusCalendarDay(targetDate);
+                            openEwidencja(targetDate);
                         }
-                        openEwidencja(targetDate);
                     },
                     select(info) {
                         const startDate = normalizeAllDayDate(info?.start);
@@ -1645,6 +1787,13 @@ function initializeApp() {
                             api.unselect();
                         }
                     },
+                    moreLinkClick: (info) => {
+                        const targetDate = info?.date ? formatDateForStorage(info.date) : info?.dateStr;
+                        if (targetDate) {
+                            openDayPanel(targetDate);
+                        }
+                        return 'none';
+                    },
                     datesSet(viewInfo) {
                         if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
                             obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
@@ -1656,6 +1805,9 @@ function initializeApp() {
                         const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
                         if (focusKey) persistCalendarDate(focusKey);
                         updateCalendarToolbarState();
+                        applyCalendarResponsiveOptions();
+                        applyDayPanelState();
+                        renderDayPanel();
                     }
                 }
             );
@@ -5963,7 +6115,10 @@ async function obslugaListyCzesci(event) {
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
     bindCalendarToolbar();
+    bindDayPanelEvents();
     updateCalendarToolbarState();
+    applyDayPanelState();
+    renderDayPanel();
     wyswietlPrzejazdy(); // puste – OK
 
     const bootstrapApp = async () => {
