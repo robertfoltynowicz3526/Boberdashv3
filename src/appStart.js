@@ -448,6 +448,46 @@ function initializeApp() {
         leaveGetter: (dayKey) => leaveByDay.get(dayKey) || null
     });
 
+    const moduleInitState = {
+        calendar: { initialized: false, inFlight: false },
+        clients: { initialized: false, inFlight: false },
+        machines: { initialized: false, inFlight: false },
+        orders: { initialized: false, inFlight: false },
+        stock: { initialized: false, inFlight: false },
+        summary: { initialized: false, inFlight: false }
+    };
+    let bootstrapReady = false;
+    let pendingCalendarInit = false;
+
+    const renderModuleError = (container, message) => {
+        if (!container) return;
+        const safeMsg = message || 'Moduł chwilowo niedostępny.';
+        container.innerHTML = `<p class="loading-state">${safeMsg}</p>`;
+    };
+
+    const safeInitModule = async (name, container, initFn, errorMessage) => {
+        if (!container) {
+            console.info(`[${name}] pomijam init — brak kontenera DOM`);
+            return { ok: false, reason: 'missing-container' };
+        }
+        const state = moduleInitState[name] || { initialized: false, inFlight: false };
+        if (state.inFlight) return { ok: false, reason: 'in-flight' };
+        if (state.initialized) return { ok: true, skipped: true };
+        state.inFlight = true;
+        moduleInitState[name] = state;
+        try {
+            await initFn();
+            state.initialized = true;
+            return { ok: true };
+        } catch (error) {
+            console.error(`[${name}] init error`, error);
+            renderModuleError(container, errorMessage);
+            return { ok: false, error };
+        } finally {
+            state.inFlight = false;
+        }
+    };
+
     const toDateSafe = (value) => {
         if (!value) return null;
         if (value.toDate && typeof value.toDate === 'function') {
@@ -1166,8 +1206,19 @@ function initializeApp() {
         if (target) target.style.display = 'block';
         const trigger = document.querySelector(`.tab-button[onclick*="'${tabName}'"]`);
         if (trigger) trigger.classList.add('active');
+        handleTabActivation(tabName);
+    };
+
+    const handleTabActivation = (tabName) => {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
+        }
+        if (tabName === 'pulpit' || tabName === 'kalendarz') {
+            if (!bootstrapReady) {
+                pendingCalendarInit = true;
+                return;
+            }
+            void initCalendarModule('tab-activation');
         }
     };
 
@@ -1367,9 +1418,7 @@ function initializeApp() {
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
         document.getElementById(tabName).style.display = 'block';
         evt.currentTarget.classList.add('active');
-        if (tabName === 'magazyn') {
-            ensureMagazynSummaryPlacement();
-        }
+        handleTabActivation(tabName);
     };
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -1514,8 +1563,14 @@ function initializeApp() {
     };
 
     // --- KALENDARZ ---
+    const getCalendarDom = () => {
+        const container = document.getElementById('kalendarz');
+        const shell = document.getElementById('calendar-shell') || container;
+        return { container, shell };
+    };
+
     const renderCalendarUnavailable = (message) => {
-        const container = kalendarzContainer || document.getElementById('kalendarz');
+        const { container } = getCalendarDom();
         if (!container) return;
         let note = container.querySelector('.calendar-unavailable');
         if (!note) {
@@ -1529,7 +1584,12 @@ function initializeApp() {
     };
 
     async function inicjalizujKalendarz() {
-        const calendarTarget = kalendarzContainer || '#kalendarz';
+        const { container: calendarContainer, shell: calendarShellEl } = getCalendarDom();
+        if (!calendarContainer) {
+            console.info('[calendar] pomijam init — brak kontenera');
+            return;
+        }
+        const calendarTarget = calendarContainer;
         const storedViewType = readCalendarViewFromStorage() || 'dayGridWeek';
         const storedDateKey = readCalendarDateFromStorage() || todayKey;
         try {
@@ -1616,7 +1676,6 @@ function initializeApp() {
             return;
         }
         updateCalendarToolbarState();
-        const calendarShellEl = calendarShell || kalendarzContainer;
         if (calendarShellEl) {
             const applySize = () => handleCalendarResize();
             applySize();
@@ -1656,6 +1715,28 @@ function initializeApp() {
         }, 0);
         window.addEventListener('resize', handleCalendarResize);
     }
+
+    const initCalendarModule = async (source = 'bootstrap') => {
+        const { container } = getCalendarDom();
+        if (!container) {
+            console.info('[calendar] brak kontenera — init odłożony');
+            return;
+        }
+        if (moduleInitState.calendar.inFlight || moduleInitState.calendar.initialized) return;
+        moduleInitState.calendar.inFlight = true;
+        try {
+            await inicjalizujKalendarz();
+            moduleInitState.calendar.initialized = Boolean(getCalendarApi());
+            if (!moduleInitState.calendar.initialized) {
+                renderCalendarUnavailable('Kalendarz chwilowo niedostępny (odśwież / przejdź na inną zakładkę)');
+            }
+        } catch (error) {
+            console.error(`[calendar] init failed (${source})`, error);
+            renderCalendarUnavailable('Kalendarz chwilowo niedostępny (odśwież / przejdź na inną zakładkę)');
+        } finally {
+            moduleInitState.calendar.inFlight = false;
+        }
+    };
 
     async function otworzModalGodzin(data) {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
@@ -1939,53 +2020,61 @@ function initializeApp() {
         }
     }
 
+    const applyDayEntriesData = (entries = [], { render = true } = {}) => {
+        wszystkieWpisyKalendarza = [];
+        manualByDay = new Map();
+        ordersByDay = new Map();
+        dayDocsByDay = new Map();
+        leaveByDay = new Map();
+        window.__lastDayDocs = {};
+
+        const orderIndex = buildOrderIndex();
+        (entries || []).forEach(({ id, data }) => {
+            const dane = data || {};
+            const dayStr = normalizeDayKey(id, 'godziny_pracy.id');
+            if (!dayStr) return;
+            window.__lastDayDocs[dayStr] = dane;
+            const normalizedDay = normalizeDayRecord(id, dane);
+            const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
+            const wpis = {
+                ...normalizedDay,
+                billed: suma,
+                fakturowane: suma,
+                nadgodziny: Number(dane?.nadgodziny ?? 0) || 0,
+                zleceniaPowiazane: powiazane
+            };
+            wszystkieWpisyKalendarza.push(wpis);
+            const dayDocForTotals = buildDayDocForTotals({ ...normalizedDay, zleceniaPowiazane: powiazane });
+            dayDocsByDay.set(dayStr, dayDocForTotals);
+            manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
+            const ordersForDay = buildOrdersForDay(dayDocForTotals, orderIndex);
+            ordersByDay.set(dayStr, ordersForDay);
+            const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : normalizedDay.flags?.wolne ? 'WOLNE' : null);
+            if (leaveKind) {
+                leaveByDay.set(dayStr, leaveKind);
+            }
+            computeDayTotals(dayStr);
+        });
+
+        if (render) {
+            rebuildCalendarDecorations();
+            updateUnfinishedSummary();
+            selectedYearNeedsRefresh = true;
+            odswiezPodsumowania();
+        }
+    };
+
     function wyswietlWpisyKalendarza() {
         if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
             if (calendar) calendar.removeAllEvents();
             return;
         }
         onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
-            wszystkieWpisyKalendarza = [];
-            manualByDay = new Map();
-            ordersByDay = new Map();
-            dayDocsByDay = new Map();
-            leaveByDay = new Map();
-            window.__lastDayDocs = {};
-
-            const orderIndex = buildOrderIndex();
-            snapshotGodziny.forEach((docSnap) => {
-                const dane = docSnap.data();
-                const id = docSnap.id;
-                const dayStr = normalizeDayKey(id, 'godziny_pracy.id');
-                if (!dayStr) return;
-                window.__lastDayDocs[dayStr] = dane;
-                const normalizedDay = normalizeDayRecord(id, dane);
-                const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
-                const wpis = {
-                    ...normalizedDay,
-                    billed: suma,
-                    fakturowane: suma,
-                    nadgodziny: Number(dane?.nadgodziny ?? 0) || 0,
-                    zleceniaPowiazane: powiazane
-                };
-                wszystkieWpisyKalendarza.push(wpis);
-                const dayDocForTotals = buildDayDocForTotals({ ...normalizedDay, zleceniaPowiazane: powiazane });
-                dayDocsByDay.set(dayStr, dayDocForTotals);
-                manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
-                const ordersForDay = buildOrdersForDay(dayDocForTotals, orderIndex);
-                ordersByDay.set(dayStr, ordersForDay);
-                const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : normalizedDay.flags?.wolne ? 'WOLNE' : null);
-                if (leaveKind) {
-                    leaveByDay.set(dayStr, leaveKind);
-                }
-
-                computeDayTotals(dayStr);
-            });
-
-            rebuildCalendarDecorations();
-            updateUnfinishedSummary();
-            selectedYearNeedsRefresh = true;
-            odswiezPodsumowania();
+            const entries = snapshotGodziny.docs.map((docSnap) => ({
+                id: docSnap.id,
+                data: docSnap.data()
+            }));
+            applyDayEntriesData(entries);
         });
     }
 
@@ -3117,17 +3206,21 @@ function wyswietlKlientow() {
   }
 }
 
+const applyClientsData = (clients = [], { render = true } = {}) => {
+  _wszystkieKlienciCache = Array.isArray(clients) ? clients : [];
+  if (render) {
+    wyswietlMaszyny();
+    wyswietlKlientow();
+  }
+};
+
 function nasluchujNaKlientow() {
   onSnapshot(
     query(collection(db, "klienci"), orderBy("nazwa")),
     (snapshot) => {
-      _wszystkieKlienciCache = [];  // odśwież cache
-      snapshot.forEach((docSnap) => {
-        _wszystkieKlienciCache.push({ id: docSnap.id, ...docSnap.data() });
-      });
+      const clients = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
       // Po załadowaniu klientów przerysuj listy, które ich potrzebują:
-      wyswietlMaszyny();   // żeby przypiąć maszyny pod klientów
-      wyswietlKlientow();  // żeby wyrenderować listę klientów + selecty
+      applyClientsData(clients);
     }
   );
 }
@@ -3852,18 +3945,20 @@ async function obslugaListyKlientow(event) {
         zlecenieMaszynaSelect.disabled = false;
     }
 
+    const applyMachinesData = (machines = [], { render = true } = {}) => {
+        _wszystkieMaszynyCache = Array.isArray(machines) ? machines : [];
+        wszystkieMaszyny = Array.isArray(machines) ? machines : [];
+        if (render) {
+            wyswietlMaszyny();
+            wyswietlKlientow();
+        }
+    };
+
 
     function nasluchujNaMaszyny() {
         onSnapshot(query(collection(db, "maszyny"), orderBy("klientNazwa")), (snapshot) => {
-            _wszystkieMaszynyCache = [];
-            wszystkieMaszyny = [];
-            snapshot.forEach(docSnap => {
-                const maszyna = { id: docSnap.id, ...docSnap.data() };
-                _wszystkieMaszynyCache.push(maszyna);
-                wszystkieMaszyny.push(maszyna);
-            });
-            wyswietlMaszyny();
-            wyswietlKlientow();
+            const machines = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            applyMachinesData(machines);
         });
     }
 
@@ -4133,20 +4228,22 @@ function wyswietlZlecenia() {
 
 
 
-function nasluchujNaZlecenia() {
-    onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
-        _wszystkieZleceniaCache = [];
-        wszystkieZlecenia = [];
-        snapshot.forEach(docSnap => {
-            const zlecenie = { id: docSnap.id, ...docSnap.data() };
-            _wszystkieZleceniaCache.push(zlecenie);
-            wszystkieZlecenia.push(zlecenie);
-        });
+const applyOrdersData = (orders = [], { render = true } = {}) => {
+    _wszystkieZleceniaCache = Array.isArray(orders) ? orders : [];
+    wszystkieZlecenia = Array.isArray(orders) ? orders : [];
+    if (render) {
         wyswietlZlecenia();
         odswiezPodsumowania();
         rebuildCalendarDecorations();
         updateUnfinishedSummary();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
+    }
+};
+
+function nasluchujNaZlecenia() {
+    onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
+        const orders = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+        applyOrdersData(orders);
     });
 }
 
@@ -5349,6 +5446,18 @@ async function obslugaListyCzesci(event) {
         }
     };
 
+    const applyStockData = (products = [], { render = true, status = 'ready' } = {}) => {
+        wszystkieProdukty = Array.isArray(products) ? products : [];
+        hasLoadedStockOnce = true;
+        stockStatus = status;
+        if (render) {
+            refreshMagazynFilters();
+            renderMagazynSummary();
+            renderMagazynTable();
+            renderMagazynWModalu();
+        }
+    };
+
     function wyswietlMagazyn() {
         if (!magazynLista) return;
         stockStatus = 'loading';
@@ -5356,31 +5465,24 @@ async function obslugaListyCzesci(event) {
         renderMagazynSummary();
         renderMagazynTable();
         onSnapshot(query(collection(db, "magazyn"), orderBy("createdAt", "desc")), (snapshot) => {
-            hasLoadedStockOnce = true;
-            stockStatus = 'ready';
-            wszystkieProdukty = [];
             if (snapshot.empty) {
-                refreshMagazynFilters();
-                renderMagazynTable();
+                applyStockData([]);
                 return;
             }
-            snapshot.forEach((docSnap) => {
+            const products = snapshot.docs.map((docSnap) => {
                 const produkt = docSnap.data();
-                produkt.id = docSnap.id;
-                produkt.ilosc = wartoscLiczbowa(produkt.ilosc);
-                produkt.pojemnosc = wartoscLiczbowa(produkt.pojemnosc);
-                produkt.jestOlejem = Boolean(produkt.jestOlejem);
-                wszystkieProdukty.push(produkt);
+                return {
+                    ...produkt,
+                    id: docSnap.id,
+                    ilosc: wartoscLiczbowa(produkt.ilosc),
+                    pojemnosc: wartoscLiczbowa(produkt.pojemnosc),
+                    jestOlejem: Boolean(produkt.jestOlejem)
+                };
             });
-            refreshMagazynFilters();
-            renderMagazynTable();
-            renderMagazynWModalu();
+            applyStockData(products);
         }, (error) => {
             console.error('Błąd ładowania magazynu:', error);
-            hasLoadedStockOnce = true;
-            stockStatus = 'error';
-            renderMagazynSummary();
-            renderMagazynTable();
+            applyStockData([], { status: 'error' });
         });
     }
 
@@ -5763,18 +5865,120 @@ async function obslugaListyCzesci(event) {
         }
     };
 
+    const loadInitialData = async () => {
+        const safeLoad = async (label, loader) => {
+            try {
+                const data = await loader();
+                return { ok: true, data };
+            } catch (error) {
+                console.error(`[bootstrap] nie udało się załadować ${label}`, error);
+                return { ok: false, data: [] };
+            }
+        };
+
+        const [clients, machines, orders, stock, dayEntries] = await Promise.all([
+            safeLoad('klientów', async () => {
+                const snapshot = await getDocs(query(collection(db, "klienci"), orderBy("nazwa")));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            }),
+            safeLoad('maszyn', async () => {
+                const snapshot = await getDocs(query(collection(db, "maszyny"), orderBy("klientNazwa")));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            }),
+            safeLoad('zleceń', async () => {
+                const snapshot = await getDocs(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            }),
+            safeLoad('magazynu', async () => {
+                const snapshot = await getDocs(query(collection(db, "magazyn"), orderBy("createdAt", "desc")));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            }),
+            safeLoad('ewidencji czasu', async () => {
+                const snapshot = await getDocs(collection(db, "godziny_pracy"));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
+            })
+        ]);
+
+        return { clients, machines, orders, stock, dayEntries };
+    };
+
+    const aggregateInitialData = (loaded) => {
+        applyClientsData(loaded.clients.data, { render: false });
+        applyMachinesData(loaded.machines.data, { render: false });
+        applyOrdersData(loaded.orders.data, { render: false });
+
+        const normalizedStock = loaded.stock.data.map((produkt) => ({
+            ...produkt,
+            ilosc: wartoscLiczbowa(produkt.ilosc),
+            pojemnosc: wartoscLiczbowa(produkt.pojemnosc),
+            jestOlejem: Boolean(produkt.jestOlejem)
+        }));
+        applyStockData(normalizedStock, { render: false, status: loaded.stock.ok ? 'ready' : 'error' });
+
+        applyDayEntriesData(loaded.dayEntries.data, { render: false });
+        rebuildCalendarDecorations();
+        updateUnfinishedSummary();
+        selectedYearNeedsRefresh = true;
+    };
+
+    const renderInitialViews = async (loaded) => {
+        if (loaded.clients.ok) {
+            wyswietlKlientow();
+        } else {
+            renderModuleError(listaKlientowDiv, 'Nie udało się załadować klientów.');
+        }
+        if (loaded.machines.ok) {
+            wyswietlMaszyny();
+        } else {
+            renderModuleError(listaMaszynDiv, 'Nie udało się załadować maszyn.');
+        }
+        if (loaded.orders.ok) {
+            wyswietlZlecenia();
+        } else {
+            const ordersContainer = aktywneZleceniaLista || ukonczoneZleceniaLista;
+            renderModuleError(ordersContainer, 'Nie udało się załadować zleceń.');
+        }
+        renderMagazynSummary();
+        renderMagazynTable();
+        renderMagazynWModalu();
+        await odswiezPodsumowania();
+        renderPulpit();
+        przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
+    };
+
+    const initModules = () => {
+        try { nasluchujNaUrlopy(); } catch (error) { console.error('[urlopy] init error', error); }
+        safeInitModule('clients', listaKlientowDiv, () => nasluchujNaKlientow(), 'Moduł klientów niedostępny.');
+        safeInitModule('machines', listaMaszynDiv, () => nasluchujNaMaszyny(), 'Moduł maszyn niedostępny.');
+        safeInitModule('orders', aktywneZleceniaLista || ukonczoneZleceniaLista, () => nasluchujNaZlecenia(), 'Moduł zleceń niedostępny.');
+        safeInitModule('stock', magazynLista || magazynTable || magazynSummaryBox, () => wyswietlMagazyn(), 'Moduł magazynu niedostępny.');
+        safeInitModule('summary', zakonczoneSummaryContainer || annualSummaryContainer || l4SummaryContainer, () => odswiezPodsumowania(), 'Moduł podsumowań niedostępny.');
+        try {
+            wyswietlWpisyKalendarza();
+        } catch (error) {
+            console.error('[calendar-data] init error', error);
+        }
+    };
+
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
     moveOrdersSearchBetweenSections();
-    wyswietlWpisyKalendarza();
-    nasluchujNaUrlopy();
-    nasluchujNaKlientow();
-    nasluchujNaMaszyny();
-    nasluchujNaZlecenia();
-    wyswietlPrzejazdy(); // puste – OK
-    wyswietlMagazyn();
-    console.info('Subscriptions started: clients/machines/orders/stock/dayEntries');
     bindCalendarToolbar();
     updateCalendarToolbarState();
-    void inicjalizujKalendarz();
+    wyswietlPrzejazdy(); // puste – OK
+
+    const bootstrapApp = async () => {
+        const initialData = await loadInitialData();
+        aggregateInitialData(initialData);
+        await renderInitialViews(initialData);
+        bootstrapReady = true;
+        if (pendingCalendarInit) {
+            pendingCalendarInit = false;
+            void initCalendarModule('bootstrap');
+        }
+        initModules();
+        console.info('Subscriptions started: clients/machines/orders/stock/dayEntries');
+    };
+
+    void bootstrapApp();
 
 } // koniec initializeApp()
