@@ -3538,13 +3538,13 @@ async function obslugaListyKlientow(event) {
         writeRecentMachineClients(next);
     };
 
-    const getMachineClientOptions = () => {
+    function getMachineClientOptions() {
         return (_wszystkieKlienciCache || []).map((client) => ({
             id: client.id,
             name: client.nazwa || '(bez nazwy)',
             nip: client.nip && client.nip !== '---' ? client.nip : ''
         }));
-    };
+    }
 
     const createClientCombobox = ({ input, hiddenInput, dropdown, clearBtn, getOptions, extraOptions = [] }) => {
         if (!input || !hiddenInput || !dropdown) return null;
