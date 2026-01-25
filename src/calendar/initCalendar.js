@@ -4,7 +4,9 @@ import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyT
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
 const SUMMARY_DISPLAY_MODES = new Set(['auto', 'full', 'short']);
-const SUMMARY_DISPLAY_BREAKPOINT = 1200;
+const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
+const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
+const SUMMARY_DISPLAY_TABLET_BREAKPOINT = 768;
 const SUMMARY_DISPLAY_DEFAULT = 'auto';
 let summaryDisplayMode = SUMMARY_DISPLAY_DEFAULT;
 let summaryDisplayEffective = null;
@@ -36,16 +38,41 @@ const getStoredSummaryDisplayMode = () => {
   }
 };
 
-const resolveSummaryDisplayMode = () => {
-  if (summaryDisplayMode === 'auto') {
-    if (typeof window === 'undefined') return 'full';
-    return window.innerWidth < SUMMARY_DISPLAY_BREAKPOINT ? 'short' : 'full';
+const getViewportWidth = () => {
+  if (typeof window === 'undefined') return SUMMARY_DISPLAY_DESKTOP_BREAKPOINT;
+  return window.innerWidth || SUMMARY_DISPLAY_DESKTOP_BREAKPOINT;
+};
+
+const getCalendarViewKey = (calendarEl) => {
+  const shell = calendarEl?.closest?.('#calendar-shell');
+  if (shell?.classList?.contains('view-day')) return 'day';
+  if (shell?.classList?.contains('view-week')) return 'week';
+  if (shell?.classList?.contains('view-month')) return 'month';
+  return null;
+};
+
+const shouldForceShortSummary = (calendarEl) => {
+  const width = getViewportWidth();
+  if (width < SUMMARY_DISPLAY_TABLET_BREAKPOINT) return true;
+  if (width >= SUMMARY_DISPLAY_TABLET_BREAKPOINT && width < SUMMARY_DISPLAY_LAPTOP_BREAKPOINT) {
+    const viewKey = getCalendarViewKey(calendarEl);
+    return viewKey !== 'day';
   }
-  return summaryDisplayMode;
+  return false;
+};
+
+const resolveSummaryDisplayMode = (calendarEl) => {
+  const width = getViewportWidth();
+  const autoMode = width >= SUMMARY_DISPLAY_DESKTOP_BREAKPOINT ? 'full' : 'short';
+  let resolved = summaryDisplayMode === 'auto' ? autoMode : summaryDisplayMode;
+  if (shouldForceShortSummary(calendarEl)) {
+    resolved = 'short';
+  }
+  return resolved;
 };
 
 const applySummaryDisplayAttributes = (calendarEl) => {
-  const effective = resolveSummaryDisplayMode();
+  const effective = resolveSummaryDisplayMode(calendarEl);
   summaryDisplayEffective = effective;
   const target = calendarEl?.closest?.('#calendar-shell') || calendarEl;
   if (target) {
@@ -55,7 +82,7 @@ const applySummaryDisplayAttributes = (calendarEl) => {
   return effective;
 };
 
-const getEffectiveSummaryDisplayMode = () => summaryDisplayEffective || resolveSummaryDisplayMode();
+const getEffectiveSummaryDisplayMode = (calendarEl) => summaryDisplayEffective || resolveSummaryDisplayMode(calendarEl);
 
 const setSummaryDisplayMode = (mode) => {
   summaryDisplayMode = SUMMARY_DISPLAY_MODES.has(mode) ? mode : SUMMARY_DISPLAY_DEFAULT;
@@ -67,6 +94,34 @@ const setSummaryDisplayMode = (mode) => {
 const refreshCalendarSummaries = (calendarEl) => {
   try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
   try { applyDecorationsFromPlaceholders(calendarEl?.ownerDocument || document); } catch (_) {}
+};
+
+const updateSummaryDisplayControlState = (calendarEl, selectEl) => {
+  if (!selectEl) return;
+  const width = getViewportWidth();
+  const viewKey = getCalendarViewKey(calendarEl);
+  const forceShort = width >= SUMMARY_DISPLAY_TABLET_BREAKPOINT
+    && width < SUMMARY_DISPLAY_LAPTOP_BREAKPOINT
+    && viewKey !== 'day';
+  const fullOption = selectEl.querySelector('option[value="full"]');
+  if (fullOption) {
+    fullOption.disabled = forceShort;
+    fullOption.hidden = forceShort;
+  }
+  if (forceShort && selectEl.value === 'full') {
+    selectEl.value = 'short';
+  }
+  selectEl.disabled = width < SUMMARY_DISPLAY_TABLET_BREAKPOINT;
+};
+
+const notifySummaryDisplayChange = (calendarEl) => {
+  if (typeof window === 'undefined') return;
+  const detail = {
+    mode: summaryDisplayMode,
+    effective: summaryDisplayEffective,
+    viewKey: getCalendarViewKey(calendarEl),
+  };
+  window.dispatchEvent(new CustomEvent('calendar:summary-display-change', { detail }));
 };
 
 const ensureSummaryDisplayControl = (calendarEl) => {
@@ -92,30 +147,35 @@ const ensureSummaryDisplayControl = (calendarEl) => {
     select.innerHTML = `
       <option value="auto">Auto</option>
       <option value="full">Pełne</option>
-      <option value="short">Skróty</option>
+      <option value="short">Skrót</option>
     `;
     select.value = summaryDisplayMode;
     select.addEventListener('change', () => {
       setSummaryDisplayMode(select.value);
       applySummaryDisplayAttributes(calendarEl);
       refreshCalendarSummaries(calendarEl);
+      notifySummaryDisplayChange(calendarEl);
     });
     wrapper.appendChild(select);
     rightChunk.appendChild(wrapper);
+    updateSummaryDisplayControlState(calendarEl, select);
   } else {
     const select = wrapper.querySelector('select');
     if (select && select.value !== summaryDisplayMode) {
       select.value = summaryDisplayMode;
     }
+    updateSummaryDisplayControlState(calendarEl, select);
   }
 };
 
 const handleSummaryDisplayResize = () => {
-  if (!summaryDisplayCalendarEl || summaryDisplayMode !== 'auto') return;
-  const next = resolveSummaryDisplayMode();
+  if (!summaryDisplayCalendarEl) return;
+  const next = resolveSummaryDisplayMode(summaryDisplayCalendarEl);
   if (next === summaryDisplayEffective) return;
   applySummaryDisplayAttributes(summaryDisplayCalendarEl);
   refreshCalendarSummaries(summaryDisplayCalendarEl);
+  ensureSummaryDisplayControl(summaryDisplayCalendarEl);
+  notifySummaryDisplayChange(summaryDisplayCalendarEl);
 };
 
 summaryDisplayMode = getStoredSummaryDisplayMode();
@@ -169,7 +229,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   if (summary) {
     const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
     const footer = document.createElement('div');
-    const displayMode = getEffectiveSummaryDisplayMode();
+    const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
@@ -393,6 +453,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (typeof extraDatesSet === 'function') extraDatesSet(...args);
       try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
       try { applyDecorationsFromPlaceholders(); } catch (_) {}
+      try { applySummaryDisplayAttributes(window.__fcCalendar?.el); } catch (_) {}
       try { ensureSummaryDisplayControl(window.__fcCalendar?.el); } catch (_) {}
     },
     eventsSet: (...args) => {

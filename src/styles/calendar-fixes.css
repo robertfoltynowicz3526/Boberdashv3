@@ -25,25 +25,24 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 
 /* Większe kratki (czytelne) */
 .fc-view-harness { min-height: calc(100vh - 220px) !important; }
-.fc-daygrid-day-frame { min-height: 180px !important; }
-@media (min-width:1600px){ .fc-daygrid-day-frame { min-height: 200px !important; } }
+.fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
 
 /* Look & feel FullCalendar */
-.fc-theme-standard td, .fc-theme-standard th { border-color: rgba(255,255,255,.08) !important; }
-.fc-daygrid-day-number { color: #d9d66a !important; font-weight: 600; }
-.fc .fc-toolbar-title { color: #e9f0e0 !important; }
+.fc-theme-standard td, .fc-theme-standard th { border-color: var(--calendar-grid) !important; }
+.fc-daygrid-day-number { color: var(--calendar-muted) !important; font-weight: 600; }
+.fc .fc-toolbar-title { color: var(--calendar-text) !important; }
 
 /* Eventy – tylko niebieskie karty, bez zielonych „chipów dnia” */
 .ab-chip, .leave-flag, .day-total, .fc-daygrid-day-events .ab-chip { display:none!important; }
 .fc .bober-chip.fc-event {
-  background:#3b82f6 !important;
-  border:0 !important;
-  border-radius:8px !important;
+  background: var(--calendar-chip-bg) !important;
+  border: 1px solid var(--calendar-chip-border) !important;
+  border-radius: 999px !important;
 }
 .fc .bober-chip .fc-event-title {
-  color:#fff !important;
-  font-size:12px !important;
-  line-height:1.25;
+  color: var(--calendar-chip-text) !important;
+  font-size: 12px !important;
+  line-height: 1.25;
 }
 
 /* --- Listy przewijane do końca (zakończone/klienci/maszyny) --- */
@@ -91,13 +90,13 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .calendar-shell .day-summary {
-  background: #3b82f6;
-  border: 1px solid rgba(255,255,255,0.22);
+  background: var(--calendar-summary-bg);
+  border: 1px solid var(--calendar-summary-border);
   border-radius: 10px;
   padding: 4px 6px;
   font-weight: 600;
-  color: #fff;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
+  color: var(--calendar-summary-text);
+  box-shadow: none;
 }
 
 /* Opcjonalny panel scrollowalny do list */
