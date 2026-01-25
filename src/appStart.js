@@ -536,8 +536,10 @@ function initializeApp() {
 
     // --- SELEKTORY ---
     const miesiacSummaryInput = document.getElementById('miesiac-summary');
-    const zlecenieKlientSelect = document.getElementById('zlecenie-klient-select');
-    const zlecenieKlientFilterInput = document.getElementById('zlecenie-klient-filter');
+    const zlecenieKlientInput = document.getElementById('zlecenie-klient-input');
+    const zlecenieKlientIdInput = document.getElementById('zlecenie-klient-id');
+    const zlecenieKlientDropdown = document.getElementById('zlecenie-klient-dropdown');
+    const zlecenieKlientClearBtn = zlecenieKlientInput?.closest('.combobox')?.querySelector('.combobox-clear');
     const zlecenieMaszynaSelect = document.getElementById('zlecenie-maszyna-select');
     const kalendarzContainer = document.getElementById('kalendarz');
     const calendarShell = document.getElementById('calendar-shell') || kalendarzContainer;
@@ -618,6 +620,14 @@ function initializeApp() {
     const bulkPreviewList = document.getElementById('bulk-preview-list');
     const bulkErrors = document.getElementById('bulk-errors');
     const bulkReport = document.getElementById('bulk-add-report');
+
+    let orderClientCombobox = null;
+    const ORDER_QUICK_OPTION = {
+        id: 'szybkie-zlecenie',
+        name: 'Szybkie zlecenie (bez klienta)',
+        nip: '',
+        isSpecial: true
+    };
     const productDetailsModal = document.getElementById('product-details-modal');
     const productDetailsCloseButton = productDetailsModal ? productDetailsModal.querySelector('.close-button') : null;
     const productEditForm = document.getElementById('product-edit-form');
@@ -1374,10 +1384,6 @@ function initializeApp() {
     inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
 
-    const odswiezSelectDebounced = debounce(() => odswiezSelectKlientaDoZlecenia(), 220);
-    if (zlecenieKlientFilterInput) {
-        zlecenieKlientFilterInput.addEventListener('input', odswiezSelectDebounced);
-    }
     odswiezSelectKlientaDoZlecenia();
 
     const dayGridPlugin = (window.dayGrid && window.dayGrid.default) || FullCalendar?.dayGridPlugin || FullCalendar?.dayGrid;
@@ -2966,45 +2972,22 @@ function initializeApp() {
     }
 
     function odswiezSelectKlientaDoZlecenia() {
-        if (!zlecenieKlientSelect) return;
+        if (!zlecenieKlientIdInput) return;
+        const poprzedniWybor = zlecenieKlientIdInput.value;
+        const klienci = getMachineClientOptions();
+        const wybranyKlient = poprzedniWybor
+            ? (poprzedniWybor === ORDER_QUICK_OPTION.id
+                ? ORDER_QUICK_OPTION
+                : klienci.find(klient => klient.id === poprzedniWybor))
+            : null;
 
-        const poprzedniWybor = zlecenieKlientSelect.value;
-        const fraza = (zlecenieKlientFilterInput?.value || '').trim().toLowerCase();
-
-        const klienciDlaSelecta = (_wszystkieKlienciCache || [])
-            .filter(klient => {
-                if (!fraza) return true;
-                const tekst = [
-                    klient.nazwa || '',
-                    klient.nip || '',
-                    klient.adres || '',
-                    klient.telefon || ''
-                ].join(' ').toLowerCase();
-                return tekst.includes(fraza);
-            })
-            .sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
-
-        const maWyniki = klienciDlaSelecta.length > 0;
-        const placeholder = (_wszystkieKlienciCache?.length || 0) === 0
-            ? '-- Brak klientów w bazie --'
-            : (maWyniki ? '-- Wybierz klienta --' : '-- Brak klientów pasujących do filtra --');
-        let optionsHtml = `<option value="">${placeholder}</option>`;
-        optionsHtml += '<option value="szybkie-zlecenie">-- SZYBKIE ZLECENIE (bez klienta) --</option>';
-
-        if (maWyniki) {
-            klienciDlaSelecta.forEach(klient => {
-                optionsHtml += `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`;
-            });
+        if (wybranyKlient) {
+            orderClientCombobox?.setSelection(wybranyKlient);
+        } else if (poprzedniWybor) {
+            orderClientCombobox?.clear();
+        } else {
+            orderClientCombobox?.refresh();
         }
-
-        zlecenieKlientSelect.innerHTML = optionsHtml;
-
-        const moznaPrzywrocic = poprzedniWybor === ''
-            || poprzedniWybor === 'szybkie-zlecenie'
-            || klienciDlaSelecta.some(klient => klient.id === poprzedniWybor);
-
-        zlecenieKlientSelect.value = moznaPrzywrocic ? poprzedniWybor : '';
-        zlecenieKlientSelect.dispatchEvent(new Event('change'));
     }
 
 function wyswietlKlientow() {
@@ -3470,7 +3453,7 @@ async function obslugaListyKlientow(event) {
         }));
     };
 
-    const createMachineClientCombobox = ({ input, hiddenInput, dropdown, clearBtn }) => {
+    const createClientCombobox = ({ input, hiddenInput, dropdown, clearBtn, getOptions, extraOptions = [] }) => {
         if (!input || !hiddenInput || !dropdown) return null;
         const state = {
             isOpen: false,
@@ -3478,6 +3461,8 @@ async function obslugaListyKlientow(event) {
             items: [],
             selectedName: ''
         };
+        const baseOptions = () => (typeof getOptions === 'function' ? getOptions() : []);
+        const allOptions = () => [...extraOptions, ...baseOptions()];
 
         const updateClearButton = () => {
             if (!clearBtn) return;
@@ -3513,10 +3498,11 @@ async function obslugaListyKlientow(event) {
             input.value = client.name;
             state.selectedName = client.name;
             updateClearButton();
-            if (trackRecent) {
+            if (trackRecent && !client.isSpecial) {
                 pushRecentMachineClient(client.id);
             }
             closeDropdown();
+            hiddenInput.dispatchEvent(new Event('change'));
         };
 
         const selectClient = (client) => applySelection(client, { trackRecent: true });
@@ -3527,13 +3513,15 @@ async function obslugaListyKlientow(event) {
             state.selectedName = '';
             updateClearButton();
             closeDropdown();
+            hiddenInput.dispatchEvent(new Event('change'));
         };
 
         const renderDropdown = () => {
             // DATA
             const query = input.value.trim();
             const queryLower = query.toLowerCase();
-            const clients = getMachineClientOptions();
+            const clients = allOptions();
+            const baseClients = baseOptions();
             const recentIds = readRecentMachineClients();
 
             // AGREGACJA
@@ -3548,13 +3536,13 @@ async function obslugaListyKlientow(event) {
 
             const recentClients = !queryLower
                 ? recentIds
-                    .map(id => clients.find(client => client.id === id))
+                    .map(id => baseClients.find(client => client.id === id))
                     .filter(Boolean)
                 : [];
 
             if (!queryLower && recentClients.length) {
                 const recentSet = new Set(recentClients.map(client => client.id));
-                sortedMatches = sortedMatches.filter(client => !recentSet.has(client.id));
+                sortedMatches = sortedMatches.filter(client => client.isSpecial || !recentSet.has(client.id));
             }
 
             // RENDER
@@ -3576,6 +3564,7 @@ async function obslugaListyKlientow(event) {
                     option.type = 'button';
                     option.className = 'combobox-option';
                     option.dataset.index = String(itemIndex);
+                    option.title = client.name;
                     option.innerHTML = `
                         <span>${client.name}</span>
                         ${client.nip ? `<small>NIP: ${client.nip}</small>` : ''}
@@ -3688,19 +3677,31 @@ async function obslugaListyKlientow(event) {
         };
     };
 
-    const addMachineClientCombobox = createMachineClientCombobox({
+    const addMachineClientCombobox = createClientCombobox({
         input: maszynaKlientInput,
         hiddenInput: maszynaKlientIdInput,
         dropdown: maszynaKlientDropdown,
-        clearBtn: maszynaKlientClearBtn
+        clearBtn: maszynaKlientClearBtn,
+        getOptions: getMachineClientOptions
     });
 
-    const editMachineClientCombobox = createMachineClientCombobox({
+    const editMachineClientCombobox = createClientCombobox({
         input: editMaszynaKlientInput,
         hiddenInput: editMaszynaKlientIdInput,
         dropdown: editMaszynaKlientDropdown,
-        clearBtn: editMaszynaKlientClearBtn
+        clearBtn: editMaszynaKlientClearBtn,
+        getOptions: getMachineClientOptions
     });
+
+    orderClientCombobox = createClientCombobox({
+        input: zlecenieKlientInput,
+        hiddenInput: zlecenieKlientIdInput,
+        dropdown: zlecenieKlientDropdown,
+        clearBtn: zlecenieKlientClearBtn,
+        getOptions: getMachineClientOptions,
+        extraOptions: [ORDER_QUICK_OPTION]
+    });
+    odswiezSelectKlientaDoZlecenia();
 
     // --- MASZYNY ---
     async function dodajMaszyne(event) {
@@ -3804,15 +3805,15 @@ async function obslugaListyKlientow(event) {
        if (listaMaszynDiv) {
             listaMaszynDiv.innerHTML = maszynyHtml || "<p>Brak maszyn w bazie lub pasujących do wyszukiwania.</p>";
         }
-        if (zlecenieKlientSelect) {
-            zlecenieKlientSelect.dispatchEvent(new Event('change'));
+        if (zlecenieKlientIdInput) {
+            zlecenieKlientIdInput.dispatchEvent(new Event('change'));
         }
     }
 
     function aktualizujMaszynyDlaZlecenia() {
         if (!zlecenieMaszynaSelect) return;
 
-        const wybranyKlientId = zlecenieKlientSelect.value;
+        const wybranyKlientId = zlecenieKlientIdInput?.value || '';
 
         if (!wybranyKlientId) {
             zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
@@ -4181,7 +4182,7 @@ async function przeprowadzMigracjeStartEnd() {
 
 async function dodajZlecenie(event) {
     event.preventDefault();
-    const wybranyKlientId = zlecenieKlientSelect.value;
+    const wybranyKlientId = zlecenieKlientIdInput?.value || '';
     const wybranaMaszynaId = zlecenieMaszynaSelect.value;
     const historia = [{ timestamp: new Date().toISOString(), akcja: "Utworzono zlecenie" }];
     // Start zlecenia zapisujemy automatycznie w chwili utworzenia (brak inicjacji z widoku kalendarza),
@@ -4228,10 +4229,10 @@ async function dodajZlecenie(event) {
             await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny });
         }
         zlecenieForm.reset();
-        zlecenieKlientSelect.value = '';
+        orderClientCombobox?.clear();
         zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
         zlecenieMaszynaSelect.disabled = true;
-        zlecenieKlientSelect.dispatchEvent(new Event('change'));
+        zlecenieKlientIdInput?.dispatchEvent(new Event('change'));
     } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
 }
 
@@ -5404,9 +5405,9 @@ async function obslugaListyCzesci(event) {
 
     // ZLECENIA
     if (zlecenieForm) zlecenieForm.addEventListener('submit', dodajZlecenie);
-    if (zlecenieKlientSelect) {
-        zlecenieKlientSelect.addEventListener('change', aktualizujMaszynyDlaZlecenia);
-        zlecenieKlientSelect.dispatchEvent(new Event('change'));
+    if (zlecenieKlientIdInput) {
+        zlecenieKlientIdInput.addEventListener('change', aktualizujMaszynyDlaZlecenia);
+        zlecenieKlientIdInput.dispatchEvent(new Event('change'));
     }
     if (aktywneZleceniaLista) aktywneZleceniaLista.addEventListener('click', obslugaListyZlecen);
     if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.addEventListener('click', obslugaListyZlecen);
