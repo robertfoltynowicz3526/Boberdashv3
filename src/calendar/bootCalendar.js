@@ -48,7 +48,7 @@ export function bootCalendar() {
 
   const cal = new Calendar(host, {
     plugins: [dayGridPlugin, interactionPlugin],
-    initialView: 'dayGridMonth',
+    initialView: 'dayGridWeek',
     headerToolbar: false,
     fixedWeekCount: false,
     showNonCurrentDates: true,

@@ -5,6 +5,9 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   background: var(--calendar-bg);
   border: 1px solid var(--calendar-border);
   border-radius: 18px;
@@ -14,9 +17,18 @@
 
 .calendar-main{
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-#calendar, #kalendarz{ width:100%; }
+#calendar, #kalendarz{
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
 #calendar {
   min-height: 70vh;
@@ -62,6 +74,13 @@
 .fc-theme-standard th{border-color: var(--calendar-grid)}
 .fc .fc-daygrid-day-number{font-weight:600;color:var(--calendar-muted);font-size:var(--calendar-day-number-size)}
 .fc .fc-daygrid-day { background: rgba(255,255,255,.02); }
+.fc .fc-daygrid-day.is-selected-day{
+  background: color-mix(in srgb, var(--jd-green-primary) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--jd-green-primary) 45%, transparent);
+}
+.fc .fc-daygrid-day.is-selected-day .fc-daygrid-day-number{
+  color: var(--text);
+}
 
 .fc .fc-daygrid-day-frame {
   position: relative;
@@ -264,6 +283,11 @@
   border-radius: 12px;
   border: 1px solid var(--calendar-border);
   background: rgba(255,255,255,0.03);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.calendar-day-panel__order.is-focused{
+  border-color: color-mix(in srgb, var(--jd-yellow-accent) 65%, var(--calendar-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--jd-yellow-accent) 35%, transparent);
 }
 
 .calendar-day-panel__order-header{
@@ -410,10 +434,6 @@
   --calendar-day-min-height: 110px;
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
-}
-
-.calendar-shell.view-month .day-summary{
-  display: none;
 }
 
 /* Breakpointy */

@@ -70,9 +70,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* --- Kalendarz na pełną wysokość i szerokość prawej kolumny --- */
 .calendar-shell {
   width: 100%;
-  height: auto;
+  height: 100%;
   margin: 0 auto;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .calendar-shell #calendar,
@@ -81,12 +84,14 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 .calendar-shell .fc-scrollgrid,
 .calendar-shell .fc-view-harness,
 .calendar-shell .fc-view-harness-active {
-  height: auto !important;
+  height: 100% !important;
+  min-height: 0;
 }
 
 .calendar-shell .fc-daygrid-body,
 .calendar-shell .fc-daygrid-body-unbalanced {
-  height: auto !important;
+  height: 100% !important;
+  min-height: 0;
 }
 
 .calendar-shell .day-summary {
