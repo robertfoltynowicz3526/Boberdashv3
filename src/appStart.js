@@ -85,7 +85,8 @@ function initializeApp() {
     const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
-    const CALENDAR_VIEW_STORAGE_KEY = 'lastCalendarView';
+    const CALENDAR_VIEW_STORAGE_KEY = 'lastView';
+    const CALENDAR_VIEW_STORAGE_LEGACY_KEY = 'lastCalendarView';
     const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
     const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
     const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
@@ -194,7 +195,8 @@ function initializeApp() {
     const normalizeCalendarViewType = (viewType) => (CALENDAR_DAYGRID_VIEWS.has(viewType) ? viewType : null);
     const readCalendarViewFromStorage = () => {
         try {
-            const stored = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY);
+            const stored = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY)
+                || localStorage.getItem(CALENDAR_VIEW_STORAGE_LEGACY_KEY);
             return normalizeCalendarViewType(stored);
         } catch (_) {
             return null;
@@ -439,6 +441,7 @@ function initializeApp() {
     };
 
     let selectedDayPanelKey = null;
+    let selectedCalendarDayKey = null;
     let dayPanelOpen = false;
     let dayPanelPinned = readPinnedPanelState();
 
@@ -469,7 +472,7 @@ function initializeApp() {
         const data = buildDayPanelData(selectedDayPanelKey);
         const model = buildDayDetailsModel({
             ...data,
-            summaryMode: getSummaryDisplayMode()
+            summaryMode: 'full'
         });
         renderDayDetailsPanel(calendarDayPanel, model);
         const pinButton = calendarDayPanel.querySelector('[data-panel-action="pin"]');
@@ -478,12 +481,46 @@ function initializeApp() {
         }
     };
 
-    const openDayPanel = (dayKey) => {
+    const clearSelectedCalendarDay = () => {
+        if (!calendarShell) return;
+        calendarShell.querySelectorAll('.fc-daygrid-day.is-selected-day').forEach((cell) => {
+            cell.classList.remove('is-selected-day');
+        });
+    };
+
+    const setSelectedCalendarDay = (dayKey) => {
+        if (!calendarShell || !dayKey) return;
+        clearSelectedCalendarDay();
+        const cell = calendarShell.querySelector(`.fc-daygrid-day[data-date="${dayKey}"]`);
+        if (cell) {
+            cell.classList.add('is-selected-day');
+            selectedCalendarDayKey = dayKey;
+        }
+    };
+
+    const focusDayPanelOrder = (orderId) => {
+        if (!calendarDayPanel || !orderId) return;
+        const safeId = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(orderId) : String(orderId).replace(/["\\]/g, '\\$&');
+        const target = calendarDayPanel.querySelector(`[data-order-id="${safeId}"]`);
+        if (target) {
+            target.classList.add('is-focused');
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            window.setTimeout(() => target.classList.remove('is-focused'), 1200);
+        }
+    };
+
+    const openDayPanel = (dayKey, options = {}) => {
         if (!dayKey) return;
         selectedDayPanelKey = dayKey;
+        selectedCalendarDayKey = dayKey;
         dayPanelOpen = true;
+        persistCalendarDate(dayKey);
+        setSelectedCalendarDay(dayKey);
         applyDayPanelState();
         renderDayPanel();
+        if (options.focusOrderId) {
+            requestAnimationFrame(() => focusDayPanelOrder(options.focusOrderId));
+        }
     };
 
     const closeDayPanel = () => {
@@ -1765,26 +1802,25 @@ function initializeApp() {
                     },
                     dateClick: (info) => {
                         const targetDate = info?.dateStr;
-                        const viewKey = fcViewToCalendarKey(info?.view?.type || getCalendarApi()?.view?.type);
-                        if (targetDate && (viewKey === 'week' || viewKey === 'month')) {
-                            openDayPanel(targetDate);
-                            return;
-                        }
                         if (targetDate) {
-                            focusCalendarDay(targetDate);
-                            openEwidencja(targetDate);
+                            openDayPanel(targetDate);
                         }
                     },
                     select(info) {
                         const startDate = normalizeAllDayDate(info?.start);
                         const normalized = info?.startStr || (startDate ? formatDateForStorage(startDate) : '');
-                        if (normalized) {
-                            focusCalendarDay(normalized);
-                            otworzModalGodzin(normalized);
-                        }
+                        if (normalized) openDayPanel(normalized);
                         const api = getCalendarApi();
                         if (api && typeof api.unselect === 'function') {
                             api.unselect();
+                        }
+                    },
+                    eventClick: (info) => {
+                        const targetDate = info?.event?.extendedProps?.day
+                            || (info?.event?.start ? formatDateForStorage(info.event.start) : null);
+                        const orderId = info?.event?.extendedProps?.orderId || null;
+                        if (targetDate) {
+                            openDayPanel(targetDate, { focusOrderId: orderId });
                         }
                     },
                     moreLinkClick: (info) => {
@@ -1808,6 +1844,9 @@ function initializeApp() {
                         applyCalendarResponsiveOptions();
                         applyDayPanelState();
                         renderDayPanel();
+                        if (selectedCalendarDayKey) {
+                            setSelectedCalendarDay(selectedCalendarDayKey);
+                        }
                     }
                 }
             );

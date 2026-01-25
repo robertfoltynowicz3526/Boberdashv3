@@ -78,6 +78,7 @@ export const buildDayDetailsModel = ({
     const billed = Number(order?.billed || 0) || 0;
     return {
       id: order?.orderId || `${dayKey || 'day'}-${index}`,
+      orderId: order?.orderId || null,
       clientName: order?.clientName || order?.orderId || 'Zlecenie',
       status: billed > 0 ? 'Fakturowane' : 'Robocze',
       statusTone: billed > 0 ? 'billed' : 'draft',
@@ -121,7 +122,7 @@ export const renderDayDetailsPanel = (container, model) => {
     ? model.orders
       .map(
         (order) => `
-          <li class="calendar-day-panel__order">
+          <li class="calendar-day-panel__order" data-order-id="${order.orderId || ''}">
             <div class="calendar-day-panel__order-header">
               <span class="calendar-day-panel__order-name" title="${order.clientName}">${order.clientName}</span>
               <span class="calendar-day-panel__order-status calendar-day-panel__order-status--${order.statusTone}">${order.status}</span>
@@ -166,7 +167,7 @@ export const renderDayDetailsPanel = (container, model) => {
     <div class="calendar-day-panel__section">
       <div class="calendar-day-panel__section-header">
         <h4>Zlecenia</h4>
-        <button type="button" class="btn-primary btn-small" data-panel-action="add">Dodaj wpis</button>
+        <button type="button" class="btn-primary btn-small" data-panel-action="add">Dodaj zlecenie</button>
       </div>
       <ul class="calendar-day-panel__list">
         ${ordersHtml}
@@ -174,8 +175,8 @@ export const renderDayDetailsPanel = (container, model) => {
     </div>
     <div class="calendar-day-panel__section">
       <div class="calendar-day-panel__section-header">
-        <h4>Ręczne wpisy</h4>
-        <button type="button" class="btn-secondary btn-small" data-panel-action="edit">Edytuj dzień</button>
+        <h4>Ręczna ewidencja</h4>
+        <button type="button" class="btn-secondary btn-small" data-panel-action="edit">Edytuj ewidencję</button>
       </div>
       <div class="calendar-day-panel__manual">
         ${manualRowsHtml}

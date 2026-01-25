@@ -991,11 +991,11 @@ select {
 }
 
 .fc .fc-day-today {
-  background: rgba(255, 222, 0, 0.12);
+  background: color-mix(in srgb, var(--jd-green-primary) 18%, transparent);
 }
 
 .fc .fc-highlight {
-  background: rgba(255, 222, 0, 0.15);
+  background: color-mix(in srgb, var(--jd-green-primary) 22%, transparent);
 }
 
 /* Kalendarz wypełnia kartę i nie wychodzi poza nią */
@@ -1077,9 +1077,9 @@ select {
   left: 6px;
   right: 6px;
   bottom: 6px;
-  background: #3b82f6 !important;
-  border: 1px solid rgba(255,255,255,0.22) !important;
-  color: #fff !important;
+  background: var(--calendar-summary-bg) !important;
+  border: 1px solid var(--calendar-summary-border) !important;
+  color: var(--calendar-summary-text) !important;
   font-weight: 700;
   border-radius: 10px;
   padding: 4px 6px;
