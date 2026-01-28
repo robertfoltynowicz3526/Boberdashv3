@@ -329,34 +329,55 @@
     <div id="kalendarz-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span><h2 id="kalendarz-modal-title">Ewidencja Czasu</h2>
-            <form id="kalendarz-form" class="modal-body">
+            <form id="kalendarz-form" class="modal-body calendar-day-form">
                 <input type="hidden" id="kalendarz-data">
-                <div class="form-group"><label for="godziny-pracy">Godziny Pracy:</label><input type="number" step="0.5" id="godziny-pracy" value="0" inputmode="decimal"></div>
-                <div class="form-group"><label for="godziny-fakturowane">Godziny Wyfakturowane:</label><input type="number" step="0.5" id="godziny-fakturowane" value="0" inputmode="decimal"></div>
-                <div class="form-group"><label for="nadgodziny">Nadgodziny:</label><input type="number" step="0.5" id="nadgodziny" value="0" inputmode="decimal"></div>
-                <div class="form-group"><label for="czas-jazdy">Czas Jazdy (h):</label><input type="number" step="0.25" id="czas-jazdy" value="0" inputmode="decimal"></div>
-                <div class="form-group"><label for="kalendarz-notatka">Notatka:</label><textarea id="kalendarz-notatka" rows="2"></textarea></div>
-                <div class="day-status">
-                    <label class="ds-label">Status dnia (opcjonalnie):</label>
-                    <div class="ds-group">
-                        <label><input type="radio" name="dayLeave" value="NONE" checked> Brak</label>
-                        <label><input type="radio" name="dayLeave" value="URL"> Urlop</label>
-                        <label><input type="radio" name="dayLeave" value="WOLNE"> Wolne</label>
-                        <label><input type="radio" name="dayLeave" value="L4"> L4</label>
-                        <label><input type="radio" name="dayLeave" value="SWIETO"> Święto</label>
+                <section class="calendar-day-form__section calendar-day-form__section--orders">
+                    <div class="calendar-day-form__section-header">
+                        <h4>Zlecenia</h4>
+                        <div class="calendar-day-form__section-actions">
+                            <button type="button" class="btn-secondary btn-small" data-panel-action="toggle-orders">Dodaj zlecenie</button>
+                            <button type="button" class="btn-ghost btn-small" data-panel-action="full-list">Pełna lista</button>
+                        </div>
                     </div>
-                </div>
-                <div id="kalendarz-zlecenia-multi">
-                    <div class="multi-row">
-                        <select class="multi-zlecenie-select">
-                            <option value="">-- Wybierz zlecenie --</option>
-                        </select>
-                        <input type="number" step="0.5" class="multi-zlecenie-fh" placeholder="Fakturowane h" inputmode="decimal">
-                        <button type="button" class="btn-add multi-add">Dodaj</button>
+                    <div id="kalendarz-zlecenia-multi" class="calendar-day-form__orders">
+                        <div class="multi-row">
+                            <select class="multi-zlecenie-select">
+                                <option value="">-- Wybierz zlecenie --</option>
+                            </select>
+                            <input type="number" step="0.5" class="multi-zlecenie-fh" placeholder="Fakturowane h" inputmode="decimal">
+                            <button type="button" class="btn-add multi-add">Dodaj</button>
+                        </div>
+                        <ul id="kalendarz-zlecenia-list"></ul>
                     </div>
-                    <ul id="kalendarz-zlecenia-list"></ul>
-                </div>
-                <div class="modal-actions">
+                </section>
+                <section class="calendar-day-form__section calendar-day-form__section--manual">
+                    <div class="calendar-day-form__section-header">
+                        <h4>Ręczna ewidencja</h4>
+                    </div>
+                    <div class="calendar-day-form__fields">
+                        <div class="form-group"><label for="godziny-pracy">Godziny Pracy:</label><input type="number" step="0.5" id="godziny-pracy" value="0" inputmode="decimal"></div>
+                        <div class="form-group"><label for="godziny-fakturowane">Godziny Wyfakturowane:</label><input type="number" step="0.5" id="godziny-fakturowane" value="0" inputmode="decimal"></div>
+                        <div class="form-group"><label for="nadgodziny">Nadgodziny:</label><input type="number" step="0.5" id="nadgodziny" value="0" inputmode="decimal"></div>
+                        <div class="form-group"><label for="czas-jazdy">Czas Jazdy (h):</label><input type="number" step="0.25" id="czas-jazdy" value="0" inputmode="decimal"></div>
+                    </div>
+                    <div class="form-group"><label for="kalendarz-notatka">Notatka:</label><textarea id="kalendarz-notatka" rows="2"></textarea></div>
+                </section>
+                <section class="calendar-day-form__section calendar-day-form__section--status">
+                    <div class="calendar-day-form__section-header">
+                        <h4>Status dnia</h4>
+                    </div>
+                    <div class="day-status">
+                        <label class="ds-label">Status dnia (opcjonalnie):</label>
+                        <div class="ds-group">
+                            <label><input type="radio" name="dayLeave" value="NONE" checked> Brak</label>
+                            <label><input type="radio" name="dayLeave" value="URL"> Urlop</label>
+                            <label><input type="radio" name="dayLeave" value="WOLNE"> Wolne</label>
+                            <label><input type="radio" name="dayLeave" value="L4"> L4</label>
+                            <label><input type="radio" name="dayLeave" value="SWIETO"> Święto</label>
+                        </div>
+                    </div>
+                </section>
+                <div class="calendar-day-form__actions">
                     <button type="submit">Zapisz</button>
                 </div>
             </form>

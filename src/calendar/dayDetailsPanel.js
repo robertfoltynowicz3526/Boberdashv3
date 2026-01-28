@@ -118,37 +118,6 @@ export const renderDayDetailsPanel = (container, model) => {
     return;
   }
 
-  const ordersHtml = model.hasOrders
-    ? model.orders
-      .map(
-        (order) => `
-          <li class="calendar-day-panel__order" data-order-id="${order.orderId || ''}">
-            <div class="calendar-day-panel__order-header">
-              <span class="calendar-day-panel__order-name" title="${order.clientName}">${order.clientName}</span>
-              <span class="calendar-day-panel__order-status calendar-day-panel__order-status--${order.statusTone}">${order.status}</span>
-            </div>
-            <div class="calendar-day-panel__order-meta">${order.meta}</div>
-          </li>
-        `
-      )
-      .join('')
-    : '<li class="calendar-day-panel__empty-state">Brak zleceń w tym dniu.</li>';
-
-  const manualRowsHtml = model.manual.rows
-    .map(
-      (row) => `
-        <div class="calendar-day-panel__manual-row">
-          <span class="calendar-day-panel__manual-label">${row.label}</span>
-          <span class="calendar-day-panel__manual-value">${row.value}</span>
-        </div>
-      `
-    )
-    .join('');
-
-  const manualNoteHtml = model.manual.note
-    ? `<div class="calendar-day-panel__manual-note">${model.manual.note}</div>`
-    : '<div class="calendar-day-panel__empty-state">Brak notatki do dnia.</div>';
-
   container.innerHTML = `
     <div class="calendar-day-panel__header">
       <div>
@@ -160,29 +129,16 @@ export const renderDayDetailsPanel = (container, model) => {
         <button type="button" class="btn-ghost btn-small" data-panel-action="close">Zamknij</button>
       </div>
     </div>
-    <div class="calendar-day-panel__summary">
-      <div>${model.summary.primary}</div>
-      <div>${model.summary.secondary}</div>
-    </div>
-    <div class="calendar-day-panel__section">
+    <div class="calendar-day-panel__summary-section">
       <div class="calendar-day-panel__section-header">
-        <h4>Zlecenia</h4>
-        <button type="button" class="btn-primary btn-small" data-panel-action="add">Dodaj zlecenie</button>
+        <h4>Podsumowanie dnia</h4>
       </div>
-      <ul class="calendar-day-panel__list">
-        ${ordersHtml}
-      </ul>
+      <div class="calendar-day-panel__summary">
+        <div>${model.summary.primary}</div>
+        <div>${model.summary.secondary}</div>
+      </div>
     </div>
-    <div class="calendar-day-panel__section">
-      <div class="calendar-day-panel__section-header">
-        <h4>Ręczna ewidencja</h4>
-        <button type="button" class="btn-secondary btn-small" data-panel-action="edit">Edytuj ewidencję</button>
-      </div>
-      <div class="calendar-day-panel__manual">
-        ${manualRowsHtml}
-      </div>
-      ${manualNoteHtml}
-    </div>
+    <div class="calendar-day-panel__form-host" data-panel-form-host></div>
   `;
 
   const pinButton = container.querySelector('[data-panel-action="pin"]');

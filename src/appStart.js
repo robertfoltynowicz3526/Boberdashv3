@@ -475,6 +475,7 @@ function initializeApp() {
             summaryMode: 'full'
         });
         renderDayDetailsPanel(calendarDayPanel, model);
+        dockCalendarFormToPanel();
         const pinButton = calendarDayPanel.querySelector('[data-panel-action="pin"]');
         if (pinButton) {
             pinButton.setAttribute('aria-pressed', dayPanelPinned ? 'true' : 'false');
@@ -518,6 +519,7 @@ function initializeApp() {
         setSelectedCalendarDay(dayKey);
         applyDayPanelState();
         renderDayPanel();
+        otworzModalGodzin(dayKey, { openModal: false });
         if (options.focusOrderId) {
             requestAnimationFrame(() => focusDayPanelOrder(options.focusOrderId));
         }
@@ -1317,9 +1319,40 @@ function initializeApp() {
         showBackdrop();
     };
 
+    const calendarFormDock = {
+        modalParent: kalendarzForm?.parentElement || null,
+        modalNextSibling: kalendarzForm?.nextSibling || null,
+        docked: false
+    };
+
+    const getCalendarPanelFormHost = () => calendarDayPanel?.querySelector('[data-panel-form-host]') || null;
+
+    const dockCalendarFormToPanel = () => {
+        if (!kalendarzForm) return;
+        const host = getCalendarPanelFormHost();
+        if (!host || host.contains(kalendarzForm)) return;
+        host.appendChild(kalendarzForm);
+        kalendarzForm.classList.add('calendar-day-form');
+        calendarFormDock.docked = true;
+    };
+
+    const restoreCalendarFormToModal = () => {
+        if (!kalendarzForm || !calendarFormDock.modalParent) return;
+        if (calendarFormDock.modalParent.contains(kalendarzForm)) return;
+        if (calendarFormDock.modalNextSibling && calendarFormDock.modalParent.contains(calendarFormDock.modalNextSibling)) {
+            calendarFormDock.modalParent.insertBefore(kalendarzForm, calendarFormDock.modalNextSibling);
+        } else {
+            calendarFormDock.modalParent.appendChild(kalendarzForm);
+        }
+        calendarFormDock.docked = false;
+    };
+
     const hideModal = (modal) => {
         if (!modal) return;
         modal.style.display = 'none';
+        if (modal === kalendarzModal) {
+            dockCalendarFormToPanel();
+        }
         if (!isAnyModalOpen()) {
             hideBackdrop();
         }
@@ -1723,9 +1756,28 @@ function initializeApp() {
                 toggleDayPanelPin();
                 return;
             }
-            if (action === 'add' || action === 'edit') {
+            if (action === 'toggle-orders' || action === 'add') {
+                if (kalendarzMultiWrapper) {
+                    const shouldExpand = !kalendarzMultiWrapper.classList.contains('is-expanded');
+                    kalendarzMultiWrapper.classList.toggle('is-expanded', shouldExpand);
+                    if (shouldExpand && kalendarzMultiSelect) {
+                        kalendarzMultiSelect.focus();
+                    }
+                }
+                return;
+            }
+            if (action === 'edit') {
+                const field = kalendarzForm?.querySelector?.('#godziny-pracy');
+                field?.focus?.();
+                field?.select?.();
+                return;
+            }
+            if (action === 'full-list') {
+                restoreCalendarFormToModal();
                 if (selectedDayPanelKey) {
-                    otworzModalGodzin(selectedDayPanelKey);
+                    otworzModalGodzin(selectedDayPanelKey, { openModal: true });
+                } else if (kalendarzModal) {
+                    openModal(kalendarzModal);
                 }
             }
         });
@@ -1785,6 +1837,7 @@ function initializeApp() {
                     expandRows: true,
                     dayMaxEvents: true,
                     dayMaxEventRows: 3,
+                    moreLinkText: (num) => `+${num}`,
                     eventDataTransform(event) {
                         if (event && typeof event.title === 'string') {
                             event.title = stripEwidencjaPrefix(event.title);
@@ -1929,8 +1982,9 @@ function initializeApp() {
         }
     };
 
-    async function otworzModalGodzin(data) {
+    async function otworzModalGodzin(data, options = {}) {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
+        const shouldOpenModal = options?.openModal !== false;
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
         setDayLeaveValue(DAY_LEAVE_NONE);
@@ -1942,6 +1996,9 @@ function initializeApp() {
         manualFakturowaneValue = 0;
         przygotujOpcjeMultiZlecen();
         resetujFormularzMulti();
+        if (kalendarzMultiWrapper) {
+            kalendarzMultiWrapper.classList.remove('is-expanded');
+        }
         renderMultiZlecenia();
 
 
@@ -1971,7 +2028,9 @@ function initializeApp() {
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
         }
-        openModal(kalendarzModal);
+        if (shouldOpenModal) {
+            openModal(kalendarzModal);
+        }
     }
 
     function przygotujOpcjeMultiZlecen() {
