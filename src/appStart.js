@@ -550,7 +550,20 @@ function initializeApp() {
         api.setOption('dayMaxEventRows', shouldLimit ? rows : false);
     };
 
+    const CALENDAR_SHELL_MIN_HEIGHT = 420;
+    const CALENDAR_SHELL_BOTTOM_GUTTER = 24;
+    const syncCalendarShellHeight = () => {
+        if (!calendarShell) return;
+        if (calendarShell.offsetParent === null) return;
+        const rect = calendarShell.getBoundingClientRect();
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.bottom || 0;
+        const available = Math.max(viewportHeight - rect.top - CALENDAR_SHELL_BOTTOM_GUTTER, CALENDAR_SHELL_MIN_HEIGHT);
+        calendarShell.style.setProperty('--calendar-shell-height', `${Math.round(available)}px`);
+        calendarShell.style.setProperty('--calendar-shell-min-height', `${CALENDAR_SHELL_MIN_HEIGHT}px`);
+    };
+
     const handleCalendarResize = () => {
+        syncCalendarShellHeight();
         try {
             getCalendarApi()?.updateSize();
         } catch (_) { }
@@ -1392,6 +1405,7 @@ function initializeApp() {
             ensureMagazynSummaryPlacement();
         }
         if (tabName === 'pulpit' || tabName === 'kalendarz') {
+            syncCalendarShellHeight();
             if (!bootstrapReady) {
                 pendingCalendarInit = true;
                 return;
@@ -1832,8 +1846,6 @@ function initializeApp() {
                     selectable: true,
                     selectMirror: true,
                     unselectAuto: true,
-                    height: '100%',
-                    contentHeight: '100%',
                     expandRows: true,
                     dayMaxEvents: true,
                     dayMaxEventRows: 3,

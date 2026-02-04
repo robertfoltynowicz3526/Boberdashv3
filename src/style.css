@@ -1011,8 +1011,8 @@ select {
   max-width: none;
   margin: 0;
   flex: 1;
-  min-height: 0;
-  height: 100%;
+  min-height: var(--calendar-shell-min-height, 420px);
+  height: var(--calendar-shell-height, auto);
   display: flex;
   flex-direction: column;
 }
