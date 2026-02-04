@@ -297,9 +297,11 @@ const isLeaveDay = (date) => {
   return Boolean(window.__calendarDecorations?.leaveByDay?.[key]);
 };
 
-const formatSummaryValue = (value) => {
+const formatSummaryValue = (value, { compact = false } = {}) => {
   const num = Number(value || 0) || 0;
-  return num.toFixed(1);
+  const rounded = Math.round(num * 10) / 10;
+  if (!compact) return rounded.toFixed(1);
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
@@ -343,22 +345,28 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     const densityMode = getEffectiveDensityDisplayMode(cellEl);
-    footer.className = `day-summary day-summary--${displayMode} day-summary--density-${densityMode}`;
+    const shell = cellEl.closest?.('#calendar-shell');
+    const isMonthView = shell?.classList?.contains('view-month');
+    footer.className = `day-summary day-summary--${displayMode} day-summary--density-${densityMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
     const row2 = document.createElement('div');
     row2.className = 'day-summary-row';
-    if (densityMode === 'compact') {
+    if (isMonthView) {
+      row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
+      footer.appendChild(row1);
+    } else if (densityMode === 'compact') {
       row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)} • F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+      footer.appendChild(row1);
     } else if (displayMode === 'short') {
       row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
       row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+      footer.appendChild(row1);
+      footer.appendChild(row2);
     } else {
       row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
       row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
-    }
-    footer.appendChild(row1);
-    if (densityMode !== 'compact') {
+      footer.appendChild(row1);
       footer.appendChild(row2);
     }
     frame.appendChild(footer);
@@ -472,7 +480,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     height: 'auto',
     contentHeight: 'auto',
     handleWindowResize: true,
-    fixedWeekCount: false,
+    fixedWeekCount: true,
     dayMaxEvents: true,
     dayMaxEventRows: 3,
     showNonCurrentDates: true,

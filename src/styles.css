@@ -213,6 +213,15 @@ input::placeholder{color:var(--jd-text-500)}
 
 #calendar-shell.view-month .fc .fc-daygrid-body table{
   table-layout: fixed;
+  height: 100%;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-body table tbody{
+  height: 100%;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-body table tr{
+  height: calc(100% / 6);
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day,
@@ -223,13 +232,32 @@ input::placeholder{color:var(--jd-text-500)}
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day-events{
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day-frame{
   padding: 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#calendar-shell.view-month .fc .day-summary--month{
+  margin-top: auto;
+  padding: 2px 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#calendar-shell.view-month .fc .day-summary--month .day-summary-row{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #calendar-shell[data-density="compact"] .fc .fc-daygrid-day-frame{
@@ -263,6 +291,62 @@ input::placeholder{color:var(--jd-text-500)}
 
 #calendar-shell[data-density="compact"] .fc .day-summary-row{
   white-space: nowrap;
+}
+
+#calendar-shell.view-month .fc .bober-chip--client,
+#calendar-shell.view-month .fc .fc-client-chip,
+#calendar-shell.view-month .fc .client-chip,
+#calendar-shell.view-month .fc .order-event.fc-event{
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1.1;
+  max-height: 18px;
+}
+
+#calendar-shell.view-month .fc .fc-event-title,
+#calendar-shell.view-month .fc .fc-title-only{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#calendar-shell.view-month .fc .fc-more-link{
+  font-size: 10px;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+
+@media (min-width: 1440px) {
+  #calendar-shell.view-month .fc .bober-chip--client,
+  #calendar-shell.view-month .fc .fc-client-chip,
+  #calendar-shell.view-month .fc .client-chip,
+  #calendar-shell.view-month .fc .order-event.fc-event{
+    padding: 3px 8px;
+    font-size: 11px;
+    max-height: 20px;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  #calendar-shell.view-month .fc .bober-chip--client,
+  #calendar-shell.view-month .fc .fc-client-chip,
+  #calendar-shell.view-month .fc .client-chip,
+  #calendar-shell.view-month .fc .order-event.fc-event{
+    padding: 2px 6px;
+    font-size: 10px;
+    max-height: 18px;
+  }
+}
+
+@media (max-width: 1023px) {
+  #calendar-shell.view-month .fc .bober-chip--client,
+  #calendar-shell.view-month .fc .fc-client-chip,
+  #calendar-shell.view-month .fc .client-chip,
+  #calendar-shell.view-month .fc .order-event.fc-event{
+    padding: 1px 4px;
+    font-size: 9px;
+    max-height: 16px;
+  }
 }
 
 .summary-display-control,
