@@ -440,6 +440,24 @@ input::placeholder{color:var(--jd-text-500)}
   font-size: 12px;
 }
 
+.day-status-badge{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--calendar-border);
+  color: var(--calendar-text);
+}
+
+.day-status-badge.is-hidden{
+  display: none;
+}
+
 .calendar-day-form #kalendarz-zlecenia-multi{
   margin: 0;
   padding: 0;

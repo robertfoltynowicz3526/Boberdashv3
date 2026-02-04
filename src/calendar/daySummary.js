@@ -14,7 +14,7 @@ const get = (obj, keys) => {
   return undefined;
 };
 
-// UWAGA: status wolnego MUSI być brany z TEGO SAMEGO pola co w modalu (radio Brak/Urlop/L4/Święto)
+// UWAGA: status wolnego MUSI być brany z TEGO SAMEGO pola co w modalu (radio Brak/Urlop/L4/Święto/Szkolenie)
 export const getLeaveKind = (dayDoc) => {
   const raw =
     get(dayDoc, ['statusDnia','status','dayStatus','wolne','leave','kind','typ']) ?? 'Brak';
@@ -24,6 +24,7 @@ export const getLeaveKind = (dayDoc) => {
   if (s === 'ŚWIĘTO' || s === 'SWIETO') return 'SWIETO';
   if (s === 'URLOP') return 'URL';
   if (s === 'WOLNE') return 'WOLNE';
+  if (s === 'SZKOLENIE') return 'SZKOLENIE';
   if (s === 'BRAK' || s === '') return null;
 
   // jeśli masz inne statusy wolnego, dodaj tu mapowanie

@@ -15,6 +15,7 @@ const normalizeLeaveKind = (value) => {
   if (upper === 'WOLNE') return 'WOLNE';
   if (upper === 'L4') return 'L4';
   if (upper === 'SWIETO' || upper === 'ŚWIĘTO') return 'SWIETO';
+  if (upper === 'SZKOLENIE') return 'SZKOLENIE';
   return null;
 };
 
@@ -26,6 +27,7 @@ export const getLeaveKind = (dayDoc) => {
   if (dayDoc?.flags?.wolne) return 'WOLNE';
   if (dayDoc?.flags?.l4) return 'L4';
   if (dayDoc?.flags?.swieto) return 'SWIETO';
+  if (dayDoc?.flags?.szkolenie) return 'SZKOLENIE';
   return null;
 };
 

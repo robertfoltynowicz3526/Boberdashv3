@@ -53,22 +53,15 @@
             <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
             <div id="calendar-toolbar" class="calendar-toolbar" role="toolbar" aria-label="Sterowanie kalendarzem">
                 <div class="calendar-toolbar-group">
-                    <button type="button" class="btn-secondary" data-calendar-view="day">Dzień</button>
-                    <button type="button" class="btn-secondary" data-calendar-view="week">Tydzień</button>
-                    <button type="button" class="btn-secondary" data-calendar-view="month">Miesiąc</button>
-                </div>
-                <div class="calendar-toolbar-group">
-                    <button type="button" id="calendar-focus-btn" class="btn-ghost">Pokaż dzień</button>
-                    <button type="button" id="calendar-today-btn" class="btn-secondary">Dziś</button>
-                    <button type="button" id="calendar-back-btn" class="btn-ghost" disabled>Wróć</button>
+                    <button type="button" id="btnPrev" class="btn-ghost" aria-label="Poprzedni miesiąc">‹</button>
+                    <button type="button" id="btnToday" class="btn-secondary">Dziś</button>
+                    <button type="button" id="btnNext" class="btn-ghost" aria-label="Następny miesiąc">›</button>
                 </div>
             </div>
             <div id="calendar-shell" class="calendar-wrap">
                 <div class="calendar-main">
                     <div id="kalendarz" class="calendar-container"></div>
                 </div>
-                <div id="calendar-day-panel-backdrop" class="calendar-day-panel-backdrop" data-panel-action="close"></div>
-                <aside id="calendar-day-panel" class="calendar-day-panel" aria-label="Szczegóły dnia"></aside>
             </div>
         </div>
         <div id="klienci" class="tab-content page-wide">
@@ -331,12 +324,18 @@
             <span class="close-button">&times;</span><h2 id="kalendarz-modal-title">Ewidencja Czasu</h2>
             <form id="kalendarz-form" class="modal-body calendar-day-form">
                 <input type="hidden" id="kalendarz-data">
+                <section class="calendar-day-form__section calendar-day-form__section--summary">
+                    <div class="calendar-day-form__section-header">
+                        <h4>Podsumowanie dnia</h4>
+                        <span id="kalendarz-status-badge" class="day-status-badge is-hidden" aria-live="polite"></span>
+                    </div>
+                    <div id="kalendarz-summary-tiles" class="calendar-day-panel__summary-tiles"></div>
+                </section>
                 <section class="calendar-day-form__section calendar-day-form__section--orders">
                     <div class="calendar-day-form__section-header">
                         <h4>Zlecenia</h4>
                         <div class="calendar-day-form__section-actions">
                             <button type="button" class="btn-secondary btn-small" data-panel-action="toggle-orders">Dodaj zlecenie</button>
-                            <button type="button" class="btn-ghost btn-small" data-panel-action="full-list">Pełna lista</button>
                         </div>
                     </div>
                     <div id="kalendarz-zlecenia-multi" class="calendar-day-form__orders">
@@ -374,6 +373,7 @@
                             <label><input type="radio" name="dayLeave" value="WOLNE"> Wolne</label>
                             <label><input type="radio" name="dayLeave" value="L4"> L4</label>
                             <label><input type="radio" name="dayLeave" value="SWIETO"> Święto</label>
+                            <label><input type="radio" name="dayLeave" value="SZKOLENIE"> Szkolenie</label>
                         </div>
                     </div>
                 </section>

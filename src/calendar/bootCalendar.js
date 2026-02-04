@@ -19,7 +19,7 @@ export function bootCalendar() {
   };
 
   const buildSummaryModel = (totals) => {
-    if (!totals || totals.l4 || totals.urlop || totals.swieto) return null;
+    if (!totals || totals.l4 || totals.urlop || totals.swieto || totals.szkolenie) return null;
     const work = Number(totals.work ?? 0);
     const drive = Number(totals.drive ?? 0);
     const billed = Number(totals.billed ?? 0);
@@ -48,7 +48,7 @@ export function bootCalendar() {
 
   const cal = new Calendar(host, {
     plugins: [dayGridPlugin, interactionPlugin],
-    initialView: 'dayGridWeek',
+    initialView: 'dayGridMonth',
     headerToolbar: false,
     fixedWeekCount: false,
     showNonCurrentDates: true,

@@ -5,6 +5,7 @@ const LEAVE_LABELS = {
   URL: 'Urlop',
   SWIETO: 'Święto',
   WOLNE: 'Wolne',
+  SZKOLENIE: 'Szkolenie',
 };
 
 const formatNumber = (value) => {
