@@ -250,6 +250,12 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   color: #e2eeff;
 }
 
+.fc .cell-leave-icon--SZKOLENIE .leave-chip{
+  background: rgba(143, 105, 255, 0.18);
+  border-color: rgba(143, 105, 255, 0.45);
+  color: #efe4ff;
+}
+
 .fc .cell-debug {
   position: absolute;
   top: 4px;

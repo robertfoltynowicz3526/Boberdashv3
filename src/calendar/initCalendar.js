@@ -206,7 +206,8 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const label =
       leave === 'L4' ? 'L4' :
       (leave === 'SWIETO' ? 'Święto' :
-      (leave === 'URL' ? 'Urlop' : 'Wolne'));
+      (leave === 'URL' ? 'Urlop' :
+      (leave === 'SZKOLENIE' ? 'Szkolenie' : 'Wolne')));
     const big = document.createElement('div');
     big.className = `cell-leave-icon cell-leave-icon--${leave}`;
     const chip = document.createElement('span');
@@ -336,7 +337,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     ? extraOptions.plugins
     : [dayGridPlugin, interactionPlugin]
   ).filter(Boolean);
-  const defaultView = 'dayGridWeek';
+  const defaultView = 'dayGridMonth';
 
   const baseOptions = {
     plugins,

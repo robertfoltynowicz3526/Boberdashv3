@@ -11,7 +11,7 @@ const normalizeDayLeaveValue = (value) => {
   if (!upper) return null;
   if (upper === 'NONE' || upper === 'BRAK') return null;
   if (upper === 'WOLNE') return 'WOLNE';
-  if (upper === 'URL' || upper === 'L4' || upper === 'SWIETO') return upper;
+  if (upper === 'URL' || upper === 'L4' || upper === 'SWIETO' || upper === 'SZKOLENIE') return upper;
   return null;
 };
 
@@ -22,6 +22,7 @@ const getLeaveKind = (dayDoc) => {
   if (dayDoc?.flags?.wolne) return 'WOLNE';
   if (dayDoc?.flags?.l4) return 'L4';
   if (dayDoc?.flags?.swieto) return 'SWIETO';
+  if (dayDoc?.flags?.szkolenie) return 'SZKOLENIE';
   return null;
 };
 

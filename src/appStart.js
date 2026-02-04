@@ -7,7 +7,6 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
-import { buildDayDetailsModel, renderDayDetailsPanel } from './calendar/dayDetailsPanel.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
@@ -358,7 +357,14 @@ function initializeApp() {
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
-    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'WOLNE', 'L4', 'SWIETO'];
+    const DAY_LEAVE_VALUES = [DAY_LEAVE_NONE, 'URL', 'WOLNE', 'L4', 'SWIETO', 'SZKOLENIE'];
+    const LEAVE_LABELS = {
+        URL: 'Urlop',
+        WOLNE: 'Wolne',
+        L4: 'L4',
+        SWIETO: 'Święto',
+        SZKOLENIE: 'Szkolenie'
+    };
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -510,6 +516,34 @@ function initializeApp() {
         }
     };
 
+    const renderCalendarModalSummary = (dayKey) => {
+        if (!kalendarzSummaryTiles) return;
+        const result = computeDayTotals(dayKey);
+        const totals = result?.totals || { work: 0, drive: 0, billed: 0, over: 0 };
+        const tiles = [
+            { label: 'Praca', value: totals.work },
+            { label: 'Jazda', value: totals.drive },
+            { label: 'Fakturowane', value: totals.billed },
+            { label: 'Nadgodziny', value: totals.over }
+        ];
+        kalendarzSummaryTiles.innerHTML = tiles.map((tile) => `
+            <div class="calendar-day-panel__summary-tile">
+                <div class="calendar-day-panel__summary-label">${tile.label}</div>
+                <div class="calendar-day-panel__summary-value">${formatujLiczbe(tile.value)} h</div>
+            </div>
+        `).join('');
+        if (kalendarzStatusBadge) {
+            const leaveKind = result?.leaveKind || null;
+            if (leaveKind) {
+                kalendarzStatusBadge.textContent = `Status: ${LEAVE_LABELS[leaveKind] || leaveKind}`;
+                kalendarzStatusBadge.classList.remove('is-hidden');
+            } else {
+                kalendarzStatusBadge.textContent = '';
+                kalendarzStatusBadge.classList.add('is-hidden');
+            }
+        }
+    };
+
     const openDayPanel = (dayKey, options = {}) => {
         if (!dayKey) return;
         selectedDayPanelKey = dayKey;
@@ -519,10 +553,7 @@ function initializeApp() {
         setSelectedCalendarDay(dayKey);
         applyDayPanelState();
         renderDayPanel();
-        otworzModalGodzin(dayKey, { openModal: false });
-        if (options.focusOrderId) {
-            requestAnimationFrame(() => focusDayPanelOrder(options.focusOrderId));
-        }
+        otworzModalGodzin(dayKey, { openModal: true });
     };
 
     const closeDayPanel = () => {
@@ -744,6 +775,8 @@ function initializeApp() {
     const kalendarzForm = document.getElementById('kalendarz-form');
     const kalendarzModalTitle = document.getElementById('kalendarz-modal-title');
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
+    const kalendarzSummaryTiles = document.getElementById('kalendarz-summary-tiles');
+    const kalendarzStatusBadge = document.getElementById('kalendarz-status-badge');
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const calendarToolbar = document.getElementById('calendar-toolbar');
     const calendarDayPanel = document.getElementById('calendar-day-panel');
@@ -1047,7 +1080,7 @@ function initializeApp() {
     const buildUnfinishedSummary = () => {
         const { start: checklistStart, end: checklistEnd } = getChecklistRange();
         const daysInRange = checklistStart && checklistEnd ? listDaysInRange(checklistStart, checklistEnd) : [];
-        const isDayOffStatus = (status) => ['L4', 'URL', 'SWIETO', 'WOLNE'].includes(status);
+        const isDayOffStatus = (status) => ['L4', 'URL', 'SWIETO', 'WOLNE', 'SZKOLENIE'].includes(status);
         const resolveDayStatus = (dayKey) => {
             const direct = leaveByDay.get(dayKey);
             if (direct) return direct;
@@ -1060,6 +1093,7 @@ function initializeApp() {
             if (flags.urlop) return 'URL';
             if (flags.swieto) return 'SWIETO';
             if (flags.wolne) return 'WOLNE';
+            if (flags.szkolenie) return 'SZKOLENIE';
             return null;
         };
         const hasAnyActivity = (dayKey) => {
@@ -1756,20 +1790,12 @@ function initializeApp() {
     };
 
     const bindDayPanelEvents = () => {
-        if (!calendarShell || !calendarDayPanel) return;
-        calendarShell.addEventListener('click', (event) => {
+        if (!kalendarzModal) return;
+        kalendarzModal.addEventListener('click', (event) => {
             const actionEl = event.target.closest('[data-panel-action]');
-            if (!actionEl || !calendarShell.contains(actionEl)) return;
+            if (!actionEl || !kalendarzModal.contains(actionEl)) return;
             const action = actionEl.dataset.panelAction;
             if (!action) return;
-            if (action === 'close') {
-                closeDayPanel();
-                return;
-            }
-            if (action === 'pin') {
-                toggleDayPanelPin();
-                return;
-            }
             if (action === 'toggle-orders' || action === 'add') {
                 if (kalendarzMultiWrapper) {
                     const shouldExpand = !kalendarzMultiWrapper.classList.contains('is-expanded');
@@ -1784,18 +1810,8 @@ function initializeApp() {
                 const field = kalendarzForm?.querySelector?.('#godziny-pracy');
                 field?.focus?.();
                 field?.select?.();
-                return;
-            }
-            if (action === 'full-list') {
-                restoreCalendarFormToModal();
-                if (selectedDayPanelKey) {
-                    otworzModalGodzin(selectedDayPanelKey, { openModal: true });
-                } else if (kalendarzModal) {
-                    openModal(kalendarzModal);
-                }
             }
         });
-        calendarDayPanelBackdrop?.addEventListener('click', () => closeDayPanel());
     };
 
     window.addEventListener('calendar:summary-display-change', () => {
@@ -1830,7 +1846,7 @@ function initializeApp() {
             return;
         }
         const calendarTarget = calendarContainer;
-        const storedViewType = readCalendarViewFromStorage() || 'dayGridWeek';
+        const storedViewType = 'dayGridMonth';
         const storedDateKey = readCalendarDateFromStorage() || todayKey;
         try {
             const result = await initCalendar(
@@ -1997,6 +2013,7 @@ function initializeApp() {
     async function otworzModalGodzin(data, options = {}) {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
         const shouldOpenModal = options?.openModal !== false;
+        const dayKey = isoDay(data, 'otworzModalGodzin');
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
         setDayLeaveValue(DAY_LEAVE_NONE);
@@ -2034,11 +2051,35 @@ function initializeApp() {
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
                 }
-                const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : normalized.flags?.wolne ? 'WOLNE' : DAY_LEAVE_NONE);
+                const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : normalized.flags?.wolne ? 'WOLNE' : normalized.flags?.szkolenie ? 'SZKOLENIE' : DAY_LEAVE_NONE);
                 setDayLeaveValue(leaveToSet || DAY_LEAVE_NONE);
+                if (dayKey) {
+                    const orderIndex = buildOrderIndex();
+                    const dayDocForTotals = buildDayDocForTotals({
+                        ...normalizeDayRecord(dayKey, dane),
+                        zleceniaPowiazane: normalizujPowiazaneZlecenia(dane).powiazane
+                    });
+                    dayDocsByDay.set(dayKey, dayDocForTotals);
+                    manualByDay.set(dayKey, buildManualDayDoc(dayDocForTotals));
+                    ordersByDay.set(dayKey, buildOrdersForDay(dayDocForTotals, orderIndex));
+                    const leaveKindNormalized = normalizeDayLeaveValue(dayDocForTotals.leaveKind || '');
+                    if (leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE) {
+                        leaveByDay.set(dayKey, leaveKindNormalized);
+                    } else {
+                        leaveByDay.delete(dayKey);
+                    }
+                }
+            } else if (dayKey) {
+                dayDocsByDay.delete(dayKey);
+                manualByDay.delete(dayKey);
+                ordersByDay.delete(dayKey);
+                leaveByDay.delete(dayKey);
             }
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
+        }
+        if (dayKey) {
+            renderCalendarModalSummary(dayKey);
         }
         if (shouldOpenModal) {
             openModal(kalendarzModal);
@@ -2211,7 +2252,8 @@ function initializeApp() {
             urlop: selectedLeaveKind === 'URL',
             l4: selectedLeaveKind === 'L4',
             swieto: selectedLeaveKind === 'SWIETO',
-            wolne: selectedLeaveKind === 'WOLNE'
+            wolne: selectedLeaveKind === 'WOLNE',
+            szkolenie: selectedLeaveKind === 'SZKOLENIE'
         };
         const dane = {
             date: data,
@@ -2311,7 +2353,7 @@ function initializeApp() {
             manualByDay.set(dayStr, buildManualDayDoc(dayDocForTotals));
             const ordersForDay = buildOrdersForDay(dayDocForTotals, orderIndex);
             ordersByDay.set(dayStr, ordersForDay);
-            const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : normalizedDay.flags?.wolne ? 'WOLNE' : null);
+            const leaveKind = normalizedDay.leaveKind || (normalizedDay.flags?.urlop ? 'URL' : normalizedDay.flags?.l4 ? 'L4' : normalizedDay.flags?.swieto ? 'SWIETO' : normalizedDay.flags?.wolne ? 'WOLNE' : normalizedDay.flags?.szkolenie ? 'SZKOLENIE' : null);
             if (leaveKind) {
                 leaveByDay.set(dayStr, leaveKind);
             }
@@ -2355,7 +2397,7 @@ function initializeApp() {
             if (wpis?.leaveKind) {
                 return acc;
             }
-            if (wpis?.flags?.urlop || wpis?.flags?.l4 || wpis?.flags?.swieto || wpis?.flags?.wolne) {
+            if (wpis?.flags?.urlop || wpis?.flags?.l4 || wpis?.flags?.swieto || wpis?.flags?.wolne || wpis?.flags?.szkolenie) {
                 return acc;
             }
             if (typeof wpisType === 'string' && wpisType.startsWith('LEAVE')) {
@@ -2512,7 +2554,8 @@ function initializeApp() {
             urlop: Boolean(flags.urlop) || normalizedKind === 'URL',
             l4: Boolean(flags.l4) || normalizedKind === 'L4',
             swieto: Boolean(flags.swieto) || normalizedKind === 'SWIETO',
-            wolne: Boolean(flags.wolne) || normalizedKind === 'WOLNE'
+            wolne: Boolean(flags.wolne) || normalizedKind === 'WOLNE',
+            szkolenie: Boolean(flags.szkolenie) || normalizedKind === 'SZKOLENIE'
         };
     };
 
