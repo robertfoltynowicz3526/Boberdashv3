@@ -1017,6 +1017,14 @@ select {
   flex-direction: column;
 }
 
+#pulpit .summary-container-subtle {
+  margin-bottom: 12px;
+}
+
+#calendar-toolbar {
+  margin-bottom: 10px;
+}
+
 #calendar-shell #kalendarz {
   flex: 1;
   min-height: 0;
@@ -1024,6 +1032,19 @@ select {
   overflow: clip;
   display: flex;
   flex-direction: column;
+}
+
+@media (max-height: 820px), (max-width: 1366px) {
+  #pulpit .summary-container-subtle {
+    padding: 0.9rem 1.1rem;
+  }
+  #calendar-toolbar {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  #kalendarz {
+    padding: 1rem;
+  }
 }
 
 #calendar-shell .fc,
@@ -2373,6 +2394,12 @@ body{ color:var(--ab-text); }
 .metrics-row{ display:grid; grid-template-columns:1fr minmax(220px,260px); gap:12px; align-items:start; }
 .metrics-left{ min-width:0; } .metrics-right{ min-width:220px; }
 @media (max-width:768px){ .metrics-row{ grid-template-columns:1fr; } .metrics-right{ min-width:0; }}
+@media (max-height: 820px), (max-width: 1366px){
+  .metrics-grid{ grid-template-columns:repeat(5,minmax(110px,1fr)); gap:8px; }
+  .metric{ padding:10px 12px; }
+  .metric .value{ font-size:1.05rem; }
+  .fh3m .bars{ height:44px; }
+}
 
 /* Mini-wykres FH */
 .fh3m{ margin-top:4px; }

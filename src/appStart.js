@@ -446,6 +446,7 @@ function initializeApp() {
         } catch (_) { }
     };
 
+    const ENABLE_DAY_PANEL = false;
     let selectedDayPanelKey = null;
     let selectedCalendarDayKey = null;
     let dayPanelOpen = false;
@@ -454,7 +455,12 @@ function initializeApp() {
     const getSummaryDisplayMode = () => calendarShell?.dataset?.summaryDisplay || 'short';
 
     const applyDayPanelState = () => {
-        if (!calendarShell || !calendarDayPanel) return;
+        if (!calendarShell) return;
+        if (!ENABLE_DAY_PANEL || !calendarDayPanel) {
+            calendarShell.dataset.panelOpen = 'false';
+            calendarShell.dataset.panelPinned = 'false';
+            return;
+        }
         const pinActive = isLaptopBreakpoint() && dayPanelPinned;
         const shouldBeOpen = isDesktopBreakpoint() || dayPanelOpen || pinActive;
         calendarShell.dataset.panelOpen = shouldBeOpen ? 'true' : 'false';
@@ -470,7 +476,7 @@ function initializeApp() {
     });
 
     const renderDayPanel = () => {
-        if (!calendarDayPanel) return;
+        if (!ENABLE_DAY_PANEL || !calendarDayPanel) return;
         if (!selectedDayPanelKey) {
             renderDayDetailsPanel(calendarDayPanel, null);
             return;
@@ -548,22 +554,24 @@ function initializeApp() {
         if (!dayKey) return;
         selectedDayPanelKey = dayKey;
         selectedCalendarDayKey = dayKey;
-        dayPanelOpen = true;
+        dayPanelOpen = ENABLE_DAY_PANEL;
         persistCalendarDate(dayKey);
         setSelectedCalendarDay(dayKey);
         applyDayPanelState();
         renderDayPanel();
-        otworzModalGodzin(dayKey, { openModal: true });
+        restoreCalendarFormToModal();
+        otworzModalGodzin(dayKey, { openModal: true, ...options });
     };
 
     const closeDayPanel = () => {
+        if (!ENABLE_DAY_PANEL) return;
         if (isDesktopBreakpoint() || dayPanelPinned) return;
         dayPanelOpen = false;
         applyDayPanelState();
     };
 
     const toggleDayPanelPin = () => {
-        if (!isLaptopBreakpoint()) return;
+        if (!ENABLE_DAY_PANEL || !isLaptopBreakpoint()) return;
         dayPanelPinned = !dayPanelPinned;
         persistPinnedPanelState(dayPanelPinned);
         applyDayPanelState();
@@ -1397,7 +1405,7 @@ function initializeApp() {
     const hideModal = (modal) => {
         if (!modal) return;
         modal.style.display = 'none';
-        if (modal === kalendarzModal) {
+        if (modal === kalendarzModal && ENABLE_DAY_PANEL) {
             dockCalendarFormToPanel();
         }
         if (!isAnyModalOpen()) {
