@@ -3,21 +3,14 @@ import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyT
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
-const SUMMARY_DISPLAY_MODES = new Set(['auto', 'full', 'short']);
+const SUMMARY_DISPLAY_MODES = new Set(['full', 'short']);
 const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
 const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
 const SUMMARY_DISPLAY_TABLET_BREAKPOINT = 768;
-const SUMMARY_DISPLAY_DEFAULT = 'auto';
-const DENSITY_DISPLAY_STORAGE_KEY = 'calendarDensityMode';
-const DENSITY_DISPLAY_MODES = new Set(['auto', 'compact', 'full']);
-const DENSITY_DISPLAY_DEFAULT = 'auto';
-const DENSITY_DISPLAY_AUTO_HEIGHT = 800;
+const SUMMARY_DISPLAY_DEFAULT = 'short';
 let summaryDisplayMode = SUMMARY_DISPLAY_DEFAULT;
 let summaryDisplayEffective = null;
 let summaryDisplayCalendarEl = null;
-let densityDisplayMode = DENSITY_DISPLAY_DEFAULT;
-let densityDisplayEffective = null;
-let densityDisplayCalendarEl = null;
 const normalizeDateKey = (value, context = '') => {
   if (!value) return '';
   let key = '';
@@ -50,11 +43,6 @@ const getViewportWidth = () => {
   return window.innerWidth || SUMMARY_DISPLAY_DESKTOP_BREAKPOINT;
 };
 
-const getViewportHeight = () => {
-  if (typeof window === 'undefined') return DENSITY_DISPLAY_AUTO_HEIGHT;
-  return window.innerHeight || DENSITY_DISPLAY_AUTO_HEIGHT;
-};
-
 const getCalendarViewKey = (calendarEl) => {
   const shell = calendarEl?.closest?.('#calendar-shell');
   if (shell?.classList?.contains('view-day')) return 'day';
@@ -74,29 +62,10 @@ const shouldForceShortSummary = (calendarEl) => {
 };
 
 const resolveSummaryDisplayMode = (calendarEl) => {
-  const width = getViewportWidth();
-  const autoMode = width >= SUMMARY_DISPLAY_DESKTOP_BREAKPOINT ? 'full' : 'short';
-  let resolved = summaryDisplayMode === 'auto' ? autoMode : summaryDisplayMode;
+  let resolved = summaryDisplayMode;
   if (shouldForceShortSummary(calendarEl)) {
     resolved = 'short';
   }
-  return resolved;
-};
-
-const getStoredDensityDisplayMode = () => {
-  if (typeof window === 'undefined') return DENSITY_DISPLAY_DEFAULT;
-  try {
-    const stored = window.localStorage?.getItem?.(DENSITY_DISPLAY_STORAGE_KEY);
-    return DENSITY_DISPLAY_MODES.has(stored) ? stored : DENSITY_DISPLAY_DEFAULT;
-  } catch (_) {
-    return DENSITY_DISPLAY_DEFAULT;
-  }
-};
-
-const resolveDensityDisplayMode = (calendarEl) => {
-  const height = getViewportHeight();
-  const autoMode = height <= DENSITY_DISPLAY_AUTO_HEIGHT ? 'compact' : 'full';
-  const resolved = densityDisplayMode === 'auto' ? autoMode : densityDisplayMode;
   return resolved;
 };
 
@@ -111,31 +80,12 @@ const applySummaryDisplayAttributes = (calendarEl) => {
   return effective;
 };
 
-const applyDensityDisplayAttributes = (calendarEl) => {
-  const effective = resolveDensityDisplayMode(calendarEl);
-  densityDisplayEffective = effective;
-  const target = calendarEl?.closest?.('#calendar-shell') || calendarEl;
-  if (target) {
-    target.dataset.density = effective;
-    target.dataset.densityPref = densityDisplayMode;
-  }
-  return effective;
-};
-
 const getEffectiveSummaryDisplayMode = (calendarEl) => summaryDisplayEffective || resolveSummaryDisplayMode(calendarEl);
-const getEffectiveDensityDisplayMode = (calendarEl) => densityDisplayEffective || resolveDensityDisplayMode(calendarEl);
 
 const setSummaryDisplayMode = (mode) => {
   summaryDisplayMode = SUMMARY_DISPLAY_MODES.has(mode) ? mode : SUMMARY_DISPLAY_DEFAULT;
   try {
     window.localStorage?.setItem?.(SUMMARY_DISPLAY_STORAGE_KEY, summaryDisplayMode);
-  } catch (_) {}
-};
-
-const setDensityDisplayMode = (mode) => {
-  densityDisplayMode = DENSITY_DISPLAY_MODES.has(mode) ? mode : DENSITY_DISPLAY_DEFAULT;
-  try {
-    window.localStorage?.setItem?.(DENSITY_DISPLAY_STORAGE_KEY, densityDisplayMode);
   } catch (_) {}
 };
 
@@ -172,16 +122,6 @@ const notifySummaryDisplayChange = (calendarEl) => {
   window.dispatchEvent(new CustomEvent('calendar:summary-display-change', { detail }));
 };
 
-const notifyDensityDisplayChange = (calendarEl) => {
-  if (typeof window === 'undefined') return;
-  const detail = {
-    mode: densityDisplayMode,
-    effective: densityDisplayEffective,
-    viewKey: getCalendarViewKey(calendarEl),
-  };
-  window.dispatchEvent(new CustomEvent('calendar:density-display-change', { detail }));
-};
-
 const ensureSummaryDisplayControl = (calendarEl) => {
   if (!calendarEl) return;
   const toolbar = calendarEl.querySelector('.fc-header-toolbar') || calendarEl.querySelector('.fc-toolbar');
@@ -203,9 +143,8 @@ const ensureSummaryDisplayControl = (calendarEl) => {
     select.setAttribute('aria-label', 'Tryb podsumowania dnia');
     select.title = 'Tryb podsumowania dnia';
     select.innerHTML = `
-      <option value="auto">Auto</option>
-      <option value="full">Pełne</option>
       <option value="short">Skrót</option>
+      <option value="full">Pełne</option>
     `;
     select.value = summaryDisplayMode;
     select.addEventListener('change', () => {
@@ -226,48 +165,6 @@ const ensureSummaryDisplayControl = (calendarEl) => {
   }
 };
 
-const ensureDensityDisplayControl = (calendarEl) => {
-  if (!calendarEl) return;
-  const toolbar = calendarEl.querySelector('.fc-header-toolbar') || calendarEl.querySelector('.fc-toolbar');
-  const fallbackToolbar = calendarEl?.ownerDocument?.getElementById?.('calendar-toolbar');
-  if (!toolbar && !fallbackToolbar) return;
-  const rightChunk =
-    toolbar?.querySelector?.('.fc-toolbar-chunk:last-child') ||
-    fallbackToolbar?.querySelector?.('.calendar-toolbar-group:last-child') ||
-    toolbar ||
-    fallbackToolbar;
-  const wrapperRoot = toolbar || fallbackToolbar;
-  if (!wrapperRoot) return;
-  let wrapper = wrapperRoot.querySelector('.density-display-control');
-  if (!wrapper) {
-    wrapper = document.createElement('div');
-    wrapper.className = 'density-display-control';
-    const select = document.createElement('select');
-    select.className = 'density-display-select';
-    select.setAttribute('aria-label', 'Gęstość komórek kalendarza');
-    select.title = 'Gęstość komórek kalendarza';
-    select.innerHTML = `
-      <option value="auto">Auto</option>
-      <option value="compact">Kompakt</option>
-      <option value="full">Pełne</option>
-    `;
-    select.value = densityDisplayMode;
-    select.addEventListener('change', () => {
-      setDensityDisplayMode(select.value);
-      applyDensityDisplayAttributes(calendarEl);
-      refreshCalendarSummaries(calendarEl);
-      notifyDensityDisplayChange(calendarEl);
-    });
-    wrapper.appendChild(select);
-    rightChunk.appendChild(wrapper);
-  } else {
-    const select = wrapper.querySelector('select');
-    if (select && select.value !== densityDisplayMode) {
-      select.value = densityDisplayMode;
-    }
-  }
-};
-
 const handleSummaryDisplayResize = () => {
   if (!summaryDisplayCalendarEl) return;
   const next = resolveSummaryDisplayMode(summaryDisplayCalendarEl);
@@ -278,18 +175,7 @@ const handleSummaryDisplayResize = () => {
   notifySummaryDisplayChange(summaryDisplayCalendarEl);
 };
 
-const handleDensityDisplayResize = () => {
-  if (!densityDisplayCalendarEl) return;
-  const next = resolveDensityDisplayMode(densityDisplayCalendarEl);
-  if (next === densityDisplayEffective) return;
-  applyDensityDisplayAttributes(densityDisplayCalendarEl);
-  refreshCalendarSummaries(densityDisplayCalendarEl);
-  ensureDensityDisplayControl(densityDisplayCalendarEl);
-  notifyDensityDisplayChange(densityDisplayCalendarEl);
-};
-
 summaryDisplayMode = getStoredSummaryDisplayMode();
-densityDisplayMode = getStoredDensityDisplayMode();
 
 const isLeaveDay = (date) => {
   const key = normalizeDateKey(date);
@@ -344,20 +230,23 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
-    const densityMode = getEffectiveDensityDisplayMode(cellEl);
     const shell = cellEl.closest?.('#calendar-shell');
     const isMonthView = shell?.classList?.contains('view-month');
-    footer.className = `day-summary day-summary--${displayMode} day-summary--density-${densityMode}${isMonthView ? ' day-summary--month' : ''}`;
+    footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
     const row2 = document.createElement('div');
     row2.className = 'day-summary-row';
     if (isMonthView) {
-      row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
-      footer.appendChild(row1);
-    } else if (densityMode === 'compact') {
-      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)} • F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
-      footer.appendChild(row1);
+      if (displayMode === 'short') {
+        row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
+        footer.appendChild(row1);
+      } else {
+        row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
+        row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+        footer.appendChild(row1);
+        footer.appendChild(row2);
+      }
     } else if (displayMode === 'short') {
       row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
       row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
@@ -580,8 +469,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       try { applyDecorationsFromPlaceholders(); } catch (_) {}
       try { applySummaryDisplayAttributes(window.__fcCalendar?.el); } catch (_) {}
       try { ensureSummaryDisplayControl(window.__fcCalendar?.el); } catch (_) {}
-      try { applyDensityDisplayAttributes(window.__fcCalendar?.el); } catch (_) {}
-      try { ensureDensityDisplayControl(window.__fcCalendar?.el); } catch (_) {}
     },
     eventsSet: (...args) => {
       if (typeof extraEventsSet === 'function') extraEventsSet(...args);
@@ -615,11 +502,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     window.__fcCalendar = calendar;
     calendar.render();
     summaryDisplayCalendarEl = calendar.el;
-    densityDisplayCalendarEl = calendar.el;
     applySummaryDisplayAttributes(calendar.el);
-    applyDensityDisplayAttributes(calendar.el);
     ensureSummaryDisplayControl(calendar.el);
-    ensureDensityDisplayControl(calendar.el);
     window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
     try { applyDecorationsFromPlaceholders(); } catch (_) {}
   } catch (e) {
@@ -632,11 +516,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         window.__fcCalendar = calendar;
         calendar.render();
         summaryDisplayCalendarEl = calendar.el;
-        densityDisplayCalendarEl = calendar.el;
         applySummaryDisplayAttributes(calendar.el);
-        applyDensityDisplayAttributes(calendar.el);
         ensureSummaryDisplayControl(calendar.el);
-        ensureDensityDisplayControl(calendar.el);
         window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
         try { applyDecorationsFromPlaceholders(); } catch (_) {}
         const noteId = 'calendar-fallback-note';
@@ -670,10 +551,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
   if (typeof window !== 'undefined' && !window.__summaryDisplayResizeBound) {
     window.__summaryDisplayResizeBound = true;
     window.addEventListener('resize', handleSummaryDisplayResize);
-  }
-  if (typeof window !== 'undefined' && !window.__densityDisplayResizeBound) {
-    window.__densityDisplayResizeBound = true;
-    window.addEventListener('resize', handleDensityDisplayResize);
   }
 
   document.getElementById('btnPrev')?.addEventListener('click', () => calendar.prev());

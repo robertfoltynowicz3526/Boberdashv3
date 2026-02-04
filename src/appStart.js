@@ -578,22 +578,11 @@ function initializeApp() {
         renderDayPanel();
     };
 
-    const getEffectiveCalendarDensity = () => {
-        const density = calendarShell?.dataset?.density;
-        if (density === 'compact' || density === 'full') return density;
-        const stored = window.localStorage?.getItem?.('calendarDensityMode');
-        const pref = stored === 'compact' || stored === 'full' || stored === 'auto' ? stored : 'auto';
-        const auto = (window.innerHeight || 0) <= 800 ? 'compact' : 'full';
-        return pref === 'auto' ? auto : pref;
-    };
-
     const applyCalendarResponsiveOptions = () => {
         const api = getCalendarApi();
         if (!api) return;
         const viewKey = fcViewToCalendarKey(api.view?.type);
         const width = window.innerWidth || 0;
-        const density = getEffectiveCalendarDensity();
-        const densityRows = density === 'compact' ? 2 : 3;
         const monthRows = width >= 1440 ? 2 : width >= 1024 ? 1 : 1;
         const rows = viewKey === 'month'
             ? monthRows
@@ -1837,10 +1826,6 @@ function initializeApp() {
     };
 
     window.addEventListener('calendar:summary-display-change', () => {
-        renderDayPanel();
-    });
-    window.addEventListener('calendar:density-display-change', () => {
-        applyCalendarResponsiveOptions();
         renderDayPanel();
     });
 
