@@ -203,25 +203,25 @@ input::placeholder{color:var(--jd-text-500)}
   box-shadow: none;
 }
 
-#calendar-shell.view-month .fc .fc-daygrid-body,
-#calendar-shell.view-month .fc .fc-daygrid-body table,
 #calendar-shell.view-month .fc .fc-scrollgrid,
 #calendar-shell.view-month .fc .fc-view-harness,
 #calendar-shell.view-month .fc .fc-view-harness-active{
   height: 100% !important;
+  min-height: 0;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-body{
+  height: auto !important;
+}
+
+#calendar-shell.view-month .fc .fc-scroller{
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-body table{
   table-layout: fixed;
-  height: 100%;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body table tbody{
-  height: 100%;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body table tr{
-  height: calc(100% / 6);
+  height: auto;
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day,
@@ -258,39 +258,6 @@ input::placeholder{color:var(--jd-text-500)}
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-#calendar-shell[data-density="compact"] .fc .fc-daygrid-day-frame{
-  padding: 4px;
-}
-
-#calendar-shell[data-density="compact"] .fc .bober-chip--client,
-#calendar-shell[data-density="compact"] .fc .fc-client-chip,
-#calendar-shell[data-density="compact"] .fc .client-chip{
-  padding: 2px 6px;
-  font-size: 10px;
-  line-height: 1.15;
-  max-height: 18px;
-}
-
-#calendar-shell[data-density="compact"] .fc .fc-event-title,
-#calendar-shell[data-density="compact"] .fc .fc-title-only{
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#calendar-shell[data-density="compact"] .fc .day-summary{
-  font-size: 10px;
-  padding: 3px 4px;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#calendar-shell[data-density="compact"] .fc .day-summary-row{
-  white-space: nowrap;
 }
 
 #calendar-shell.view-month .fc .bober-chip--client,
@@ -349,15 +316,13 @@ input::placeholder{color:var(--jd-text-500)}
   }
 }
 
-.summary-display-control,
-.density-display-control{
+.summary-display-control{
   display: inline-flex;
   align-items: center;
   margin-left: 6px;
 }
 
-.summary-display-select,
-.density-display-select{
+.summary-display-select{
   background: var(--surface);
   color: var(--jd-text-100);
   border: 1px solid var(--jd-line-600);

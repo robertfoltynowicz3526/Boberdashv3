@@ -94,6 +94,20 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   min-height: 0;
 }
 
+.calendar-shell.view-month .fc .fc-daygrid-body,
+.calendar-shell.view-month .fc .fc-daygrid-body-unbalanced {
+  height: auto !important;
+}
+
+.calendar-shell.view-month .fc .fc-scroller {
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-day-frame {
+  overflow: hidden;
+}
+
 .calendar-shell .day-summary {
   background: var(--calendar-summary-bg);
   border: 1px solid var(--calendar-summary-border);
