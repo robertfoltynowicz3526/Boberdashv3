@@ -594,8 +594,9 @@ function initializeApp() {
         const width = window.innerWidth || 0;
         const density = getEffectiveCalendarDensity();
         const densityRows = density === 'compact' ? 2 : 3;
+        const monthRows = width >= 1440 ? 2 : width >= 1024 ? 1 : 1;
         const rows = viewKey === 'month'
-            ? densityRows
+            ? monthRows
             : (width >= CALENDAR_BREAKPOINTS.desktop ? 3 : width >= CALENDAR_BREAKPOINTS.laptop ? 2 : 1);
         const shouldLimit = viewKey === 'week' || viewKey === 'month';
         api.setOption('dayMaxEvents', shouldLimit);

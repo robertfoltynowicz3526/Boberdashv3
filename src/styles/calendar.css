@@ -472,13 +472,50 @@
 }
 
 /* Widok miesiąca – minimalistyczny overview */
+.calendar-shell.view-month{
+  --calendar-month-min-height: 420px;
+}
+
+.calendar-shell.view-month .calendar-main{
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .calendar-shell.view-month .fc{
   --calendar-day-min-height: clamp(72px, 12vh, 110px);
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
+  --day-summary-space: 28px;
+  height: 100%;
+}
+
+.calendar-shell.view-month .fc .fc-view-harness{
+  min-height: var(--calendar-month-min-height);
 }
 
 /* Breakpointy */
+@media (min-width: 1440px) {
+  .calendar-shell.view-month .fc{
+    --calendar-cell-padding: 7px;
+    --calendar-event-font: 11px;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .calendar-shell.view-month .fc{
+    --calendar-cell-padding: 5px;
+    --calendar-event-font: 10px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .calendar-shell.view-month .fc{
+    --calendar-cell-padding: 4px;
+    --calendar-event-font: 9px;
+  }
+}
+
 @media (min-width: 1100px) {
   .calendar-wrap{
     grid-template-columns: minmax(0, 1fr);
