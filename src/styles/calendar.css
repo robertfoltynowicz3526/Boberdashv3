@@ -473,7 +473,7 @@
 
 /* Widok miesiąca – minimalistyczny overview */
 .calendar-shell.view-month .fc{
-  --calendar-day-min-height: 110px;
+  --calendar-day-min-height: clamp(72px, 12vh, 110px);
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
 }
@@ -481,12 +481,10 @@
 /* Breakpointy */
 @media (min-width: 1100px) {
   .calendar-wrap{
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    grid-template-columns: minmax(0, 1fr);
   }
   .calendar-day-panel{
-    position: sticky;
-    top: 24px;
-    max-height: calc(100vh - 48px);
+    display: none;
   }
   .calendar-day-panel [data-panel-action="pin"],
   .calendar-day-panel [data-panel-action="close"]{
@@ -511,8 +509,7 @@
     height: auto;
   }
   .calendar-day-panel{
-    position: static;
-    max-height: none;
+    display: none;
   }
   .calendar-day-panel__body{
     overflow: visible;
@@ -531,5 +528,18 @@
     --calendar-cell-padding: 6px;
     --calendar-event-font: 11px;
     --calendar-day-min-height: 150px;
+  }
+}
+
+@media (max-height: 820px) {
+  .calendar-wrap{
+    padding: 12px;
+  }
+  .calendar-shell.view-month .fc{
+    --calendar-day-min-height: clamp(64px, 11vh, 96px);
+    --calendar-cell-padding: 5px;
+  }
+  .fc{
+    --day-summary-space: 44px;
   }
 }
