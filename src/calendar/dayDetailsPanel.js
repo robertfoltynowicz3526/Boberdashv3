@@ -39,6 +39,13 @@ const buildSummaryLines = (totals, mode) => {
   };
 };
 
+const buildSummaryTiles = (totals) => ([
+  { label: 'Praca', value: formatHours(totals.work) },
+  { label: 'Jazda', value: formatHours(totals.drive) },
+  { label: 'Fakturowane', value: formatHours(totals.billed) },
+  { label: 'Nadgodziny', value: formatHours(totals.over) },
+]);
+
 const buildOrderMeta = (order) => {
   const parts = [];
   if (Number(order.work || 0) !== 0) parts.push(`P ${formatNumber(order.work)}h`);
@@ -60,6 +67,7 @@ export const buildDayDetailsModel = ({
   const leaveKind = totalsResult?.leaveKind || null;
   const leaveLabel = leaveKind ? (LEAVE_LABELS[leaveKind] || leaveKind) : null;
   const summaryLines = buildSummaryLines(totals, summaryMode);
+  const summaryTiles = buildSummaryTiles(totals);
 
   const manualNote = (dayDoc?.notatka || dayDoc?.note || '').toString().trim();
   const manualWork = Number(manual.work || 0) || 0;
@@ -95,6 +103,7 @@ export const buildDayDetailsModel = ({
       mode: summaryMode,
       primary: summaryLines.primary,
       secondary: summaryLines.secondary,
+      tiles: summaryTiles,
     },
     orders: orderItems,
     hasOrders: orderItems.length > 0,
@@ -129,16 +138,22 @@ export const renderDayDetailsPanel = (container, model) => {
         <button type="button" class="btn-ghost btn-small" data-panel-action="close">Zamknij</button>
       </div>
     </div>
-    <div class="calendar-day-panel__summary-section">
-      <div class="calendar-day-panel__section-header">
-        <h4>Podsumowanie dnia</h4>
+    <div class="calendar-day-panel__body">
+      <div class="calendar-day-panel__summary-section">
+        <div class="calendar-day-panel__section-header">
+          <h4>Podsumowanie dnia</h4>
+        </div>
+        <div class="calendar-day-panel__summary-tiles">
+          ${model.summary.tiles.map((tile) => `
+            <div class="calendar-day-panel__summary-tile">
+              <div class="calendar-day-panel__summary-label">${tile.label}</div>
+              <div class="calendar-day-panel__summary-value">${tile.value}</div>
+            </div>
+          `).join('')}
+        </div>
       </div>
-      <div class="calendar-day-panel__summary">
-        <div>${model.summary.primary}</div>
-        <div>${model.summary.secondary}</div>
-      </div>
+      <div class="calendar-day-panel__form-host" data-panel-form-host></div>
     </div>
-    <div class="calendar-day-panel__form-host" data-panel-form-host></div>
   `;
 
   const pinButton = container.querySelector('[data-panel-action="pin"]');

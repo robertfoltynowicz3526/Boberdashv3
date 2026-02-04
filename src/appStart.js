@@ -413,9 +413,9 @@ function initializeApp() {
     };
     const CALENDAR_PANEL_PINNED_STORAGE_KEY = 'calendarDayPanelPinned';
     const CALENDAR_BREAKPOINTS = {
-        desktop: 1440,
-        laptop: 1024,
-        tablet: 768
+        desktop: 1100,
+        laptop: 768,
+        tablet: 640
     };
     const getCalendarBreakpoint = () => {
         const width = window.innerWidth || 0;
