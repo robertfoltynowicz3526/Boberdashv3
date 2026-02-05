@@ -1653,7 +1653,9 @@ function initializeApp() {
     window.openTab = (evt, tabName) => {
         document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        document.getElementById(tabName).style.display = 'block';
+        const activeTab = document.getElementById(tabName);
+        if (!activeTab) return;
+        activeTab.style.display = activeTab.classList.contains('calendarSection') ? 'flex' : 'block';
         evt.currentTarget.classList.add('active');
         handleTabActivation(tabName);
     };
