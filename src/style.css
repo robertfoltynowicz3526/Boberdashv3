@@ -1029,7 +1029,7 @@ select {
   flex: 1;
   min-height: 0;
   height: 100%;
-  overflow: clip;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }

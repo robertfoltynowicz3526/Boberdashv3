@@ -100,8 +100,8 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 }
 
 .calendar-shell.view-month .fc .fc-scroller {
-  overflow-y: auto;
-  max-height: 100%;
+  overflow: visible;
+  max-height: none;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-frame {

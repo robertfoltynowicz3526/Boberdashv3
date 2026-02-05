@@ -479,7 +479,7 @@
 .calendar-shell.view-month .calendar-main{
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   overscroll-behavior: contain;
 }
 
@@ -493,20 +493,40 @@
 }
 
 .calendar-shell.view-month .fc .fc-view-harness{
-  height: 100%;
+  height: auto !important;
   min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
+.calendar-shell.view-month .fc .fc-view-harness-active,
+.calendar-shell.view-month .fc .fc-scrollgrid,
+.calendar-shell.view-month .fc .fc-daygrid-body-unbalanced{
+  height: auto !important;
+}
+
 .calendar-shell.view-month .fc .fc-scroller{
-  overflow-y: auto;
-  max-height: 100%;
+  overflow: visible;
+  max-height: none;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-body{
   height: auto !important;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-body table{
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: repeat(6, minmax(90px, 1fr));
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-body tr{
+  display: contents;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-day{
+  display: block;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-frame{

@@ -660,8 +660,33 @@ input::placeholder{color:var(--jd-text-500)}
 .day-flag--wolne .pill{background:rgba(71,162,60,0.18);border:2px solid var(--jd-green-400)}
 .day-flag--l4    .pill{background:rgba(224,106,106,0.15);border:2px solid var(--color-error)}
 
+/* Layout kalendarza: flex + min-height:0 dla scrolla wewnętrznego */
+.mainContent{
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 0;
+}
+
+.calendarSection{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 1rem;
+}
+
+.calendarGridWrap{
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* Kalendarz zawsze w ramie – nic nie wystaje */
 .calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:visible}
+.calendar-wrap.calendarGridWrap{
+  overflow-y: auto;
+  overflow-x: hidden;
+}
 .fc{width:100%}
 
 /* Layout aplikacji – pełna szerokość kontentu */
@@ -711,7 +736,7 @@ input::placeholder{color:var(--jd-text-500)}
 .calendar-wrap,
 .fc {
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fc .fc-daygrid-body,
