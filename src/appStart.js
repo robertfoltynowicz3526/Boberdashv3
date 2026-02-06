@@ -2405,8 +2405,8 @@ function initializeApp() {
         // Zewnętrzne kolekcje (np. events) nie wpływają na dekoracje kalendarza.
     }
 
-    function obliczSumeGodzinZKalendarza(start, end) {
-        const wpisyZMiesiaca = wszystkieWpisyKalendarza.filter(wpis => {
+    function agregujPodsumowanieMiesiaca(start, end, wpisy) {
+        const wpisyZMiesiaca = (wpisy || []).filter((wpis) => {
             const dataWpisu = new Date(wpis.id);
             return dataWpisu >= start && dataWpisu < end;
         });
@@ -2427,26 +2427,35 @@ function initializeApp() {
             acc.jazda += wpis.jazda || 0;
             return acc;
         }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
-        const absorpcja = obliczAbsorpcja(sumyMies.wyfakturowaneGodziny);
+        return {
+            ...sumyMies,
+            absorpcja: obliczAbsorpcja(sumyMies.wyfakturowaneGodziny)
+        };
+    }
 
+    function renderPulpitStatystykiMiesiaca(podsumowanie) {
         if (!kalendarzPodsumowanieDiv) return;
         const metricsHTML = `
-  <div class="metric"><div class="label">Praca</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Fakt.</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Nadgodz.</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Jazda</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Praca</div><div class="value num">${(podsumowanie.praca || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Fakturowane</div><div class="value num">${(podsumowanie.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Nadgodziny</div><div class="value num">${(podsumowanie.nadgodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Jazda</div><div class="value num">${(podsumowanie.jazda || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(podsumowanie.absorpcja)}</div></div>
 `;
-        kalendarzPodsumowanieDiv.innerHTML = `
-  <div class="metrics-grid">${metricsHTML}</div>
-  <div class="metrics-absorpcja">
-    <div class="metric metric--wide">
-      <div class="label">Absorpcja</div>
-      <div class="value num">${fmtPct(absorpcja)}</div>
-    </div>
-  </div>
-  <div class="metrics-chart" id="fh3m-pulpit"></div>`;
+        kalendarzPodsumowanieDiv.innerHTML = `<div class="metrics-grid">${metricsHTML}</div>`;
+    }
+
+    function renderPulpitWykresy() {
+        const chartHost = document.getElementById('fh3m-pulpit');
+        if (!chartHost) return;
         const { y, m } = ymFromMonthInput();
-        renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
+        renderFH3M(chartHost, y, m);
+    }
+
+    function obliczSumeGodzinZKalendarza(start, end) {
+        const podsumowanie = agregujPodsumowanieMiesiaca(start, end, wszystkieWpisyKalendarza);
+        renderPulpitStatystykiMiesiaca(podsumowanie);
+        renderPulpitWykresy();
     }
 
     async function obslugaKalendarza(event) {
