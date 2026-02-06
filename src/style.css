@@ -957,8 +957,8 @@ select {
   box-shadow: var(--shadow-sm);
 }
 
-#pulpit .calendar-container,
-#pulpit #kalendarz {
+#kalendarz-tab .calendar-container,
+#kalendarz-tab #kalendarz {
   width: 100%;
   max-width: none;
 }
@@ -1012,8 +1012,6 @@ select {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  height: 100%;
-  min-height: 0;
 }
 
 .pulpit-stats-bar {
@@ -1022,11 +1020,17 @@ select {
   gap: 0.4rem;
 }
 
-.pulpit-calendar {
+#kalendarz-tab {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 0;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+#kalendarz-tab .calendar-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -1272,6 +1276,10 @@ select {
   height: 100%;
   overflow: auto;
   padding: 2rem;
+}
+
+.modal#kalendarz-modal {
+  z-index: 950;
 }
 
 .modal#details-zlecenie-modal {
@@ -3390,8 +3398,8 @@ main,
   color: var(--text-muted);
 }
 #kalendarz {
-  height: auto;
-  min-height: auto;
+  height: 100%;
+  min-height: 0;
 }
 
 /* Kratki dnia wyższe – poprawa czytelności */
