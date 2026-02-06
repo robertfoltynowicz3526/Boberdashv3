@@ -3,7 +3,7 @@ import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyT
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
-const SUMMARY_DISPLAY_MODES = new Set(['short']);
+const SUMMARY_DISPLAY_MODES = new Set(['short', 'full']);
 const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
 const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
 const SUMMARY_DISPLAY_TABLET_BREAKPOINT = 768;
@@ -128,8 +128,41 @@ const ensureSummaryDisplayControl = (calendarEl) => {
   const fallbackToolbar = calendarEl?.ownerDocument?.getElementById?.('calendar-toolbar');
   const wrapperRoot = toolbar || fallbackToolbar;
   if (!wrapperRoot) return;
-  const wrapper = wrapperRoot.querySelector('.summary-display-control');
-  if (wrapper) wrapper.remove();
+  let wrapper = wrapperRoot.querySelector('.summary-display-control');
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'summary-display-control';
+    const label = document.createElement('label');
+    label.className = 'summary-display-label';
+    label.textContent = 'Podsumowanie';
+    const select = document.createElement('select');
+    select.className = 'summary-display-select';
+    select.setAttribute('aria-label', 'Widok podsumowań');
+    select.innerHTML = `
+      <option value="short">Skrót</option>
+      <option value="full">Pełne</option>
+    `;
+    label.setAttribute('for', 'calendar-summary-display');
+    select.id = 'calendar-summary-display';
+    wrapper.appendChild(label);
+    wrapper.appendChild(select);
+    wrapperRoot.appendChild(wrapper);
+  }
+  const selectEl = wrapper.querySelector('.summary-display-select');
+  if (!selectEl) return;
+  selectEl.value = SUMMARY_DISPLAY_MODES.has(summaryDisplayMode) ? summaryDisplayMode : SUMMARY_DISPLAY_DEFAULT;
+  updateSummaryDisplayControlState(calendarEl, selectEl);
+  if (!selectEl.dataset.bound) {
+    selectEl.dataset.bound = 'true';
+    selectEl.addEventListener('change', (event) => {
+      const next = event.target?.value;
+      setSummaryDisplayMode(next);
+      applySummaryDisplayAttributes(calendarEl);
+      refreshCalendarSummaries(calendarEl);
+      ensureSummaryDisplayControl(calendarEl);
+      notifySummaryDisplayChange(calendarEl);
+    });
+  }
 };
 
 const handleSummaryDisplayResize = () => {

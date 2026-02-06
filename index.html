@@ -26,6 +26,7 @@
         </div>
         <nav class="sidebar-nav tabs-row">
             <button class="tab-button" onclick="openTab(event, 'pulpit')">Pulpit</button>
+            <button class="tab-button" onclick="openTab(event, 'kalendarz-tab')">Kalendarz</button>
             <button class="tab-button" onclick="openTab(event, 'klienci')">Klienci</button>
             <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
             <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
@@ -45,9 +46,10 @@
         </div>
     </header>
     <main class="mainContent">
-        <div id="pulpit" class="tab-content page-wide calendarSection" data-section="kalendarz">
+        <div id="pulpit" class="tab-content page-wide" data-section="pulpit">
             <div class="pulpit-header">
-                <h2>Pulpit i Ewidencja Czasu Pracy</h2>
+                <h2>Pulpit</h2>
+                <div id="unfinished-button-slot" class="pulpit-actions"></div>
             </div>
             <section class="pulpit-stats-bar" aria-label="Statystyki miesiąca">
                 <div class="pulpit-stats-header">
@@ -55,6 +57,17 @@
                 </div>
                 <div id="kalendarz-podsumowanie" class="summary-container-subtle summary-compact"></div>
             </section>
+            <section class="pulpit-charts" aria-label="Wykresy pulpitu">
+                <h3>Wyfakturowane – ostatnie 3 mies.</h3>
+                <div class="summary-container-subtle">
+                    <div class="metrics-chart" id="fh3m-pulpit"></div>
+                </div>
+            </section>
+        </div>
+        <div id="kalendarz-tab" class="tab-content page-wide calendarSection" data-section="kalendarz">
+            <div class="pulpit-header">
+                <h2>Kalendarz</h2>
+            </div>
             <div id="calendar-toolbar" class="calendar-toolbar" role="toolbar" aria-label="Sterowanie kalendarzem">
                 <div class="calendar-toolbar-group">
                     <button type="button" id="btnPrev" class="btn-ghost" aria-label="Poprzedni miesiąc">‹</button>
@@ -63,22 +76,22 @@
                 </div>
                 <div class="calendar-toolbar-title" id="calendar-title" aria-live="polite"></div>
                 <div class="calendar-toolbar-group calendar-toolbar-group--actions">
-                    <div id="unfinished-button-slot"></div>
+                    <div class="summary-display-control">
+                        <label for="calendar-summary-display" class="summary-display-label">Podsumowanie</label>
+                        <select id="calendar-summary-display" class="summary-display-select">
+                            <option value="short">Skrót</option>
+                            <option value="full">Pełne</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div class="pulpit-calendar">
+            <div class="calendar-view">
                 <div id="calendar-shell" class="calendar-wrap calendarGridWrap">
                     <div class="calendar-main">
                         <div id="kalendarz" class="calendar-container"></div>
                     </div>
                 </div>
             </div>
-            <section class="pulpit-charts" aria-label="Wykresy pulpitu">
-                <h3>Wyfakturowane – ostatnie 3 mies.</h3>
-                <div class="summary-container-subtle">
-                    <div class="metrics-chart" id="fh3m-pulpit"></div>
-                </div>
-            </section>
         </div>
         <div id="klienci" class="tab-content page-wide">
             <h2>Baza Klientów</h2>

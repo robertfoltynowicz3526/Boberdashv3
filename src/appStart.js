@@ -1450,7 +1450,7 @@ function initializeApp() {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
         }
-        if (tabName === 'pulpit' || tabName === 'kalendarz') {
+        if (tabName === 'pulpit' || tabName === 'kalendarz-tab') {
             syncCalendarShellHeight();
             if (!bootstrapReady) {
                 pendingCalendarInit = true;
@@ -1568,7 +1568,7 @@ function initializeApp() {
             ordersFilterMode = null;
         }
         if (key === 'daysWithoutSummary') {
-            showTab('pulpit');
+            showTab('kalendarz-tab');
             const target = unfinishedSummary.daysWithoutSummary[0];
             if (target && calendar?.gotoDate) {
                 calendar.gotoDate(target);
