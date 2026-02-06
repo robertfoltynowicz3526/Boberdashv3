@@ -789,6 +789,7 @@ function initializeApp() {
     const kalendarzSummaryTiles = document.getElementById('kalendarz-summary-tiles');
     const kalendarzStatusBadge = document.getElementById('kalendarz-status-badge');
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const calendarTitleEl = document.getElementById('calendar-title');
     const calendarToolbar = document.getElementById('calendar-toolbar');
     const calendarDayPanel = document.getElementById('calendar-day-panel');
     const calendarDayPanelBackdrop = document.getElementById('calendar-day-panel-backdrop');
@@ -1717,6 +1718,7 @@ function initializeApp() {
         if (!api) {
             setCalendarViewClass(null);
             setCalendarToolbarDisabled(true, 'Kalendarz się ładuje');
+            if (calendarTitleEl) calendarTitleEl.textContent = 'Ładowanie...';
             return;
         }
         setCalendarToolbarDisabled(false);
@@ -1726,6 +1728,9 @@ function initializeApp() {
             const isActive = button.dataset.calendarView === viewKey;
             button.classList.toggle('is-active', isActive);
         });
+        if (calendarTitleEl) {
+            calendarTitleEl.textContent = api.view?.title || '';
+        }
         if (calendarBackBtn) {
             const hasReturn = Boolean(calendarReturnState?.viewKey && calendarReturnState?.dateStr);
             calendarBackBtn.disabled = !hasReturn;
@@ -2426,17 +2431,20 @@ function initializeApp() {
 
         if (!kalendarzPodsumowanieDiv) return;
         const metricsHTML = `
-  <div class="metric"><div class="label">Praca w miesiącu</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Fakturowane</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Nadgodziny</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
-  <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(obliczAbsorpcja(sumyMies.wyfakturowaneGodziny))}</div></div>
+  <div class="metric"><div class="label">Praca</div><div class="value num">${(sumyMies.praca || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Fakt.</div><div class="value num">${(sumyMies.wyfakturowaneGodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Nadgodz.</div><div class="value num">${(sumyMies.nadgodziny || 0).toFixed(1)} h</div></div>
+  <div class="metric"><div class="label">Jazda</div><div class="value num">${(sumyMies.jazda || 0).toFixed(1)} h</div></div>
 `;
         kalendarzPodsumowanieDiv.innerHTML = `
-  <div class="metrics-row">
-    <div class="metrics-left"><div class="metrics-grid">${metricsHTML}</div></div>
-    <div class="metrics-right"><div id="fh3m-pulpit"></div></div>
-  </div>`;
+  <div class="metrics-grid">${metricsHTML}</div>
+  <div class="metrics-absorpcja">
+    <div class="metric metric--wide">
+      <div class="label">Absorpcja</div>
+      <div class="value num">${fmtPct(absorpcja)}</div>
+    </div>
+  </div>
+  <div class="metrics-chart" id="fh3m-pulpit"></div>`;
         const { y, m } = ymFromMonthInput();
         renderFH3M(document.getElementById('fh3m-pulpit'), y, m);
     }

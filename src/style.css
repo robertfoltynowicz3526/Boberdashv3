@@ -396,7 +396,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 1rem;
+  padding: 0.55rem 0.85rem;
   border-radius: 16px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
@@ -407,6 +407,15 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.calendar-toolbar-title {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text-color);
+  min-width: 160px;
 }
 
 .calendar-toolbar .is-active {
@@ -1006,6 +1015,42 @@ select {
   min-height: 0;
 }
 
+.pulpit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 1rem;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.pulpit-calendar,
+.pulpit-stats {
+  min-width: 0;
+  min-height: 0;
+}
+
+.pulpit-calendar {
+  display: flex;
+  flex-direction: column;
+}
+
+.pulpit-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pulpit-stats-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pulpit-stats .summary-container-subtle {
+  flex: 1;
+  overflow: auto;
+}
+
 #calendar-shell {
   width: 100%;
   max-width: none;
@@ -1018,11 +1063,12 @@ select {
 }
 
 #pulpit .summary-container-subtle {
-  margin-bottom: 12px;
+  margin: 0;
+  padding: 1rem;
 }
 
 #calendar-toolbar {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 #calendar-shell #kalendarz {
@@ -1036,7 +1082,7 @@ select {
 
 @media (max-height: 820px), (max-width: 1366px) {
   #pulpit .summary-container-subtle {
-    padding: 0.9rem 1.1rem;
+    padding: 0.85rem 0.95rem;
   }
   #calendar-toolbar {
     gap: 8px;
@@ -1044,6 +1090,31 @@ select {
   }
   #kalendarz {
     padding: 1rem;
+  }
+}
+
+#pulpit .pulpit-stats .metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+#pulpit .pulpit-stats .metrics-absorpcja,
+#pulpit .pulpit-stats .metrics-chart {
+  margin-top: 0.75rem;
+}
+
+#pulpit .pulpit-stats .metric.metric--wide {
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .pulpit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pulpit-stats {
+    order: 2;
   }
 }
 
@@ -3271,6 +3342,10 @@ main,
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+#pulpit .pulpit-header h2 {
+  margin: 0 0 0.6rem;
 }
 
 .unfinished-button {

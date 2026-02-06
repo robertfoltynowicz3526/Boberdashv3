@@ -48,20 +48,32 @@
         <div id="pulpit" class="tab-content page-wide calendarSection" data-section="kalendarz">
             <div class="pulpit-header">
                 <h2>Pulpit i Ewidencja Czasu Pracy</h2>
-                <div id="unfinished-button-slot"></div>
             </div>
-            <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
             <div id="calendar-toolbar" class="calendar-toolbar" role="toolbar" aria-label="Sterowanie kalendarzem">
                 <div class="calendar-toolbar-group">
                     <button type="button" id="btnPrev" class="btn-ghost" aria-label="Poprzedni miesiąc">‹</button>
                     <button type="button" id="btnToday" class="btn-secondary">Dziś</button>
                     <button type="button" id="btnNext" class="btn-ghost" aria-label="Następny miesiąc">›</button>
                 </div>
-            </div>
-            <div id="calendar-shell" class="calendar-wrap calendarGridWrap">
-                <div class="calendar-main">
-                    <div id="kalendarz" class="calendar-container"></div>
+                <div class="calendar-toolbar-title" id="calendar-title" aria-live="polite"></div>
+                <div class="calendar-toolbar-group calendar-toolbar-group--actions">
+                    <div id="unfinished-button-slot"></div>
                 </div>
+            </div>
+            <div class="pulpit-grid">
+                <div class="pulpit-calendar">
+                    <div id="calendar-shell" class="calendar-wrap calendarGridWrap">
+                        <div class="calendar-main">
+                            <div id="kalendarz" class="calendar-container"></div>
+                        </div>
+                    </div>
+                </div>
+                <aside class="pulpit-stats" aria-label="Statystyki miesiąca">
+                    <div class="pulpit-stats-header">
+                        <h3>Statystyki miesiąca</h3>
+                    </div>
+                    <div id="kalendarz-podsumowanie" class="summary-container-subtle"></div>
+                </aside>
             </div>
         </div>
         <div id="klienci" class="tab-content page-wide">
