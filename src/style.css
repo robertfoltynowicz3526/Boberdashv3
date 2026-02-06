@@ -1011,44 +1011,36 @@ select {
 #pulpit {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
   height: 100%;
   min-height: 0;
 }
 
-.pulpit-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 1rem;
-  align-items: stretch;
-  min-height: 0;
-}
-
-.pulpit-calendar,
-.pulpit-stats {
-  min-width: 0;
-  min-height: 0;
+.pulpit-stats-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .pulpit-calendar {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 
-.pulpit-stats {
+.pulpit-charts {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
-.pulpit-stats-header h3 {
+.pulpit-stats-header h3,
+.pulpit-charts h3 {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-}
-
-.pulpit-stats .summary-container-subtle {
-  flex: 1;
-  overflow: auto;
 }
 
 #calendar-shell {
@@ -1065,6 +1057,36 @@ select {
 #pulpit .summary-container-subtle {
   margin: 0;
   padding: 1rem;
+}
+
+#pulpit .summary-container-subtle.summary-compact {
+  padding: 0.45rem 0.75rem;
+}
+
+#pulpit .summary-container-subtle.summary-compact .metrics-grid {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  font-size: 0.85rem;
+}
+
+#pulpit .summary-container-subtle.summary-compact .metric {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+#pulpit .summary-container-subtle.summary-compact .metric .label {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+#pulpit .summary-container-subtle.summary-compact .metric .value {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 #calendar-toolbar {
@@ -1093,28 +1115,10 @@ select {
   }
 }
 
-#pulpit .pulpit-stats .metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.6rem;
-}
-
-#pulpit .pulpit-stats .metrics-absorpcja,
-#pulpit .pulpit-stats .metrics-chart {
-  margin-top: 0.75rem;
-}
-
-#pulpit .pulpit-stats .metric.metric--wide {
-  width: 100%;
-}
-
 @media (max-width: 1200px) {
-  .pulpit-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pulpit-stats {
-    order: 2;
+  #pulpit .summary-container-subtle.summary-compact .metrics-grid {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 }
 

@@ -479,7 +479,7 @@
 .calendar-shell.view-month .calendar-main{
   min-height: 0;
   flex: 1;
-  overflow: visible;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
@@ -493,7 +493,7 @@
 }
 
 .calendar-shell.view-month .fc .fc-view-harness{
-  height: auto !important;
+  height: 100% !important;
   min-height: 0;
   flex: 1;
   display: flex;
@@ -503,12 +503,12 @@
 .calendar-shell.view-month .fc .fc-view-harness-active,
 .calendar-shell.view-month .fc .fc-scrollgrid,
 .calendar-shell.view-month .fc .fc-daygrid-body-unbalanced{
-  height: auto !important;
+  height: 100% !important;
 }
 
 .calendar-shell.view-month .fc .fc-scroller{
-  overflow: visible;
-  max-height: none;
+  overflow-y: auto;
+  max-height: 100%;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-body{

@@ -3,7 +3,7 @@ import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyT
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
-const SUMMARY_DISPLAY_MODES = new Set(['full', 'short']);
+const SUMMARY_DISPLAY_MODES = new Set(['short']);
 const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
 const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
 const SUMMARY_DISPLAY_TABLET_BREAKPOINT = 768;
@@ -126,43 +126,10 @@ const ensureSummaryDisplayControl = (calendarEl) => {
   if (!calendarEl) return;
   const toolbar = calendarEl.querySelector('.fc-header-toolbar') || calendarEl.querySelector('.fc-toolbar');
   const fallbackToolbar = calendarEl?.ownerDocument?.getElementById?.('calendar-toolbar');
-  if (!toolbar && !fallbackToolbar) return;
-  const rightChunk =
-    toolbar?.querySelector?.('.fc-toolbar-chunk:last-child') ||
-    fallbackToolbar?.querySelector?.('.calendar-toolbar-group:last-child') ||
-    toolbar ||
-    fallbackToolbar;
   const wrapperRoot = toolbar || fallbackToolbar;
   if (!wrapperRoot) return;
-  let wrapper = wrapperRoot.querySelector('.summary-display-control');
-  if (!wrapper) {
-    wrapper = document.createElement('div');
-    wrapper.className = 'summary-display-control';
-    const select = document.createElement('select');
-    select.className = 'summary-display-select';
-    select.setAttribute('aria-label', 'Tryb podsumowania dnia');
-    select.title = 'Tryb podsumowania dnia';
-    select.innerHTML = `
-      <option value="short">Skrót</option>
-      <option value="full">Pełne</option>
-    `;
-    select.value = summaryDisplayMode;
-    select.addEventListener('change', () => {
-      setSummaryDisplayMode(select.value);
-      applySummaryDisplayAttributes(calendarEl);
-      refreshCalendarSummaries(calendarEl);
-      notifySummaryDisplayChange(calendarEl);
-    });
-    wrapper.appendChild(select);
-    rightChunk.appendChild(wrapper);
-    updateSummaryDisplayControlState(calendarEl, select);
-  } else {
-    const select = wrapper.querySelector('select');
-    if (select && select.value !== summaryDisplayMode) {
-      select.value = summaryDisplayMode;
-    }
-    updateSummaryDisplayControlState(calendarEl, select);
-  }
+  const wrapper = wrapperRoot.querySelector('.summary-display-control');
+  if (wrapper) wrapper.remove();
 };
 
 const handleSummaryDisplayResize = () => {
