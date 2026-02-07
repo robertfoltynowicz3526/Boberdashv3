@@ -606,6 +606,7 @@ td.num {
   align-items: baseline;
   justify-content: flex-end;
   gap: 0.35rem;
+  min-width: 6ch;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1086,9 +1087,26 @@ select {
 }
 
 .pulpit-weekly .summary-container-subtle.summary-compact .metrics-grid {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 0.75rem 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.pulpit-weekly .summary-container-subtle.summary-compact .metric {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-height: 72px;
+  white-space: normal;
+}
+
+.pulpit-weekly .summary-container-subtle.summary-compact .metric .label {
+  font-size: 0.78rem;
+}
+
+.pulpit-weekly .summary-container-subtle.summary-compact .metric .value {
+  font-size: 0.95rem;
 }
 
 .weekly-missing {
@@ -1103,6 +1121,7 @@ select {
   background: color-mix(in srgb, var(--jd-yellow) 18%, transparent);
   color: inherit;
   cursor: pointer;
+  margin-top: 0.5rem;
 }
 
 .activity-list {
@@ -1276,6 +1295,25 @@ select {
 #calendar-shell .fc-daygrid-body-unbalanced {
   height: 100% !important;
   min-height: 0;
+}
+
+#calendar-shell .fc .fc-scrollgrid,
+#calendar-shell .fc .fc-daygrid,
+#calendar-shell .fc .fc-daygrid-body table,
+#calendar-shell .fc .fc-scrollgrid table {
+  width: 100% !important;
+}
+
+#calendar-shell .fc .fc-daygrid-body {
+  display: table-row-group;
+}
+
+#calendar-shell .fc .fc-daygrid-body table {
+  table-layout: fixed;
+}
+
+#calendar-shell .fc .fc-daygrid-day {
+  width: calc(100% / 7);
 }
 
 #calendar-shell.view-week .fc .bober-chip.fc-event,
@@ -1765,6 +1803,15 @@ select {
   z-index: 5;
 }
 
+.row-action-menu--portal {
+  position: fixed;
+  right: auto;
+  top: auto;
+  display: grid;
+  gap: 0.35rem;
+  z-index: 2000;
+}
+
 .row-action.is-open .row-action-menu {
   display: grid;
   gap: 0.35rem;
@@ -2102,6 +2149,33 @@ select {
 
 .drawer.is-open .drawer-panel {
   transform: translateX(0);
+}
+
+#client-drawer,
+#machine-drawer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+#client-drawer .drawer-panel,
+#machine-drawer .drawer-panel {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: min(720px, 100%);
+  height: auto;
+  max-height: min(90vh, 720px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  transform: translateY(20px);
+}
+
+#client-drawer.is-open .drawer-panel,
+#machine-drawer.is-open .drawer-panel {
+  transform: translateY(0);
 }
 
 .drawer-header {
@@ -2948,6 +3022,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   gap: 1.2rem;
   flex: 1;
   min-width: 0;
+  overflow: visible;
 }
 
 .warehouse-toolbar {
@@ -2988,6 +3063,16 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .warehouse-table {
   width: 100%;
   min-width: 0;
+}
+
+.warehouse-table .table-responsive {
+  max-height: calc(100vh - 360px);
+  overflow: auto;
+}
+
+#magazyn {
+  overflow: visible;
+  max-height: none;
 }
 
 .warehouse-quick-actions .quick-actions-grid {

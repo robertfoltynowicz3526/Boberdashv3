@@ -228,7 +228,7 @@
                             <select id="magazyn-filter-client"><option value="">Wszyscy</option></select>
                         </div>
                         <div class="form-group">
-                            <label for="magazyn-filter-oil-type">Typ oleju</label>
+                            <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
                             <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
                         </div>
                         <div class="form-group">
@@ -502,6 +502,13 @@
             <form id="magazyn-form" class="modal-body">
                 <div class="form-group"><label for="item-index">Index</label><input type="text" id="item-index" required></div>
                 <div class="form-group"><label for="item-name">Nazwa</label><input type="text" id="item-name" required></div>
+                <div class="form-group">
+                    <label for="item-product-type">Typ produktu</label>
+                    <select id="item-product-type">
+                        <option value="">Brak</option>
+                        <option value="ZMYWACZ">Zmywacz</option>
+                    </select>
+                </div>
                 <div class="form-group"><label for="item-ilosc">Ilość (szt.)</label><input type="number" step="1" id="item-ilosc" value="0" inputmode="numeric"></div>
                 <div class="form-group"><label for="item-klient">Klient (opcjonalnie)</label><input type="text" id="item-klient"></div>
                 <div class="form-group">
