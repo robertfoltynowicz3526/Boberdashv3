@@ -374,8 +374,9 @@ function initializeApp() {
         { id: 'add-machine', label: 'Dodaj maszynę', icon: '🚜', action: 'open-add-machine', route: 'maszyny', note: 'Maszyny' },
         { id: 'warehouse', label: 'Magazyn', icon: '📦', action: 'open-warehouse', route: 'magazyn', note: 'Stan i wyszukiwarka' }
     ];
+    const PRODUCT_TYPE_ZMYWACZ = 'ZMYWACZ';
     const DEFAULT_STOCK_ITEMS = [
-        { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false }
+        { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false, typProdukt: PRODUCT_TYPE_ZMYWACZ }
     ];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
@@ -931,6 +932,7 @@ function initializeApp() {
     const itemOilFields = document.getElementById('item-oil-fields');
     const itemOilTypeSelect = document.getElementById('item-oil-type');
     const itemOilContainerSelect = document.getElementById('item-oil-container');
+    const itemProductTypeSelect = document.getElementById('item-product-type');
     const oilToolsDrawer = document.getElementById('oil-tools-drawer');
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
@@ -2630,6 +2632,7 @@ function initializeApp() {
             acc.nadgodziny += Number(entry.nadgodziny ?? 0) || 0;
             return acc;
         }, { praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
+        const absorpcja = totals.praca > 0 ? (totals.fakturowane / totals.praca) * 100 : 0;
 
         const missingDaysList = data.days.filter((dayKey) => {
             const date = toDateSafe(dayKey);
@@ -2641,8 +2644,17 @@ function initializeApp() {
             return !dayDocsByDay.has(dayKey);
         });
 
+        const tiles = [
+            { label: 'Praca', value: `${totals.praca.toFixed(1)} h` },
+            { label: 'Jazda', value: `${totals.jazda.toFixed(1)} h` },
+            { label: 'Fakturowane', value: `${totals.fakturowane.toFixed(1)} h` },
+            { label: 'Nadgodziny', value: `${totals.nadgodziny.toFixed(1)} h` },
+            { label: 'Absorpcja tygodnia', value: fmtPct(absorpcja) }
+        ];
+
         return {
             totals,
+            tiles,
             missingDaysCount: missingDaysList.length,
             missingDaysList
         };
@@ -2656,16 +2668,19 @@ function initializeApp() {
             return;
         }
         weeklyMissingDays = model.missingDaysList;
+        const tilesHtml = model.tiles.map(tile => `
+            <div class="metric">
+                <div class="label">${tile.label}</div>
+                <div class="value num">${tile.value}</div>
+            </div>
+        `).join('');
         pulpitWeeklyContainer.innerHTML = `
             <div class="metrics-grid">
-                <div class="metric"><div class="label">P</div><div class="value num">${model.totals.praca.toFixed(1)} h</div></div>
-                <div class="metric"><div class="label">J</div><div class="value num">${model.totals.jazda.toFixed(1)} h</div></div>
-                <div class="metric"><div class="label">F</div><div class="value num">${model.totals.fakturowane.toFixed(1)} h</div></div>
-                <div class="metric"><div class="label">N</div><div class="value num">${model.totals.nadgodziny.toFixed(1)} h</div></div>
-                <button type="button" class="weekly-missing" data-weekly-missing>
-                    Braki: ${model.missingDaysCount} dni
-                </button>
+                ${tilesHtml}
             </div>
+            <button type="button" class="weekly-missing" data-weekly-missing>
+                Braki: ${model.missingDaysCount} dni
+            </button>
         `;
     };
 
@@ -5202,6 +5217,8 @@ async function obslugaListyZlecen(event) {
                 dataUkonczenia: null,
                 serviceDate: null,
                 endAt: null,
+                closeDate: null,
+                closedAt: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
@@ -5573,6 +5590,7 @@ async function obslugaListyCzesci(event) {
 
         const fallbackEndAtDate = manualEndAt || new Date();
         const endAtValue = manualEndAt || serverTimestamp();
+        const closeDateKey = formatDateForStorage(fallbackEndAtDate);
         const dane = {
             status: 'ukończone',
             wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
@@ -5581,7 +5599,8 @@ async function obslugaListyCzesci(event) {
             dataUkonczenia: serviceDateKey,
             serviceDate: serviceDateKey,
             endAt: endAtValue,
-            closedAt: serverTimestamp(),
+            closedAt: endAtValue,
+            closeDate: closeDateKey,
             uzyteCzesci: czesciDoZlecenia,
             zakonczenieNotatka: notatka || null,
             zakonczenieNumerWZ: numerWzValue || null
@@ -5630,7 +5649,7 @@ async function obslugaListyCzesci(event) {
                     orderNo: zamykaneZlecenieData.nrZlecenia || '',
                     description: zamykaneZlecenieData.opis || '',
                     motoHours: Number(motoHours),
-                    closedAt: serverTimestamp()
+                    closedAt: endAtValue
                 };
                 try {
                     await addDoc(collection(db, 'orders_history'), historiaPayload);
@@ -5666,6 +5685,7 @@ async function obslugaListyCzesci(event) {
         return trimmed;
     };
 
+
     const parseOilMeta = (produkt = {}) => {
         let typOleju = produkt.typOleju || produkt.typOlej || produkt.typ;
         let pojemnosc = Number(produkt.pojemnosc) || null;
@@ -5691,6 +5711,21 @@ async function obslugaListyCzesci(event) {
         };
     };
 
+    const resolveWarehouseType = (produkt = {}) => {
+        if (!produkt) return '';
+        if (produkt.jestOlejem) {
+            const { typOleju } = parseOilMeta(produkt);
+            return typOleju || '';
+        }
+        if (produkt.typProdukt) return produkt.typProdukt;
+        const index = String(produkt.index || '').toUpperCase();
+        const name = String(produkt.nazwa || '').toUpperCase();
+        if (index.includes(PRODUCT_TYPE_ZMYWACZ) || name.includes('ZMYWACZ')) {
+            return PRODUCT_TYPE_ZMYWACZ;
+        }
+        return '';
+    };
+
     const formatWarehouseDate = (value) => {
         const date = toDateSafe(value);
         if (!date) return '—';
@@ -5706,6 +5741,7 @@ async function obslugaListyCzesci(event) {
         if (!magazynForm) return;
         magazynForm.reset();
         if (itemIsOilCheckbox) itemIsOilCheckbox.checked = false;
+        if (itemProductTypeSelect) itemProductTypeSelect.value = '';
         setOilFieldsVisibility(false);
     };
 
@@ -5730,6 +5766,7 @@ async function obslugaListyCzesci(event) {
                     ilosc: 0,
                     klient: '---',
                     jestOlejem: Boolean(item.jestOlejem),
+                    typProdukt: item.typProdukt || null,
                     createdAt: new Date(),
                     updatedAt: new Date()
                 });
@@ -5751,6 +5788,7 @@ async function obslugaListyCzesci(event) {
         const isOil = Boolean(itemIsOilCheckbox?.checked);
         const pojemnosc = Number(itemOilContainerSelect?.value || '');
         const typOleju = itemOilTypeSelect?.value || '';
+        const typProdukt = itemProductTypeSelect?.value || '';
 
         if (!index || !nazwa) { alert("Index i nazwa są wymagane."); return; }
         if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === index.toLowerCase())) {
@@ -5772,6 +5810,7 @@ async function obslugaListyCzesci(event) {
             jestOlejem: isOil,
             typOleju: isOil ? typOleju : null,
             pojemnosc: isOil ? pojemnosc : null,
+            typProdukt: isOil ? typOleju : (typProdukt || null)
         };
         try {
             const docRef = await addDoc(collection(db, "magazyn"), dane);
@@ -6044,16 +6083,17 @@ async function obslugaListyCzesci(event) {
     const applyMagazynFilters = (items) => {
         const search = (magazynSearchInput?.value || '').trim().toLowerCase();
         const clientFilter = magazynFilterClient?.value || '';
-        const oilTypeFilter = magazynFilterOilType?.value || '';
+        const productTypeFilter = magazynFilterOilType?.value || '';
         const containerFilter = magazynFilterContainer?.value || '';
         return (items || []).filter(item => {
             const clientName = normalizeClientName(item.klient);
             const matchesSearch = !search || [item.index, item.nazwa, clientName].some(val => String(val || '').toLowerCase().includes(search));
-            const { typOleju, pojemnosc } = parseOilMeta(item);
+            const { pojemnosc } = parseOilMeta(item);
+            const productType = resolveWarehouseType(item);
             const matchesClient = !clientFilter || clientName === clientFilter;
-            const matchesOilType = !oilTypeFilter || typOleju === oilTypeFilter;
+            const matchesProductType = !productTypeFilter || productType === productTypeFilter;
             const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            return matchesSearch && matchesClient && matchesOilType && matchesContainer;
+            return matchesSearch && matchesClient && matchesProductType && matchesContainer;
         });
     };
 
@@ -6109,6 +6149,7 @@ async function obslugaListyCzesci(event) {
         const rows = filtered.map((produkt) => {
             const jestOlejem = Boolean(produkt.jestOlejem);
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
+            const productType = resolveWarehouseType(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
             const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
@@ -6117,11 +6158,7 @@ async function obslugaListyCzesci(event) {
                 : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
             const klientDisplay = normalizeClientName(produkt.klient);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
-            const oilActions = jestOlejem ? `
-                <button type="button" data-action="add-oil">Dodaj olej</button>
-                <button type="button" data-action="remove-oil">Zdejmij olej</button>
-            ` : '';
-            return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-container="${pojemnosc || ''}">
+            return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Index">${produkt.index}</td>
                     <td data-label="Nazwa">${produkt.nazwa}</td>
                     <td data-label="Klient">${klientDisplay}</td>
@@ -6131,12 +6168,6 @@ async function obslugaListyCzesci(event) {
                     <td data-label="Akcje" class="actions-col">
                         <div class="row-action">
                             <button type="button" class="row-action-btn" data-action="menu" aria-label="Akcje">⋯</button>
-                            <div class="row-action-menu" role="menu">
-                                <button type="button" data-action="details">Szczegóły</button>
-                                <button type="button" data-action="add">Dodaj</button>
-                                <button type="button" data-action="remove">Zdejmij</button>
-                                ${oilActions}
-                            </div>
                         </div>
                     </td>
                 </tr>`;
@@ -6151,22 +6182,23 @@ async function obslugaListyCzesci(event) {
         const prevOilType = magazynFilterOilType.value;
         const prevContainer = magazynFilterContainer.value;
         const clients = new Set();
-        const oilTypes = new Set();
+        const productTypes = new Set();
         const containers = new Set();
         wszystkieProdukty.forEach(item => {
             clients.add(normalizeClientName(item.klient));
-            const { typOleju, pojemnosc } = parseOilMeta(item);
-            if (typOleju) oilTypes.add(typOleju);
+            const { pojemnosc } = parseOilMeta(item);
+            const productType = resolveWarehouseType(item);
+            if (productType) productTypes.add(productType);
             if (pojemnosc) containers.add(String(pojemnosc));
         });
         const clientOptions = [''].concat([...clients].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pl')));
         magazynFilterClient.innerHTML = clientOptions.map(val => `<option value="${val}">${val || 'Wszyscy'}</option>`).join('');
-        const oilOptions = [''].concat([...oilTypes].filter(Boolean).sort());
-        magazynFilterOilType.innerHTML = oilOptions.map(val => `<option value="${val}">${val || 'Wszystkie'}</option>`).join('');
+        const typeOptions = [''].concat([...productTypes].filter(Boolean).sort());
+        magazynFilterOilType.innerHTML = typeOptions.map(val => `<option value="${val}">${val || 'Wszystkie'}</option>`).join('');
         const containerOptions = [''].concat([...containers].filter(Boolean).sort((a, b) => Number(a) - Number(b)));
         magazynFilterContainer.innerHTML = containerOptions.map(val => `<option value="${val}">${val ? `${val} L` : 'Wszystkie'}</option>`).join('');
         if (clientOptions.includes(prevClient)) magazynFilterClient.value = prevClient;
-        if (oilOptions.includes(prevOilType)) magazynFilterOilType.value = prevOilType;
+        if (typeOptions.includes(prevOilType)) magazynFilterOilType.value = prevOilType;
         if (containerOptions.includes(prevContainer)) magazynFilterContainer.value = prevContainer;
         syncOilToolOptions();
     };
@@ -6198,11 +6230,101 @@ async function obslugaListyCzesci(event) {
 
     const getProductById = (id) => wszystkieProdukty.find(p => p.id === id);
 
-    const closeRowActionMenus = (except = null) => {
-        if (!magazynTable) return;
-        magazynTable.querySelectorAll('.row-action').forEach(menu => {
-            if (menu !== except) menu.classList.remove('is-open');
+    let magazynMenuPortal = null;
+    let magazynMenuState = { productId: null, trigger: null };
+
+    const buildMagazynMenuItems = (produkt) => {
+        const items = [
+            { action: 'details', label: 'Szczegóły' },
+            { action: 'add', label: 'Dodaj' },
+            { action: 'remove', label: 'Zdejmij' }
+        ];
+        if (produkt?.jestOlejem) {
+            items.push(
+                { action: 'add-oil', label: 'Dodaj olej' },
+                { action: 'remove-oil', label: 'Zdejmij olej' }
+            );
+        }
+        return items;
+    };
+
+    const ensureMagazynMenuPortal = () => {
+        if (magazynMenuPortal) return magazynMenuPortal;
+        const menu = document.createElement('div');
+        menu.className = 'row-action-menu row-action-menu--portal';
+        menu.setAttribute('role', 'menu');
+        menu.style.display = 'none';
+        menu.addEventListener('click', (event) => {
+            const btn = event.target.closest('button[data-action]');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const produkt = getProductById(magazynMenuState.productId);
+            if (!produkt) return;
+            closeMagazynRowMenu();
+            if (action === 'details') {
+                openProductDetailsModal(produkt, 'add');
+                return;
+            }
+            if (action === 'add' || action === 'add-oil') {
+                openProductDetailsModal(produkt, 'add');
+                return;
+            }
+            if (action === 'remove' || action === 'remove-oil') {
+                openProductDetailsModal(produkt, 'remove');
+            }
         });
+        document.body.appendChild(menu);
+        magazynMenuPortal = menu;
+        return menu;
+    };
+
+    const closeMagazynRowMenu = () => {
+        if (!magazynMenuPortal) return;
+        magazynMenuPortal.style.display = 'none';
+        magazynMenuPortal.style.left = '';
+        magazynMenuPortal.style.top = '';
+        magazynMenuPortal.style.visibility = '';
+        magazynMenuState = { productId: null, trigger: null };
+    };
+
+    const positionMagazynMenu = (menu, trigger) => {
+        const rect = trigger.getBoundingClientRect();
+        const spacing = 8;
+        menu.style.visibility = 'hidden';
+        menu.style.display = 'grid';
+        const menuRect = menu.getBoundingClientRect();
+        let top = rect.bottom + spacing;
+        let left = rect.right - menuRect.width;
+        if (top + menuRect.height > window.innerHeight - spacing) {
+            top = rect.top - menuRect.height - spacing;
+        }
+        if (left < spacing) {
+            left = spacing;
+        }
+        if (left + menuRect.width > window.innerWidth - spacing) {
+            left = window.innerWidth - menuRect.width - spacing;
+        }
+        menu.style.top = `${Math.max(spacing, top)}px`;
+        menu.style.left = `${Math.max(spacing, left)}px`;
+        menu.style.visibility = 'visible';
+    };
+
+    const openMagazynRowMenu = (trigger, produkt) => {
+        if (!trigger || !produkt) return;
+        const menu = ensureMagazynMenuPortal();
+        const items = buildMagazynMenuItems(produkt);
+        menu.innerHTML = items.map(item => `<button type="button" data-action="${item.action}">${item.label}</button>`).join('');
+        magazynMenuState = { productId: produkt.id, trigger };
+        positionMagazynMenu(menu, trigger);
+    };
+
+    const closeRowActionMenus = (except = null) => {
+        if (magazynTable) {
+            magazynTable.querySelectorAll('.row-action').forEach(menu => {
+                if (menu !== except) menu.classList.remove('is-open');
+            });
+        }
+        closeMagazynRowMenu();
     };
 
     const handleMagazynRowClick = (event) => {
@@ -6214,10 +6336,9 @@ async function obslugaListyCzesci(event) {
         const actionButton = event.target.closest('[data-action]');
         if (actionButton) {
             const action = actionButton.dataset.action;
-            const actionMenu = actionButton.closest('.row-action');
             if (action === 'menu') {
-                const isOpen = actionMenu?.classList.toggle('is-open');
-                closeRowActionMenus(isOpen ? actionMenu : null);
+                closeRowActionMenus();
+                openMagazynRowMenu(actionButton, produkt);
                 return;
             }
             closeRowActionMenus();
@@ -6435,6 +6556,16 @@ async function obslugaListyCzesci(event) {
     if (itemIsOilCheckbox) {
         itemIsOilCheckbox.addEventListener('change', () => setOilFieldsVisibility(itemIsOilCheckbox.checked));
     }
+    if (itemProductTypeSelect) {
+        itemProductTypeSelect.addEventListener('change', () => {
+            if (!magazynForm) return;
+            if (itemProductTypeSelect.value !== PRODUCT_TYPE_ZMYWACZ) return;
+            const indexInput = magazynForm['item-index'];
+            const nameInput = magazynForm['item-name'];
+            if (indexInput && !indexInput.value) indexInput.value = PRODUCT_TYPE_ZMYWACZ;
+            if (nameInput && !nameInput.value) nameInput.value = 'Zmywacz';
+        });
+    }
     if (productDetailsCloseButton && productDetailsModal) {
         productDetailsCloseButton.onclick = () => { hideModal(productDetailsModal); };
     }
@@ -6528,7 +6659,7 @@ async function obslugaListyCzesci(event) {
         });
     }
     document.addEventListener('click', (event) => {
-        if (!event.target.closest('.row-action')) {
+        if (!event.target.closest('.row-action') && !event.target.closest('.row-action-menu--portal')) {
             closeRowActionMenus();
             closeClientActionMenus();
         }
@@ -6558,6 +6689,12 @@ async function obslugaListyCzesci(event) {
             return;
         }
         if (openMenus.length) closeMenus();
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeMagazynRowMenu();
+        }
     });
 
     if (vacationTabs) {
