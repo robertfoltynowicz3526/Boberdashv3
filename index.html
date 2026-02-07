@@ -51,6 +51,18 @@
                 <h2>Pulpit</h2>
                 <div id="unfinished-button-slot" class="pulpit-actions"></div>
             </div>
+            <section class="pulpit-quick-actions" aria-label="Szybkie akcje">
+                <div class="pulpit-stats-header">
+                    <h3>Szybkie akcje</h3>
+                </div>
+                <div id="pulpit-quick-actions" class="quick-actions-grid"></div>
+            </section>
+            <section class="pulpit-weekly" aria-label="Ten tydzień">
+                <div class="pulpit-stats-header">
+                    <h3>Ten tydzień</h3>
+                </div>
+                <div id="pulpit-weekly-preview" class="summary-container-subtle summary-compact"></div>
+            </section>
             <section class="pulpit-stats-bar" aria-label="Statystyki miesiąca">
                 <div class="pulpit-stats-header">
                     <h3>Statystyki miesiąca</h3>
@@ -61,6 +73,14 @@
                 <h3>Wyfakturowane – ostatnie 3 mies.</h3>
                 <div class="summary-container-subtle">
                     <div class="metrics-chart" id="fh3m-pulpit"></div>
+                </div>
+            </section>
+            <section class="pulpit-activity" aria-label="Ostatnie działania">
+                <div class="pulpit-stats-header">
+                    <h3>Ostatnie działania</h3>
+                </div>
+                <div id="pulpit-activity" class="summary-container-subtle">
+                    <ul id="pulpit-activity-list" class="activity-list"></ul>
                 </div>
             </section>
         </div>
@@ -425,6 +445,10 @@
             <div class="form-group">
               <label for="complete-zlecenie-end-at">Zakończenie (data i godzina):</label>
               <input type="datetime-local" id="complete-zlecenie-end-at">
+            </div>
+            <div class="form-group">
+              <label for="complete-zlecenie-service-date">Data wykonania:</label>
+              <input type="date" id="complete-zlecenie-service-date">
             </div>
             <hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
     </div>

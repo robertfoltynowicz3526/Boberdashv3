@@ -1,5 +1,5 @@
 import { db, auth } from './firebase-config.js';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, startAt, endBefore } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, startAt, endBefore, limit } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
 import './styles/desktop-only.css';
@@ -365,6 +365,18 @@ function initializeApp() {
         SWIETO: 'Święto',
         SZKOLENIE: 'Szkolenie'
     };
+    const DAY_OFF_STATUSES = ['L4', 'URL', 'SWIETO', 'WOLNE', 'SZKOLENIE'];
+    const QUICK_ACTIONS_CONFIG = [
+        { id: 'add-order', label: 'Dodaj zlecenie', icon: '🧾', action: 'open-add-order', route: 'dodaj-zlecenie', note: 'Zlecenia' },
+        { id: 'add-entry-today', label: 'Dodaj ewidencję (dziś)', icon: '🗓️', action: 'open-entry-today', route: 'kalendarz-tab', note: 'Ewidencja' },
+        { id: 'calendar-today', label: 'Kalendarz (dziś)', icon: '📌', action: 'open-calendar-today', route: 'kalendarz-tab', note: 'Kalendarz' },
+        { id: 'add-client', label: 'Dodaj klienta', icon: '👤', action: 'open-add-client', route: 'klienci', note: 'Klienci' },
+        { id: 'add-machine', label: 'Dodaj maszynę', icon: '🚜', action: 'open-add-machine', route: 'maszyny', note: 'Maszyny' },
+        { id: 'warehouse', label: 'Magazyn', icon: '📦', action: 'open-warehouse', route: 'magazyn', note: 'Stan i wyszukiwarka' }
+    ];
+    const DEFAULT_STOCK_ITEMS = [
+        { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false }
+    ];
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -408,6 +420,10 @@ function initializeApp() {
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
     let _wszystkieKlienciCache = [], _wszystkieMaszynyCache = [], _wszystkieZleceniaCache = []; // Cache z Firebase
     const NISKI_STAN_MAGAZYNOWY = 5;
+    let recentActivity = [];
+    let weeklyMissingDays = [];
+    let activityStatus = 'idle';
+    let hasEnsuredDefaultStock = false;
     let calendar;
     window.calendar = null;
     window.__calendarApi = null;
@@ -638,6 +654,7 @@ function initializeApp() {
         plannedLeaveWithoutCalendar: [],
         total: 0
     };
+    let unfinishedDrawerView = { mode: 'summary', days: [] };
     let ordersFilterMode = null;
     let unfinishedDrawer = null;
     let unfinishedButton = null;
@@ -653,7 +670,8 @@ function initializeApp() {
         machines: { initialized: false, inFlight: false },
         orders: { initialized: false, inFlight: false },
         stock: { initialized: false, inFlight: false },
-        summary: { initialized: false, inFlight: false }
+        summary: { initialized: false, inFlight: false },
+        activity: { initialized: false, inFlight: false }
     };
     let bootstrapReady = false;
     let pendingCalendarInit = false;
@@ -723,6 +741,20 @@ function initializeApp() {
         return Number.isNaN(parsed.getTime()) ? null : parsed;
     };
 
+    const logActivityEvent = async ({ type, refId, label }) => {
+        if (!type || !label) return;
+        try {
+            await addDoc(collection(db, "activity"), {
+                type,
+                refId: refId || null,
+                label,
+                timestamp: serverTimestamp()
+            });
+        } catch (error) {
+            console.warn('[activity] Nie udało się zapisać zdarzenia:', error);
+        }
+    };
+
     const walidujPrzedzialCzasu = (startValue, endValue, options = {}) => {
         const { allowEndBeforeStart = false } = options;
         const startDate = toDateSafe(startValue);
@@ -789,6 +821,9 @@ function initializeApp() {
     const kalendarzSummaryTiles = document.getElementById('kalendarz-summary-tiles');
     const kalendarzStatusBadge = document.getElementById('kalendarz-status-badge');
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
+    const pulpitQuickActionsContainer = document.getElementById('pulpit-quick-actions');
+    const pulpitWeeklyContainer = document.getElementById('pulpit-weekly-preview');
+    const pulpitActivityList = document.getElementById('pulpit-activity-list');
     const calendarTitleEl = document.getElementById('calendar-title');
     const calendarToolbar = document.getElementById('calendar-toolbar');
     const calendarDayPanel = document.getElementById('calendar-day-panel');
@@ -973,6 +1008,9 @@ function initializeApp() {
         if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = '<p class="loading-state">Ładowanie zleceń...</p>';
         if (ukonczoneZleceniaLista) ukonczoneZleceniaLista.innerHTML = '<p class="loading-state">Ładowanie zleceń...</p>';
         if (kalendarzPodsumowanieDiv) kalendarzPodsumowanieDiv.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.innerHTML = '<p class="loading-state">Ładowanie akcji...</p>';
+        if (pulpitWeeklyContainer) pulpitWeeklyContainer.innerHTML = '<p class="loading-state">Ładowanie tygodnia...</p>';
+        if (pulpitActivityList) pulpitActivityList.innerHTML = '<li class="loading-state">Ładowanie aktywności...</li>';
         if (zakonczoneSummaryContainer) zakonczoneSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         if (annualSummaryContainer) annualSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         if (l4SummaryContainer) l4SummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
@@ -997,6 +1035,12 @@ function initializeApp() {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    };
+
+    const resolveServiceDate = (order) => {
+        if (!order) return '';
+        const raw = order.serviceDate || order.performedAt || order.dataUkonczenia || '';
+        return typeof raw === 'string' ? raw : formatDateForStorage(toDateSafe(raw));
     };
 
     const addDaysToDate = (date, days) => {
@@ -1075,6 +1119,22 @@ function initializeApp() {
 
     const isOnOrAfterMinDate = (dayKey) => Boolean(dayKey) && dayKey >= MIN_DATE;
 
+    const resolveDayStatus = (dayKey) => {
+        const direct = leaveByDay.get(dayKey);
+        if (direct) return direct;
+        const dayDoc = dayDocsByDay.get(dayKey);
+        if (!dayDoc) return null;
+        const normalizedKind = normalizeDayLeaveValue(dayDoc?.leaveKind || dayDoc?.dayLeave || '');
+        if (normalizedKind && normalizedKind !== DAY_LEAVE_NONE) return normalizedKind;
+        const flags = dayDoc?.flags || {};
+        if (flags.l4) return 'L4';
+        if (flags.urlop) return 'URL';
+        if (flags.swieto) return 'SWIETO';
+        if (flags.wolne) return 'WOLNE';
+        if (flags.szkolenie) return 'SZKOLENIE';
+        return null;
+    };
+
     const getChecklistRange = () => {
         const view = calendar?.view || window.__fcCalendar?.view;
         const today = normalizeAllDayDate(new Date());
@@ -1092,22 +1152,7 @@ function initializeApp() {
     const buildUnfinishedSummary = () => {
         const { start: checklistStart, end: checklistEnd } = getChecklistRange();
         const daysInRange = checklistStart && checklistEnd ? listDaysInRange(checklistStart, checklistEnd) : [];
-        const isDayOffStatus = (status) => ['L4', 'URL', 'SWIETO', 'WOLNE', 'SZKOLENIE'].includes(status);
-        const resolveDayStatus = (dayKey) => {
-            const direct = leaveByDay.get(dayKey);
-            if (direct) return direct;
-            const dayDoc = dayDocsByDay.get(dayKey);
-            if (!dayDoc) return null;
-            const normalizedKind = normalizeDayLeaveValue(dayDoc?.leaveKind || dayDoc?.dayLeave || '');
-            if (normalizedKind && normalizedKind !== DAY_LEAVE_NONE) return normalizedKind;
-            const flags = dayDoc?.flags || {};
-            if (flags.l4) return 'L4';
-            if (flags.urlop) return 'URL';
-            if (flags.swieto) return 'SWIETO';
-            if (flags.wolne) return 'WOLNE';
-            if (flags.szkolenie) return 'SZKOLENIE';
-            return null;
-        };
+        const isDayOffStatus = (status) => DAY_OFF_STATUSES.includes(status);
         const hasAnyActivity = (dayKey) => {
             const ordersForDay = Array.isArray(ordersByDay.get(dayKey)) ? ordersByDay.get(dayKey) : [];
             if (ordersForDay.length > 0) return true;
@@ -1471,7 +1516,10 @@ function initializeApp() {
             <span class="unfinished-button-label">Niedokończone</span>
             <span class="unfinished-badge">0</span>
         `;
-        button.addEventListener('click', () => setUnfinishedDrawerOpen(true));
+        button.addEventListener('click', () => {
+            setUnfinishedDrawerView('summary');
+            setUnfinishedDrawerOpen(true);
+        });
         return button;
     };
 
@@ -1534,6 +1582,26 @@ function initializeApp() {
         const list = unfinishedDrawer.querySelector('[data-unfinished-list]');
         const empty = unfinishedDrawer.querySelector('[data-unfinished-empty]');
         if (!list || !empty) return;
+        if (unfinishedDrawerView.mode === 'week-missing') {
+            const days = Array.isArray(unfinishedDrawerView.days) ? unfinishedDrawerView.days : [];
+            list.innerHTML = `
+                <div class="unfinished-subheader">
+                    <button type="button" class="btn-ghost" data-unfinished-back>← Wróć</button>
+                    <span>Braki w tym tygodniu</span>
+                </div>
+                ${days.map(day => `
+                    <button type="button" class="unfinished-item" data-unfinished-day="${day}">
+                        <div class="unfinished-item-header">
+                            <span class="unfinished-item-title">${day}</span>
+                            <span class="unfinished-item-count">Brak ewidencji</span>
+                        </div>
+                    </button>
+                `).join('') || '<div class="unfinished-empty-inline">Brak braków w tym tygodniu.</div>'}
+            `;
+            empty.style.display = 'none';
+            list.style.display = 'grid';
+            return;
+        }
         const items = getUnfinishedItemConfig();
         list.innerHTML = items.map(item => `
             <button type="button" class="unfinished-item" data-unfinished-item="${item.key}">
@@ -1560,6 +1628,14 @@ function initializeApp() {
         } else {
             closeDrawer(unfinishedDrawer);
         }
+    };
+
+    const setUnfinishedDrawerView = (mode = 'summary', days = []) => {
+        unfinishedDrawerView = {
+            mode,
+            days: Array.isArray(days) ? days : []
+        };
+        renderUnfinishedDrawer();
     };
 
     const handleUnfinishedItemClick = (key) => {
@@ -1604,6 +1680,21 @@ function initializeApp() {
             btn.addEventListener('click', () => setUnfinishedDrawerOpen(false));
         });
         unfinishedDrawer.addEventListener('click', (event) => {
+            const backButton = event.target.closest('[data-unfinished-back]');
+            if (backButton) {
+                setUnfinishedDrawerView('summary');
+                return;
+            }
+            const dayButton = event.target.closest('[data-unfinished-day]');
+            if (dayButton) {
+                const dayKey = dayButton.dataset.unfinishedDay;
+                if (dayKey) {
+                    showTab('kalendarz-tab');
+                    focusCalendarDay(dayKey);
+                }
+                setUnfinishedDrawerOpen(false);
+                return;
+            }
             const target = event.target.closest('[data-unfinished-item]');
             if (!target) return;
             handleUnfinishedItemClick(target.dataset.unfinishedItem);
@@ -2314,6 +2405,19 @@ function initializeApp() {
 
             await setDoc(doc(db, "godziny_pracy", data), dane);
             await syncLeaveEventForDay(data, selectedLeaveKind);
+            await logActivityEvent({
+                type: 'TIME_EDIT',
+                refId: dayKey,
+                label: `Ewidencja ${dayKey}: P ${dane.work}h, J ${dane.drive}h, F ${fakturowaneDoZapisu}h, N ${dane.nadgodziny}h`
+            });
+            const normalizedLeaveKind = normalizeDayLeaveValue(selectedLeaveKind || '');
+            if (normalizedLeaveKind && normalizedLeaveKind !== DAY_LEAVE_NONE) {
+                await logActivityEvent({
+                    type: 'DAY_STATUS_SET',
+                    refId: dayKey,
+                    label: `Status dnia ${dayKey}: ${LEAVE_LABELS[normalizedLeaveKind] || normalizedLeaveKind}`
+                });
+            }
             const localRecord = normalizeDayRecord(data, dane);
             localRecord.fakturowane = fakturowaneDoZapisu;
             localRecord.billed = fakturowaneDoZapisu;
@@ -2433,6 +2537,48 @@ function initializeApp() {
         };
     }
 
+    const getQuickActionsData = () => ({
+        actions: QUICK_ACTIONS_CONFIG,
+        hasCalendar: Boolean(kalendarzContainer),
+        canAddClient: Boolean(clientDrawer && klientForm),
+        canAddMachine: Boolean(machineDrawer && maszynaForm),
+        canOpenWarehouse: Boolean(magazynTab),
+        canOpenOrders: Boolean(zlecenieForm)
+    });
+
+    const buildQuickActionsModel = (data) => (data.actions || []).map((action) => {
+        let disabled = false;
+        if (action.action === 'open-entry-today' || action.action === 'open-calendar-today') {
+            disabled = !data.hasCalendar;
+        }
+        if (action.action === 'open-add-client') {
+            disabled = !data.canAddClient;
+        }
+        if (action.action === 'open-add-machine') {
+            disabled = !data.canAddMachine;
+        }
+        if (action.action === 'open-warehouse') {
+            disabled = !data.canOpenWarehouse;
+        }
+        if (action.action === 'open-add-order') {
+            disabled = !data.canOpenOrders;
+        }
+        return { ...action, disabled };
+    });
+
+    const renderQuickActions = (model = []) => {
+        if (!pulpitQuickActionsContainer) return;
+        pulpitQuickActionsContainer.innerHTML = model.map(action => `
+            <button type="button" class="quick-action-card" data-quick-action="${action.id}" ${action.disabled ? 'disabled' : ''}>
+                <span class="quick-action-icon">${action.icon}</span>
+                <span class="quick-action-label">
+                    <span>${action.label}</span>
+                    <span class="quick-action-note">${action.note || action.route}</span>
+                </span>
+            </button>
+        `).join('') || '<p class="loading-state">Brak akcji do wyświetlenia.</p>';
+    };
+
     function renderPulpitStatystykiMiesiaca(podsumowanie) {
         if (!kalendarzPodsumowanieDiv) return;
         const metricsHTML = `
@@ -2452,11 +2598,237 @@ function initializeApp() {
         renderFH3M(chartHost, y, m);
     }
 
+    const getWeekPreviewData = () => {
+        const today = normalizeAllDayDate(new Date());
+        if (!today) return null;
+        const day = today.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        const weekStart = addDaysToDate(today, diffToMonday);
+        const weekEnd = addDaysToDate(weekStart, 6);
+        if (!weekStart || !weekEnd) return null;
+        const days = listDaysInclusive(weekStart, weekEnd);
+        const entries = (wszystkieWpisyKalendarza || []).filter((entry) => {
+            const key = normalizeDayKey(entry?.id || entry?.date, 'weekPreview.entry');
+            return key && days.includes(key);
+        });
+        return {
+            days,
+            entries,
+            statuses: new Map(days.map(dayKey => [dayKey, resolveDayStatus(dayKey)]))
+        };
+    };
+
+    const buildWeekPreviewModel = (data) => {
+        if (!data) return null;
+        const totals = data.entries.reduce((acc, entry) => {
+            if (entry?.leaveKind || entry?.flags?.urlop || entry?.flags?.l4 || entry?.flags?.swieto || entry?.flags?.wolne || entry?.flags?.szkolenie) {
+                return acc;
+            }
+            acc.praca += Number(entry.praca ?? entry.work ?? 0) || 0;
+            acc.jazda += Number(entry.jazda ?? entry.drive ?? 0) || 0;
+            acc.fakturowane += Number(entry.fakturowane ?? entry.billed ?? 0) || 0;
+            acc.nadgodziny += Number(entry.nadgodziny ?? 0) || 0;
+            return acc;
+        }, { praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
+
+        const missingDaysList = data.days.filter((dayKey) => {
+            const date = toDateSafe(dayKey);
+            if (!date) return false;
+            const dayOfWeek = date.getDay();
+            if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+            const status = data.statuses.get(dayKey);
+            if (status && DAY_OFF_STATUSES.includes(status)) return false;
+            return !dayDocsByDay.has(dayKey);
+        });
+
+        return {
+            totals,
+            missingDaysCount: missingDaysList.length,
+            missingDaysList
+        };
+    };
+
+    const renderWeekPreview = (model) => {
+        if (!pulpitWeeklyContainer) return;
+        if (!model) {
+            pulpitWeeklyContainer.innerHTML = '<p class="loading-state">Brak danych tygodniowych.</p>';
+            weeklyMissingDays = [];
+            return;
+        }
+        weeklyMissingDays = model.missingDaysList;
+        pulpitWeeklyContainer.innerHTML = `
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">P</div><div class="value num">${model.totals.praca.toFixed(1)} h</div></div>
+                <div class="metric"><div class="label">J</div><div class="value num">${model.totals.jazda.toFixed(1)} h</div></div>
+                <div class="metric"><div class="label">F</div><div class="value num">${model.totals.fakturowane.toFixed(1)} h</div></div>
+                <div class="metric"><div class="label">N</div><div class="value num">${model.totals.nadgodziny.toFixed(1)} h</div></div>
+                <button type="button" class="weekly-missing" data-weekly-missing>
+                    Braki: ${model.missingDaysCount} dni
+                </button>
+            </div>
+        `;
+    };
+
+    const getActivityData = () => ({
+        entries: Array.isArray(recentActivity) ? recentActivity : []
+    });
+
+    const buildActivityModel = (data) => {
+        const icons = {
+            ORDER_CREATED: '🧾',
+            ORDER_CLOSED: '✅',
+            TIME_EDIT: '⏱️',
+            DAY_STATUS_SET: '📌',
+            STOCK_CHANGE: '📦',
+            CLIENT_EDIT: '👤',
+            MACHINE_EDIT: '🚜'
+        };
+        return (data.entries || []).map(entry => ({
+            id: entry.id,
+            refId: entry.refId,
+            type: entry.type,
+            label: entry.label || '—',
+            time: formatDateTimeLabel(entry.timestamp),
+            icon: icons[entry.type] || '•'
+        }));
+    };
+
+    const renderActivity = (model = []) => {
+        if (!pulpitActivityList) return;
+        if (activityStatus === 'loading') {
+            pulpitActivityList.innerHTML = '<li class="loading-state">Ładowanie aktywności...</li>';
+            return;
+        }
+        if (activityStatus === 'error') {
+            pulpitActivityList.innerHTML = '<li class="loading-state">Nie udało się załadować aktywności.</li>';
+            return;
+        }
+        if (!model.length) {
+            pulpitActivityList.innerHTML = '<li class="loading-state">Brak ostatnich działań.</li>';
+            return;
+        }
+        pulpitActivityList.innerHTML = model.map(item => `
+            <li class="activity-item" data-activity-id="${item.id}" data-activity-type="${item.type}" data-activity-ref="${item.refId || ''}">
+                <span class="activity-icon">${item.icon}</span>
+                <span class="activity-text">
+                    <span>${item.label}</span>
+                    <span class="activity-time">${item.time}</span>
+                </span>
+            </li>
+        `).join('');
+    };
+
     function obliczSumeGodzinZKalendarza(start, end) {
         const podsumowanie = agregujPodsumowanieMiesiaca(start, end, wszystkieWpisyKalendarza);
         renderPulpitStatystykiMiesiaca(podsumowanie);
         renderPulpitWykresy();
     }
+
+    const waitForCalendarReady = async (attempts = 8, delayMs = 200) => {
+        for (let i = 0; i < attempts; i += 1) {
+            if (getCalendarApi()) return true;
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        return Boolean(getCalendarApi());
+    };
+
+    const runQuickAction = async (actionId) => {
+        const todayKey = formatDateForStorage(new Date());
+        if (!actionId) return;
+        switch (actionId) {
+            case 'add-order':
+                showTab('dodaj-zlecenie');
+                break;
+            case 'add-entry-today':
+                showTab('kalendarz-tab');
+                if (!getCalendarApi()) {
+                    await initCalendarModule('quick-action');
+                    await waitForCalendarReady();
+                }
+                setCalendarView('day', todayKey);
+                openEwidencja(todayKey);
+                break;
+            case 'calendar-today':
+                showTab('kalendarz-tab');
+                if (!getCalendarApi()) {
+                    await initCalendarModule('quick-action');
+                    await waitForCalendarReady();
+                }
+                setCalendarView('day', todayKey);
+                break;
+            case 'add-client':
+                showTab('klienci');
+                openClientDrawer(null, 'add');
+                break;
+            case 'add-machine':
+                showTab('maszyny');
+                maszynaForm?.reset();
+                addMachineClientCombobox?.clear();
+                setMachineDrawerMode('add');
+                break;
+            case 'warehouse':
+                showTab('magazyn');
+                magazynSearchInput?.focus();
+                break;
+            default:
+                break;
+        }
+    };
+
+    const handleQuickActionClick = (event) => {
+        const button = event.target.closest('[data-quick-action]');
+        if (!button) return;
+        const actionId = button.dataset.quickAction;
+        if (button.disabled) return;
+        void runQuickAction(actionId);
+    };
+
+    const openWeeklyMissingDrawer = () => {
+        setUnfinishedDrawerView('week-missing', weeklyMissingDays);
+        setUnfinishedDrawerOpen(true);
+    };
+
+    const handleWeeklyMissingClick = (event) => {
+        const trigger = event.target.closest('[data-weekly-missing]');
+        if (!trigger) return;
+        openWeeklyMissingDrawer();
+    };
+
+    const handleActivityClick = (event) => {
+        const item = event.target.closest('[data-activity-id]');
+        if (!item) return;
+        const type = item.dataset.activityType;
+        const refId = item.dataset.activityRef;
+        if (!type || !refId) return;
+        if (type === 'ORDER_CREATED' || type === 'ORDER_CLOSED') {
+            showTab('zlecenia');
+            handleDetailsButtonClick(refId);
+            return;
+        }
+        if (type === 'TIME_EDIT' || type === 'DAY_STATUS_SET') {
+            showTab('kalendarz-tab');
+            if (!getCalendarApi()) {
+                void initCalendarModule('activity');
+            }
+            focusCalendarDay(refId);
+            return;
+        }
+        if (type === 'STOCK_CHANGE') {
+            showTab('magazyn');
+            const produkt = getProductById(refId);
+            if (produkt) openProductDetailsModal(produkt, 'add');
+            return;
+        }
+        if (type === 'CLIENT_EDIT') {
+            showTab('klienci');
+            openClientDrawer(refId, 'view');
+            return;
+        }
+        if (type === 'MACHINE_EDIT') {
+            showTab('maszyny');
+            otworzModalEdycjiMaszyny(refId);
+        }
+    };
 
     async function obslugaKalendarza(event) {
         const target = event.target;
@@ -2790,7 +3162,7 @@ function initializeApp() {
 
 
         return wszystkieZlecenia
-            .filter(z => z?.status === 'ukończone' && z.dataUkonczenia?.startsWith(miesiac))
+            .filter(z => z?.status === 'ukończone' && resolveServiceDate(z)?.startsWith(miesiac))
             .reduce((acc, z) => {
                 const godziny = Number(z.wyfakturowaneGodziny) || 0;
                 const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
@@ -3244,6 +3616,18 @@ function initializeApp() {
     }
 
     function renderPulpit() {
+        const quickActionsData = getQuickActionsData();
+        const quickActionsModel = buildQuickActionsModel(quickActionsData);
+        renderQuickActions(quickActionsModel);
+
+        const weeklyData = getWeekPreviewData();
+        const weeklyModel = buildWeekPreviewModel(weeklyData);
+        renderWeekPreview(weeklyModel);
+
+        const activityData = getActivityData();
+        const activityModel = buildActivityModel(activityData);
+        renderActivity(activityModel);
+
         if (calendar?.view) {
             obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
         }
@@ -3709,7 +4093,7 @@ async function obslugaListyKlientow(event) {
                 collection(db, "zlecenia"),
                 where("maszynaId", "==", maszynaId),
                 where("status", "==", "ukończone"),
-                orderBy("dataUkonczenia", "desc")
+                orderBy("serviceDate", "desc")
             );
             const querySnapshot = await getDocs(qMasz);
 
@@ -3718,6 +4102,7 @@ async function obslugaListyKlientow(event) {
             if (!querySnapshot.empty) {
                 querySnapshot.forEach((d) => {
                     const zlecenie = d.data();
+                    const serviceDate = resolveServiceDate(zlecenie);
                     const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0
                         ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
                         : '';
@@ -3726,7 +4111,7 @@ async function obslugaListyKlientow(event) {
                     const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
                     rowsHtml += `
                         <tr data-id="${d.id}">
-                            <td>${zlecenie.dataUkonczenia || 'b.d.'}</td>
+                            <td>${serviceDate || 'b.d.'}</td>
                             <td>${zlecenie.nrZlecenia || '—'}</td>
                             <td>
                                 <div><em>${zlecenie.opis || 'Brak'}</em></div>
@@ -3827,6 +4212,11 @@ async function obslugaListyKlientow(event) {
             }
             renderClientView(updatedClient);
             setClientDrawerMode('view');
+            await logActivityEvent({
+                type: 'CLIENT_EDIT',
+                refId: klientId,
+                label: `Zmieniono klienta ${updatedClient.nazwa || ''}`.trim()
+            });
         } catch (e) {
             console.error("Błąd aktualizacji klienta lub powiązanych dokumentów:", e);
             alert("Wystąpił błąd podczas zapisywania zmian. Sprawdź konsolę.");
@@ -4398,6 +4788,11 @@ async function zapiszEdycjeMaszyny(event) {
             });
         }
 
+        await logActivityEvent({
+            type: 'MACHINE_EDIT',
+            refId: maszynaId,
+            label: `Zmieniono maszynę ${nowyTyp || ''} ${nowyModel || ''}`.trim()
+        });
         closeDrawer(machineDrawer);
     } catch (e) {
         console.error("Błąd aktualizacji maszyny lub powiązanych zleceń:", e);
@@ -4518,8 +4913,8 @@ function wyswietlZlecenia() {
                 `
             ));
         } else if (zlecenie.status === 'ukończone') {
-            const dataUkonczenia = zlecenie.dataUkonczenia || '';
-            if (!dataUkonczenia.startsWith(selectedMonth)) {
+            const serviceDate = resolveServiceDate(zlecenie);
+            if (!serviceDate.startsWith(selectedMonth)) {
                 return;
             }
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
@@ -4532,7 +4927,7 @@ function wyswietlZlecenia() {
                 zlecenie,
                 `
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
-                    <em>Ukończono (${zlecenie.dataUkonczenia || 'b.d.'})</em><br>
+                    <em>Wykonano (${serviceDate || 'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
                     ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
                     ${motoHtml}
@@ -4575,6 +4970,29 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
     }
 };
 
+const applyActivityData = (entries = [], { render = true, status = 'ready' } = {}) => {
+    recentActivity = Array.isArray(entries) ? entries : [];
+    activityStatus = status;
+    if (render) {
+        renderPulpit();
+    }
+};
+
+function nasluchujNaActivity() {
+    activityStatus = 'loading';
+    onSnapshot(
+        query(collection(db, "activity"), orderBy("timestamp", "desc"), limit(20)),
+        (snapshot) => {
+            const entries = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            applyActivityData(entries, { status: 'ready' });
+        },
+        (error) => {
+            console.error('Błąd ładowania aktywności:', error);
+            applyActivityData([], { status: 'error' });
+        }
+    );
+}
+
 function nasluchujNaZlecenia() {
     onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
         const orders = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
@@ -4600,6 +5018,12 @@ async function przeprowadzMigracjeStartEnd() {
                 payload.endAt = parsed;
             }
         }
+        if (!zlecenie.serviceDate) {
+            const fallbackDate = zlecenie.dataUkonczenia || (zlecenie.createdAt ? formatDateForStorage(toDateSafe(zlecenie.createdAt)) : '');
+            if (fallbackDate) {
+                payload.serviceDate = fallbackDate;
+            }
+        }
         if (Object.keys(payload).length > 0) {
             aktualizacje.push(
                 updateDoc(doc(db, "zlecenia", zlecenie.id), payload)
@@ -4621,6 +5045,7 @@ async function dodajZlecenie(event) {
     // dlatego bazujemy na serverTimestamp(), który odpowiada czasowi zapisowemu na serwerze.
     const startAtFieldValue = serverTimestamp();
 
+    const serviceDate = formatDateForStorage(new Date());
     let dane;
     if (wybranyKlientId === "szybkie-zlecenie") {
         dane = {
@@ -4630,6 +5055,7 @@ async function dodajZlecenie(event) {
             motoHours: 0,
             startAt: startAtFieldValue,
             endAt: null,
+            serviceDate,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -4648,6 +5074,7 @@ async function dodajZlecenie(event) {
             motoHours: Number(zlecenieForm.motogodziny.value) || 0,
             startAt: startAtFieldValue,
             endAt: null,
+            serviceDate,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -4656,10 +5083,15 @@ async function dodajZlecenie(event) {
     } else { alert("Wybierz klienta i maszynę LUB opcję 'Szybkie Zlecenie'."); return; }
 
     try {
-        await addDoc(collection(db, "zlecenia"), dane);
+        const docRef = await addDoc(collection(db, "zlecenia"), dane);
         if (dane.maszynaId && zlecenieForm.motogodziny.value) {
             await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny });
         }
+        await logActivityEvent({
+            type: 'ORDER_CREATED',
+            refId: docRef.id,
+            label: `Utworzono zlecenie ${dane.nrZlecenia || '(bez numeru)'}`
+        });
         zlecenieForm.reset();
         orderClientCombobox?.clear();
         zlecenieMaszynaSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
@@ -4732,6 +5164,11 @@ async function obslugaListyZlecen(event) {
             if (completeEndInput) {
                 completeEndInput.value = formatDatetimeLocalInput(new Date());
             }
+            const completeServiceDateInput = document.getElementById('complete-zlecenie-service-date');
+            if (completeServiceDateInput) {
+                const resolvedServiceDate = resolveServiceDate(zlecenie) || formatDateForStorage(new Date());
+                completeServiceDateInput.value = resolvedServiceDate;
+            }
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
@@ -4763,6 +5200,7 @@ async function obslugaListyZlecen(event) {
             await updateDoc(zlecenieRef, {
                 status: 'aktywne',
                 dataUkonczenia: null,
+                serviceDate: null,
                 endAt: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
@@ -4901,11 +5339,14 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
             return `${czesc.nazwa} (x${wyswietlanaIlosc})${oznaczenieOleju}`;
         }).join(', ')
         : 'Brak';
+    const serviceDate = resolveServiceDate(zlecenie);
 
     titleEl.textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
     infoDiv.innerHTML = `
         <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
         <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
+        <div class="details-group"><strong>Utworzono:</strong> <p>${formatDateTimeLabel(zlecenie.createdAt)}</p></div>
+        <div class="details-group"><strong>Wykonano:</strong> <p>${serviceDate ? formatDateLabel(serviceDate) : '—'}</p></div>
         <div class="details-group"><strong>Start:</strong> <p>${formatDateTimeLabel(zlecenie.startAt)}</p></div>
         <div class="details-group"><strong>Koniec:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
@@ -4915,7 +5356,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
          const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         const notatkaHtml = zlecenie.zakonczenieNotatka ? `<div class="details-group"><strong>Notatka przy zakończeniu:</strong> <p>${zlecenie.zakonczenieNotatka}</p></div>` : '';
         infoDiv.innerHTML += `
-            <div class="details-group"><strong>Data Faktycznego Zakończenia:</strong> <p>${zlecenie.dataUkonczenia}</p></div>
+            <div class="details-group"><strong>Data wykonania:</strong> <p>${serviceDate || '—'}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
@@ -5098,6 +5539,14 @@ async function obslugaListyCzesci(event) {
         const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
         const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
         const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
+        const serviceDateInput = document.getElementById('complete-zlecenie-service-date');
+        const serviceDateRaw = serviceDateInput?.value || '';
+        const normalizedServiceDate = normalizeDayKey(serviceDateRaw, 'serviceDate');
+        if (serviceDateRaw && !normalizedServiceDate) {
+            alert('Wybierz poprawną datę wykonania.');
+            return;
+        }
+        const serviceDateKey = normalizedServiceDate || formatDateForStorage(new Date());
         const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
         if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
             alert('Motogodziny muszą być liczbą większą lub równą 0.');
@@ -5129,7 +5578,8 @@ async function obslugaListyCzesci(event) {
             wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
             motoHours: Number(motoHours),
             typZlecenia: document.getElementById('typ-zlecenia').value,
-            dataUkonczenia: fallbackEndAtDate.toISOString().split('T')[0],
+            dataUkonczenia: serviceDateKey,
+            serviceDate: serviceDateKey,
             endAt: endAtValue,
             closedAt: serverTimestamp(),
             uzyteCzesci: czesciDoZlecenia,
@@ -5137,13 +5587,15 @@ async function obslugaListyCzesci(event) {
             zakonczenieNumerWZ: numerWzValue || null
         };
         let zamykaneZlecenieData = null;
+        let staraDataWykonania = null;
         try {
             await runTransaction(db, async (t) => {
                 const zlecenieSnap = await t.get(zlecenieRef);
                 if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
                 const zlecenieData = zlecenieSnap.data();
                 zamykaneZlecenieData = zlecenieData;
-                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h.`;
+                staraDataWykonania = resolveServiceDate(zlecenieData);
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${serviceDateKey}.`;
                 if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
                 if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
                 const nowaHistoria = [...(zlecenieData.historia || []), {
@@ -5184,6 +5636,18 @@ async function obslugaListyCzesci(event) {
                     await addDoc(collection(db, 'orders_history'), historiaPayload);
                 } catch (historyErr) {
                     console.warn('Nie udało się zapisać historii zlecenia:', historyErr);
+                }
+                await logActivityEvent({
+                    type: 'ORDER_CLOSED',
+                    refId: docId,
+                    label: `Zamknięto zlecenie ${zamykaneZlecenieData.nrZlecenia || ''} (wykonano ${serviceDateKey})`
+                });
+                if (staraDataWykonania && staraDataWykonania !== serviceDateKey) {
+                    await logActivityEvent({
+                        type: 'ORDER_CLOSED',
+                        refId: docId,
+                        label: `Zmieniono datę wykonania z ${staraDataWykonania} na ${serviceDateKey}`
+                    });
                 }
             }
             alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
@@ -5245,6 +5709,38 @@ async function obslugaListyCzesci(event) {
         setOilFieldsVisibility(false);
     };
 
+    const ensureDefaultStockItems = async (items = []) => {
+        if (hasEnsuredDefaultStock) return;
+        const existingIndexes = new Set((items || []).map(item => (item.index || '').toLowerCase()));
+        const existingNames = new Set((items || []).map(item => (item.nazwa || '').toLowerCase()));
+        const missing = DEFAULT_STOCK_ITEMS.filter(item => {
+            const indexKey = item.index.toLowerCase();
+            const nameKey = item.nazwa.toLowerCase();
+            return !existingIndexes.has(indexKey) && !existingNames.has(nameKey);
+        });
+        if (!missing.length) {
+            hasEnsuredDefaultStock = true;
+            return;
+        }
+        try {
+            for (const item of missing) {
+                await addDoc(collection(db, "magazyn"), {
+                    index: item.index,
+                    nazwa: item.nazwa,
+                    ilosc: 0,
+                    klient: '---',
+                    jestOlejem: Boolean(item.jestOlejem),
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                });
+            }
+        } catch (error) {
+            console.warn('[magazyn] Nie udało się dodać domyślnych produktów:', error);
+        } finally {
+            hasEnsuredDefaultStock = true;
+        }
+    };
+
     async function dodajProduktDoMagazynu(event) {
         event.preventDefault();
         if (!magazynForm) return;
@@ -5278,7 +5774,12 @@ async function obslugaListyCzesci(event) {
             pojemnosc: isOil ? pojemnosc : null,
         };
         try {
-            await addDoc(collection(db, "magazyn"), dane);
+            const docRef = await addDoc(collection(db, "magazyn"), dane);
+            await logActivityEvent({
+                type: 'STOCK_CHANGE',
+                refId: docRef.id,
+                label: `Dodano produkt ${dane.index} (${dane.nazwa})`
+            });
             resetProductAddForm();
             if (productAddModal) hideModal(productAddModal);
         } catch (e) {
@@ -5459,6 +5960,8 @@ async function obslugaListyCzesci(event) {
     const adjustWarehouseStock = async ({ docId, changeQty, operation }) => {
         if (!docId) return;
         const docRef = doc(db, "magazyn", docId);
+        const produkt = getProductById(docId);
+        const produktLabel = produkt ? `${produkt.index || ''} ${produkt.nazwa || ''}`.trim() : 'produkt';
         await runTransaction(db, async (t) => {
             const sfDoc = await t.get(docRef);
             if (!sfDoc.exists()) { throw "Dokument nie istnieje!"; }
@@ -5474,6 +5977,11 @@ async function obslugaListyCzesci(event) {
             }
             if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
             t.update(docRef, { ilosc: newQty, updatedAt: new Date() });
+        });
+        await logActivityEvent({
+            type: 'STOCK_CHANGE',
+            refId: docId,
+            label: `Zmiana stanu: ${produktLabel} (${operation === 'add' ? '+' : '-'}${changeQty} szt.)`
         });
     };
 
@@ -5503,12 +6011,17 @@ async function obslugaListyCzesci(event) {
             if (existing) {
                 await adjustWarehouseStock({ docId: existing.id, changeQty: normalizedQty, operation: 'add' });
             } else {
-                await addDoc(collection(db, "magazyn"), buildOilProductData({
+                const docRef = await addDoc(collection(db, "magazyn"), buildOilProductData({
                     typ,
                     pojemnosc,
                     klient,
                     ilosc: normalizedQty
                 }));
+                await logActivityEvent({
+                    type: 'STOCK_CHANGE',
+                    refId: docRef.id,
+                    label: `Dodano olej ${typ} ${pojemnosc}L (${normalizedQty} szt.)`
+                });
             }
             if (oilQuickQuantityInput) oilQuickQuantityInput.value = '';
             if (oilQuickClientInput) oilQuickClientInput.value = '';
@@ -5785,6 +6298,9 @@ async function obslugaListyCzesci(event) {
         wszystkieProdukty = Array.isArray(products) ? products : [];
         hasLoadedStockOnce = true;
         stockStatus = status;
+        if (status === 'ready') {
+            void ensureDefaultStockItems(wszystkieProdukty);
+        }
         if (render) {
             refreshMagazynFilters();
             renderMagazynSummary();
@@ -5822,6 +6338,9 @@ async function obslugaListyCzesci(event) {
     }
 
    // --- PODPIĘCIE EVENTÓW ---
+    if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.addEventListener('click', handleQuickActionClick);
+    if (pulpitWeeklyContainer) pulpitWeeklyContainer.addEventListener('click', handleWeeklyMissingClick);
+    if (pulpitActivityList) pulpitActivityList.addEventListener('click', handleActivityClick);
     if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
     if (klientAddBtn) {
         klientAddBtn.addEventListener('click', () => {
@@ -5872,7 +6391,7 @@ async function obslugaListyCzesci(event) {
         exportZleceniaBtn.addEventListener('click', () => {
             const miesiac = getSelectedMonth();
             const dane = _wszystkieZleceniaCache
-                .filter(z => z.status === 'ukończone' && z.dataUkonczenia && z.dataUkonczenia.startsWith(miesiac))
+                .filter(z => z.status === 'ukończone' && resolveServiceDate(z) && resolveServiceDate(z).startsWith(miesiac))
                 .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
                     ...rest,
                     uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
@@ -6211,7 +6730,7 @@ async function obslugaListyCzesci(event) {
             }
         };
 
-        const [clients, machines, orders, stock, dayEntries] = await Promise.all([
+        const [clients, machines, orders, stock, dayEntries, activity] = await Promise.all([
             safeLoad('klientów', async () => {
                 const snapshot = await getDocs(query(collection(db, "klienci"), orderBy("nazwa")));
                 return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -6231,10 +6750,14 @@ async function obslugaListyCzesci(event) {
             safeLoad('ewidencji czasu', async () => {
                 const snapshot = await getDocs(collection(db, "godziny_pracy"));
                 return snapshot.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
+            }),
+            safeLoad('aktywności', async () => {
+                const snapshot = await getDocs(query(collection(db, "activity"), orderBy("timestamp", "desc"), limit(20)));
+                return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
             })
         ]);
 
-        return { clients, machines, orders, stock, dayEntries };
+        return { clients, machines, orders, stock, dayEntries, activity };
     };
 
     const aggregateInitialData = (loaded) => {
@@ -6251,6 +6774,7 @@ async function obslugaListyCzesci(event) {
         applyStockData(normalizedStock, { render: false, status: loaded.stock.ok ? 'ready' : 'error' });
 
         applyDayEntriesData(loaded.dayEntries.data, { render: false });
+        applyActivityData(loaded.activity.data, { render: false, status: loaded.activity.ok ? 'ready' : 'error' });
         rebuildCalendarDecorations();
         updateUnfinishedSummary();
         selectedYearNeedsRefresh = true;
@@ -6288,6 +6812,7 @@ async function obslugaListyCzesci(event) {
         safeInitModule('orders', aktywneZleceniaLista || ukonczoneZleceniaLista, () => nasluchujNaZlecenia(), 'Moduł zleceń niedostępny.');
         safeInitModule('stock', magazynLista || magazynTable || magazynSummaryBox, () => wyswietlMagazyn(), 'Moduł magazynu niedostępny.');
         safeInitModule('summary', zakonczoneSummaryContainer || annualSummaryContainer || l4SummaryContainer, () => odswiezPodsumowania(), 'Moduł podsumowań niedostępny.');
+        safeInitModule('activity', pulpitActivityList, () => nasluchujNaActivity(), 'Moduł aktywności niedostępny.');
         try {
             wyswietlWpisyKalendarza();
         } catch (error) {
