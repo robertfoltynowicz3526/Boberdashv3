@@ -1020,6 +1020,138 @@ select {
   gap: 0.4rem;
 }
 
+.pulpit-quick-actions,
+.pulpit-weekly,
+.pulpit-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.quick-action-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--jd-border) 75%, transparent);
+  background: color-mix(in srgb, var(--jd-panel) 92%, transparent);
+  color: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--jd-green-primary) 60%, var(--jd-border));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.quick-action-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.quick-action-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--jd-green-primary) 18%, transparent);
+  font-size: 1.1rem;
+}
+
+.quick-action-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quick-action-note {
+  font-size: 0.72rem;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
+.pulpit-weekly .summary-container-subtle.summary-compact .metrics-grid {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.75rem 1.25rem;
+}
+
+.weekly-missing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--jd-yellow) 55%, var(--jd-border));
+  background: color-mix(in srgb, var(--jd-yellow) 18%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--jd-border) 70%, transparent);
+  background: color-mix(in srgb, var(--jd-panel) 95%, transparent);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.activity-item:hover {
+  border-color: color-mix(in srgb, var(--jd-green-primary) 60%, var(--jd-border));
+  background: color-mix(in srgb, var(--jd-panel) 85%, transparent);
+}
+
+.activity-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--jd-green-primary) 20%, transparent);
+  font-size: 1rem;
+}
+
+.activity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.85rem;
+}
+
+.activity-time {
+  font-size: 0.7rem;
+  opacity: 0.65;
+}
+
 #kalendarz-tab {
   display: flex;
   flex-direction: column;
@@ -1120,9 +1252,18 @@ select {
 }
 
 @media (max-width: 1200px) {
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   #pulpit .summary-container-subtle.summary-compact .metrics-grid {
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .quick-actions-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2055,6 +2196,23 @@ select {
 .unfinished-list {
   display: grid;
   gap: 0.9rem;
+}
+
+.unfinished-subheader {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.unfinished-empty-inline {
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  color: var(--text-muted);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .unfinished-item {
