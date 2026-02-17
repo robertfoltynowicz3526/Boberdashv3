@@ -1312,37 +1312,37 @@ function initializeApp() {
                 return;
             }
             const dayDoc = dayDocsByDay.get(normalizedDay);
-            if (dayDoc) {
-                const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
-                const clientsForDayMap = new Map();
-                powiazane.forEach((entry) => {
-                    const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
-                    const normalizedClient = clientName || 'Zlecenie';
-                    if (!clientsForDayMap.has(normalizedClient)) {
-                        clientsForDayMap.set(normalizedClient, { name: normalizedClient, praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
-                    }
-                    const current = clientsForDayMap.get(normalizedClient);
-                    current.praca += parsePlNumber(entry?.work ?? 0);
-                    current.jazda += parsePlNumber(entry?.drive ?? 0);
-                    current.fakturowane += parsePlNumber(entry?.fakturowane ?? 0);
-                    current.nadgodziny += parsePlNumber(entry?.over ?? 0);
-
-                    const idSuffix = entry.zlecenieId || hashString(normalizedClient || 'client');
-                    if (!isMonthView) {
-                        orderEvents.push({
-                            id: `client_${normalizedDay}_${idSuffix}`,
-                            start: normalizedDay,
-                            allDay: true,
-                            title: normalizedClient,
-                            classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
-                            extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
-                            sortOrder: 1
-                        });
-                    }
-                });
-                if (clientsForDayMap.size) {
-                    clientsByDay[normalizedDay] = Array.from(clientsForDayMap.values());
+            const normalizedOrders = dayDoc
+                ? normalizujPowiazaneZlecenia(dayDoc).powiazane
+                : (Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : []);
+            const clientsForDayMap = new Map();
+            normalizedOrders.forEach((entry) => {
+                const clientName = resolveOrderClientName(entry.zlecenieId || entry.orderId, entry.klientNazwa || entry.clientName, orderIndex);
+                const normalizedClient = clientName || 'Zlecenie';
+                if (!clientsForDayMap.has(normalizedClient)) {
+                    clientsForDayMap.set(normalizedClient, { name: normalizedClient, praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
                 }
+                const current = clientsForDayMap.get(normalizedClient);
+                current.praca += parsePlNumber(entry?.work ?? 0);
+                current.jazda += parsePlNumber(entry?.drive ?? 0);
+                current.fakturowane += parsePlNumber(entry?.fakturowane ?? entry?.billed ?? 0);
+                current.nadgodziny += parsePlNumber(entry?.over ?? 0);
+
+                const idSuffix = entry.zlecenieId || entry.orderId || hashString(normalizedClient || 'client');
+                if (!isMonthView) {
+                    orderEvents.push({
+                        id: `client_${normalizedDay}_${idSuffix}`,
+                        start: normalizedDay,
+                        allDay: true,
+                        title: normalizedClient,
+                        classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
+                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || entry.orderId || null, type: 'client' },
+                        sortOrder: 1
+                    });
+                }
+            });
+            if (clientsForDayMap.size) {
+                clientsByDay[normalizedDay] = Array.from(clientsForDayMap.values());
             }
             if (hasAnyData) {
                 summaryByDay[normalizedDay] = {

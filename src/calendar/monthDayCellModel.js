@@ -6,7 +6,7 @@ const DAY_STATUS_LABELS = {
   WOLNE: 'Wolne',
 };
 
-const MONTH_CLIENT_LIMIT = 2;
+const MONTH_CLIENT_LIMIT = 3;
 
 export const normalizeClientName = (value) => {
   if (value == null) return '';
@@ -37,37 +37,37 @@ const toHours = (value) => Number(value) || 0;
 
 export const buildDayCellViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
   const summary = data.rawSummary || null;
-  const clients = [...new Set((data.rawClients || []).map(normalizeClientName).filter(Boolean))];
-  const status = resolveDayStatus(data.rawStatus);
+  const clientsForDay = [...new Set((data.rawClients || []).map(normalizeClientName).filter(Boolean))];
+  const dayStatus = resolveDayStatus(data.rawStatus);
 
-  const totals = {
+  const summaryForDay = {
     praca: toHours(summary?.praca),
     jazda: toHours(summary?.jazda),
     fakturowane: toHours(summary?.fakturowane),
     nadgodziny: toHours(summary?.nadgodziny),
   };
 
-  const hasPositiveTotals = Object.values(totals).some((value) => value > 0);
-  const hasTimeEntries = Boolean(summary)
+  const hasPositiveTotals = Object.values(summaryForDay).some((value) => value > 0);
+  const hasWorkEntry = Boolean(summary)
     && ['praca', 'jazda', 'fakturowane', 'nadgodziny'].some((key) => summary?.[key] != null && summary?.[key] !== '');
-  const hasRelatedEntries = clients.length > 0 || hasTimeEntries;
+  const hasAnyWork = hasPositiveTotals || hasWorkEntry;
 
-  const hasData = Boolean(status) || clients.length > 0 || hasPositiveTotals;
-  const hasSummary = hasPositiveTotals || hasRelatedEntries;
-  const hasChips = Boolean(status) || clients.length > 0;
+  const flags = {
+    hasAnyWork,
+    hasAnyClients: clientsForDay.length > 0,
+    hasStatus: Boolean(dayStatus),
+  };
 
   return {
-    dateKey: dayKey,
+    date: dayKey,
     dayNumber: Number(dayKey?.slice?.(8, 10)) || null,
     isOutsideMonth,
-    status,
-    clients,
-    visibleClients: clients.slice(0, MONTH_CLIENT_LIMIT),
-    overflowCount: Math.max(clients.length - MONTH_CLIENT_LIMIT, 0),
-    totals,
-    hasData,
-    hasSummary,
-    hasChips,
+    dayStatus,
+    clientsForDay,
+    visibleClients: clientsForDay.slice(0, MONTH_CLIENT_LIMIT),
+    overflowCount: Math.max(clientsForDay.length - MONTH_CLIENT_LIMIT, 0),
+    summaryForDay,
+    flags,
   };
 };
 
