@@ -649,6 +649,7 @@ function initializeApp() {
     let plannedLeaveByDay = new Map();
     let lastSummaryByDay = {};
     let lastLeaveByDay = {};
+    let lastClientsByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
     let unfinishedDrawerOpen = false;
@@ -1311,28 +1312,36 @@ function initializeApp() {
                 return;
             }
             const dayDoc = dayDocsByDay.get(normalizedDay);
-            const ordersForDay = Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : [];
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
-                const clientNamesForDay = [];
+                const clientsForDayMap = new Map();
                 powiazane.forEach((entry) => {
                     const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
-                    if (clientName) clientNamesForDay.push(clientName);
-                    const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
+                    const normalizedClient = clientName || 'Zlecenie';
+                    if (!clientsForDayMap.has(normalizedClient)) {
+                        clientsForDayMap.set(normalizedClient, { name: normalizedClient, praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
+                    }
+                    const current = clientsForDayMap.get(normalizedClient);
+                    current.praca += parsePlNumber(entry?.work ?? 0);
+                    current.jazda += parsePlNumber(entry?.drive ?? 0);
+                    current.fakturowane += parsePlNumber(entry?.fakturowane ?? 0);
+                    current.nadgodziny += parsePlNumber(entry?.over ?? 0);
+
+                    const idSuffix = entry.zlecenieId || hashString(normalizedClient || 'client');
                     if (!isMonthView) {
                         orderEvents.push({
                             id: `client_${normalizedDay}_${idSuffix}`,
                             start: normalizedDay,
                             allDay: true,
-                            title: clientName || 'Zlecenie',
+                            title: normalizedClient,
                             classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
                             extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
                             sortOrder: 1
                         });
                     }
                 });
-                if (clientNamesForDay.length) {
-                    clientsByDay[normalizedDay] = Array.from(new Set(clientNamesForDay));
+                if (clientsForDayMap.size) {
+                    clientsByDay[normalizedDay] = Array.from(clientsForDayMap.values());
                 }
             }
             if (hasAnyData) {
@@ -1347,6 +1356,7 @@ function initializeApp() {
 
         lastSummaryByDay = summaryByDay;
         lastLeaveByDay = leaveByDayOut;
+        lastClientsByDay = clientsByDay;
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay), clientsByDay });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
         workEvents = [...orderEvents];
@@ -3483,7 +3493,7 @@ function initializeApp() {
             const days = listDaysInclusive(entry.startDate, entry.endDate);
             days.forEach(day => plannedLeaveByDay.set(day, entry.type || 'PLAN'));
         });
-        setDecorations({ summaryByDay: lastSummaryByDay, leaveByDay: lastLeaveByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
+        setDecorations({ summaryByDay: lastSummaryByDay, leaveByDay: lastLeaveByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay), clientsByDay: lastClientsByDay });
     };
 
     const renderPlannedLeaveList = () => {
