@@ -1,5 +1,6 @@
 import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
+import { buildDayCellViewModel, readDayData } from './monthDayCellModel.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
@@ -192,42 +193,43 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-client-chips').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
   }
 
-  const leave = decorations.leaveByDay?.[dayKey];
+  const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  const vm = buildDayCellViewModel({ dayKey, data: readDayData(dayKey, decorations) });
   const planned = decorations.plannedLeaveByDay?.[dayKey];
-
-  if (leave) {
-    const label =
-      leave === 'L4' ? 'L4' :
-      (leave === 'SWIETO' ? 'Święto' :
-      (leave === 'URL' ? 'Urlop' :
-      (leave === 'SZKOLENIE' ? 'Szkolenie' : 'Wolne')));
-    const big = document.createElement('div');
-    big.className = `cell-leave-icon cell-leave-icon--${leave}`;
-    const chip = document.createElement('span');
-    chip.className = 'leave-chip';
-    chip.textContent = label;
-    big.appendChild(chip);
-    cellEl.appendChild(big);
-    if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
-    return;
-  }
 
   if (planned) {
     const marker = document.createElement('div');
     marker.className = 'cell-planned-leave';
     marker.title = 'Zaplanowany urlop';
-    cellEl.appendChild(marker);
+    frame.appendChild(marker);
   }
 
-  const summary = decorations.summaryByDay?.[dayKey];
-  if (summary) {
-    const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  if (vm.flags.hasAnyClients) {
+    const chips = document.createElement('div');
+    chips.className = 'cell-client-chips';
+    vm.visibleClients.forEach((client) => {
+      const chip = document.createElement('span');
+      chip.className = 'cell-client-chip';
+      chip.title = client;
+      chip.textContent = client;
+      chips.appendChild(chip);
+    });
+    if (vm.overflowCount > 0) {
+      const chip = document.createElement('span');
+      chip.className = 'cell-client-chip cell-client-chip--more';
+      chip.textContent = `+${vm.overflowCount}`;
+      chips.appendChild(chip);
+    }
+    frame.appendChild(chips);
+  }
+
+  if (vm.flags.hasAnyWork) {
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     const shell = cellEl.closest?.('#calendar-shell');
@@ -239,26 +241,36 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     row2.className = 'day-summary-row';
     if (isMonthView) {
       if (displayMode === 'short') {
-        row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
+        row1.textContent = `P ${formatSummaryValue(vm.summaryForDay.praca, { compact: true })} • J ${formatSummaryValue(vm.summaryForDay.jazda, { compact: true })} • F ${formatSummaryValue(vm.summaryForDay.fakturowane, { compact: true })} • N ${formatSummaryValue(vm.summaryForDay.nadgodziny, { compact: true })}`;
         footer.appendChild(row1);
       } else {
-        row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-        row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+        row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
+        row2.textContent = `Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
         footer.appendChild(row1);
         footer.appendChild(row2);
       }
     } else if (displayMode === 'short') {
-      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+      row1.textContent = `P: ${formatSummaryValue(vm.summaryForDay.praca)} • J: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
+      row2.textContent = `F: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • N: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
       footer.appendChild(row1);
       footer.appendChild(row2);
     } else {
-      row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+      row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
+      row2.textContent = `Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
       footer.appendChild(row1);
       footer.appendChild(row2);
     }
     frame.appendChild(footer);
+  }
+
+  if (vm.flags.hasStatus && vm.dayStatus) {
+    const big = document.createElement('div');
+    big.className = `cell-leave-icon cell-leave-icon--${vm.dayStatus.key}`;
+    const chip = document.createElement('span');
+    chip.className = 'leave-chip';
+    chip.textContent = vm.dayStatus.label;
+    big.appendChild(chip);
+    frame.appendChild(big);
   }
 
   if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
@@ -390,6 +402,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const day = normalizeDateKey(arg.date, 'dayCellDidMount');
       const decorations = window.__calendarDecorations || null;
       renderDayCellDecorations(arg.el, day, decorations, extraDayCellDidMount, arg);
+      if (import.meta.env?.DEV) {
+        arg.el.onclick = () => {
+          const dbgData = readDayData(day, window.__calendarDecorations || {});
+          const dbgVm = buildDayCellViewModel({ dayKey: day, data: dbgData });
+          console.debug('[calendar:day-cell]', { day, clients: dbgVm.clientsForDay.length, summary: dbgVm.summaryForDay });
+        };
+      }
     },
     dayCellContent: (arg) => {
       const day = normalizeDateKey(arg.date, 'dayCellContent');
