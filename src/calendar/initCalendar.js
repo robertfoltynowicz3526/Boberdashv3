@@ -205,52 +205,6 @@ const createEl = (tag, className, text) => {
   return el;
 };
 
-const getDayClientNames = (dayEvents = []) => {
-  const unique = new Map();
-  (Array.isArray(dayEvents) ? dayEvents : []).forEach((entry) => {
-    if (!entry) return;
-    const source = typeof entry === 'object' ? entry : { name: entry };
-    const rawName = String(source.name || source.clientName || source.label || '').trim();
-    const fallbackName = typeof entry === 'string' ? entry.trim() : '';
-    const clientName = rawName || fallbackName;
-    if (!clientName) return;
-    const rawId = source.clientId || source.klientId || source.id || '';
-    const dedupeKey = rawId ? `id:${String(rawId).trim()}` : `name:${clientName.toLocaleLowerCase('pl-PL')}`;
-    if (!unique.has(dedupeKey)) unique.set(dedupeKey, clientName);
-  });
-  return Array.from(unique.values());
-};
-
-const getDayTotals = (dayEvents = [], daySummary = null) => {
-  const totals = { P: 0, J: 0, F: 0, N: 0 };
-  const events = Array.isArray(dayEvents) ? dayEvents : [];
-  if (!events.length) {
-    totals.P = Number(daySummary?.praca ?? 0) || 0;
-    totals.J = Number(daySummary?.jazda ?? 0) || 0;
-    totals.F = Number(daySummary?.fakturowane ?? 0) || 0;
-    totals.N = Number(daySummary?.nadgodziny ?? 0) || 0;
-    return totals;
-  }
-  events.forEach((entry) => {
-    const source = entry && typeof entry === 'object' ? entry : {};
-    totals.P += Number(source.praca ?? source.work ?? 0) || 0;
-    totals.J += Number(source.jazda ?? source.drive ?? 0) || 0;
-    totals.F += Number(source.fakturowane ?? source.billed ?? 0) || 0;
-    totals.N += Number(source.nadgodziny ?? source.over ?? 0) || 0;
-  });
-  return totals;
-};
-
-const renderStatusChip = (status) => {
-  const normalized = status ? String(status).trim().toUpperCase() : '';
-  const leaveClass = normalized ? ` month-day-status-chip--${normalized.toLowerCase()}` : '';
-  return createEl(
-    'span',
-    `leave-chip month-day-status-chip${normalized ? leaveClass : ''}${normalized ? '' : ' is-empty'}`,
-    normalized ? (DAY_STATUS_LABELS[normalized] || normalized) : ''
-  );
-};
-
 const ensureClientListModal = () => {
   const existing = document.getElementById('calendar-client-list-modal');
   if (existing) return existing;
@@ -303,42 +257,32 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const isMonthView = shell?.classList?.contains('view-month');
 
   const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
-  const displayMode = getEffectiveSummaryDisplayMode(cellEl);
 
   if (isMonthView) {
     const monthWrap = createEl('div', 'month-day-content');
-    monthWrap.dataset.summaryMode = displayMode;
     const header = createEl('div', 'month-day-content__header');
-    const dayNumber = createEl('span', 'month-day-content__day-number', String(Number(dayKey.slice(8, 10)) || ''));
-    const statusChip = renderStatusChip(leave);
+    const dayNumber = createEl('div', 'dayNumber', String(Number(dayKey.slice(8, 10)) || ''));
     const body = createEl('div', 'month-day-content__body');
+    const statusChip = createEl('span', `leave-chip statusChip month-day-content__status${leave ? '' : ' is-empty'}`,
+      leave ? (DAY_STATUS_LABELS[leave] || leave) : '');
     header.append(dayNumber, statusChip);
     monthWrap.appendChild(header);
 
-    const daySummary = decorations.summaryByDay?.[dayKey] || null;
-    const dayEvents = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
-    const clientNames = Array.from(new Set(getDayClientNames(dayEvents)));
-    const totals = getDayTotals(dayEvents, daySummary);
-    const ordersCount = dayEvents.length;
-    const manualEntryExists = Boolean(daySummary);
-    const hasAnyEntry = ordersCount > 0 || manualEntryExists === true || clientNames.length > 0;
-    const hasTotals = totals.P > 0 || totals.J > 0 || totals.F > 0 || totals.N > 0;
-    const showFooterSummary = hasTotals && hasAnyEntry;
+    const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
     const clientsRow = createEl('div', 'month-day-content__clients');
-    const maxVisibleClients = 3;
-    const visibleClients = clientNames.slice(0, maxVisibleClients);
+    const visibleClients = clients.slice(0, 2);
     visibleClients.forEach((clientName) => {
-      const clientLine = createEl('div', 'month-client-chip', clientName);
-      clientLine.title = clientName;
-      clientsRow.appendChild(clientLine);
+      const chip = createEl('span', 'month-client-chip', clientName);
+      chip.title = clientName;
+      clientsRow.appendChild(chip);
     });
-    if (clientNames.length > maxVisibleClients) {
-      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clientNames.length - maxVisibleClients} więcej`);
+    if (clients.length > 2) {
+      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - 2}`);
       moreBtn.type = 'button';
       moreBtn.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openClientListModal(dayKey, clientNames);
+        openClientListModal(dayKey, clients);
       });
       clientsRow.appendChild(moreBtn);
     }
@@ -352,16 +296,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     }
 
     monthWrap.appendChild(body);
-
-    if (showFooterSummary) {
-      const summaryText = displayMode === 'short'
-        ? `P${formatSummaryValue(totals.P, { compact: true })} • J${formatSummaryValue(totals.J, { compact: true })} • F${formatSummaryValue(totals.F, { compact: true })} • N${formatSummaryValue(totals.N, { compact: true })}`
-        : `Praca: ${formatSummaryValue(totals.P)}h • Jazda: ${formatSummaryValue(totals.J)}h • Fakturowane: ${formatSummaryValue(totals.F)}h • Nadgodziny: ${formatSummaryValue(totals.N)}h`;
-      const footer = createEl('div', `day-summary day-summary--${displayMode} day-summary--month`, summaryText);
-      footer.title = summaryText;
-      monthWrap.appendChild(footer);
-    }
-
     frame.appendChild(monthWrap);
   } else if (leave) {
     const big = document.createElement('div');
@@ -383,8 +317,20 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   }
 
   const summary = decorations.summaryByDay?.[dayKey];
-  if (summary && !isMonthView) {
+  const dayEvents = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
+  const totals = {
+    P: Number(summary?.praca) || 0,
+    J: Number(summary?.jazda) || 0,
+    F: Number(summary?.fakturowane) || 0,
+    N: Number(summary?.nadgodziny) || 0,
+  };
+  const hasTotals = totals.P > 0 || totals.J > 0 || totals.F > 0 || totals.N > 0;
+  const manualEntryExists = Boolean(summary);
+  const hasAnyEntry = dayEvents.length > 0 || manualEntryExists;
+
+  if (summary && (!isMonthView || (hasTotals && hasAnyEntry))) {
     const footer = document.createElement('div');
+    const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
@@ -536,7 +482,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     dayCellContent: (arg) => {
       const day = normalizeDateKey(arg.date, 'dayCellContent');
-      const isMonthView = String(arg?.view?.type || '').toLowerCase().includes('month');
+      const isMonthView = arg.view?.type === 'dayGridMonth';
       const dayNumber = isMonthView ? '' : (arg.dayNumberText || '');
       const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
       const dayNumberHtml = dayNumber ? `<div class="fc-daygrid-day-number">${dayNumber}</div>` : '';

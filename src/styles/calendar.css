@@ -550,10 +550,6 @@
   display: block;
 }
 
-.calendar-shell.view-month .fc .fc-daygrid-day-top{
-  display: none;
-}
-
 .calendar-shell.view-month .fc .fc-daygrid-day-frame{
   overflow: hidden;
   min-height: var(--calendar-day-min-height);
@@ -574,13 +570,8 @@
 }
 
 .calendar-shell.view-month .month-day-content{
-  margin-top: 2px;
+  margin-top: 24px;
   min-height: 42px;
-  height: calc(100% - 2px);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
 }
 
 .calendar-shell.view-month .month-day-content__header{
@@ -588,12 +579,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  margin-bottom: 4px;
 }
 
-.calendar-shell.view-month .month-day-content__day-number{
-  font-size: 12px;
+.calendar-shell.view-month .dayNumber{
+  font-size: clamp(12px, 0.8vw, 14px);
   font-weight: 700;
-  color: var(--calendar-muted);
+  color: var(--calendar-text);
+  line-height: 1;
 }
 
 .calendar-shell.view-month .month-day-content__body{
@@ -601,56 +594,19 @@
   flex-direction: column;
   gap: 4px;
   width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
 }
 
-.calendar-shell.view-month .month-day-status-chip{
-  position: static;
-  max-width: calc(100% - 4px);
-  border: 1px solid color-mix(in srgb, var(--calendar-accent) 38%, var(--calendar-border));
-  background: color-mix(in srgb, var(--calendar-accent) 16%, transparent);
-  color: var(--calendar-text-strong);
-  border-radius: 999px;
-  padding: 4px 8px;
-  min-height: 20px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
+.calendar-shell.view-month .month-day-content__status{
+  width: fit-content;
+  max-width: 100%;
+  font-size: 10px;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 1px 2px rgba(10, 12, 16, 0.12);
 }
 
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--l4{
-  border-color: color-mix(in srgb, #e06a6a 50%, var(--calendar-border));
-  background: color-mix(in srgb, #e06a6a 18%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--url{
-  border-color: color-mix(in srgb, #47a23c 50%, var(--calendar-border));
-  background: color-mix(in srgb, #47a23c 18%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--swieto{
-  border-color: color-mix(in srgb, #fcd116 55%, var(--calendar-border));
-  background: color-mix(in srgb, #fcd116 20%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--wolne{
-  border-color: color-mix(in srgb, #1f8dcf 50%, var(--calendar-border));
-  background: color-mix(in srgb, #1f8dcf 18%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--szkolenie{
-  border-color: color-mix(in srgb, #a06be0 52%, var(--calendar-border));
-  background: color-mix(in srgb, #a06be0 18%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.is-empty{
+.calendar-shell.view-month .month-day-content__status.is-empty{
   display: none;
 }
 
@@ -658,30 +614,25 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .calendar-shell.view-month .month-client-chip{
   border: 1px solid var(--calendar-chip-border);
   background: var(--calendar-chip-bg);
   color: var(--calendar-chip-text);
-  border-radius: 12px;
-  padding: 3px 8px;
+  border-radius: 999px;
+  padding: 2px 8px;
   font-size: 10px;
   line-height: 1.2;
   width: 100%;
-  text-align: left;
-  min-height: 0;
-  overflow: hidden;
   white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
 }
 
 .calendar-shell.view-month .month-client-chip--more{
   cursor: pointer;
-  text-align: center;
-  min-height: 24px;
 }
 
 .calendar-shell.view-month .day-summary--month{
