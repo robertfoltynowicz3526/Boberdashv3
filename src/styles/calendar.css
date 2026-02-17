@@ -570,7 +570,7 @@
 }
 
 .calendar-shell.view-month .month-day-content{
-  margin-top: 24px;
+  margin-top: 22px;
   min-height: 42px;
 }
 
@@ -581,17 +581,27 @@
   width: 100%;
 }
 
-.calendar-shell.view-month .month-day-content__status{
-  width: fit-content;
-  max-width: 100%;
+.calendar-shell.view-month .month-day-status-chip{
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 14px);
+  border: 1px solid color-mix(in srgb, var(--calendar-accent) 30%, var(--calendar-border));
+  background: color-mix(in srgb, var(--calendar-accent) 13%, transparent);
+  color: var(--calendar-text-strong);
+  border-radius: 999px;
+  padding: 2px 9px;
   font-size: 10px;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.calendar-shell.view-month .month-day-content__status.is-empty{
+.calendar-shell.view-month .month-day-status-chip.is-empty{
   display: none;
 }
 
@@ -599,6 +609,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  margin-top: 18px;
 }
 
 .calendar-shell.view-month .month-client-chip{

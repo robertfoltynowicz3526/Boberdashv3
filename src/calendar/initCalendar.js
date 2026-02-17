@@ -260,10 +260,13 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   if (isMonthView) {
     const monthWrap = createEl('div', 'month-day-content');
+    const statusChip = createEl(
+      'span',
+      `leave-chip month-day-status-chip${leave ? '' : ' is-empty'}`,
+      leave ? (DAY_STATUS_LABELS[leave] || leave) : ''
+    );
     const body = createEl('div', 'month-day-content__body');
-    const statusChip = createEl('span', `leave-chip month-day-content__status${leave ? '' : ' is-empty'}`,
-      leave ? (DAY_STATUS_LABELS[leave] || leave) : '');
-    body.appendChild(statusChip);
+    monthWrap.appendChild(statusChip);
 
     const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
     const clientsRow = createEl('div', 'month-day-content__clients');
