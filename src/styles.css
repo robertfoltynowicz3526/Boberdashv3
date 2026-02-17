@@ -49,6 +49,10 @@
   --calendar-chip-bg: color-mix(in srgb, var(--jd-green-primary) 18%, transparent);
   --calendar-chip-border: color-mix(in srgb, var(--jd-green-primary) 40%, transparent);
   --calendar-chip-text: var(--text);
+  --calendar-client-chip-bg: color-mix(in srgb, #20262e 84%, transparent);
+  --calendar-client-chip-border: color-mix(in srgb, var(--jd-green-primary) 48%, #7b8a74 52%);
+  --calendar-client-chip-text: #eef4ea;
+  --calendar-client-chip-more-bg: color-mix(in srgb, #2a3328 74%, transparent);
   --calendar-summary-bg: color-mix(in srgb, var(--jd-green-primary) 20%, transparent);
   --calendar-summary-border: color-mix(in srgb, var(--jd-green-primary) 45%, transparent);
   --calendar-summary-text: var(--text);

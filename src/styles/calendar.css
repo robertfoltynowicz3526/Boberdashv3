@@ -189,15 +189,28 @@
 .day-summary--short{font-size: 10px;line-height:1.1;}
 .day-summary-row{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-#calendar-shell.view-month .fc .cell-client-chips{
+#calendar-shell.view-month .fc .dayCellContent{
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  height: 100%;
+  min-height: 100%;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+#calendar-shell.view-month .fc .cell-client-chips,
+#calendar-shell.view-month .fc .clientsStack{
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   max-width: 100%;
   min-width: 0;
-  margin-top: 0;
+  margin-top: 8px;
   margin-bottom: 0;
   flex: 0 0 auto;
+  max-height: 74px;
+  overflow: hidden;
   z-index: 3;
 }
 
@@ -207,53 +220,38 @@
   max-width: 100%;
   min-width: 0;
   width: fit-content;
-  padding: 3px 9px;
+  height: 22px;
+  padding: 0 9px;
   border-radius: 999px;
-  border: 1px solid var(--calendar-chip-border);
-  background: color-mix(in srgb, var(--calendar-chip-bg) 88%, #ffffff 12%);
-  color: var(--calendar-chip-text);
+  border: 1px solid var(--calendar-client-chip-border);
+  background: var(--calendar-client-chip-bg);
+  color: var(--calendar-client-chip-text);
   font-size: 10px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   position: relative;
   z-index: 3;
   transform: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
 #calendar-shell.view-month .fc .cell-client-chip:hover{
-  border-color: color-mix(in srgb, var(--calendar-chip-border) 60%, #fff 40%);
+  border-color: color-mix(in srgb, var(--calendar-client-chip-border) 76%, #fff 24%);
 }
 
 #calendar-shell.view-month .fc .cell-client-chip--more{
   font-weight: 700;
-  max-width: 40px;
+  max-width: 44px;
   justify-content: center;
+  background: var(--calendar-client-chip-more-bg);
 }
 
 #calendar-shell.view-month .fc .day-summary--month{
   width: 100%;
   max-width: 100%;
-}
-
-#calendar-shell.view-month .fc .dayCellContent{
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: 7px;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-#calendar-shell.view-month .fc .clientsStack{
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 3;
 }
 
 #calendar-shell.view-month .fc .summaryTile{
