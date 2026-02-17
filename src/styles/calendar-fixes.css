@@ -217,19 +217,20 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* DUŻA IKONA WOLNEGO – tylko ona w dniu wolnym */
 .fc .cell-leave-icon{
   position: absolute;
-  inset: 0;
-  display: flex;
+  top: 6px;
+  left: 8px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 .fc .cell-leave-icon .leave-chip{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.3rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;

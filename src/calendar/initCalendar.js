@@ -225,29 +225,19 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     cellEl.appendChild(marker);
   }
 
+  const shell = cellEl.closest?.('#calendar-shell');
+  const isMonthView = shell?.classList?.contains('view-month');
   const summary = decorations.summaryByDay?.[dayKey];
-  if (summary) {
+  if (summary && !isMonthView) {
     const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
-    const shell = cellEl.closest?.('#calendar-shell');
-    const isMonthView = shell?.classList?.contains('view-month');
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
     const row2 = document.createElement('div');
     row2.className = 'day-summary-row';
-    if (isMonthView) {
-      if (displayMode === 'short') {
-        row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
-        footer.appendChild(row1);
-      } else {
-        row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-        row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
-        footer.appendChild(row1);
-        footer.appendChild(row2);
-      }
-    } else if (displayMode === 'short') {
+    if (displayMode === 'short') {
       row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
       row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
       footer.appendChild(row1);
@@ -458,7 +448,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         info?.el?.classList?.contains?.('bober-chip--client') ||
         info?.el?.classList?.contains?.('fc-client-chip') ||
         info?.el?.classList?.contains?.('client-chip');
-      if (isClientChip && info?.event?.title) {
+      if (info?.event?.title) {
         info.el.title = info.event.title;
       }
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
