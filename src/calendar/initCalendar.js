@@ -1,6 +1,5 @@
 import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
-import { DAY_STATUS_LABELS, readDayData, buildDayCellViewModel } from './monthDayCellModel.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
@@ -191,49 +190,9 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
-const createEl = (tag, className, text) => {
-  const el = document.createElement(tag);
-  if (className) el.className = className;
-  if (typeof text === 'string') el.textContent = text;
-  return el;
-};
-
-const renderMonthCellFromViewModel = (frame, model) => {
-  const monthWrap = createEl('div', 'month-day-content');
-  const chipsRow = createEl('div', 'month-day-content__chips');
-
-  model.visibleClients.forEach((clientName) => {
-    const chip = createEl('span', 'month-chip month-chip--client', clientName);
-    chip.title = clientName;
-    chipsRow.appendChild(chip);
-  });
-
-  if (model.overflowCount > 0) {
-    const moreBtn = createEl('button', 'month-chip month-chip--client month-chip--more', `+${model.overflowCount}`);
-    moreBtn.type = 'button';
-    moreBtn.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openClientListModal(model.dateKey, model.clients);
-    });
-    chipsRow.appendChild(moreBtn);
-  }
-
-  if (model.status) {
-    const statusChip = createEl('span', `month-chip month-chip--status month-chip--status-${String(model.status.key || '').toLowerCase()}`, model.status.label);
-    chipsRow.appendChild(statusChip);
-  }
-
-  if (model.hasSummary) monthWrap.classList.add('month-day-content--with-summary');
-  if (model.hasChips) {
-    monthWrap.appendChild(chipsRow);
-  }
-  frame.appendChild(monthWrap);
-};
-
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .month-day-content').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -241,53 +200,64 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   const leave = decorations.leaveByDay?.[dayKey];
   const planned = decorations.plannedLeaveByDay?.[dayKey];
-  const shell = cellEl.closest?.('#calendar-shell');
-  const isMonthView = shell?.classList?.contains('view-month');
 
-  const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
-  const dayData = readDayData(dayKey, decorations);
-  const model = buildDayCellViewModel({ dayKey, isOutsideMonth: Boolean(arg?.isOther), data: dayData });
-
-  if (isMonthView) {
-    renderMonthCellFromViewModel(frame, model);
-
-    if (planned && !leave) {
-      const marker = document.createElement('div');
-      marker.className = 'cell-planned-leave';
-      marker.title = 'Zaplanowany urlop';
-      frame.appendChild(marker);
-    }
-  } else if (leave) {
+  if (leave) {
+    const label =
+      leave === 'L4' ? 'L4' :
+      (leave === 'SWIETO' ? 'Święto' :
+      (leave === 'URL' ? 'Urlop' :
+      (leave === 'SZKOLENIE' ? 'Szkolenie' : 'Wolne')));
     const big = document.createElement('div');
     big.className = `cell-leave-icon cell-leave-icon--${leave}`;
     const chip = document.createElement('span');
     chip.className = 'leave-chip';
-    chip.textContent = DAY_STATUS_LABELS[leave] || leave;
+    chip.textContent = label;
     big.appendChild(chip);
     cellEl.appendChild(big);
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
   }
 
-  if (planned && !isMonthView) {
+  if (planned) {
     const marker = document.createElement('div');
     marker.className = 'cell-planned-leave';
     marker.title = 'Zaplanowany urlop';
     cellEl.appendChild(marker);
   }
 
-  if (model.hasSummary) {
+  const summary = decorations.summaryByDay?.[dayKey];
+  if (summary) {
+    const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
+    const shell = cellEl.closest?.('#calendar-shell');
+    const isMonthView = shell?.classList?.contains('view-month');
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
-    const row = document.createElement('div');
-    row.className = 'day-summary-row';
-    if (displayMode === 'short') {
-      row.textContent = `P: ${formatSummaryValue(model.totals.praca)} • J: ${formatSummaryValue(model.totals.jazda)} • F: ${formatSummaryValue(model.totals.fakturowane)} • N: ${formatSummaryValue(model.totals.nadgodziny)}`;
+    const row1 = document.createElement('div');
+    row1.className = 'day-summary-row';
+    const row2 = document.createElement('div');
+    row2.className = 'day-summary-row';
+    if (isMonthView) {
+      if (displayMode === 'short') {
+        row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
+        footer.appendChild(row1);
+      } else {
+        row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
+        row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+        footer.appendChild(row1);
+        footer.appendChild(row2);
+      }
+    } else if (displayMode === 'short') {
+      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
+      row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+      footer.appendChild(row1);
+      footer.appendChild(row2);
     } else {
-      row.textContent = `Praca: ${formatSummaryValue(model.totals.praca)} • Jazda: ${formatSummaryValue(model.totals.jazda)} • Fakturowane: ${formatSummaryValue(model.totals.fakturowane)} • Nadgodziny: ${formatSummaryValue(model.totals.nadgodziny)}`;
+      row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
+      row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+      footer.appendChild(row1);
+      footer.appendChild(row2);
     }
-    footer.appendChild(row);
     frame.appendChild(footer);
   }
 
@@ -425,8 +395,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const day = normalizeDateKey(arg.date, 'dayCellContent');
       const dayNumber = arg.dayNumberText || '';
       const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
-      const dayNumberHtml = dayNumber ? `<div class="fc-daygrid-day-number">${dayNumber}</div>` : '';
-      return { html: `${dayNumberHtml}${placeholder}` };
+      return { html: `<div class="fc-daygrid-day-number">${dayNumber}</div>${placeholder}` };
     },
     events: async (info, success) => {
       try {
@@ -470,10 +439,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       }
     },
     eventContent: (info) => {
-      const isMonthView = info?.view?.type === 'dayGridMonth';
-      if (isMonthView) {
-        return { html: '' };
-      }
       if (typeof extraEventContent === 'function') return extraEventContent(info);
       const eventType = info?.event?.extendedProps?.type;
       const isClientChip =
@@ -493,7 +458,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         info?.el?.classList?.contains?.('bober-chip--client') ||
         info?.el?.classList?.contains?.('fc-client-chip') ||
         info?.el?.classList?.contains?.('client-chip');
-      if (info?.event?.title) {
+      if (isClientChip && info?.event?.title) {
         info.el.title = info.event.title;
       }
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
