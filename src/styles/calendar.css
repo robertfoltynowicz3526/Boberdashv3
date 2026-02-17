@@ -593,7 +593,7 @@
 .calendar-shell.view-month .month-day-content__day-number{
   font-size: 12px;
   font-weight: 700;
-  color: var(--calendar-text-strong);
+  color: var(--calendar-muted);
 }
 
 .calendar-shell.view-month .month-day-content__body{
@@ -613,11 +613,11 @@
   background: color-mix(in srgb, var(--calendar-accent) 16%, transparent);
   color: var(--calendar-text-strong);
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 8px;
   min-height: 20px;
   display: inline-flex;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
