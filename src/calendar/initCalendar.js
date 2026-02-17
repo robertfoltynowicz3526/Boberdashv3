@@ -317,23 +317,28 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
     const daySummary = decorations.summaryByDay?.[dayKey] || null;
     const dayEvents = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
-    const clients = getDayClientNames(dayEvents);
+    const clientNames = Array.from(new Set(getDayClientNames(dayEvents)));
     const totals = getDayTotals(dayEvents, daySummary);
+    const ordersCount = dayEvents.length;
+    const manualEntryExists = Boolean(daySummary);
+    const hasAnyEntry = ordersCount > 0 || manualEntryExists === true || clientNames.length > 0;
+    const hasTotals = totals.P > 0 || totals.J > 0 || totals.F > 0 || totals.N > 0;
+    const showFooterSummary = hasTotals && hasAnyEntry;
     const clientsRow = createEl('div', 'month-day-content__clients');
     const maxVisibleClients = 3;
-    const visibleClients = clients.slice(0, maxVisibleClients);
+    const visibleClients = clientNames.slice(0, maxVisibleClients);
     visibleClients.forEach((clientName) => {
       const clientLine = createEl('div', 'month-client-chip', clientName);
       clientLine.title = clientName;
       clientsRow.appendChild(clientLine);
     });
-    if (clients.length > maxVisibleClients) {
-      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - maxVisibleClients} więcej`);
+    if (clientNames.length > maxVisibleClients) {
+      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clientNames.length - maxVisibleClients} więcej`);
       moreBtn.type = 'button';
       moreBtn.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        openClientListModal(dayKey, clients);
+        openClientListModal(dayKey, clientNames);
       });
       clientsRow.appendChild(moreBtn);
     }
@@ -348,12 +353,14 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
     monthWrap.appendChild(body);
 
-    const summaryText = displayMode === 'short'
-      ? `P${formatSummaryValue(totals.P, { compact: true })} • J${formatSummaryValue(totals.J, { compact: true })} • F${formatSummaryValue(totals.F, { compact: true })} • N${formatSummaryValue(totals.N, { compact: true })}`
-      : `Praca: ${formatSummaryValue(totals.P)}h • Jazda: ${formatSummaryValue(totals.J)}h • Fakturowane: ${formatSummaryValue(totals.F)}h • Nadgodziny: ${formatSummaryValue(totals.N)}h`;
-    const footer = createEl('div', `day-summary day-summary--${displayMode} day-summary--month`, summaryText);
-    footer.title = summaryText;
-    monthWrap.appendChild(footer);
+    if (showFooterSummary) {
+      const summaryText = displayMode === 'short'
+        ? `P${formatSummaryValue(totals.P, { compact: true })} • J${formatSummaryValue(totals.J, { compact: true })} • F${formatSummaryValue(totals.F, { compact: true })} • N${formatSummaryValue(totals.N, { compact: true })}`
+        : `Praca: ${formatSummaryValue(totals.P)}h • Jazda: ${formatSummaryValue(totals.J)}h • Fakturowane: ${formatSummaryValue(totals.F)}h • Nadgodziny: ${formatSummaryValue(totals.N)}h`;
+      const footer = createEl('div', `day-summary day-summary--${displayMode} day-summary--month`, summaryText);
+      footer.title = summaryText;
+      monthWrap.appendChild(footer);
+    }
 
     frame.appendChild(monthWrap);
   } else if (leave) {
@@ -529,9 +536,11 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     dayCellContent: (arg) => {
       const day = normalizeDateKey(arg.date, 'dayCellContent');
-      const dayNumber = arg.dayNumberText || '';
+      const isMonthView = String(arg?.view?.type || '').toLowerCase().includes('month');
+      const dayNumber = isMonthView ? '' : (arg.dayNumberText || '');
       const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
-      return { html: `<div class="fc-daygrid-day-number">${dayNumber}</div>${placeholder}` };
+      const dayNumberHtml = dayNumber ? `<div class="fc-daygrid-day-number">${dayNumber}</div>` : '';
+      return { html: `${dayNumberHtml}${placeholder}` };
     },
     events: async (info, success) => {
       try {
