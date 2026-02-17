@@ -273,16 +273,14 @@ const readDayData = (dayKey, decorations = {}) => {
 const buildDayViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
   const summary = data.rawSummary || null;
   const totals = {
-    workH: Number(summary?.praca) || 0,
-    driveH: Number(summary?.jazda) || 0,
-    billedH: Number(summary?.fakturowane) || 0,
-    overtimeH: Number(summary?.nadgodziny) || 0,
+    P: Number(summary?.praca) || 0,
+    J: Number(summary?.jazda) || 0,
+    F: Number(summary?.fakturowane) || 0,
+    N: Number(summary?.nadgodziny) || 0,
   };
   const clients = [...new Set((data.rawClients || []).map(normalizeClientName).filter(Boolean))];
-  const eventsCount = clients.length;
-  const manualEntries = summary ? 1 : 0;
-  const totalsSum = totals.workH + totals.driveH + totals.billedH + totals.overtimeH;
-  const hasSummary = totalsSum > 0 || eventsCount > 0 || manualEntries > 0;
+  const totalsSum = totals.P + totals.J + totals.F + totals.N;
+  const hasSummary = totalsSum > 0;
   const visibleClients = clients.slice(0, MONTH_CLIENT_LIMIT);
 
   return {
@@ -292,7 +290,7 @@ const buildDayViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
     status: resolveDayStatus(data.rawStatus),
     clients,
     visibleClients,
-    overflowClientsCount: Math.max(clients.length - visibleClients.length, 0),
+    overflowCount: Math.max(clients.length - visibleClients.length, 0),
     totals,
     hasSummary,
   };
@@ -300,7 +298,6 @@ const buildDayViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
 
 const renderMonthCellFromViewModel = (frame, model) => {
   const monthWrap = createEl('div', 'month-day-content');
-  const dayNumber = createEl('div', 'month-day-content__day-number', model.dayNumber ? String(model.dayNumber) : '');
   const statusRow = createEl('div', 'month-day-content__status-row');
   if (model.status) {
     const statusChip = createEl('span', `leave-chip statusChip month-day-content__status month-day-content__status--${String(model.status.key || '').toLowerCase()}`, model.status.label);
@@ -312,8 +309,8 @@ const renderMonthCellFromViewModel = (frame, model) => {
     chip.title = clientName;
     clientsRow.appendChild(chip);
   });
-  if (model.overflowClientsCount > 0) {
-    const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${model.overflowClientsCount}`);
+  if (model.overflowCount > 0) {
+    const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${model.overflowCount}`);
     moreBtn.type = 'button';
     moreBtn.addEventListener('click', (event) => {
       event.preventDefault();
@@ -323,7 +320,8 @@ const renderMonthCellFromViewModel = (frame, model) => {
     clientsRow.appendChild(moreBtn);
   }
 
-  monthWrap.append(dayNumber, statusRow, clientsRow);
+  if (model.hasSummary) monthWrap.classList.add('month-day-content--with-summary');
+  monthWrap.append(statusRow, clientsRow);
   frame.appendChild(monthWrap);
 };
 
@@ -376,21 +374,14 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
-    const row1 = document.createElement('div');
-    row1.className = 'day-summary-row';
-    const row2 = document.createElement('div');
-    row2.className = 'day-summary-row';
+    const row = document.createElement('div');
+    row.className = 'day-summary-row';
     if (displayMode === 'short') {
-      row1.textContent = `P: ${formatSummaryValue(model.totals.workH)} • J: ${formatSummaryValue(model.totals.driveH)}`;
-      row2.textContent = `F: ${formatSummaryValue(model.totals.billedH)} • N: ${formatSummaryValue(model.totals.overtimeH)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
+      row.textContent = `P: ${formatSummaryValue(model.totals.P)} • J: ${formatSummaryValue(model.totals.J)} • F: ${formatSummaryValue(model.totals.F)} • N: ${formatSummaryValue(model.totals.N)}`;
     } else {
-      row1.textContent = `Praca: ${formatSummaryValue(model.totals.workH)} • Jazda: ${formatSummaryValue(model.totals.driveH)}`;
-      row2.textContent = `Fakturowane: ${formatSummaryValue(model.totals.billedH)} • Nadgodziny: ${formatSummaryValue(model.totals.overtimeH)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
+      row.textContent = `Praca: ${formatSummaryValue(model.totals.P)} • Jazda: ${formatSummaryValue(model.totals.J)} • Fakturowane: ${formatSummaryValue(model.totals.F)} • Nadgodziny: ${formatSummaryValue(model.totals.N)}`;
     }
+    footer.appendChild(row);
     frame.appendChild(footer);
   }
 
@@ -526,8 +517,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     dayCellContent: (arg) => {
       const day = normalizeDateKey(arg.date, 'dayCellContent');
-      const isMonthView = arg.view?.type === 'dayGridMonth';
-      const dayNumber = isMonthView ? '' : (arg.dayNumberText || '');
+      const dayNumber = arg.dayNumberText || '';
       const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
       const dayNumberHtml = dayNumber ? `<div class="fc-daygrid-day-number">${dayNumber}</div>` : '';
       return { html: `${dayNumberHtml}${placeholder}` };
@@ -574,6 +564,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       }
     },
     eventContent: (info) => {
+      const isMonthView = info?.view?.type === 'dayGridMonth';
+      if (isMonthView) {
+        return { html: '' };
+      }
       if (typeof extraEventContent === 'function') return extraEventContent(info);
       const eventType = info?.event?.extendedProps?.type;
       const isClientChip =
