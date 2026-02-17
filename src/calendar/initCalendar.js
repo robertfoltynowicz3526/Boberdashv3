@@ -205,24 +205,50 @@ const createEl = (tag, className, text) => {
   return el;
 };
 
-const normalizeClientChipData = (client, daySummary = null) => {
-  if (typeof client === 'string') {
-    return {
-      name: client,
-      praca: Number(daySummary?.praca || 0) || 0,
-      jazda: Number(daySummary?.jazda || 0) || 0,
-      fakturowane: Number(daySummary?.fakturowane || 0) || 0,
-      nadgodziny: Number(daySummary?.nadgodziny || 0) || 0,
-    };
+const getDayClientNames = (dayEvents = []) => {
+  const unique = new Map();
+  (Array.isArray(dayEvents) ? dayEvents : []).forEach((entry) => {
+    if (!entry) return;
+    const source = typeof entry === 'object' ? entry : { name: entry };
+    const rawName = String(source.name || source.clientName || source.label || '').trim();
+    const fallbackName = typeof entry === 'string' ? entry.trim() : '';
+    const clientName = rawName || fallbackName;
+    if (!clientName) return;
+    const rawId = source.clientId || source.klientId || source.id || '';
+    const dedupeKey = rawId ? `id:${String(rawId).trim()}` : `name:${clientName.toLocaleLowerCase('pl-PL')}`;
+    if (!unique.has(dedupeKey)) unique.set(dedupeKey, clientName);
+  });
+  return Array.from(unique.values());
+};
+
+const getDayTotals = (dayEvents = [], daySummary = null) => {
+  const totals = { P: 0, J: 0, F: 0, N: 0 };
+  const events = Array.isArray(dayEvents) ? dayEvents : [];
+  if (!events.length) {
+    totals.P = Number(daySummary?.praca ?? 0) || 0;
+    totals.J = Number(daySummary?.jazda ?? 0) || 0;
+    totals.F = Number(daySummary?.fakturowane ?? 0) || 0;
+    totals.N = Number(daySummary?.nadgodziny ?? 0) || 0;
+    return totals;
   }
-  const source = client && typeof client === 'object' ? client : {};
-  return {
-    name: String(source.name || source.clientName || source.label || '').trim() || 'Klient',
-    praca: Number(source.praca ?? source.work ?? daySummary?.praca ?? 0) || 0,
-    jazda: Number(source.jazda ?? source.drive ?? daySummary?.jazda ?? 0) || 0,
-    fakturowane: Number(source.fakturowane ?? source.billed ?? daySummary?.fakturowane ?? 0) || 0,
-    nadgodziny: Number(source.nadgodziny ?? source.over ?? daySummary?.nadgodziny ?? 0) || 0,
-  };
+  events.forEach((entry) => {
+    const source = entry && typeof entry === 'object' ? entry : {};
+    totals.P += Number(source.praca ?? source.work ?? 0) || 0;
+    totals.J += Number(source.jazda ?? source.drive ?? 0) || 0;
+    totals.F += Number(source.fakturowane ?? source.billed ?? 0) || 0;
+    totals.N += Number(source.nadgodziny ?? source.over ?? 0) || 0;
+  });
+  return totals;
+};
+
+const renderStatusChip = (status) => {
+  const normalized = status ? String(status).trim().toUpperCase() : '';
+  const leaveClass = normalized ? ` month-day-status-chip--${normalized.toLowerCase()}` : '';
+  return createEl(
+    'span',
+    `leave-chip month-day-status-chip${normalized ? leaveClass : ''}${normalized ? '' : ' is-empty'}`,
+    normalized ? (DAY_STATUS_LABELS[normalized] || normalized) : ''
+  );
 };
 
 const ensureClientListModal = () => {
@@ -282,35 +308,27 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   if (isMonthView) {
     const monthWrap = createEl('div', 'month-day-content');
     monthWrap.dataset.summaryMode = displayMode;
-    const leaveClass = leave ? ` month-day-status-chip--${String(leave).toLowerCase()}` : '';
-    const statusChip = createEl(
-      'span',
-      `leave-chip month-day-status-chip${leave ? leaveClass : ''}${leave ? '' : ' is-empty'}`,
-      leave ? (DAY_STATUS_LABELS[leave] || leave) : ''
-    );
+    const header = createEl('div', 'month-day-content__header');
+    const dayNumber = createEl('span', 'month-day-content__day-number', String(Number(dayKey.slice(8, 10)) || ''));
+    const statusChip = renderStatusChip(leave);
     const body = createEl('div', 'month-day-content__body');
-    monthWrap.appendChild(statusChip);
+    header.append(dayNumber, statusChip);
+    monthWrap.appendChild(header);
 
     const daySummary = decorations.summaryByDay?.[dayKey] || null;
-    const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
+    const dayEvents = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
+    const clients = getDayClientNames(dayEvents);
+    const totals = getDayTotals(dayEvents, daySummary);
     const clientsRow = createEl('div', 'month-day-content__clients');
-    const maxVisibleClients = 2;
+    const maxVisibleClients = 3;
     const visibleClients = clients.slice(0, maxVisibleClients);
-    visibleClients.forEach((clientEntry) => {
-      const client = normalizeClientChipData(clientEntry, daySummary);
-      const chip = createEl('div', 'month-client-chip');
-      const chipName = createEl('span', 'month-client-chip__name', client.name);
-      const chipSummary = createEl(
-        'span',
-        'month-client-chip__summary',
-        `P: ${formatSummaryValue(client.praca, { compact: true })} | J: ${formatSummaryValue(client.jazda, { compact: true })} | F: ${formatSummaryValue(client.fakturowane, { compact: true })} | N: ${formatSummaryValue(client.nadgodziny, { compact: true })}`
-      );
-      chip.title = client.name;
-      chip.append(chipName, chipSummary);
-      clientsRow.appendChild(chip);
+    visibleClients.forEach((clientName) => {
+      const clientLine = createEl('div', 'month-client-chip', clientName);
+      clientLine.title = clientName;
+      clientsRow.appendChild(clientLine);
     });
     if (clients.length > maxVisibleClients) {
-      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - maxVisibleClients}`);
+      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - maxVisibleClients} więcej`);
       moreBtn.type = 'button';
       moreBtn.addEventListener('click', (event) => {
         event.preventDefault();
@@ -329,6 +347,14 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     }
 
     monthWrap.appendChild(body);
+
+    const summaryText = displayMode === 'short'
+      ? `P${formatSummaryValue(totals.P, { compact: true })} • J${formatSummaryValue(totals.J, { compact: true })} • F${formatSummaryValue(totals.F, { compact: true })} • N${formatSummaryValue(totals.N, { compact: true })}`
+      : `Praca: ${formatSummaryValue(totals.P)}h • Jazda: ${formatSummaryValue(totals.J)}h • Fakturowane: ${formatSummaryValue(totals.F)}h • Nadgodziny: ${formatSummaryValue(totals.N)}h`;
+    const footer = createEl('div', `day-summary day-summary--${displayMode} day-summary--month`, summaryText);
+    footer.title = summaryText;
+    monthWrap.appendChild(footer);
+
     frame.appendChild(monthWrap);
   } else if (leave) {
     const big = document.createElement('div');
@@ -350,7 +376,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   }
 
   const summary = decorations.summaryByDay?.[dayKey];
-  if (summary) {
+  if (summary && !isMonthView) {
     const footer = document.createElement('div');
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');

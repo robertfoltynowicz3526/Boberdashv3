@@ -550,6 +550,10 @@
   display: block;
 }
 
+.calendar-shell.view-month .fc .fc-daygrid-day-top{
+  display: none;
+}
+
 .calendar-shell.view-month .fc .fc-daygrid-day-frame{
   overflow: hidden;
   min-height: var(--calendar-day-min-height);
@@ -570,8 +574,26 @@
 }
 
 .calendar-shell.view-month .month-day-content{
-  margin-top: 22px;
+  margin-top: 2px;
   min-height: 42px;
+  height: calc(100% - 2px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.calendar-shell.view-month .month-day-content__header{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.calendar-shell.view-month .month-day-content__day-number{
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--calendar-text-strong);
 }
 
 .calendar-shell.view-month .month-day-content__body{
@@ -579,14 +601,14 @@
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .calendar-shell.view-month .month-day-status-chip{
-  position: absolute;
-  top: 22px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100% - 14px);
+  position: static;
+  max-width: calc(100% - 4px);
   border: 1px solid color-mix(in srgb, var(--calendar-accent) 38%, var(--calendar-border));
   background: color-mix(in srgb, var(--calendar-accent) 16%, transparent);
   color: var(--calendar-text-strong);
@@ -600,8 +622,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  z-index: 4;
-  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(10, 12, 16, 0.12);
 }
 
 .calendar-shell.view-month .month-day-status-chip.month-day-status-chip--l4{
@@ -610,23 +631,23 @@
 }
 
 .calendar-shell.view-month .month-day-status-chip.month-day-status-chip--url{
-  border-color: color-mix(in srgb, #fcd116 55%, var(--calendar-border));
-  background: color-mix(in srgb, #fcd116 20%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--swieto{
-  border-color: color-mix(in srgb, #a06be0 52%, var(--calendar-border));
-  background: color-mix(in srgb, #a06be0 18%, transparent);
-}
-
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--wolne{
   border-color: color-mix(in srgb, #47a23c 50%, var(--calendar-border));
   background: color-mix(in srgb, #47a23c 18%, transparent);
 }
 
-.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--szkolenie{
+.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--swieto{
+  border-color: color-mix(in srgb, #fcd116 55%, var(--calendar-border));
+  background: color-mix(in srgb, #fcd116 20%, transparent);
+}
+
+.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--wolne{
   border-color: color-mix(in srgb, #1f8dcf 50%, var(--calendar-border));
   background: color-mix(in srgb, #1f8dcf 18%, transparent);
+}
+
+.calendar-shell.view-month .month-day-status-chip.month-day-status-chip--szkolenie{
+  border-color: color-mix(in srgb, #a06be0 52%, var(--calendar-border));
+  background: color-mix(in srgb, #a06be0 18%, transparent);
 }
 
 .calendar-shell.view-month .month-day-status-chip.is-empty{
@@ -637,11 +658,8 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  margin-top: 18px;
-}
-
-.calendar-shell.view-month .month-day-content[data-summary-mode="full"] .month-day-content__clients{
-  margin-top: 16px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .calendar-shell.view-month .month-client-chip{
@@ -654,34 +672,15 @@
   line-height: 1.2;
   width: 100%;
   text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 34px;
+  min-height: 0;
   overflow: hidden;
-}
-
-.calendar-shell.view-month .month-client-chip__name{
-  display: block;
-  font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.calendar-shell.view-month .month-client-chip__summary{
-  display: block;
-  font-size: 9px;
-  color: var(--calendar-muted);
-  white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .calendar-shell.view-month .month-client-chip--more{
   cursor: pointer;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
   min-height: 24px;
 }
 
