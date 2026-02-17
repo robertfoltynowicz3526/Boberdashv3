@@ -283,3 +283,23 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   z-index: 6;
   pointer-events: none;
 }
+
+
+#calendar-shell.view-month .fc .cell-leave-icon{
+  position: static;
+  inset: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  pointer-events: none;
+  z-index: 3;
+}
+
+#calendar-shell.view-month .fc .cell-leave-icon .leave-chip{
+  padding: 0.24rem 0.58rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+  box-shadow: none;
+  opacity: 0.98;
+}

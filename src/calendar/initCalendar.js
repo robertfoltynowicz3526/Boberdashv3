@@ -213,6 +213,16 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const content = document.createElement('div');
   content.className = 'dayCellContent';
 
+  if (vm.flags.hasStatus && vm.dayStatus) {
+    const statusWrap = document.createElement('div');
+    statusWrap.className = `cell-leave-icon cell-leave-icon--${vm.dayStatus.key}`;
+    const chip = document.createElement('span');
+    chip.className = 'leave-chip';
+    chip.textContent = vm.dayStatus.label;
+    statusWrap.appendChild(chip);
+    content.appendChild(statusWrap);
+  }
+
   if (vm.flags.hasAnyClients) {
     const chips = document.createElement('div');
     chips.className = 'cell-client-chips clientsStack';
@@ -237,7 +247,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     content.appendChild(chips);
   }
 
-  if (vm.flags.hasAnyWork) {
+  if (vm.flags.hasAnyWork && vm.flags.hasPositiveTotals) {
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     const shell = cellEl.closest?.('#calendar-shell');
@@ -249,7 +259,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     row2.className = 'day-summary-row';
     if (isMonthView) {
       if (displayMode === 'short') {
-        row1.textContent = `P ${formatSummaryValue(vm.summaryForDay.praca, { compact: true })} • J ${formatSummaryValue(vm.summaryForDay.jazda, { compact: true })} • F ${formatSummaryValue(vm.summaryForDay.fakturowane, { compact: true })} • N ${formatSummaryValue(vm.summaryForDay.nadgodziny, { compact: true })}`;
+        row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)} • Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
         footer.appendChild(row1);
       } else {
         row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
@@ -273,16 +283,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   if (content.childElementCount > 0) {
     frame.appendChild(content);
-  }
-
-  if (vm.flags.hasStatus && vm.dayStatus) {
-    const big = document.createElement('div');
-    big.className = `cell-leave-icon cell-leave-icon--${vm.dayStatus.key}`;
-    const chip = document.createElement('span');
-    chip.className = 'leave-chip';
-    chip.textContent = vm.dayStatus.label;
-    big.appendChild(chip);
-    frame.appendChild(big);
   }
 
   if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
@@ -414,13 +414,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const day = normalizeDateKey(arg.date, 'dayCellDidMount');
       const decorations = window.__calendarDecorations || null;
       renderDayCellDecorations(arg.el, day, decorations, extraDayCellDidMount, arg);
-      if (import.meta.env?.DEV) {
-        arg.el.onclick = () => {
-          const dbgData = readDayData(day, window.__calendarDecorations || {});
-          const dbgVm = buildDayCellViewModel({ dayKey: day, data: dbgData });
-          console.debug('[calendar:day-cell]', { day, clients: dbgVm.clientsForDay.length, summary: dbgVm.summaryForDay });
-        };
-      }
     },
     dayCellContent: (arg) => {
       const day = normalizeDateKey(arg.date, 'dayCellContent');

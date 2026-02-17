@@ -54,6 +54,7 @@ export const buildDayCellViewModel = ({ dayKey, isOutsideMonth = false, data = {
 
   const flags = {
     hasAnyWork,
+    hasPositiveTotals,
     hasAnyClients: clientsForDay.length > 0,
     hasStatus: Boolean(dayStatus),
   };
