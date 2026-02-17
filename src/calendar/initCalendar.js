@@ -193,7 +193,7 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-client-chips').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .summaryTile, .cell-leave-icon, .cell-planned-leave, .cell-client-chips, .dayCellContent, .clientsStack').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -210,23 +210,31 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     frame.appendChild(marker);
   }
 
+  const content = document.createElement('div');
+  content.className = 'dayCellContent';
+
   if (vm.flags.hasAnyClients) {
     const chips = document.createElement('div');
-    chips.className = 'cell-client-chips';
+    chips.className = 'cell-client-chips clientsStack';
     vm.visibleClients.forEach((client) => {
       const chip = document.createElement('span');
-      chip.className = 'cell-client-chip';
+      chip.className = 'cell-client-chip clientChip';
       chip.title = client;
-      chip.textContent = client;
+
+      const chipText = document.createElement('span');
+      chipText.className = 'clientChipText';
+      chipText.textContent = client;
+      chip.appendChild(chipText);
+
       chips.appendChild(chip);
     });
     if (vm.overflowCount > 0) {
       const chip = document.createElement('span');
-      chip.className = 'cell-client-chip cell-client-chip--more';
+      chip.className = 'cell-client-chip cell-client-chip--more clientChip';
       chip.textContent = `+${vm.overflowCount}`;
       chips.appendChild(chip);
     }
-    frame.appendChild(chips);
+    content.appendChild(chips);
   }
 
   if (vm.flags.hasAnyWork) {
@@ -234,7 +242,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     const shell = cellEl.closest?.('#calendar-shell');
     const isMonthView = shell?.classList?.contains('view-month');
-    footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
+    footer.className = `day-summary summaryTile day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
     const row2 = document.createElement('div');
@@ -260,7 +268,11 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
       footer.appendChild(row1);
       footer.appendChild(row2);
     }
-    frame.appendChild(footer);
+    content.appendChild(footer);
+  }
+
+  if (content.childElementCount > 0) {
+    frame.appendChild(content);
   }
 
   if (vm.flags.hasStatus && vm.dayStatus) {
