@@ -610,8 +610,8 @@ function initializeApp() {
     };
 
     const CALENDAR_SHELL_MIN_HEIGHT = 420;
-    const CALENDAR_MONTH_MIN_HEIGHT = '75vh';
-    const CALENDAR_RESERVED_SPACE = 120;
+    const CALENDAR_MONTH_MIN_HEIGHT = '78vh';
+    const CALENDAR_RESERVED_SPACE = 96;
     const syncCalendarShellHeight = () => {
         if (!calendarShell) return;
         if (calendarShell.offsetParent === null) return;
@@ -1291,6 +1291,7 @@ function initializeApp() {
         const end = rangeEnd || view?.currentEnd || null;
         const summaryByDay = {};
         const leaveByDayOut = {};
+        const clientsByDay = {};
         const orderEvents = [];
         const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
@@ -1312,8 +1313,10 @@ function initializeApp() {
             const ordersForDay = Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : [];
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
+                const clientNamesForDay = [];
                 powiazane.forEach((entry) => {
                     const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
+                    if (clientName) clientNamesForDay.push(clientName);
                     const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
                     orderEvents.push({
                         id: `client_${normalizedDay}_${idSuffix}`,
@@ -1325,6 +1328,9 @@ function initializeApp() {
                         sortOrder: 1
                     });
                 });
+                if (clientNamesForDay.length) {
+                    clientsByDay[normalizedDay] = Array.from(new Set(clientNamesForDay));
+                }
             }
             if (hasAnyData) {
                 summaryByDay[normalizedDay] = {
@@ -1338,7 +1344,7 @@ function initializeApp() {
 
         lastSummaryByDay = summaryByDay;
         lastLeaveByDay = leaveByDayOut;
-        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
+        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay), clientsByDay });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
         workEvents = [...orderEvents];
         updateCalendarData(calendar, workEvents, []);
