@@ -195,11 +195,6 @@ input::placeholder{color:var(--jd-text-500)}
 }
 
 .fc .day-summary{
-  position: static;
-  left: auto;
-  right: auto;
-  bottom: auto;
-  margin-top: auto;
   box-shadow: none;
 }
 
@@ -245,9 +240,9 @@ input::placeholder{color:var(--jd-text-500)}
 }
 
 #calendar-shell.view-month .fc .day-summary--month{
-  margin-top: auto;
-  padding: 2px 4px;
-  font-size: 10px;
+  margin-top: 0;
+  padding: 4px 6px;
+  font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -264,10 +259,10 @@ input::placeholder{color:var(--jd-text-500)}
 #calendar-shell.view-month .fc .fc-client-chip,
 #calendar-shell.view-month .fc .client-chip,
 #calendar-shell.view-month .fc .order-event.fc-event{
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
   line-height: 1.1;
-  max-height: 18px;
+  max-height: 22px;
 }
 
 #calendar-shell.view-month .fc .fc-event-title,

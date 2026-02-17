@@ -190,9 +190,62 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
+const DAY_STATUS_LABELS = {
+  L4: 'L4',
+  SWIETO: 'Święto',
+  URL: 'Urlop',
+  SZKOLENIE: 'Szkolenie',
+  WOLNE: 'Wolne',
+};
+
+const createEl = (tag, className, text) => {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (typeof text === 'string') el.textContent = text;
+  return el;
+};
+
+const ensureClientListModal = () => {
+  const existing = document.getElementById('calendar-client-list-modal');
+  if (existing) return existing;
+  const modal = createEl('div', 'calendar-client-list-modal');
+  modal.id = 'calendar-client-list-modal';
+  modal.innerHTML = `
+    <div class="calendar-client-list-modal__dialog" role="dialog" aria-modal="true" aria-label="Lista zleceń dnia">
+      <div class="calendar-client-list-modal__header">
+        <h4>Zlecenia dnia</h4>
+        <button type="button" class="btn-ghost btn-small" data-close-client-list>Zamknij</button>
+      </div>
+      <div class="calendar-client-list-modal__body"></div>
+    </div>
+  `;
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal || event.target?.closest?.('[data-close-client-list]')) {
+      modal.classList.remove('is-open');
+    }
+  });
+  document.body.appendChild(modal);
+  return modal;
+};
+
+const openClientListModal = (dayKey, clients = []) => {
+  const modal = ensureClientListModal();
+  const body = modal.querySelector('.calendar-client-list-modal__body');
+  const title = modal.querySelector('h4');
+  if (title) {
+    title.textContent = dayKey ? `Zlecenia dnia ${dayKey}` : 'Zlecenia dnia';
+  }
+  if (body) {
+    body.innerHTML = (clients || []).length
+      ? `<ul>${clients.map((client) => `<li title="${client}">${client}</li>`).join('')}</ul>`
+      : '<p>Brak zleceń dla tego dnia.</p>';
+  }
+  modal.classList.add('is-open');
+};
+
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .month-day-content').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -200,36 +253,68 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   const leave = decorations.leaveByDay?.[dayKey];
   const planned = decorations.plannedLeaveByDay?.[dayKey];
+  const shell = cellEl.closest?.('#calendar-shell');
+  const isMonthView = shell?.classList?.contains('view-month');
 
-  if (leave) {
-    const label =
-      leave === 'L4' ? 'L4' :
-      (leave === 'SWIETO' ? 'Święto' :
-      (leave === 'URL' ? 'Urlop' :
-      (leave === 'SZKOLENIE' ? 'Szkolenie' : 'Wolne')));
+  const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+
+  if (isMonthView) {
+    const monthWrap = createEl('div', 'month-day-content');
+    const body = createEl('div', 'month-day-content__body');
+    const statusChip = createEl('span', `leave-chip month-day-content__status${leave ? '' : ' is-empty'}`,
+      leave ? (DAY_STATUS_LABELS[leave] || leave) : '');
+    body.appendChild(statusChip);
+
+    const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
+    const clientsRow = createEl('div', 'month-day-content__clients');
+    const visibleClients = clients.slice(0, 2);
+    visibleClients.forEach((clientName) => {
+      const chip = createEl('span', 'month-client-chip', clientName);
+      chip.title = clientName;
+      clientsRow.appendChild(chip);
+    });
+    if (clients.length > 2) {
+      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - 2}`);
+      moreBtn.type = 'button';
+      moreBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openClientListModal(dayKey, clients);
+      });
+      clientsRow.appendChild(moreBtn);
+    }
+    body.appendChild(clientsRow);
+
+    if (planned && !leave) {
+      const marker = document.createElement('div');
+      marker.className = 'cell-planned-leave';
+      marker.title = 'Zaplanowany urlop';
+      body.appendChild(marker);
+    }
+
+    monthWrap.appendChild(body);
+    frame.appendChild(monthWrap);
+  } else if (leave) {
     const big = document.createElement('div');
     big.className = `cell-leave-icon cell-leave-icon--${leave}`;
     const chip = document.createElement('span');
     chip.className = 'leave-chip';
-    chip.textContent = label;
+    chip.textContent = DAY_STATUS_LABELS[leave] || leave;
     big.appendChild(chip);
     cellEl.appendChild(big);
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
   }
 
-  if (planned) {
+  if (planned && !isMonthView) {
     const marker = document.createElement('div');
     marker.className = 'cell-planned-leave';
     marker.title = 'Zaplanowany urlop';
     cellEl.appendChild(marker);
   }
 
-  const shell = cellEl.closest?.('#calendar-shell');
-  const isMonthView = shell?.classList?.contains('view-month');
   const summary = decorations.summaryByDay?.[dayKey];
-  if (summary && !isMonthView) {
-    const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  if (summary) {
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;

@@ -40,8 +40,8 @@
   gap: 10px;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  min-height: 44px;
+  margin-bottom: 6px;
+  min-height: 38px;
 }
 
 #calendar-toolbar .calendar-toolbar-group{
@@ -504,11 +504,11 @@
 }
 
 .calendar-shell.view-month .fc{
-  --calendar-day-min-height: clamp(110px, 15vh, 170px);
-  --calendar-cell-padding: 6px;
-  --calendar-event-font: 11px;
+  --calendar-day-min-height: clamp(120px, 15.5vh, 190px);
+  --calendar-cell-padding: 5px;
+  --calendar-event-font: 12px;
   --day-summary-space: 0px;
-  min-height: 75vh;
+  min-height: 78vh;
   height: var(--calendar-shell-height, calc(100vh - 180px));
 }
 
@@ -553,20 +553,141 @@
 .calendar-shell.view-month .fc .fc-daygrid-day-frame{
   overflow: hidden;
   min-height: var(--calendar-day-min-height);
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-day-events{
+  margin-top: 22px;
+  margin-bottom: 56px;
+  gap: 4px;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-day-number{
+  top: 4px;
+  right: 6px;
+  font-size: clamp(12px, 0.8vw, 14px);
+}
+
+.calendar-shell.view-month .month-day-content{
+  margin-top: 24px;
+  min-height: 42px;
+}
+
+.calendar-shell.view-month .month-day-content__body{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.calendar-shell.view-month .month-day-content__status{
+  width: fit-content;
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-shell.view-month .month-day-content__status.is-empty{
+  display: none;
+}
+
+.calendar-shell.view-month .month-day-content__clients{
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.calendar-shell.view-month .month-client-chip{
+  border: 1px solid var(--calendar-chip-border);
+  background: var(--calendar-chip-bg);
+  color: var(--calendar-chip-text);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1.2;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.calendar-shell.view-month .month-client-chip--more{
+  cursor: pointer;
+}
+
+.calendar-shell.view-month .day-summary--month{
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  font-size: 10px;
+  padding: 4px 6px;
+}
+
+.calendar-client-list-modal{
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.58);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.calendar-client-list-modal.is-open{
+  display: flex;
+}
+
+.calendar-client-list-modal__dialog{
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--calendar-border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-client-list-modal__header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--calendar-border);
+}
+
+.calendar-client-list-modal__body{
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+.calendar-client-list-modal__body ul{
+  margin: 0;
+  padding-left: 18px;
 }
 
 /* Breakpointy */
 @media (min-width: 1440px) {
   .calendar-shell.view-month .fc{
     --calendar-cell-padding: 7px;
-    --calendar-event-font: 11px;
+    --calendar-event-font: 12px;
+    --calendar-day-min-height: clamp(138px, 16vh, 210px);
+  }
+  .calendar-shell.view-month .day-summary--month,
+  .calendar-shell.view-month .month-client-chip{
+    font-size: 11px;
   }
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
   .calendar-shell.view-month .fc{
     --calendar-cell-padding: 5px;
-    --calendar-event-font: 10px;
+    --calendar-event-font: 11px;
   }
 }
 
@@ -631,15 +752,13 @@
 
 @media (max-height: 820px) {
   .calendar-wrap{
-    padding: 12px;
+    padding: 8px;
   }
   .calendar-shell.view-month .fc{
-    --calendar-day-min-height: clamp(64px, 11vh, 96px);
+    --calendar-day-min-height: clamp(86px, 12vh, 118px);
     --calendar-cell-padding: 5px;
   }
   .fc{
     --day-summary-space: 44px;
   }
 }
-
-.calendar-shell.view-month .day-summary{ display:none !important; }
