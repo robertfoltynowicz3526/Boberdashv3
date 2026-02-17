@@ -584,85 +584,69 @@
   padding-bottom: 34px;
 }
 
-.calendar-shell.view-month .month-day-content__status-row{
+.calendar-shell.view-month .month-day-content__chips{
   display: flex;
-  justify-content: flex-start;
-  min-height: 22px;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-content: flex-start;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.calendar-shell.view-month .month-day-content__status{
-  width: fit-content;
+.calendar-shell.view-month .month-chip{
+  border-radius: 999px;
+  border: 1px solid var(--calendar-chip-border);
+  background: var(--calendar-chip-bg);
+  color: var(--calendar-chip-text);
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 8px;
   max-width: 100%;
-  font-size: 11px;
-  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-width: 1px;
-  border-style: solid;
-  border-radius: 999px;
-  padding: 3px 10px;
 }
 
-.calendar-shell.view-month .month-day-content__status--l4{
+.calendar-shell.view-month .month-chip--client{
+  max-width: calc(100% - 4px);
+}
+
+.calendar-shell.view-month .month-chip--more{
+  cursor: pointer;
+}
+
+.calendar-shell.view-month .month-chip--status{
+  border-style: solid;
+}
+
+.calendar-shell.view-month .month-chip--status-l4{
   border-color: rgba(245, 158, 11, 0.45);
   background: rgba(245, 158, 11, 0.18);
   color: #fcd68a;
 }
 
-.calendar-shell.view-month .month-day-content__status--url{
+.calendar-shell.view-month .month-chip--status-url{
   border-color: rgba(56, 189, 248, 0.45);
   background: rgba(14, 116, 144, 0.18);
   color: #bae6fd;
 }
 
-.calendar-shell.view-month .month-day-content__status--swieto{
+.calendar-shell.view-month .month-chip--status-swieto{
   border-color: rgba(248, 113, 113, 0.42);
   background: rgba(127, 29, 29, 0.2);
   color: #fecaca;
 }
 
-.calendar-shell.view-month .month-day-content__status--wolne{
+.calendar-shell.view-month .month-chip--status-wolne{
   border-color: rgba(125, 211, 252, 0.4);
   background: rgba(37, 99, 235, 0.16);
   color: #dbeafe;
 }
 
-.calendar-shell.view-month .month-day-content__status--szkolenie{
+.calendar-shell.view-month .month-chip--status-szkolenie{
   border-color: rgba(167, 139, 250, 0.45);
   background: rgba(109, 40, 217, 0.18);
   color: #ddd6fe;
-}
-
-.calendar-shell.view-month .month-day-content__status.is-empty{
-  display: none;
-}
-
-.calendar-shell.view-month .month-day-content__clients{
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.calendar-shell.view-month .month-client-chip{
-  border: 1px solid var(--calendar-chip-border);
-  background: var(--calendar-chip-bg);
-  color: var(--calendar-chip-text);
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 10px;
-  line-height: 1.2;
-  width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: left;
-}
-
-.calendar-shell.view-month .month-client-chip--more{
-  cursor: pointer;
 }
 
 .calendar-shell.view-month .day-summary--month{
@@ -726,7 +710,7 @@
     --calendar-day-min-height: clamp(138px, 16vh, 210px);
   }
   .calendar-shell.view-month .day-summary--month,
-  .calendar-shell.view-month .month-client-chip{
+  .calendar-shell.view-month .month-chip{
     font-size: 11px;
   }
 }

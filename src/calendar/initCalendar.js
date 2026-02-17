@@ -1,5 +1,6 @@
 import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
+import { DAY_STATUS_LABELS, readDayData, buildDayCellViewModel } from './monthDayCellModel.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
@@ -190,16 +191,6 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
-const DAY_STATUS_LABELS = {
-  L4: 'L4',
-  SWIETO: 'Święto',
-  URL: 'Urlop',
-  SZKOLENIE: 'Szkolenie',
-  WOLNE: 'Wolne',
-};
-
-const MONTH_CLIENT_LIMIT = 3;
-
 const createEl = (tag, className, text) => {
   const el = document.createElement(tag);
   if (className) el.className = className;
@@ -207,121 +198,36 @@ const createEl = (tag, className, text) => {
   return el;
 };
 
-const ensureClientListModal = () => {
-  const existing = document.getElementById('calendar-client-list-modal');
-  if (existing) return existing;
-  const modal = createEl('div', 'calendar-client-list-modal');
-  modal.id = 'calendar-client-list-modal';
-  modal.innerHTML = `
-    <div class="calendar-client-list-modal__dialog" role="dialog" aria-modal="true" aria-label="Lista zleceń dnia">
-      <div class="calendar-client-list-modal__header">
-        <h4>Zlecenia dnia</h4>
-        <button type="button" class="btn-ghost btn-small" data-close-client-list>Zamknij</button>
-      </div>
-      <div class="calendar-client-list-modal__body"></div>
-    </div>
-  `;
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal || event.target?.closest?.('[data-close-client-list]')) {
-      modal.classList.remove('is-open');
-    }
-  });
-  document.body.appendChild(modal);
-  return modal;
-};
-
-const openClientListModal = (dayKey, clients = []) => {
-  const modal = ensureClientListModal();
-  const body = modal.querySelector('.calendar-client-list-modal__body');
-  const title = modal.querySelector('h4');
-  if (title) {
-    title.textContent = dayKey ? `Zlecenia dnia ${dayKey}` : 'Zlecenia dnia';
-  }
-  if (body) {
-    body.innerHTML = (clients || []).length
-      ? `<ul>${clients.map((client) => `<li title="${client}">${client}</li>`).join('')}</ul>`
-      : '<p>Brak zleceń dla tego dnia.</p>';
-  }
-  modal.classList.add('is-open');
-};
-
-const normalizeClientName = (value) => {
-  if (value == null) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'object') {
-    const candidate = value.name ?? value.clientName ?? value.klientNazwa ?? value.title ?? '';
-    return String(candidate || '').trim();
-  }
-  return String(value).trim();
-};
-
-const resolveDayStatus = (statusValue) => {
-  if (!statusValue) return null;
-  const raw = String(statusValue).trim().toUpperCase();
-  const key = raw === 'SWIĘTO' ? 'SWIETO' : raw.replace('Ś', 'S');
-  if (!DAY_STATUS_LABELS[key]) return null;
-  return { key, label: DAY_STATUS_LABELS[key] };
-};
-
-const readDayData = (dayKey, decorations = {}) => {
-  const rawSummary = decorations.summaryByDay?.[dayKey] || null;
-  const rawClients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
-  const rawStatus = decorations.leaveByDay?.[dayKey] || null;
-  return { rawSummary, rawClients, rawStatus };
-};
-
-const buildDayViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
-  const summary = data.rawSummary || null;
-  const totals = {
-    P: Number(summary?.praca) || 0,
-    J: Number(summary?.jazda) || 0,
-    F: Number(summary?.fakturowane) || 0,
-    N: Number(summary?.nadgodziny) || 0,
-  };
-  const clients = [...new Set((data.rawClients || []).map(normalizeClientName).filter(Boolean))];
-  const totalsSum = totals.P + totals.J + totals.F + totals.N;
-  const hasSummary = totalsSum > 0;
-  const visibleClients = clients.slice(0, MONTH_CLIENT_LIMIT);
-
-  return {
-    dateKey: dayKey,
-    dayNumber: Number(dayKey?.slice?.(8, 10)) || null,
-    isOutsideMonth,
-    status: resolveDayStatus(data.rawStatus),
-    clients,
-    visibleClients,
-    overflowCount: Math.max(clients.length - visibleClients.length, 0),
-    totals,
-    hasSummary,
-  };
-};
-
 const renderMonthCellFromViewModel = (frame, model) => {
   const monthWrap = createEl('div', 'month-day-content');
-  const statusRow = createEl('div', 'month-day-content__status-row');
-  if (model.status) {
-    const statusChip = createEl('span', `leave-chip statusChip month-day-content__status month-day-content__status--${String(model.status.key || '').toLowerCase()}`, model.status.label);
-    statusRow.appendChild(statusChip);
-  }
-  const clientsRow = createEl('div', 'month-day-content__clients');
+  const chipsRow = createEl('div', 'month-day-content__chips');
+
   model.visibleClients.forEach((clientName) => {
-    const chip = createEl('span', 'month-client-chip', clientName);
+    const chip = createEl('span', 'month-chip month-chip--client', clientName);
     chip.title = clientName;
-    clientsRow.appendChild(chip);
+    chipsRow.appendChild(chip);
   });
+
   if (model.overflowCount > 0) {
-    const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${model.overflowCount}`);
+    const moreBtn = createEl('button', 'month-chip month-chip--client month-chip--more', `+${model.overflowCount}`);
     moreBtn.type = 'button';
     moreBtn.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
       openClientListModal(model.dateKey, model.clients);
     });
-    clientsRow.appendChild(moreBtn);
+    chipsRow.appendChild(moreBtn);
+  }
+
+  if (model.status) {
+    const statusChip = createEl('span', `month-chip month-chip--status month-chip--status-${String(model.status.key || '').toLowerCase()}`, model.status.label);
+    chipsRow.appendChild(statusChip);
   }
 
   if (model.hasSummary) monthWrap.classList.add('month-day-content--with-summary');
-  monthWrap.append(statusRow, clientsRow);
+  if (model.hasChips) {
+    monthWrap.appendChild(chipsRow);
+  }
   frame.appendChild(monthWrap);
 };
 
@@ -340,7 +246,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
   const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
   const dayData = readDayData(dayKey, decorations);
-  const model = buildDayViewModel({ dayKey, isOutsideMonth: Boolean(arg?.isOther), data: dayData });
+  const model = buildDayCellViewModel({ dayKey, isOutsideMonth: Boolean(arg?.isOther), data: dayData });
 
   if (isMonthView) {
     renderMonthCellFromViewModel(frame, model);
@@ -377,9 +283,9 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const row = document.createElement('div');
     row.className = 'day-summary-row';
     if (displayMode === 'short') {
-      row.textContent = `P: ${formatSummaryValue(model.totals.P)} • J: ${formatSummaryValue(model.totals.J)} • F: ${formatSummaryValue(model.totals.F)} • N: ${formatSummaryValue(model.totals.N)}`;
+      row.textContent = `P: ${formatSummaryValue(model.totals.praca)} • J: ${formatSummaryValue(model.totals.jazda)} • F: ${formatSummaryValue(model.totals.fakturowane)} • N: ${formatSummaryValue(model.totals.nadgodziny)}`;
     } else {
-      row.textContent = `Praca: ${formatSummaryValue(model.totals.P)} • Jazda: ${formatSummaryValue(model.totals.J)} • Fakturowane: ${formatSummaryValue(model.totals.F)} • Nadgodziny: ${formatSummaryValue(model.totals.N)}`;
+      row.textContent = `Praca: ${formatSummaryValue(model.totals.praca)} • Jazda: ${formatSummaryValue(model.totals.jazda)} • Fakturowane: ${formatSummaryValue(model.totals.fakturowane)} • Nadgodziny: ${formatSummaryValue(model.totals.nadgodziny)}`;
     }
     footer.appendChild(row);
     frame.appendChild(footer);
