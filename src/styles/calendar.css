@@ -592,6 +592,9 @@
   color: var(--calendar-text-strong);
   border-radius: 999px;
   padding: 3px 10px;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
   font-size: 10px;
   line-height: 1.1;
   white-space: nowrap;
@@ -645,19 +648,41 @@
   border: 1px solid var(--calendar-chip-border);
   background: var(--calendar-chip-bg);
   color: var(--calendar-chip-text);
-  border-radius: 999px;
-  padding: 2px 8px;
+  border-radius: 12px;
+  padding: 3px 8px;
   font-size: 10px;
   line-height: 1.2;
   width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 34px;
+  overflow: hidden;
+}
+
+.calendar-shell.view-month .month-client-chip__name{
+  display: block;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: left;
+}
+
+.calendar-shell.view-month .month-client-chip__summary{
+  display: block;
+  font-size: 9px;
+  color: var(--calendar-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-shell.view-month .month-client-chip--more{
   cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
 }
 
 .calendar-shell.view-month .day-summary--month{

@@ -205,6 +205,26 @@ const createEl = (tag, className, text) => {
   return el;
 };
 
+const normalizeClientChipData = (client, daySummary = null) => {
+  if (typeof client === 'string') {
+    return {
+      name: client,
+      praca: Number(daySummary?.praca || 0) || 0,
+      jazda: Number(daySummary?.jazda || 0) || 0,
+      fakturowane: Number(daySummary?.fakturowane || 0) || 0,
+      nadgodziny: Number(daySummary?.nadgodziny || 0) || 0,
+    };
+  }
+  const source = client && typeof client === 'object' ? client : {};
+  return {
+    name: String(source.name || source.clientName || source.label || '').trim() || 'Klient',
+    praca: Number(source.praca ?? source.work ?? daySummary?.praca ?? 0) || 0,
+    jazda: Number(source.jazda ?? source.drive ?? daySummary?.jazda ?? 0) || 0,
+    fakturowane: Number(source.fakturowane ?? source.billed ?? daySummary?.fakturowane ?? 0) || 0,
+    nadgodziny: Number(source.nadgodziny ?? source.over ?? daySummary?.nadgodziny ?? 0) || 0,
+  };
+};
+
 const ensureClientListModal = () => {
   const existing = document.getElementById('calendar-client-list-modal');
   if (existing) return existing;
@@ -271,13 +291,22 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const body = createEl('div', 'month-day-content__body');
     monthWrap.appendChild(statusChip);
 
+    const daySummary = decorations.summaryByDay?.[dayKey] || null;
     const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
     const clientsRow = createEl('div', 'month-day-content__clients');
     const maxVisibleClients = 2;
     const visibleClients = clients.slice(0, maxVisibleClients);
-    visibleClients.forEach((clientName) => {
-      const chip = createEl('span', 'month-client-chip', clientName);
-      chip.title = clientName;
+    visibleClients.forEach((clientEntry) => {
+      const client = normalizeClientChipData(clientEntry, daySummary);
+      const chip = createEl('div', 'month-client-chip');
+      const chipName = createEl('span', 'month-client-chip__name', client.name);
+      const chipSummary = createEl(
+        'span',
+        'month-client-chip__summary',
+        `P: ${formatSummaryValue(client.praca, { compact: true })} | J: ${formatSummaryValue(client.jazda, { compact: true })} | F: ${formatSummaryValue(client.fakturowane, { compact: true })} | N: ${formatSummaryValue(client.nadgodziny, { compact: true })}`
+      );
+      chip.title = client.name;
+      chip.append(chipName, chipSummary);
       clientsRow.appendChild(chip);
     });
     if (clients.length > maxVisibleClients) {
