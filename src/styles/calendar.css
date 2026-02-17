@@ -169,10 +169,10 @@
 
 /* Stopka z podsumowaniem dnia */
 .day-summary{
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
   padding: 4px 6px;
   border-radius: 10px;
   font-size: 11px;
@@ -182,7 +182,9 @@
   color: var(--calendar-summary-text);
   box-shadow: none;
   box-sizing: border-box;
-  z-index: 4;
+  z-index: 1;
+  margin-top: auto;
+  max-width: 100%;
 }
 .day-summary--short{font-size: 10px;line-height:1.1;}
 .day-summary-row{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -190,11 +192,13 @@
 #calendar-shell.view-month .fc .cell-client-chips{
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   max-width: 100%;
   min-width: 0;
-  margin-top: 2px;
-  margin-bottom: 8px;
+  margin-top: 0;
+  margin-bottom: 0;
+  flex: 0 0 auto;
+  z-index: 3;
 }
 
 #calendar-shell.view-month .fc .cell-client-chip{
@@ -213,6 +217,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  position: relative;
+  z-index: 3;
+  transform: none;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 #calendar-shell.view-month .fc .cell-client-chip--more{
@@ -222,8 +230,41 @@
 }
 
 #calendar-shell.view-month .fc .day-summary--month{
-  width: calc(100% - 12px);
-  max-width: calc(100% - 12px);
+  width: 100%;
+  max-width: 100%;
+}
+
+#calendar-shell.view-month .fc .dayCellContent{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+  min-width: 0;
+}
+
+#calendar-shell.view-month .fc .clientsStack{
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 3;
+}
+
+#calendar-shell.view-month .fc .summaryTile{
+  flex: 0 0 auto;
+  margin-top: auto;
+  z-index: 1;
+  max-width: 100%;
+  position: relative;
+}
+
+#calendar-shell.view-month .fc .clientChipText{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  min-width: 0;
+  display: block;
 }
 
 
