@@ -555,13 +555,12 @@
   min-height: var(--calendar-day-min-height);
   display: flex;
   flex-direction: column;
-  padding: 4px 6px 60px;
+  padding: 4px 6px;
+  position: relative;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-events{
-  margin-top: 22px;
-  margin-bottom: 56px;
-  gap: 4px;
+  display: none;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-number{
@@ -572,18 +571,22 @@
 }
 
 .calendar-shell.view-month .month-day-content{
-  margin-top: 18px;
-  min-height: 54px;
+  margin-top: 22px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.calendar-shell.view-month .month-day-content__day-number{ display:none; }
+.calendar-shell.view-month .month-day-content--with-summary{
+  padding-bottom: 34px;
+}
 
 .calendar-shell.view-month .month-day-content__status-row{
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 22px;
 }
 
@@ -639,6 +642,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .calendar-shell.view-month .month-client-chip{
@@ -667,6 +672,7 @@
   font-size: 10px;
   padding: 4px 6px;
   z-index: 5;
+  margin: 0;
 }
 
 .calendar-client-list-modal{
