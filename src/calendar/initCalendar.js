@@ -198,6 +198,8 @@ const DAY_STATUS_LABELS = {
   WOLNE: 'Wolne',
 };
 
+const MONTH_CLIENT_LIMIT = 3;
+
 const createEl = (tag, className, text) => {
   const el = document.createElement(tag);
   if (className) el.className = className;
@@ -243,6 +245,88 @@ const openClientListModal = (dayKey, clients = []) => {
   modal.classList.add('is-open');
 };
 
+const normalizeClientName = (value) => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    const candidate = value.name ?? value.clientName ?? value.klientNazwa ?? value.title ?? '';
+    return String(candidate || '').trim();
+  }
+  return String(value).trim();
+};
+
+const resolveDayStatus = (statusValue) => {
+  if (!statusValue) return null;
+  const raw = String(statusValue).trim().toUpperCase();
+  const key = raw === 'SWIĘTO' ? 'SWIETO' : raw.replace('Ś', 'S');
+  if (!DAY_STATUS_LABELS[key]) return null;
+  return { key, label: DAY_STATUS_LABELS[key] };
+};
+
+const readDayData = (dayKey, decorations = {}) => {
+  const rawSummary = decorations.summaryByDay?.[dayKey] || null;
+  const rawClients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
+  const rawStatus = decorations.leaveByDay?.[dayKey] || null;
+  return { rawSummary, rawClients, rawStatus };
+};
+
+const buildDayViewModel = ({ dayKey, isOutsideMonth = false, data = {} }) => {
+  const summary = data.rawSummary || null;
+  const totals = {
+    workH: Number(summary?.praca) || 0,
+    driveH: Number(summary?.jazda) || 0,
+    billedH: Number(summary?.fakturowane) || 0,
+    overtimeH: Number(summary?.nadgodziny) || 0,
+  };
+  const clients = [...new Set((data.rawClients || []).map(normalizeClientName).filter(Boolean))];
+  const eventsCount = clients.length;
+  const manualEntries = summary ? 1 : 0;
+  const totalsSum = totals.workH + totals.driveH + totals.billedH + totals.overtimeH;
+  const hasSummary = totalsSum > 0 || eventsCount > 0 || manualEntries > 0;
+  const visibleClients = clients.slice(0, MONTH_CLIENT_LIMIT);
+
+  return {
+    dateKey: dayKey,
+    dayNumber: Number(dayKey?.slice?.(8, 10)) || null,
+    isOutsideMonth,
+    status: resolveDayStatus(data.rawStatus),
+    clients,
+    visibleClients,
+    overflowClientsCount: Math.max(clients.length - visibleClients.length, 0),
+    totals,
+    hasSummary,
+  };
+};
+
+const renderMonthCellFromViewModel = (frame, model) => {
+  const monthWrap = createEl('div', 'month-day-content');
+  const dayNumber = createEl('div', 'month-day-content__day-number', model.dayNumber ? String(model.dayNumber) : '');
+  const statusRow = createEl('div', 'month-day-content__status-row');
+  if (model.status) {
+    const statusChip = createEl('span', `leave-chip statusChip month-day-content__status month-day-content__status--${String(model.status.key || '').toLowerCase()}`, model.status.label);
+    statusRow.appendChild(statusChip);
+  }
+  const clientsRow = createEl('div', 'month-day-content__clients');
+  model.visibleClients.forEach((clientName) => {
+    const chip = createEl('span', 'month-client-chip', clientName);
+    chip.title = clientName;
+    clientsRow.appendChild(chip);
+  });
+  if (model.overflowClientsCount > 0) {
+    const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${model.overflowClientsCount}`);
+    moreBtn.type = 'button';
+    moreBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openClientListModal(model.dateKey, model.clients);
+    });
+    clientsRow.appendChild(moreBtn);
+  }
+
+  monthWrap.append(dayNumber, statusRow, clientsRow);
+  frame.appendChild(monthWrap);
+};
+
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
   cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .month-day-content').forEach((node) => node.remove());
@@ -257,46 +341,18 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const isMonthView = shell?.classList?.contains('view-month');
 
   const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  const dayData = readDayData(dayKey, decorations);
+  const model = buildDayViewModel({ dayKey, isOutsideMonth: Boolean(arg?.isOther), data: dayData });
 
   if (isMonthView) {
-    const monthWrap = createEl('div', 'month-day-content');
-    const header = createEl('div', 'month-day-content__header');
-    const dayNumber = createEl('div', 'dayNumber', String(Number(dayKey.slice(8, 10)) || ''));
-    const body = createEl('div', 'month-day-content__body');
-    const statusChip = createEl('span', `leave-chip statusChip month-day-content__status${leave ? '' : ' is-empty'}`,
-      leave ? (DAY_STATUS_LABELS[leave] || leave) : '');
-    header.append(dayNumber, statusChip);
-    monthWrap.appendChild(header);
-
-    const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
-    const clientsRow = createEl('div', 'month-day-content__clients');
-    const visibleClients = clients.slice(0, 2);
-    visibleClients.forEach((clientName) => {
-      const chip = createEl('span', 'month-client-chip', clientName);
-      chip.title = clientName;
-      clientsRow.appendChild(chip);
-    });
-    if (clients.length > 2) {
-      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - 2}`);
-      moreBtn.type = 'button';
-      moreBtn.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openClientListModal(dayKey, clients);
-      });
-      clientsRow.appendChild(moreBtn);
-    }
-    body.appendChild(clientsRow);
+    renderMonthCellFromViewModel(frame, model);
 
     if (planned && !leave) {
       const marker = document.createElement('div');
       marker.className = 'cell-planned-leave';
       marker.title = 'Zaplanowany urlop';
-      body.appendChild(marker);
+      frame.appendChild(marker);
     }
-
-    monthWrap.appendChild(body);
-    frame.appendChild(monthWrap);
   } else if (leave) {
     const big = document.createElement('div');
     big.className = `cell-leave-icon cell-leave-icon--${leave}`;
@@ -316,19 +372,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     cellEl.appendChild(marker);
   }
 
-  const summary = decorations.summaryByDay?.[dayKey];
-  const dayEvents = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
-  const totals = {
-    P: Number(summary?.praca) || 0,
-    J: Number(summary?.jazda) || 0,
-    F: Number(summary?.fakturowane) || 0,
-    N: Number(summary?.nadgodziny) || 0,
-  };
-  const hasTotals = totals.P > 0 || totals.J > 0 || totals.F > 0 || totals.N > 0;
-  const manualEntryExists = Boolean(summary);
-  const hasAnyEntry = dayEvents.length > 0 || manualEntryExists;
-
-  if (summary && (!isMonthView || (hasTotals && hasAnyEntry))) {
+  if (model.hasSummary) {
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
@@ -337,13 +381,13 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const row2 = document.createElement('div');
     row2.className = 'day-summary-row';
     if (displayMode === 'short') {
-      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
+      row1.textContent = `P: ${formatSummaryValue(model.totals.workH)} • J: ${formatSummaryValue(model.totals.driveH)}`;
+      row2.textContent = `F: ${formatSummaryValue(model.totals.billedH)} • N: ${formatSummaryValue(model.totals.overtimeH)}`;
       footer.appendChild(row1);
       footer.appendChild(row2);
     } else {
-      row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
+      row1.textContent = `Praca: ${formatSummaryValue(model.totals.workH)} • Jazda: ${formatSummaryValue(model.totals.driveH)}`;
+      row2.textContent = `Fakturowane: ${formatSummaryValue(model.totals.billedH)} • Nadgodziny: ${formatSummaryValue(model.totals.overtimeH)}`;
       footer.appendChild(row1);
       footer.appendChild(row2);
     }

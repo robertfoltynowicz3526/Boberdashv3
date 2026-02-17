@@ -555,6 +555,7 @@
   min-height: var(--calendar-day-min-height);
   display: flex;
   flex-direction: column;
+  padding: 4px 6px 60px;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-events{
@@ -565,45 +566,69 @@
 
 .calendar-shell.view-month .fc .fc-daygrid-day-number{
   top: 4px;
-  right: 6px;
+  right: 8px;
   font-size: clamp(12px, 0.8vw, 14px);
+  z-index: 6;
 }
 
 .calendar-shell.view-month .month-day-content{
-  margin-top: 24px;
-  min-height: 42px;
-}
-
-.calendar-shell.view-month .month-day-content__header{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-
-.calendar-shell.view-month .dayNumber{
-  font-size: clamp(12px, 0.8vw, 14px);
-  font-weight: 700;
-  color: var(--calendar-text);
-  line-height: 1;
-}
-
-.calendar-shell.view-month .month-day-content__body{
+  margin-top: 18px;
+  min-height: 54px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  width: 100%;
+  gap: 6px;
+}
+
+.calendar-shell.view-month .month-day-content__day-number{ display:none; }
+
+.calendar-shell.view-month .month-day-content__status-row{
+  display: flex;
+  justify-content: center;
+  min-height: 22px;
 }
 
 .calendar-shell.view-month .month-day-content__status{
   width: fit-content;
   max-width: 100%;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.calendar-shell.view-month .month-day-content__status--l4{
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd68a;
+}
+
+.calendar-shell.view-month .month-day-content__status--url{
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(14, 116, 144, 0.18);
+  color: #bae6fd;
+}
+
+.calendar-shell.view-month .month-day-content__status--swieto{
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecaca;
+}
+
+.calendar-shell.view-month .month-day-content__status--wolne{
+  border-color: rgba(125, 211, 252, 0.4);
+  background: rgba(37, 99, 235, 0.16);
+  color: #dbeafe;
+}
+
+.calendar-shell.view-month .month-day-content__status--szkolenie{
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(109, 40, 217, 0.18);
+  color: #ddd6fe;
 }
 
 .calendar-shell.view-month .month-day-content__status.is-empty{
@@ -613,7 +638,7 @@
 .calendar-shell.view-month .month-day-content__clients{
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .calendar-shell.view-month .month-client-chip{
@@ -636,11 +661,12 @@
 }
 
 .calendar-shell.view-month .day-summary--month{
-  left: 5px;
-  right: 5px;
-  bottom: 5px;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
   font-size: 10px;
   padding: 4px 6px;
+  z-index: 5;
 }
 
 .calendar-client-list-modal{
