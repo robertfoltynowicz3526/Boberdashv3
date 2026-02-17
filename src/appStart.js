@@ -1293,6 +1293,7 @@ function initializeApp() {
         const leaveByDayOut = {};
         const clientsByDay = {};
         const orderEvents = [];
+        const isMonthView = (view?.type || '').toLowerCase().includes('month');
         const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
             ...manualByDay.keys(),
@@ -1318,15 +1319,17 @@ function initializeApp() {
                     const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
                     if (clientName) clientNamesForDay.push(clientName);
                     const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
-                    orderEvents.push({
-                        id: `client_${normalizedDay}_${idSuffix}`,
-                        start: normalizedDay,
-                        allDay: true,
-                        title: clientName || 'Zlecenie',
-                        classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
-                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
-                        sortOrder: 1
-                    });
+                    if (!isMonthView) {
+                        orderEvents.push({
+                            id: `client_${normalizedDay}_${idSuffix}`,
+                            start: normalizedDay,
+                            allDay: true,
+                            title: clientName || 'Zlecenie',
+                            classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
+                            extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
+                            sortOrder: 1
+                        });
+                    }
                 });
                 if (clientNamesForDay.length) {
                     clientsByDay[normalizedDay] = Array.from(new Set(clientNamesForDay));
