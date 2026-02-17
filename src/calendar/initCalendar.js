@@ -257,12 +257,15 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const isMonthView = shell?.classList?.contains('view-month');
 
   const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  const displayMode = getEffectiveSummaryDisplayMode(cellEl);
 
   if (isMonthView) {
     const monthWrap = createEl('div', 'month-day-content');
+    monthWrap.dataset.summaryMode = displayMode;
+    const leaveClass = leave ? ` month-day-status-chip--${String(leave).toLowerCase()}` : '';
     const statusChip = createEl(
       'span',
-      `leave-chip month-day-status-chip${leave ? '' : ' is-empty'}`,
+      `leave-chip month-day-status-chip${leave ? leaveClass : ''}${leave ? '' : ' is-empty'}`,
       leave ? (DAY_STATUS_LABELS[leave] || leave) : ''
     );
     const body = createEl('div', 'month-day-content__body');
@@ -270,14 +273,15 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
 
     const clients = Array.isArray(decorations.clientsByDay?.[dayKey]) ? decorations.clientsByDay[dayKey] : [];
     const clientsRow = createEl('div', 'month-day-content__clients');
-    const visibleClients = clients.slice(0, 2);
+    const maxVisibleClients = 2;
+    const visibleClients = clients.slice(0, maxVisibleClients);
     visibleClients.forEach((clientName) => {
       const chip = createEl('span', 'month-client-chip', clientName);
       chip.title = clientName;
       clientsRow.appendChild(chip);
     });
-    if (clients.length > 2) {
-      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - 2}`);
+    if (clients.length > maxVisibleClients) {
+      const moreBtn = createEl('button', 'month-client-chip month-client-chip--more', `+${clients.length - maxVisibleClients}`);
       moreBtn.type = 'button';
       moreBtn.addEventListener('click', (event) => {
         event.preventDefault();
@@ -319,7 +323,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   const summary = decorations.summaryByDay?.[dayKey];
   if (summary) {
     const footer = document.createElement('div');
-    const displayMode = getEffectiveSummaryDisplayMode(cellEl);
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
     const row1 = document.createElement('div');
     row1.className = 'day-summary-row';
