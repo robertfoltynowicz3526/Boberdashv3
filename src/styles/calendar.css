@@ -1,16 +1,16 @@
 .calendar-wrap{
   width: 100%;
-  margin: 0 auto;
-  padding: 16px;
+  margin: 0;
+  padding: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   flex: 1;
   min-height: var(--calendar-shell-min-height, 420px);
   height: var(--calendar-shell-height, auto);
-  background: var(--calendar-bg);
-  border: 1px solid var(--calendar-border);
-  border-radius: 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   position: relative;
   overflow: visible;
 }
@@ -31,28 +31,39 @@
 }
 
 #calendar {
-  min-height: 70vh;
+  min-height: 75vh;
 }
 
 #calendar-toolbar{
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  flex-wrap: nowrap;
+  gap: 10px;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  min-height: 44px;
 }
 
 #calendar-toolbar .calendar-toolbar-group{
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 #calendar-toolbar .is-active{
   background: var(--calendar-active);
   border-color: var(--calendar-active);
   color: #2a2200;
+}
+
+#calendar-toolbar .calendar-toolbar-group--actions{
+  margin-left: auto;
+}
+
+#calendar-toolbar .calendar-toolbar-title{
+  flex: 1;
+  text-align: center;
 }
 
 .fc{
@@ -72,7 +83,7 @@
 .fc-theme-standard .fc-scrollgrid,
 .fc-theme-standard td,
 .fc-theme-standard th{border-color: var(--calendar-grid)}
-.fc .fc-daygrid-day-number{font-weight:600;color:var(--calendar-muted);font-size:var(--calendar-day-number-size)}
+.fc .fc-daygrid-day-number{font-weight:700;color:var(--calendar-text);font-size:clamp(14px, 1.1vw, 17px);position:absolute;top:6px;right:8px;z-index:4}
 .fc .fc-daygrid-day { background: rgba(255,255,255,.02); }
 .fc .fc-daygrid-day.is-selected-day{
   background: color-mix(in srgb, var(--jd-green-primary) 16%, transparent);
@@ -90,14 +101,19 @@
 }
 
 .fc .fc-daygrid-day-events{
+  margin-top: 24px;
   margin-bottom: 2px;
-  padding-bottom: var(--day-summary-space, 58px);
+  padding-bottom: 0;
   max-width: 100%;
   overflow: hidden;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.calendar-shell.view-month .fc .fc-daygrid-day-events{
+  gap: 5px;
 }
 
 .fc .fc-daygrid-event-harness {
@@ -145,9 +161,12 @@
   font-size: var(--calendar-event-font);
   box-shadow: none;
   display: inline-flex;
+  align-items: center;
   min-width: 0;
   max-width: 100%;
-  width: fit-content;
+  width: 100%;
+  min-height: 22px;
+  height: 22px;
 }
 
 .fc .bober-chip--client .fc-event-title,
@@ -479,17 +498,18 @@
 .calendar-shell.view-month .calendar-main{
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
 .calendar-shell.view-month .fc{
-  --calendar-day-min-height: clamp(72px, 12vh, 110px);
+  --calendar-day-min-height: clamp(110px, 15vh, 170px);
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
-  --day-summary-space: 28px;
-  height: 100%;
-  min-height: 0;
+  --day-summary-space: 0px;
+  min-height: 75vh;
+  height: var(--calendar-shell-height, calc(100vh - 180px));
 }
 
 .calendar-shell.view-month .fc .fc-view-harness{
@@ -508,6 +528,7 @@
 
 .calendar-shell.view-month .fc .fc-scroller{
   overflow-y: auto;
+  overflow-x: hidden;
   max-height: 100%;
 }
 
@@ -518,7 +539,7 @@
 .calendar-shell.view-month .fc .fc-daygrid-body table{
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: repeat(6, minmax(90px, 1fr));
+  grid-template-rows: repeat(6, minmax(120px, 1fr));
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-body tr{
@@ -620,3 +641,5 @@
     --day-summary-space: 44px;
   }
 }
+
+.calendar-shell.view-month .day-summary{ display:none !important; }

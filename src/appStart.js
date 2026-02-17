@@ -600,7 +600,7 @@ function initializeApp() {
         if (!api) return;
         const viewKey = fcViewToCalendarKey(api.view?.type);
         const width = window.innerWidth || 0;
-        const monthRows = width >= 1440 ? 2 : width >= 1024 ? 1 : 1;
+        const monthRows = 2;
         const rows = viewKey === 'month'
             ? monthRows
             : (width >= CALENDAR_BREAKPOINTS.desktop ? 3 : width >= CALENDAR_BREAKPOINTS.laptop ? 2 : 1);
@@ -610,15 +610,18 @@ function initializeApp() {
     };
 
     const CALENDAR_SHELL_MIN_HEIGHT = 420;
-    const CALENDAR_SHELL_BOTTOM_GUTTER = 24;
+    const CALENDAR_MONTH_MIN_HEIGHT = '75vh';
+    const CALENDAR_RESERVED_SPACE = 120;
     const syncCalendarShellHeight = () => {
         if (!calendarShell) return;
         if (calendarShell.offsetParent === null) return;
-        const rect = calendarShell.getBoundingClientRect();
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.bottom || 0;
-        const available = Math.max(viewportHeight - rect.top - CALENDAR_SHELL_BOTTOM_GUTTER, CALENDAR_SHELL_MIN_HEIGHT);
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const mainContentEl = document.querySelector('main.mainContent') || document.querySelector('main');
+        const headerHeight = document.querySelector('header')?.offsetHeight || 0;
+        const navHeight = mainContentEl ? Math.max((mainContentEl.getBoundingClientRect().top || 0) - headerHeight, 0) : 0;
+        const available = Math.max(viewportHeight - headerHeight - navHeight - CALENDAR_RESERVED_SPACE, CALENDAR_SHELL_MIN_HEIGHT);
         calendarShell.style.setProperty('--calendar-shell-height', `${Math.round(available)}px`);
-        calendarShell.style.setProperty('--calendar-shell-min-height', `${CALENDAR_SHELL_MIN_HEIGHT}px`);
+        calendarShell.style.setProperty('--calendar-shell-min-height', CALENDAR_MONTH_MIN_HEIGHT);
     };
 
     const handleCalendarResize = () => {
