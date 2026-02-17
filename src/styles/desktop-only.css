@@ -168,22 +168,3 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 /* Sticky nagłówki w panelach list (jeśli są) */
 .list-header { position: sticky; top: 0; z-index: 2; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); }
 
-/* Kalendarz: wymuś siatkę 7 kolumn */
-#calendar-shell .fc .fc-scrollgrid,
-#calendar-shell .fc .fc-daygrid,
-#calendar-shell .fc .fc-daygrid-body table,
-#calendar-shell .fc .fc-scrollgrid table {
-  width: 100% !important;
-}
-
-#calendar-shell .fc .fc-daygrid-body {
-  display: table-row-group;
-}
-
-#calendar-shell .fc .fc-daygrid-body table {
-  table-layout: fixed;
-}
-
-#calendar-shell .fc .fc-daygrid-day {
-  width: calc(100% / 7);
-}

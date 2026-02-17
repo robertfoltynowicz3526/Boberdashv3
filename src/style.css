@@ -1297,25 +1297,6 @@ select {
   min-height: 0;
 }
 
-#calendar-shell .fc .fc-scrollgrid,
-#calendar-shell .fc .fc-daygrid,
-#calendar-shell .fc .fc-daygrid-body table,
-#calendar-shell .fc .fc-scrollgrid table {
-  width: 100% !important;
-}
-
-#calendar-shell .fc .fc-daygrid-body {
-  display: table-row-group;
-}
-
-#calendar-shell .fc .fc-daygrid-body table {
-  table-layout: fixed;
-}
-
-#calendar-shell .fc .fc-daygrid-day {
-  width: calc(100% / 7);
-}
-
 #calendar-shell.view-week .fc .bober-chip.fc-event,
 #calendar-shell.view-day .fc .bober-chip.fc-event {
   padding: 6px 12px;
