@@ -378,6 +378,21 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     return 'dayGridMonth';
   };
 
+  const getRangeModeStepDays = (mode) => {
+    if (mode === 'twoWeeks') return 14;
+    if (mode === 'week') return 7;
+    return 0;
+  };
+
+  const updateRangeModeLayoutState = (focusedDate = getFocusedDate()) => {
+    const shell = document.getElementById('calendar-shell');
+    if (!shell) return;
+    shell.dataset.rangeMode = calendarRangeMode;
+    const { rangeStart, rangeEnd } = computeRange(focusedDate, calendarRangeMode, weekStartsOn);
+    const weeks = generateGrid(rangeStart, rangeEnd, weekStartsOn);
+    shell.style.setProperty('--calendar-visible-weeks', String(weeks.length || 0));
+  };
+
   const inferRangeModeFromView = (viewType) => {
     if (viewType === 'dayGridTwoWeeks') return 'twoWeeks';
     if (viewType === 'dayGridWeek' || viewType === 'dayGridDay') return 'week';
@@ -442,6 +457,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     calendarRangeMode = safeMode;
     persistRangeMode(safeMode);
     syncRangeModeButtons();
+    updateRangeModeLayoutState(focusedDate);
     const api = window.__fcCalendar;
     if (!api) return;
     api.changeView(rangeModeToView(safeMode), startOfDay(focusedDate) || new Date());
@@ -454,10 +470,8 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     if (mode === 'month') {
       return new Date(base.getFullYear(), base.getMonth() + multiplier, base.getDate());
     }
-    if (mode === 'twoWeeks') {
-      return new Date(base.getTime() + (14 * multiplier * 24 * 60 * 60 * 1000));
-    }
-    return new Date(base.getTime() + (7 * multiplier * 24 * 60 * 60 * 1000));
+    const days = getRangeModeStepDays(mode) || 7;
+    return new Date(base.getTime() + (days * multiplier * 24 * 60 * 60 * 1000));
   };
 
   const baseOptions = {
@@ -484,7 +498,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     height: 'auto',
     contentHeight: 'auto',
     handleWindowResize: true,
-    fixedWeekCount: true,
+    fixedWeekCount: false,
     dayMaxEvents: true,
     dayMaxEventRows: 3,
     showNonCurrentDates: true,
@@ -584,6 +598,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       persistRangeMode(calendarRangeMode);
       syncRangeModeButtons();
       const focusedDate = getFocusedDate();
+      updateRangeModeLayoutState(focusedDate);
       ensureGridSafe(focusedDate, calendarRangeMode);
       const computedTitle = formatCalendarTitle(focusedDate, calendarRangeMode);
       window.__calendarRangeTitle = computedTitle;
@@ -714,6 +729,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     });
   });
   syncRangeModeButtons();
+  updateRangeModeLayoutState();
 
   setTimeout(() => {
     try {
