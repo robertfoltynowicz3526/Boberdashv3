@@ -1,8 +1,11 @@
 import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
+import { computeRange, generateGrid, startOfDay } from './rangeUtils.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SUMMARY_DISPLAY_STORAGE_KEY = 'summaryDisplayMode';
+const CALENDAR_RANGE_MODE_STORAGE_KEY = 'calendar.rangeMode';
+const CALENDAR_RANGE_MODES = new Set(['month', 'twoWeeks', 'week']);
 const SUMMARY_DISPLAY_MODES = new Set(['short', 'full']);
 const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
 const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
@@ -351,6 +354,111 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     : [dayGridPlugin, interactionPlugin]
   ).filter(Boolean);
   const defaultView = 'dayGridMonth';
+  let calendarRangeMode = 'month';
+  const weekStartsOn = Number(extraOptions?.firstDay ?? 1) || 1;
+
+  const readRangeModeFromStorage = () => {
+    try {
+      const stored = window.localStorage?.getItem?.(CALENDAR_RANGE_MODE_STORAGE_KEY);
+      return CALENDAR_RANGE_MODES.has(stored) ? stored : 'month';
+    } catch (_) {
+      return 'month';
+    }
+  };
+
+  const persistRangeMode = (mode) => {
+    try {
+      window.localStorage?.setItem?.(CALENDAR_RANGE_MODE_STORAGE_KEY, mode);
+    } catch (_) {}
+  };
+
+  const rangeModeToView = (mode) => {
+    if (mode === 'week') return 'dayGridWeek';
+    if (mode === 'twoWeeks') return 'dayGridTwoWeeks';
+    return 'dayGridMonth';
+  };
+
+  const inferRangeModeFromView = (viewType) => {
+    if (viewType === 'dayGridTwoWeeks') return 'twoWeeks';
+    if (viewType === 'dayGridWeek' || viewType === 'dayGridDay') return 'week';
+    return 'month';
+  };
+
+  const getFocusedDate = () => startOfDay(window.__fcCalendar?.getDate?.() || new Date()) || new Date();
+
+  const validateCalendarGrid = (focusedDate, mode) => {
+    const safeMode = CALENDAR_RANGE_MODES.has(mode) ? mode : 'month';
+    const { rangeStart, rangeEnd } = computeRange(focusedDate, safeMode, weekStartsOn);
+    let weeks = generateGrid(rangeStart, rangeEnd, weekStartsOn);
+    if (safeMode === 'month' && weeks.length <= 1) {
+      const fallbackDate = startOfDay(focusedDate) || new Date();
+      const monthStart = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth(), 1);
+      const monthEnd = new Date(fallbackDate.getFullYear(), fallbackDate.getMonth() + 1, 0);
+      const fallbackRange = computeRange(monthStart, 'month', weekStartsOn);
+      weeks = generateGrid(fallbackRange.rangeStart, fallbackRange.rangeEnd, weekStartsOn);
+    }
+    return weeks;
+  };
+
+  const ensureGridSafe = (focusedDate, mode) => {
+    const weeks = validateCalendarGrid(focusedDate, mode);
+    const expected = mode === 'week' ? 1 : (mode === 'twoWeeks' ? 2 : 4);
+    if ((mode === 'month' && weeks.length <= 1) || (mode !== 'month' && weeks.length !== expected)) {
+      const api = window.__fcCalendar;
+      if (api) {
+        const targetDate = startOfDay(focusedDate) || new Date();
+        api.changeView(rangeModeToView(mode), targetDate);
+      }
+    }
+    return weeks;
+  };
+
+  const formatCalendarTitle = (focusedDate, mode) => {
+    const safeDate = startOfDay(focusedDate) || new Date();
+    const { rangeStart, rangeEnd } = computeRange(safeDate, mode, weekStartsOn);
+    if (mode === 'month') {
+      return new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(safeDate);
+    }
+    const sameMonth = rangeStart.getMonth() === rangeEnd.getMonth() && rangeStart.getFullYear() === rangeEnd.getFullYear();
+    if (sameMonth) {
+      return `${rangeStart.getDate()}–${rangeEnd.getDate()} ${new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' }).format(rangeStart)}`;
+    }
+    const startLabel = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short' }).format(rangeStart);
+    const endLabel = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' }).format(rangeEnd);
+    return `${startLabel} – ${endLabel}`;
+  };
+
+  const syncRangeModeButtons = () => {
+    const buttons = document.querySelectorAll('[data-calendar-range-mode]');
+    buttons.forEach((button) => {
+      const active = button.dataset.calendarRangeMode === calendarRangeMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  };
+
+  const setRangeMode = (nextMode, focusedDate = getFocusedDate()) => {
+    const safeMode = CALENDAR_RANGE_MODES.has(nextMode) ? nextMode : 'month';
+    calendarRangeMode = safeMode;
+    persistRangeMode(safeMode);
+    syncRangeModeButtons();
+    const api = window.__fcCalendar;
+    if (!api) return;
+    api.changeView(rangeModeToView(safeMode), startOfDay(focusedDate) || new Date());
+    ensureGridSafe(focusedDate, safeMode);
+  };
+
+  const shiftDateByMode = (focusedDate, direction, mode) => {
+    const base = startOfDay(focusedDate) || new Date();
+    const multiplier = direction < 0 ? -1 : 1;
+    if (mode === 'month') {
+      return new Date(base.getFullYear(), base.getMonth() + multiplier, base.getDate());
+    }
+    if (mode === 'twoWeeks') {
+      return new Date(base.getTime() + (14 * multiplier * 24 * 60 * 60 * 1000));
+    }
+    return new Date(base.getTime() + (7 * multiplier * 24 * 60 * 60 * 1000));
+  };
 
   const baseOptions = {
     plugins,
@@ -364,6 +472,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       day: 'Dzień'
     },
     titleFormat: { year: 'numeric', month: 'long' },
+    views: {
+      dayGridTwoWeeks: {
+        type: 'dayGrid',
+        duration: { weeks: 2 },
+        dateIncrement: { weeks: 2 },
+      },
+    },
     navLinks: true,
     expandRows: true,
     height: 'auto',
@@ -464,6 +579,18 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (typeof extraEventDidMount === 'function') extraEventDidMount(info);
     },
     datesSet: (...args) => {
+      const [viewInfo] = args;
+      calendarRangeMode = inferRangeModeFromView(viewInfo?.view?.type);
+      persistRangeMode(calendarRangeMode);
+      syncRangeModeButtons();
+      const focusedDate = getFocusedDate();
+      ensureGridSafe(focusedDate, calendarRangeMode);
+      const computedTitle = formatCalendarTitle(focusedDate, calendarRangeMode);
+      window.__calendarRangeTitle = computedTitle;
+      const titleEl = document.getElementById('calendar-title');
+      if (titleEl) {
+        titleEl.textContent = computedTitle;
+      }
       if (typeof extraDatesSet === 'function') extraDatesSet(...args);
       try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
       try { applyDecorationsFromPlaceholders(); } catch (_) {}
@@ -485,6 +612,9 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     },
     ...restExtraOptions,
   };
+
+  calendarRangeMode = readRangeModeFromStorage();
+  baseOptions.initialView = rangeModeToView(calendarRangeMode);
 
   const resourceOptions = {
     ...baseOptions,
@@ -553,9 +683,37 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
     window.addEventListener('resize', handleSummaryDisplayResize);
   }
 
-  document.getElementById('btnPrev')?.addEventListener('click', () => calendar.prev());
-  document.getElementById('btnNext')?.addEventListener('click', () => calendar.next());
-  document.getElementById('btnToday')?.addEventListener('click', () => calendar.today());
+  const prevButton = document.getElementById('btnPrev');
+  const nextButton = document.getElementById('btnNext');
+  const todayButton = document.getElementById('btnToday');
+
+  prevButton?.addEventListener('click', () => {
+    const focusedDate = getFocusedDate();
+    const nextDate = shiftDateByMode(focusedDate, -1, calendarRangeMode);
+    calendar.changeView(rangeModeToView(calendarRangeMode), nextDate);
+    ensureGridSafe(nextDate, calendarRangeMode);
+  });
+
+  nextButton?.addEventListener('click', () => {
+    const focusedDate = getFocusedDate();
+    const nextDate = shiftDateByMode(focusedDate, 1, calendarRangeMode);
+    calendar.changeView(rangeModeToView(calendarRangeMode), nextDate);
+    ensureGridSafe(nextDate, calendarRangeMode);
+  });
+
+  todayButton?.addEventListener('click', () => {
+    const today = startOfDay(new Date()) || new Date();
+    calendar.changeView(rangeModeToView(calendarRangeMode), today);
+    ensureGridSafe(today, calendarRangeMode);
+  });
+
+  document.querySelectorAll('[data-calendar-range-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextMode = button.dataset.calendarRangeMode;
+      setRangeMode(nextMode, getFocusedDate());
+    });
+  });
+  syncRangeModeButtons();
 
   setTimeout(() => {
     try {

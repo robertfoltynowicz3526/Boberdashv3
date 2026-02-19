@@ -96,6 +96,11 @@
                 </div>
                 <div class="calendar-toolbar-title" id="calendar-title" aria-live="polite"></div>
                 <div class="calendar-toolbar-group calendar-toolbar-group--actions">
+                    <div class="calendar-range-switch" role="group" aria-label="Zakres kalendarza">
+                        <button type="button" class="btn-ghost is-active" data-calendar-range-mode="month" aria-pressed="true">Miesiąc</button>
+                        <button type="button" class="btn-ghost" data-calendar-range-mode="twoWeeks" aria-pressed="false">2 tygodnie</button>
+                        <button type="button" class="btn-ghost" data-calendar-range-mode="week" aria-pressed="false">Tydzień</button>
+                    </div>
                     <div class="summary-display-control">
                         <label for="calendar-summary-display" class="summary-display-label">Podsumowanie</label>
                         <select id="calendar-summary-display" class="summary-display-select">
