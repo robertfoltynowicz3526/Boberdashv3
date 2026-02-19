@@ -1822,7 +1822,7 @@ function initializeApp() {
             button.classList.toggle('is-active', isActive);
         });
         if (calendarTitleEl) {
-            calendarTitleEl.textContent = api.view?.title || '';
+            calendarTitleEl.textContent = window.__calendarRangeTitle || api.view?.title || '';
         }
         if (calendarBackBtn) {
             const hasReturn = Boolean(calendarReturnState?.viewKey && calendarReturnState?.dateStr);

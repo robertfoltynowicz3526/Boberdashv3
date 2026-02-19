@@ -187,6 +187,23 @@
 
 /* Przełącznik trybu podsumowania */
 .fc .summary-display-control,
+
+.calendar-range-switch{
+  display:flex;
+  gap:6px;
+  margin-right:10px;
+}
+
+.calendar-range-switch .btn-ghost{
+  padding:6px 10px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,0.2);
+}
+
+.calendar-range-switch .btn-ghost.is-active{
+  background:rgba(255,255,255,0.2);
+  border-color:rgba(255,255,255,0.45);
+}
 #calendar-toolbar .summary-display-control{
   display: inline-flex;
   align-items: center;
