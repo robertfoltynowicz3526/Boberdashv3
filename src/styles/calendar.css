@@ -535,7 +535,7 @@
 .calendar-shell.view-month .fc .fc-daygrid-body table{
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: repeat(6, minmax(90px, 1fr));
+  grid-template-rows: repeat(var(--calendar-visible-weeks, 6), minmax(90px, 1fr));
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-body tr{
@@ -549,6 +549,29 @@
 .calendar-shell.view-month .fc .fc-daygrid-day-frame{
   overflow: hidden;
   min-height: var(--calendar-day-min-height);
+}
+
+
+.calendar-shell[data-range-mode="week"],
+.calendar-shell[data-range-mode="twoWeeks"]{
+  min-height: auto;
+  height: auto;
+}
+
+.calendar-shell[data-range-mode="week"] .fc,
+.calendar-shell[data-range-mode="week"] .fc-view-harness,
+.calendar-shell[data-range-mode="week"] .fc-view-harness-active,
+.calendar-shell[data-range-mode="week"] .fc-scrollgrid,
+.calendar-shell[data-range-mode="week"] .fc-daygrid-body,
+.calendar-shell[data-range-mode="week"] .fc-daygrid-body-unbalanced,
+.calendar-shell[data-range-mode="twoWeeks"] .fc,
+.calendar-shell[data-range-mode="twoWeeks"] .fc-view-harness,
+.calendar-shell[data-range-mode="twoWeeks"] .fc-view-harness-active,
+.calendar-shell[data-range-mode="twoWeeks"] .fc-scrollgrid,
+.calendar-shell[data-range-mode="twoWeeks"] .fc-daygrid-body,
+.calendar-shell[data-range-mode="twoWeeks"] .fc-daygrid-body-unbalanced{
+  height: auto !important;
+  min-height: 0;
 }
 
 /* Breakpointy */
