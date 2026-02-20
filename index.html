@@ -40,8 +40,7 @@
             <div class="theme-switcher">
                 <select id="theme-select" class="theme-select" aria-label="Wybierz motyw interfejsu">
                     <option value="jd-dark">John Deere (ciemny, lekki)</option>
-                    <option value="jd-contrast">John Deere (kontrastowy)</option>
-                </select>
+                                    </select>
             </div>
             <button type="button" id="app-lock-button" class="btn-secondary app-lock-button">Zablokuj</button>
         </div>
@@ -89,7 +88,7 @@
         <div id="notatnik" class="tab-content page-wide">
             <div class="pulpit-header">
                 <h2>Notatnik</h2>
-                <button type="button" id="notes-add-btn" class="btn-add">Nowa notatka</button>
+                <button type="button" id="notes-add-btn" class="btn-add">+ Nowa notatka</button>
             </div>
             <div class="orders-grid notes-layout">
                 <div class="side">
@@ -481,8 +480,8 @@
               <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
             </div>
             <div class="form-group">
-              <label for="complete-zlecenie-end-at">Zakończenie (data i godzina):</label>
-              <input type="datetime-local" id="complete-zlecenie-end-at">
+              <label for="complete-zlecenie-end-date">Data zakończenia:</label>
+              <input type="date" id="complete-zlecenie-end-date">
             </div>
             <div class="form-group">
               <label for="complete-zlecenie-service-date">Data wykonania:</label>
@@ -814,7 +813,7 @@
     <div id="edit-zlecenie-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <h2>Edytuj Zakończone Zlecenie</h2>
+            <h2>Edytuj zlecenie</h2>
             <form id="edit-zlecenie-form" class="modal-body">
                 <input type="hidden" id="edit-zlecenie-id">
                 <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
@@ -835,12 +834,12 @@
                 </div>
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="edit-start-at">Data rozpoczęcia:</label>
-                        <input type="datetime-local" id="edit-start-at">
+                        <label for="edit-start-date">Data rozpoczęcia:</label>
+                        <input type="date" id="edit-start-date">
                     </div>
                     <div class="form-group">
-                        <label for="edit-end-at">Zakończono dnia:</label>
-                        <input type="datetime-local" id="edit-end-at">
+                        <label for="edit-completion-date">Data wykonania:</label>
+                        <input type="date" id="edit-completion-date">
                     </div>
                 </div>
                 <div class="form-group">
@@ -849,6 +848,34 @@
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn-add">Zapisz Zmiany</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="notes-editor-modal" class="modal">
+        <div class="modal-content modal-content-notes">
+            <span class="close-button" id="notes-modal-close">&times;</span>
+            <h2 id="notes-modal-title">Notatka</h2>
+            <form id="notes-editor-form" class="modal-body">
+                <input type="hidden" id="notes-editor-id">
+                <div class="form-group"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title"></div>
+                <div class="form-group"><label>Powiąż ze zleceniem</label>
+                    <div class="notes-link-toggle">
+                        <label><input type="radio" name="notes-link-type" value="none" checked> Wolna</label>
+                        <label><input type="radio" name="notes-link-type" value="order"> Do zlecenia</label>
+                    </div>
+                </div>
+                <div class="form-group" id="notes-editor-order-group" hidden>
+                    <label for="notes-editor-order">Zlecenie</label>
+                    <select id="notes-editor-order"><option value="">Wybierz zlecenie</option></select>
+                </div>
+                <div class="form-group"><label for="notes-editor-content">Treść</label><textarea id="notes-editor-content" rows="16"></textarea></div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-add">Zapisz</button>
+                    <button type="button" id="notes-editor-cancel" class="btn-secondary">Anuluj</button>
+                    <button type="button" id="notes-editor-delete" class="btn-danger">Usuń</button>
+                    <button type="button" id="notes-editor-export" class="btn-secondary">Eksport TXT</button>
                 </div>
             </form>
         </div>
