@@ -31,6 +31,7 @@
             <button class="tab-button" onclick="openTab(event, 'maszyny')">Maszyny</button>
             <button class="tab-button" onclick="openTab(event, 'zlecenia')">Zlecenia</button>
             <button class="tab-button" onclick="openTab(event, 'dodaj-zlecenie')">Dodaj Zlecenie</button>
+            <button class="tab-button" onclick="openTab(event, 'notatnik')">Notatnik</button>
             <button class="tab-button" onclick="openTab(event, 'magazyn')">Magazyn</button>
             <button class="tab-button" onclick="openTab(event, 'podsumowanie')">Podsumowanie</button>
         </nav>
@@ -77,12 +78,44 @@
             </section>
             <section class="pulpit-activity" aria-label="Ostatnie działania">
                 <div class="pulpit-stats-header">
-                    <h3>Ostatnie działania</h3>
+                    <h3 id="pulpit-activity-title">Ostatnie działania</h3>
+                    <button type="button" id="pulpit-activity-toggle" class="btn-ghost">Pokaż</button>
                 </div>
                 <div id="pulpit-activity" class="summary-container-subtle">
                     <ul id="pulpit-activity-list" class="activity-list"></ul>
                 </div>
             </section>
+        </div>
+        <div id="notatnik" class="tab-content page-wide">
+            <div class="pulpit-header">
+                <h2>Notatnik</h2>
+                <button type="button" id="notes-add-btn" class="btn-add">Nowa notatka</button>
+            </div>
+            <div class="orders-grid notes-layout">
+                <div class="side">
+                    <div class="form-group">
+                        <label for="notes-search">Szukaj</label>
+                        <input type="search" id="notes-search" placeholder="Tytuł lub treść...">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes-filter-type">Filtr</label>
+                        <select id="notes-filter-type">
+                            <option value="all">Wszystkie</option>
+                            <option value="none">Wolne</option>
+                            <option value="order">Do zlecenia</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes-filter-order">Konkretne zlecenie</label>
+                        <select id="notes-filter-order"><option value="">Wszystkie zlecenia</option></select>
+                    </div>
+                    <button type="button" id="notes-export-selected" class="btn-secondary">Eksportuj .txt (wybrana)</button>
+                    <button type="button" id="notes-export-filtered" class="btn-secondary">Eksportuj .txt (lista)</button>
+                </div>
+                <div class="main">
+                    <div id="notes-list" class="table-section section-scroll scroll-y"></div>
+                </div>
+            </div>
         </div>
         <div id="kalendarz-tab" class="tab-content page-wide calendarSection" data-section="kalendarz">
             <div class="pulpit-header">
@@ -785,7 +818,7 @@
             <form id="edit-zlecenie-form" class="modal-body">
                 <input type="hidden" id="edit-zlecenie-id">
                 <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
-                <p><strong>Nr zlecenia:</strong> <span id="edit-zlecenie-nr"></span></p>
+                <div class="form-group"><label for="edit-zlecenie-nr-input">Numer zlecenia:</label><input type="text" id="edit-zlecenie-nr-input" required></div>
                 <div class="form-group">
                     <label for="edit-wyfakturowane-godziny">Wyfakturowane godziny:</label>
                     <input type="number" step="0.1" id="edit-wyfakturowane-godziny" required inputmode="decimal">
@@ -802,11 +835,11 @@
                 </div>
                 <div class="form-grid form-grid-2">
                     <div class="form-group">
-                        <label for="edit-start-at">Start (data i godzina):</label>
+                        <label for="edit-start-at">Data rozpoczęcia:</label>
                         <input type="datetime-local" id="edit-start-at">
                     </div>
                     <div class="form-group">
-                        <label for="edit-end-at">Koniec (data i godzina):</label>
+                        <label for="edit-end-at">Zakończono dnia:</label>
                         <input type="datetime-local" id="edit-end-at">
                     </div>
                 </div>

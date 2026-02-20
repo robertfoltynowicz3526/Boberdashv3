@@ -378,6 +378,8 @@ function initializeApp() {
     const DEFAULT_STOCK_ITEMS = [
         { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false, typProdukt: PRODUCT_TYPE_ZMYWACZ }
     ];
+    const NOTES_STORAGE_KEY = 'notesActivityCollapsed';
+    const NOTE_LINKED_TYPES = { NONE: 'none', ORDER: 'order' };
     function obliczAbsorpcja(wyfakturowaneGodziny) {
         const v = Number(wyfakturowaneGodziny || 0);
         return v <= 0 ? 0 : (v / BAZA_MIESIECZNA_GODZIN) * 100;
@@ -424,6 +426,10 @@ function initializeApp() {
     let recentActivity = [];
     let weeklyMissingDays = [];
     let activityStatus = 'idle';
+    let allNotes = [];
+    let notesStatus = 'idle';
+    let selectedNoteId = null;
+    let notesActivityCollapsed = true;
     let hasEnsuredDefaultStock = false;
     let calendar;
     window.calendar = null;
@@ -825,6 +831,16 @@ function initializeApp() {
     const pulpitQuickActionsContainer = document.getElementById('pulpit-quick-actions');
     const pulpitWeeklyContainer = document.getElementById('pulpit-weekly-preview');
     const pulpitActivityList = document.getElementById('pulpit-activity-list');
+    const pulpitActivityContainer = document.getElementById('pulpit-activity');
+    const pulpitActivityTitle = document.getElementById('pulpit-activity-title');
+    const pulpitActivityToggle = document.getElementById('pulpit-activity-toggle');
+    const notesListContainer = document.getElementById('notes-list');
+    const notesSearchInput = document.getElementById('notes-search');
+    const notesFilterType = document.getElementById('notes-filter-type');
+    const notesFilterOrder = document.getElementById('notes-filter-order');
+    const notesAddBtn = document.getElementById('notes-add-btn');
+    const notesExportSelectedBtn = document.getElementById('notes-export-selected');
+    const notesExportFilteredBtn = document.getElementById('notes-export-filtered');
     const calendarTitleEl = document.getElementById('calendar-title');
     const calendarToolbar = document.getElementById('calendar-toolbar');
     const calendarDayPanel = document.getElementById('calendar-day-panel');
@@ -1023,6 +1039,8 @@ function initializeApp() {
     };
 
     setBootstrapLoadingState();
+    try { notesActivityCollapsed = localStorage.getItem(NOTES_STORAGE_KEY) !== '0'; } catch (_) { notesActivityCollapsed = true; }
+    setActivityCollapsed(notesActivityCollapsed);
 
     const normalizeAllDayDate = (value) => {
         if (!value) return null;
@@ -1041,7 +1059,8 @@ function initializeApp() {
 
     const resolveServiceDate = (order) => {
         if (!order) return '';
-        const raw = order.serviceDate || order.performedAt || order.dataUkonczenia || '';
+        const fromCompleted = formatDateForStorage(toDateSafe(order.completedAt));
+        const raw = fromCompleted || order.serviceDate || order.performedAt || order.dataUkonczenia || '';
         return typeof raw === 'string' ? raw : formatDateForStorage(toDateSafe(raw));
     };
 
@@ -1415,6 +1434,7 @@ function initializeApp() {
         });
         if (!isAnyModalOpen()) {
             hideBackdrop();
+            document.body.classList.remove('modal-open');
         }
     };
 
@@ -1423,6 +1443,7 @@ function initializeApp() {
         closeAllModals(modal);
         modal.style.display = 'block';
         showBackdrop();
+        document.body.classList.add('modal-open');
     };
 
     const calendarFormDock = {
@@ -1461,10 +1482,10 @@ function initializeApp() {
         }
         if (!isAnyModalOpen()) {
             hideBackdrop();
+            document.body.classList.remove('modal-open');
         }
     };
 
-    modalBackdrop.addEventListener('click', () => closeAllModals());
 
     const trackedDrawers = [clientDrawer, machineDrawer, oilToolsDrawer].filter(Boolean);
     const isAnyDrawerOpen = () => trackedDrawers.some(drawer => drawer.classList.contains('is-open'));
@@ -2678,9 +2699,7 @@ function initializeApp() {
             <div class="metrics-grid">
                 ${tilesHtml}
             </div>
-            <button type="button" class="weekly-missing" data-weekly-missing>
-                Braki: ${model.missingDaysCount} dni
-            </button>
+            <span class="weekly-missing" data-weekly-missing>Braki: ${model.missingDaysCount} dni</span>
         `;
     };
 
@@ -2731,6 +2750,125 @@ function initializeApp() {
                 </span>
             </li>
         `).join('');
+    };
+
+
+    const getNotesCollection = () => collection(db, 'notes');
+    const toIsoValue = (value) => {
+        if (!value) return '';
+        const date = toDateSafe(value);
+        return date ? date.toISOString() : '';
+    };
+    const listNotes = ({ linkedType = 'all', linkedOrderId = '', search = '' } = {}) => {
+        let notes = Array.isArray(allNotes) ? [...allNotes] : [];
+        if (linkedType !== 'all') {
+            notes = notes.filter((note) => (note.linkedType || NOTE_LINKED_TYPES.NONE) === linkedType);
+        }
+        if (linkedOrderId) {
+            notes = notes.filter((note) => note.linkedOrderId === linkedOrderId);
+        }
+        const queryText = (search || '').trim().toLowerCase();
+        if (queryText) {
+            notes = notes.filter((note) => `${note.title || ''} ${note.content || ''}`.toLowerCase().includes(queryText));
+        }
+        return notes.sort((a, b) => (toDateSafe(b.updatedAt)?.getTime() || 0) - (toDateSafe(a.updatedAt)?.getTime() || 0));
+    };
+    const createNote = async (payload = {}) => {
+        const notePayload = {
+            title: (payload.title || '').trim() || null,
+            content: payload.content || '',
+            linkedType: payload.linkedType || NOTE_LINKED_TYPES.NONE,
+            linkedOrderId: payload.linkedOrderId || null,
+            archived: false,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        return addDoc(getNotesCollection(), notePayload);
+    };
+    const updateNote = async (noteId, payload = {}) => {
+        if (!noteId) return;
+        return updateDoc(doc(db, 'notes', noteId), { ...payload, updatedAt: new Date() });
+    };
+    const deleteNote = async (noteId) => {
+        if (!noteId) return;
+        return updateDoc(doc(db, 'notes', noteId), { archived: true, updatedAt: new Date() });
+    };
+    const buildNotesTxt = (notes = []) => notes.map((note, idx) => {
+        const title = note.title || '(bez tytułu)';
+        const created = formatDateTimeLabel(note.createdAt, '—');
+        const updated = formatDateTimeLabel(note.updatedAt, '—');
+        const content = note.content || '';
+        return `${idx + 1}. ${title}\nUtworzono: ${created}\nAktualizacja: ${updated}\n\n${content}\n\n------------------------------`;
+    }).join('\n');
+    const exportNotesTxt = (notes = [], filename = 'notatki.txt') => {
+        if (!notes.length) {
+            alert('Brak notatek do eksportu.');
+            return;
+        }
+        const blob = new Blob([buildNotesTxt(notes)], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+    const fillNotesOrderFilter = () => {
+        if (!notesFilterOrder) return;
+        const current = notesFilterOrder.value;
+        const options = ['<option value="">Wszystkie zlecenia</option>'].concat(
+            (_wszystkieZleceniaCache || []).map((z) => `<option value="${z.id}">${z.nrZlecenia || z.id}</option>`)
+        );
+        notesFilterOrder.innerHTML = options.join('');
+        notesFilterOrder.value = current || '';
+    };
+    const renderNotesList = () => {
+        if (!notesListContainer) return;
+        if (notesStatus === 'loading') {
+            notesListContainer.innerHTML = '<p class="loading-state">Ładowanie notatek...</p>';
+            return;
+        }
+        const filtered = listNotes({
+            linkedType: notesFilterType?.value || 'all',
+            linkedOrderId: notesFilterOrder?.value || '',
+            search: notesSearchInput?.value || ''
+        });
+        if (!filtered.length) {
+            notesListContainer.innerHTML = '<p class="loading-state">Brak notatek.</p>';
+            return;
+        }
+        notesListContainer.innerHTML = filtered.map((note) => `
+            <article class="note-item ${selectedNoteId === note.id ? 'is-active' : ''}" data-note-id="${note.id}">
+                <header><strong>${note.title || '(bez tytułu)'}</strong></header>
+                <p>${(note.content || '').slice(0, 180) || '—'}</p>
+                <small>${formatDateTimeLabel(note.updatedAt)} ${note.linkedOrderId ? `• zlecenie: ${note.linkedOrderId}` : ''}</small>
+                <div class="note-actions">
+                    <button type="button" class="btn-edit" data-note-action="edit" data-note-id="${note.id}">Edytuj</button>
+                    <button type="button" class="btn-danger" data-note-action="delete" data-note-id="${note.id}">Archiwizuj</button>
+                </div>
+            </article>
+        `).join('');
+    };
+    const promptNotePayload = (base = {}) => {
+        const title = prompt('Tytuł notatki (opcjonalnie):', base.title || '') ?? '';
+        const content = prompt('Treść notatki:', base.content || '') ?? '';
+        if (!content.trim()) return null;
+        return { title, content };
+    };
+    const setActivityCollapsed = (collapsed) => {
+        notesActivityCollapsed = Boolean(collapsed);
+        if (pulpitActivityContainer) pulpitActivityContainer.hidden = notesActivityCollapsed;
+        if (pulpitActivityToggle) pulpitActivityToggle.textContent = notesActivityCollapsed ? 'Pokaż' : 'Ukryj';
+        const count = Array.isArray(recentActivity) ? recentActivity.length : 0;
+        if (pulpitActivityTitle) pulpitActivityTitle.textContent = `Ostatnie działania (${count})`;
+        try { localStorage.setItem(NOTES_STORAGE_KEY, notesActivityCollapsed ? '1' : '0'); } catch (_) { }
+    };
+
+    const renderActivitySummaryHeader = () => {
+        const count = Array.isArray(recentActivity) ? recentActivity.length : 0;
+        if (pulpitActivityTitle) pulpitActivityTitle.textContent = `Ostatnie działania (${count})`;
     };
 
     function obliczSumeGodzinZKalendarza(start, end) {
@@ -4993,6 +5131,28 @@ const applyActivityData = (entries = [], { render = true, status = 'ready' } = {
     }
 };
 
+
+function nasluchujNaNotatki() {
+    notesStatus = 'loading';
+    renderNotesList();
+    onSnapshot(
+        query(collection(db, 'notes'), orderBy('updatedAt', 'desc')),
+        (snapshot) => {
+            allNotes = snapshot.docs
+                .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+                .filter((note) => !note.archived);
+            notesStatus = 'ready';
+            renderNotesList();
+            renderOrderNotes();
+        },
+        (error) => {
+            console.error('Błąd ładowania notatek:', error);
+            notesStatus = 'error';
+            renderNotesList();
+        }
+    );
+}
+
 function nasluchujNaActivity() {
     activityStatus = 'loading';
     onSnapshot(
@@ -5012,6 +5172,7 @@ function nasluchujNaZlecenia() {
     onSnapshot(query(collection(db, "zlecenia"), orderBy("createdAt", "desc")), (snapshot) => {
         const orders = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
         applyOrdersData(orders);
+        fillNotesOrderFilter();
     });
 }
 
@@ -5070,6 +5231,7 @@ async function dodajZlecenie(event) {
             motoHours: 0,
             startAt: startAtFieldValue,
             endAt: null,
+            completedAt: null,
             serviceDate,
             historia,
             createdAt: new Date(),
@@ -5089,6 +5251,7 @@ async function dodajZlecenie(event) {
             motoHours: Number(zlecenieForm.motogodziny.value) || 0,
             startAt: startAtFieldValue,
             endAt: null,
+            completedAt: null,
             serviceDate,
             historia,
             createdAt: new Date(),
@@ -5113,6 +5276,27 @@ async function dodajZlecenie(event) {
         zlecenieMaszynaSelect.disabled = true;
         zlecenieKlientIdInput?.dispatchEvent(new Event('change'));
     } catch (e) { console.error("Błąd dodawania zlecenia: ", e); }
+}
+
+
+function renderOrderNotes(orderId = null) {
+    const host = document.getElementById('details-order-notes');
+    if (!host) return;
+    const currentOrderId = orderId || host.dataset.orderId || '';
+    host.dataset.orderId = currentOrderId;
+    const notes = listNotes({ linkedType: NOTE_LINKED_TYPES.ORDER, linkedOrderId: currentOrderId });
+    host.innerHTML = `
+        <div class="order-notes-actions"><button type="button" class="btn-secondary" id="order-note-add">Dodaj notatkę</button><button type="button" class="btn-secondary" id="order-notes-export">Eksportuj .txt</button></div>
+        ${notes.length ? notes.map((note) => `<div class="note-item"><strong>${note.title || '(bez tytułu)'}</strong><p>${note.content || ''}</p></div>`).join('') : '<p class="loading-state">Brak notatek do zlecenia.</p>'}
+    `;
+    host.querySelector('#order-note-add')?.addEventListener('click', async () => {
+        const payload = promptNotePayload();
+        if (!payload || !currentOrderId) return;
+        await createNote({ ...payload, linkedType: NOTE_LINKED_TYPES.ORDER, linkedOrderId: currentOrderId });
+    });
+    host.querySelector('#order-notes-export')?.addEventListener('click', () => {
+        exportNotesTxt(notes, `notatki-zlecenie-${currentOrderId || 'brak'}.txt`);
+    });
 }
 
 function handleDetailsButtonClick(docId, event) {
@@ -5217,6 +5401,7 @@ async function obslugaListyZlecen(event) {
                 dataUkonczenia: null,
                 serviceDate: null,
                 endAt: null,
+                completedAt: null,
                 closeDate: null,
                 closedAt: null,
                 wyfakturowaneGodziny: null,
@@ -5243,7 +5428,8 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
 
     editZlecenieForm['edit-zlecenie-id'].value = zlecenie.id;
     document.getElementById('edit-zlecenie-klient').textContent = nazwaMaszyny;
-    document.getElementById('edit-zlecenie-nr').textContent = zlecenie.nrZlecenia;
+    const nrInput = document.getElementById('edit-zlecenie-nr-input');
+    if (nrInput) nrInput.value = zlecenie.nrZlecenia || '';
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
@@ -5266,6 +5452,7 @@ async function zapiszEdycjeZlecenia(event) {
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
+    const nowyNumerZlecenia = (document.getElementById('edit-zlecenie-nr-input')?.value || '').trim();
     const noweStartAt = parseDatetimeInput(editZlecenieForm['edit-start-at']?.value || '');
     const noweEndAt = parseDatetimeInput(editZlecenieForm['edit-end-at']?.value || '');
 
@@ -5273,7 +5460,10 @@ async function zapiszEdycjeZlecenia(event) {
         alert("Podaj poprawną liczbę godzin.");
         return;
     }
-    if (!walidujPrzedzialCzasu(noweStartAt, noweEndAt)) {
+    if (!nowyNumerZlecenia) { alert('Numer zlecenia jest wymagany.'); return; }
+    const duplicate = _wszystkieZleceniaCache.find((z) => z.id !== zlecenieId && (z.nrZlecenia || '').trim() === nowyNumerZlecenia);
+    if (duplicate) { alert('Numer zlecenia musi być unikalny.'); return; }
+    if (!walidujPrzedzialCzasu(noweStartAt, noweEndAt, { allowEndBeforeStart: true })) {
         return;
     }
 
@@ -5285,6 +5475,7 @@ async function zapiszEdycjeZlecenia(event) {
         const staryTyp = zlecenieData.typZlecenia;
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
+        const staryNumerZlecenia = zlecenieData.nrZlecenia || '';
         const staryStartAt = toDateSafe(zlecenieData.startAt);
         const staryEndAt = toDateSafe(zlecenieData.endAt);
         const staryStartMs = staryStartAt ? staryStartAt.getTime() : null;
@@ -5296,6 +5487,7 @@ async function zapiszEdycjeZlecenia(event) {
         const zmiany = [];
         if (stareGodziny !== noweGodziny) zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
         if (staryTyp !== nowyTyp) zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
+        if (staryNumerZlecenia !== nowyNumerZlecenia) zmiany.push(`Numer zlecenia zmieniono z ${staryNumerZlecenia || 'brak'} na ${nowyNumerZlecenia}`);
         if (staryNumerWz !== nowyNumerWz) {
             const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
@@ -5321,9 +5513,11 @@ async function zapiszEdycjeZlecenia(event) {
         await updateDoc(zlecenieRef, {
             wyfakturowaneGodziny: noweGodziny,
             typZlecenia: nowyTyp,
+            nrZlecenia: nowyNumerZlecenia,
             zakonczenieNumerWZ: nowyNumerWz || null,
             startAt: noweStartAt || null,
             endAt: noweEndAt || null,
+            completedAt: noweEndAt || null,
             historia: nowaHistoria
         });
         hideModal(editZlecenieModal);
@@ -5362,10 +5556,9 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     infoDiv.innerHTML = `
         <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
         <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
-        <div class="details-group"><strong>Utworzono:</strong> <p>${formatDateTimeLabel(zlecenie.createdAt)}</p></div>
-        <div class="details-group"><strong>Wykonano:</strong> <p>${serviceDate ? formatDateLabel(serviceDate) : '—'}</p></div>
-        <div class="details-group"><strong>Start:</strong> <p>${formatDateTimeLabel(zlecenie.startAt)}</p></div>
-        <div class="details-group"><strong>Koniec:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
+        <div class="details-group"><strong>Data dodania:</strong> <p>${formatDateTimeLabel(zlecenie.createdAt)}</p></div>
+        <div class="details-group"><strong>Data rozpoczęcia:</strong> <p>${formatDateTimeLabel(zlecenie.startAt)}</p></div>
+        <div class="details-group"><strong>Zakończono dnia:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
     `;
 
@@ -5373,7 +5566,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
          const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         const notatkaHtml = zlecenie.zakonczenieNotatka ? `<div class="details-group"><strong>Notatka przy zakończeniu:</strong> <p>${zlecenie.zakonczenieNotatka}</p></div>` : '';
         infoDiv.innerHTML += `
-            <div class="details-group"><strong>Data wykonania:</strong> <p>${serviceDate || '—'}</p></div>
+            <div class="details-group"><strong>Zakończono dnia:</strong> <p>${serviceDate || '—'}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
@@ -5422,7 +5615,11 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
-    opisDiv.innerHTML = zlecenie.opis ? `<p>${zlecenie.opis}</p>` : '<p>Brak opisu.</p>';
+    opisDiv.innerHTML = `
+        ${zlecenie.opis ? `<p>${zlecenie.opis}</p>` : '<p>Brak opisu.</p>'}
+        <hr><h4>Notatki</h4><div id="details-order-notes" data-order-id="${zlecenie.id}"></div>
+    `;
+    renderOrderNotes(zlecenie.id);
 
     if (!skipOpen) {
         openModal(detailsZlecenieModal);
@@ -5563,7 +5760,9 @@ async function obslugaListyCzesci(event) {
             alert('Wybierz poprawną datę wykonania.');
             return;
         }
-        const serviceDateKey = normalizedServiceDate || formatDateForStorage(new Date());
+        const todayKey = formatDateForStorage(new Date());
+        const serviceDateKey = normalizedServiceDate || todayKey;
+        if (serviceDateKey > todayKey) { alert('Data zakończenia nie może być z przyszłości.'); return; }
         const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
         if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
             alert('Motogodziny muszą być liczbą większą lub równą 0.');
@@ -5599,6 +5798,7 @@ async function obslugaListyCzesci(event) {
             dataUkonczenia: serviceDateKey,
             serviceDate: serviceDateKey,
             endAt: endAtValue,
+            completedAt: endAtValue,
             closedAt: endAtValue,
             closeDate: closeDateKey,
             uzyteCzesci: czesciDoZlecenia,
@@ -6692,9 +6892,10 @@ async function obslugaListyCzesci(event) {
     });
 
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-            closeMagazynRowMenu();
-        }
+        if (event.key !== 'Escape') return;
+        closeMagazynRowMenu();
+        const openModalItem = [...trackedModals].reverse().find((modal) => modal && modal.style.display === 'block');
+        if (openModalItem) hideModal(openModalItem);
     });
 
     if (vacationTabs) {
@@ -6849,12 +7050,57 @@ async function obslugaListyCzesci(event) {
         });
     });
 
-    // Klik poza modal zamyka go
-    window.onclick = (event) => {
-        if (trackedModals.includes(event.target)) {
-            hideModal(event.target);
-        }
-    };
+    // Klik poza modalem wyłączony zgodnie z UX (zamykanie tylko X/ESC).
+
+
+    if (notesAddBtn) {
+        notesAddBtn.addEventListener('click', async () => {
+            const payload = promptNotePayload();
+            if (!payload) return;
+            await createNote({ ...payload, linkedType: NOTE_LINKED_TYPES.NONE });
+        });
+    }
+    if (notesSearchInput) notesSearchInput.addEventListener('input', renderNotesList);
+    if (notesFilterType) notesFilterType.addEventListener('change', renderNotesList);
+    if (notesFilterOrder) notesFilterOrder.addEventListener('change', renderNotesList);
+    if (notesExportSelectedBtn) {
+        notesExportSelectedBtn.addEventListener('click', () => {
+            const selected = allNotes.find((note) => note.id === selectedNoteId);
+            exportNotesTxt(selected ? [selected] : [], 'notatka.txt');
+        });
+    }
+    if (notesExportFilteredBtn) {
+        notesExportFilteredBtn.addEventListener('click', () => {
+            const filtered = listNotes({ linkedType: notesFilterType?.value || 'all', linkedOrderId: notesFilterOrder?.value || '', search: notesSearchInput?.value || '' });
+            exportNotesTxt(filtered, 'notatki.txt');
+        });
+    }
+    if (notesListContainer) {
+        notesListContainer.addEventListener('click', async (event) => {
+            const actionBtn = event.target.closest('[data-note-action]');
+            const noteCard = event.target.closest('[data-note-id]');
+            const noteId = actionBtn?.dataset.noteId || noteCard?.dataset.noteId;
+            if (!noteId) return;
+            selectedNoteId = noteId;
+            if (!actionBtn) {
+                renderNotesList();
+                return;
+            }
+            const note = allNotes.find((item) => item.id === noteId);
+            if (!note) return;
+            if (actionBtn.dataset.noteAction === 'edit') {
+                const payload = promptNotePayload(note);
+                if (!payload) return;
+                await updateNote(noteId, payload);
+            }
+            if (actionBtn.dataset.noteAction === 'delete') {
+                await deleteNote(noteId);
+            }
+        });
+    }
+    if (pulpitActivityToggle) {
+        pulpitActivityToggle.addEventListener('click', () => setActivityCollapsed(!notesActivityCollapsed));
+    }
 
     const loadInitialData = async () => {
         const safeLoad = async (label, loader) => {
@@ -6950,6 +7196,7 @@ async function obslugaListyCzesci(event) {
         safeInitModule('stock', magazynLista || magazynTable || magazynSummaryBox, () => wyswietlMagazyn(), 'Moduł magazynu niedostępny.');
         safeInitModule('summary', zakonczoneSummaryContainer || annualSummaryContainer || l4SummaryContainer, () => odswiezPodsumowania(), 'Moduł podsumowań niedostępny.');
         safeInitModule('activity', pulpitActivityList, () => nasluchujNaActivity(), 'Moduł aktywności niedostępny.');
+        safeInitModule('notes', notesListContainer, () => nasluchujNaNotatki(), 'Moduł notatnika niedostępny.');
         try {
             wyswietlWpisyKalendarza();
         } catch (error) {

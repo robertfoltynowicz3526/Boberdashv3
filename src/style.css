@@ -3673,3 +3673,69 @@ main,
   overscroll-behavior: contain;
   padding-right: 6px;
 }
+
+/* --- Desktop-only final overrides --- */
+body { min-width: 1024px; }
+@media (max-width: 1023px) {
+  body { min-width: 1024px; overflow-x: auto; }
+}
+.mainContent {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+.pulpit-weekly .summary-container-subtle,
+.pulpit-stats-bar .summary-container-subtle {
+  border: 1px solid var(--line-color);
+  background: var(--surface-color);
+}
+.weekly-missing {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-color);
+  color: var(--text-color);
+}
+
+/* Notatnik */
+.notes-layout .main { min-width: 0; }
+#notes-list { display: grid; gap: 10px; }
+.note-item {
+  border: 1px solid var(--line-color);
+  background: var(--surface-color);
+  border-radius: 10px;
+  padding: 10px;
+}
+.note-item.is-active { border-color: var(--color-accent); }
+.note-actions { display: flex; gap: 8px; margin-top: 8px; }
+.order-notes-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* Modale i kontrast */
+body.modal-open { overflow: hidden; }
+.modal-content {
+  background: var(--surface-color);
+  color: var(--text-color);
+  backdrop-filter: none;
+}
+.modal-backdrop { backdrop-filter: none; }
+.table, table, .summary-container-subtle, .metric {
+  color: var(--text-color);
+}
+
+/* Ikona kalendarza input[type=date|month|datetime-local] */
+input[type="date"],
+input[type="month"],
+input[type="datetime-local"] { color-scheme: dark light; }
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.9;
+  cursor: pointer;
+}
+input[type="date"]:hover::-webkit-calendar-picker-indicator,
+input[type="month"]:hover::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+
+/* Ostatnie działania */
+#pulpit-activity[hidden] { display: none !important; }
