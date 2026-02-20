@@ -28,3 +28,35 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
     }
   };
 };
+
+
+const normalizeToken = (value) => String(value || '').toLowerCase().trim();
+
+export const buildNoteOrderOptionsModel = ({ orders = [], clients = [], machines = [] } = {}) => {
+  const clientsById = new Map((clients || []).map((client) => [client.id, client]));
+  const machinesById = new Map((machines || []).map((machine) => [machine.id, machine]));
+  return (orders || []).map((order) => {
+    const client = clientsById.get(order.klientId);
+    const machine = machinesById.get(order.maszynaId);
+    const clientLabel = client?.nazwa || order.klientNazwa || 'Brak klienta';
+    const machineLabel = [machine?.typMaszyny, machine?.model].filter(Boolean).join(' ').trim() || [order.typMaszyny, order.model].filter(Boolean).join(' ').trim() || 'Brak maszyny';
+    const orderNumber = String(order.nrZlecenia || order.id || '').trim();
+    const label = `${clientLabel} — ${machineLabel} — #${orderNumber || order.id}`;
+    const searchTokens = [
+      orderNumber,
+      clientLabel,
+      machine?.typMaszyny || order.typMaszyny || '',
+      machine?.model || order.model || '',
+      machineLabel
+    ]
+      .map(normalizeToken)
+      .filter(Boolean);
+    return { id: order.id, label, searchTokens };
+  });
+};
+
+export const filterNoteOrderOptions = ({ options = [], query = '' } = {}) => {
+  const q = normalizeToken(query);
+  if (!q) return options;
+  return (options || []).filter((option) => (option.searchTokens || []).some((token) => token.includes(q)));
+};

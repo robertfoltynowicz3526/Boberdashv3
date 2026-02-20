@@ -817,7 +817,19 @@
             <form id="edit-zlecenie-form" class="modal-body">
                 <input type="hidden" id="edit-zlecenie-id">
                 <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
+                <p><strong>ID dokumentu:</strong> <code id="edit-zlecenie-doc-id"></code></p>
+                <div class="form-grid form-grid-2">
+                    <div class="form-group">
+                        <label for="edit-zlecenie-client-select">Klient:</label>
+                        <select id="edit-zlecenie-client-select"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-zlecenie-machine-select">Maszyna:</label>
+                        <select id="edit-zlecenie-machine-select"></select>
+                    </div>
+                </div>
                 <div class="form-group"><label for="edit-zlecenie-nr-input">Numer zlecenia:</label><input type="text" id="edit-zlecenie-nr-input" required></div>
+                <div class="form-group"><label for="edit-zlecenie-opis">Opis / Notatka:</label><textarea id="edit-zlecenie-opis" rows="4" placeholder="Opis usterki i uwagi..."></textarea></div>
                 <div class="form-group">
                     <label for="edit-wyfakturowane-godziny">Wyfakturowane godziny:</label>
                     <input type="number" step="0.1" id="edit-wyfakturowane-godziny" required inputmode="decimal">
@@ -868,7 +880,14 @@
                 </div>
                 <div class="form-group" id="notes-editor-order-group" hidden>
                     <label for="notes-editor-order">Zlecenie</label>
-                    <select id="notes-editor-order"><option value="">Wybierz zlecenie</option></select>
+                    <div class="combobox" data-combobox="notes-order">
+                        <div class="combobox-input">
+                            <input type="text" id="notes-editor-order-input" autocomplete="off" placeholder="Wyszukaj: klient, maszyna, numer">
+                            <button type="button" class="combobox-clear" id="notes-editor-order-clear" aria-label="Wyczyść">×</button>
+                        </div>
+                        <input type="hidden" id="notes-editor-order">
+                        <div id="notes-editor-order-dropdown" class="combobox-dropdown" role="listbox"></div>
+                    </div>
                 </div>
                 <div class="form-group"><label for="notes-editor-content">Treść</label><textarea id="notes-editor-content" rows="16"></textarea></div>
                 <div class="modal-actions">

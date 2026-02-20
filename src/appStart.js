@@ -11,7 +11,7 @@ import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
 import { createNotesDataLayer, mapNoteDoc, NOTE_LINK_TYPES } from './notes/notesData.js';
-import { buildNotesViewModel } from './notes/notesAggregation.js';
+import { buildNotesViewModel, buildNoteOrderOptionsModel, filterNoteOrderOptions } from './notes/notesAggregation.js';
 import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
 import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
@@ -1000,6 +1000,9 @@ function initializeApp() {
     const maszynaSearchInput = document.getElementById('maszyna-search-input');
     const editZlecenieModal = document.getElementById('edit-zlecenie-modal');
     const editZlecenieForm = document.getElementById('edit-zlecenie-form');
+    const editZlecenieDocId = document.getElementById('edit-zlecenie-doc-id');
+    const editZlecenieClientSelect = document.getElementById('edit-zlecenie-client-select');
+    const editZlecenieMachineSelect = document.getElementById('edit-zlecenie-machine-select');
     const machineHistoryModal = document.getElementById('machine-history-modal');
     const machineHistoryList = document.getElementById('machine-history-list');
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
@@ -2758,12 +2761,16 @@ function initializeApp() {
     const notesEditorTitle = document.getElementById('notes-editor-title');
     const notesEditorContent = document.getElementById('notes-editor-content');
     const notesEditorOrder = document.getElementById('notes-editor-order');
+    const notesEditorOrderInput = document.getElementById('notes-editor-order-input');
+    const notesEditorOrderDropdown = document.getElementById('notes-editor-order-dropdown');
+    const notesEditorOrderClear = document.getElementById('notes-editor-order-clear');
     const notesEditorOrderGroup = document.getElementById('notes-editor-order-group');
     const notesEditorCancel = document.getElementById('notes-editor-cancel');
     const notesEditorDelete = document.getElementById('notes-editor-delete');
     const notesEditorExport = document.getElementById('notes-editor-export');
     const notesModalClose = document.getElementById('notes-modal-close');
     let notesDirty = false;
+    let notesOrderOptions = [];
 
     const toDateLabel = (value) => {
         if (!value) return '—';
@@ -2777,7 +2784,7 @@ function initializeApp() {
     };
     const exportSingleNote = (note) => {
         if (!note) return;
-        const orderLabel = (_wszystkieZleceniaCache || []).find((z) => z.id === note.linkedOrderId)?.nrZlecenia || note.linkedOrderId || '';
+        const orderLabel = notesOrderOptions.find((option) => option.id === note.linkedOrderId)?.label || note.linkedOrderId || '';
         const text = buildNoteTxt(note, orderLabel);
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -2791,7 +2798,7 @@ function initializeApp() {
     };
     const exportManyNotes = (notes = [], filename = 'notatki.txt') => {
         if (!notes.length) return alert('Brak notatek do eksportu.');
-        const text = notes.map((note) => buildNoteTxt(note, (_wszystkieZleceniaCache || []).find((z) => z.id === note.linkedOrderId)?.nrZlecenia || '')).join('\n\n==========================\n\n');
+        const text = notes.map((note) => buildNoteTxt(note, notesOrderOptions.find((option) => option.id === note.linkedOrderId)?.label || '')).join('\n\n==========================\n\n');
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -2808,17 +2815,44 @@ function initializeApp() {
         search: notesSearchInput?.value || ''
     });
     const getNotesViewModel = () => buildNotesViewModel({ notes: allNotes, filters: readNotesFilters() });
+    const buildNotesOrdersModel = () => buildNoteOrderOptionsModel({
+        orders: _wszystkieZleceniaCache || [],
+        clients: _wszystkieKlienciCache || [],
+        machines: _wszystkieMaszynyCache || []
+    });
+    const syncNotesEditorOrderInput = () => {
+        if (!notesEditorOrderInput) return;
+        const selected = notesOrderOptions.find((option) => option.id === notesEditorOrder.value);
+        notesEditorOrderInput.value = selected?.label || '';
+        updateNotesEditorOrderClear();
+    };
+    const updateNotesEditorOrderClear = () => {
+        if (!notesEditorOrderClear || !notesEditorOrderInput) return;
+        notesEditorOrderClear.classList.toggle('is-visible', Boolean(notesEditorOrderInput.value));
+    };
+    const renderNotesOrderDropdown = () => {
+        if (!notesEditorOrderDropdown) return;
+        const filtered = filterNoteOrderOptions({ options: notesOrderOptions, query: notesEditorOrderInput?.value || '' });
+        if (!filtered.length) {
+            notesEditorOrderDropdown.innerHTML = '<div class="combobox-empty">Brak wyników</div>';
+            notesEditorOrderDropdown.classList.add('is-open');
+            return;
+        }
+        notesEditorOrderDropdown.innerHTML = filtered.map((option, index) => `<button type="button" class="combobox-option" data-order-option-id="${option.id}" data-order-option-index="${index}"><span>${option.label}</span></button>`).join('');
+        notesEditorOrderDropdown.classList.add('is-open');
+    };
     const fillNotesOrderFilter = () => {
         if (!notesFilterOrder || !notesEditorOrder) return;
         const current = notesFilterOrder.value;
         const currentModal = notesEditorOrder.value;
-        const options = ['<option value="">Wszystkie zlecenia</option>'].concat(
-            (_wszystkieZleceniaCache || []).map((z) => `<option value="${z.id}">${z.nrZlecenia || z.id}</option>`)
+        notesOrderOptions = buildNotesOrdersModel();
+        const filterOptions = ['<option value="">Wszystkie zlecenia</option>'].concat(
+            notesOrderOptions.map((option) => `<option value="${option.id}">${option.label}</option>`)
         );
-        notesFilterOrder.innerHTML = options.join('');
+        notesFilterOrder.innerHTML = filterOptions.join('');
         notesFilterOrder.value = current || '';
-        notesEditorOrder.innerHTML = '<option value="">Wybierz zlecenie</option>' + (_wszystkieZleceniaCache || []).map((z) => `<option value="${z.id}">${z.nrZlecenia || z.id}</option>`).join('');
         notesEditorOrder.value = currentModal || '';
+        syncNotesEditorOrderInput();
     };
     const renderNotesList = () => {
         if (!notesListContainer) return;
@@ -2836,6 +2870,7 @@ function initializeApp() {
         notesEditorTitle.value = draft.title || '';
         notesEditorContent.value = draft.content || '';
         notesEditorOrder.value = draft.linkedOrderId || '';
+        syncNotesEditorOrderInput();
         const type = draft.linkType || NOTE_LINK_TYPES.NONE;
         const radio = notesEditorForm.querySelector(`input[name="notes-link-type"][value="${type}"]`);
         if (radio) radio.checked = true;
@@ -5065,6 +5100,7 @@ function wyswietlZlecenia() {
                 `<strong>${nazwa}</strong><br>${opisHtml}${timelineHtml}`,
                 `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                    <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     ${przycisk}
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
@@ -5398,18 +5434,60 @@ async function obslugaListyZlecen(event) {
     }
 }
 
+function buildOrderHumanLabel(order = {}) {
+    const maszyna = _wszystkieMaszynyCache.find(m => m.id === order.maszynaId);
+    const klient = _wszystkieKlienciCache.find(k => k.id === order.klientId);
+    const klientLabel = klient?.nazwa || order.klientNazwa || 'Brak klienta';
+    const maszynaLabel = [maszyna?.typMaszyny || order.typMaszyny, maszyna?.model || order.model].filter(Boolean).join(' ').trim() || 'Brak maszyny';
+    return `${klientLabel} - ${maszynaLabel}`;
+}
+
+function fillEditOrderClients(selectedClientId = '') {
+    if (!editZlecenieClientSelect) return;
+    const options = ['<option value="">-- Wybierz klienta --</option>'].concat(
+        (_wszystkieKlienciCache || []).map((klient) => `<option value="${klient.id}">${klient.nazwa || '(bez nazwy)'}</option>`)
+    );
+    editZlecenieClientSelect.innerHTML = options.join('');
+    editZlecenieClientSelect.value = selectedClientId || '';
+}
+
+function fillEditOrderMachines(clientId = '', selectedMachineId = '') {
+    if (!editZlecenieMachineSelect) return;
+    if (!clientId) {
+        editZlecenieMachineSelect.innerHTML = '<option value="">-- Najpierw wybierz klienta --</option>';
+        editZlecenieMachineSelect.disabled = true;
+        return;
+    }
+    const machines = (_wszystkieMaszynyCache || []).filter((machine) => machine.klientId === clientId);
+    if (!machines.length) {
+        editZlecenieMachineSelect.innerHTML = '<option value="">-- Brak maszyn dla klienta --</option>';
+        editZlecenieMachineSelect.disabled = true;
+        return;
+    }
+    editZlecenieMachineSelect.disabled = false;
+    editZlecenieMachineSelect.innerHTML = ['<option value="">-- Wybierz maszynę --</option>'].concat(
+        machines.map((machine) => `<option value="${machine.id}">${[machine.typMaszyny, machine.model].filter(Boolean).join(' ')}</option>`)
+    ).join('');
+    editZlecenieMachineSelect.value = selectedMachineId || '';
+}
+
 function otworzModalEdycjiZlecenia(zlecenieId) {
     if (!editZlecenieForm || !editZlecenieModal) return;
     const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
     if (!zlecenie) return;
-    const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-    const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-    const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Nieprzypisane');
+    const nazwaMaszyny = buildOrderHumanLabel(zlecenie);
 
     editZlecenieForm['edit-zlecenie-id'].value = zlecenie.id;
+    if (editZlecenieDocId) editZlecenieDocId.textContent = zlecenie.id;
     document.getElementById('edit-zlecenie-klient').textContent = nazwaMaszyny;
+    fillEditOrderClients(zlecenie.klientId || '');
+    fillEditOrderMachines(zlecenie.klientId || '', zlecenie.maszynaId || '');
+
     const nrInput = document.getElementById('edit-zlecenie-nr-input');
     if (nrInput) nrInput.value = zlecenie.nrZlecenia || '';
+    const opisInput = document.getElementById('edit-zlecenie-opis');
+    if (opisInput) opisInput.value = zlecenie.opis || '';
+
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
@@ -5429,6 +5507,9 @@ async function zapiszEdycjeZlecenia(event) {
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
     const nowyNumerZlecenia = (document.getElementById('edit-zlecenie-nr-input')?.value || '').trim();
+    const nowyOpis = (document.getElementById('edit-zlecenie-opis')?.value || '').trim();
+    const nowyKlientId = editZlecenieClientSelect?.value || '';
+    const nowaMaszynaId = editZlecenieMachineSelect?.value || '';
     const noweStartDate = normalizeDateOnly(editZlecenieForm['edit-start-date']?.value || '');
     const noweCompletionDate = normalizeDateOnly(editZlecenieForm['edit-completion-date']?.value || '');
 
@@ -5437,6 +5518,12 @@ async function zapiszEdycjeZlecenia(event) {
         return;
     }
     if (!nowyNumerZlecenia) { alert('Numer zlecenia jest wymagany.'); return; }
+    if (!nowyKlientId) { alert('Wybierz klienta.'); return; }
+    if (!nowaMaszynaId) { alert('Wybierz maszynę.'); return; }
+    if (noweStartDate && noweCompletionDate && noweStartDate > noweCompletionDate) {
+        alert('Data wykonania nie może być wcześniejsza niż data rozpoczęcia.');
+        return;
+    }
     const duplicate = _wszystkieZleceniaCache.find((z) => z.id !== zlecenieId && (z.nrZlecenia || '').trim() === nowyNumerZlecenia);
     if (duplicate) { alert('Numer zlecenia musi być unikalny.'); return; }
 
@@ -5449,14 +5536,20 @@ async function zapiszEdycjeZlecenia(event) {
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
         const staryNumerZlecenia = zlecenieData.nrZlecenia || '';
+        const staryOpis = zlecenieData.opis || '';
+        const staryKlientId = zlecenieData.klientId || '';
+        const staraMaszynaId = zlecenieData.maszynaId || '';
         const staraStartDate = normalizeDateOnly(zlecenieData.startDate || zlecenieData.startAt);
         const staraCompletionDate = normalizeDateOnly(zlecenieData.completionDate || zlecenieData.serviceDate || zlecenieData.completedAt);
 
-        let wpisHistorii = `Edytowano zakończone zlecenie: `;
+        let wpisHistorii = `Edytowano zlecenie: `;
         const zmiany = [];
         if (stareGodziny !== noweGodziny) zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
         if (staryTyp !== nowyTyp) zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
         if (staryNumerZlecenia !== nowyNumerZlecenia) zmiany.push(`Numer zlecenia zmieniono z ${staryNumerZlecenia || 'brak'} na ${nowyNumerZlecenia}`);
+        if (staryOpis !== nowyOpis) zmiany.push('Zmieniono opis/notatkę.');
+        if (staryKlientId !== nowyKlientId) zmiany.push('Zmieniono klienta.');
+        if (staraMaszynaId !== nowaMaszynaId) zmiany.push('Zmieniono maszynę.');
         if (staryNumerWz !== nowyNumerWz) {
             const staryTekst = staryNumerWz ? staryNumerWz : 'brak';
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
@@ -5471,7 +5564,16 @@ async function zapiszEdycjeZlecenia(event) {
         wpisHistorii += zmiany.join('; ');
         const nowaHistoria = [...staraHistoria, { timestamp: new Date().toISOString(), akcja: wpisHistorii }];
 
+        const klient = _wszystkieKlienciCache.find((item) => item.id === nowyKlientId);
+        const maszyna = _wszystkieMaszynyCache.find((item) => item.id === nowaMaszynaId);
+
         await updateDoc(zlecenieRef, {
+            klientId: nowyKlientId,
+            klientNazwa: klient?.nazwa || zlecenieData.klientNazwa || '',
+            maszynaId: nowaMaszynaId,
+            typMaszyny: maszyna?.typMaszyny || zlecenieData.typMaszyny || null,
+            model: maszyna?.model || zlecenieData.model || null,
+            opis: nowyOpis,
             wyfakturowaneGodziny: noweGodziny,
             typZlecenia: nowyTyp,
             nrZlecenia: nowyNumerZlecenia,
@@ -6966,6 +7068,11 @@ async function obslugaListyCzesci(event) {
     // EDYCJE (modale)
     if (editKlientForm) editKlientForm.addEventListener('submit', zapiszEdycjeKlienta);
     if (editMaszynaForm) editMaszynaForm.addEventListener('submit', zapiszEdycjeMaszyny);
+    if (editZlecenieClientSelect) {
+        editZlecenieClientSelect.addEventListener('change', () => {
+            fillEditOrderMachines(editZlecenieClientSelect.value || '', '');
+        });
+    }
     if (editZlecenieForm) editZlecenieForm.addEventListener('submit', zapiszEdycjeZlecenia);
 
     if (clientViewEditBtn) {
@@ -7011,6 +7118,42 @@ async function obslugaListyCzesci(event) {
     if (notesSearchInput) notesSearchInput.addEventListener('input', renderNotesList);
     if (notesFilterType) notesFilterType.addEventListener('change', renderNotesList);
     if (notesFilterOrder) notesFilterOrder.addEventListener('change', renderNotesList);
+    if (notesEditorOrderInput && notesEditorOrderDropdown) {
+        notesEditorOrderInput.addEventListener('input', () => {
+            notesEditorOrder.value = '';
+            notesDirty = true;
+            updateNotesEditorOrderClear();
+            renderNotesOrderDropdown();
+        });
+        notesEditorOrderInput.addEventListener('focus', renderNotesOrderDropdown);
+        notesEditorOrderInput.addEventListener('click', renderNotesOrderDropdown);
+        notesEditorOrderDropdown.addEventListener('click', (event) => {
+            const optionBtn = event.target.closest('[data-order-option-id]');
+            if (!optionBtn) return;
+            const selected = notesOrderOptions.find((option) => option.id === optionBtn.dataset.orderOptionId);
+            if (!selected) return;
+            notesEditorOrder.value = selected.id;
+            notesEditorOrderInput.value = selected.label;
+            notesEditorOrderDropdown.classList.remove('is-open');
+            updateNotesEditorOrderClear();
+            notesDirty = true;
+        });
+        document.addEventListener('click', (event) => {
+            const root = notesEditorOrderInput.closest('.combobox');
+            if (!root?.contains(event.target)) {
+                notesEditorOrderDropdown.classList.remove('is-open');
+            }
+        });
+    }
+    if (notesEditorOrderClear) {
+        notesEditorOrderClear.addEventListener('click', () => {
+            notesEditorOrder.value = '';
+            if (notesEditorOrderInput) notesEditorOrderInput.value = '';
+            notesEditorOrderDropdown?.classList.remove('is-open');
+            updateNotesEditorOrderClear();
+            notesDirty = true;
+        });
+    }
     if (notesExportSelectedBtn) notesExportSelectedBtn.addEventListener('click', () => exportSingleNote(allNotes.find((note) => note.id === selectedNoteId)));
     if (notesExportFilteredBtn) notesExportFilteredBtn.addEventListener('click', () => exportManyNotes(getNotesViewModel().results, 'notatki_filtr.txt'));
     if (notesListContainer) {
@@ -7044,6 +7187,7 @@ async function obslugaListyCzesci(event) {
                 linkedOrderId: linkType === NOTE_LINK_TYPES.ORDER ? (notesEditorOrder.value || null) : null
             };
             if (!payload.content.trim()) return alert('Treść notatki jest wymagana.');
+            if (linkType === NOTE_LINK_TYPES.ORDER && !payload.linkedOrderId) return alert('Wybierz zlecenie do powiązania.');
             if (noteId) await notesData.updateNote(noteId, payload); else await notesData.createNote(payload);
             notesDirty = false;
             hideModal(notesModal);
