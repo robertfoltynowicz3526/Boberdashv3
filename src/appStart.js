@@ -1040,7 +1040,6 @@ function initializeApp() {
 
     setBootstrapLoadingState();
     try { notesActivityCollapsed = localStorage.getItem(NOTES_STORAGE_KEY) !== '0'; } catch (_) { notesActivityCollapsed = true; }
-    setActivityCollapsed(notesActivityCollapsed);
 
     const normalizeAllDayDate = (value) => {
         if (!value) return null;
@@ -1509,7 +1508,7 @@ function initializeApp() {
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
         const target = document.getElementById(tabName);
         if (target) target.style.display = 'block';
-        const trigger = document.querySelector(`.tab-button[onclick*="'${tabName}'"]`);
+        const trigger = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
         if (trigger) trigger.classList.add('active');
         handleTabActivation(tabName);
     };
@@ -1518,7 +1517,7 @@ function initializeApp() {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
         }
-        if (tabName === 'pulpit' || tabName === 'kalendarz-tab') {
+        if (tabName === 'kalendarz-tab') {
             syncCalendarShellHeight();
             if (!bootstrapReady) {
                 pendingCalendarInit = true;
@@ -1526,6 +1525,16 @@ function initializeApp() {
             }
             void initCalendarModule('tab-activation');
         }
+    };
+
+    const bindTabNavigation = () => {
+        document.querySelectorAll('.tab-button[data-tab]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+                if (!tabName) return;
+                showTab(tabName);
+            });
+        });
     };
 
     const createUnfinishedButton = () => {
@@ -1765,15 +1774,7 @@ function initializeApp() {
     setupUnfinishedUI();
 
     // --- INICJALIZACJA UI / TABS / MOTYW ---
-    window.openTab = (evt, tabName) => {
-        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
-        const activeTab = document.getElementById(tabName);
-        if (!activeTab) return;
-        activeTab.style.display = activeTab.classList.contains('calendarSection') ? 'flex' : 'block';
-        evt.currentTarget.classList.add('active');
-        handleTabActivation(tabName);
-    };
+    bindTabNavigation();
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
@@ -2857,19 +2858,21 @@ function initializeApp() {
         if (!content.trim()) return null;
         return { title, content };
     };
-    const setActivityCollapsed = (collapsed) => {
+    function setActivityCollapsed(collapsed) {
         notesActivityCollapsed = Boolean(collapsed);
         if (pulpitActivityContainer) pulpitActivityContainer.hidden = notesActivityCollapsed;
         if (pulpitActivityToggle) pulpitActivityToggle.textContent = notesActivityCollapsed ? 'Pokaż' : 'Ukryj';
         const count = Array.isArray(recentActivity) ? recentActivity.length : 0;
         if (pulpitActivityTitle) pulpitActivityTitle.textContent = `Ostatnie działania (${count})`;
         try { localStorage.setItem(NOTES_STORAGE_KEY, notesActivityCollapsed ? '1' : '0'); } catch (_) { }
-    };
+    }
 
     const renderActivitySummaryHeader = () => {
         const count = Array.isArray(recentActivity) ? recentActivity.length : 0;
         if (pulpitActivityTitle) pulpitActivityTitle.textContent = `Ostatnie działania (${count})`;
     };
+
+    setActivityCollapsed(notesActivityCollapsed);
 
     function obliczSumeGodzinZKalendarza(start, end) {
         const podsumowanie = agregujPodsumowanieMiesiaca(start, end, wszystkieWpisyKalendarza);
