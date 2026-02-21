@@ -21,12 +21,11 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
     <article class="noteCard ${selectedNoteId === note.id ? 'is-active' : ''}" data-note-id="${note.id}" role="button" tabindex="0" aria-label="Otwórz notatkę: ${esc(note.title || '(bez tytułu)')}">
       <header class="noteCard__header">
         <strong class="noteCard__title">${esc(note.title || '(bez tytułu)')}</strong>
-        <p class="noteCard__meta">${esc(note.orderLabel || (note.linkType === 'order' ? 'Zlecenie' : 'Wolna notatka'))}</p>
+        <p class="noteCard__meta"><span class="noteCard__metaLabel">Powiązanie:</span> ${esc(note.relationLabel || (note.linkType === 'order' ? note.orderLabel : 'Wolna notatka'))}</p>
       </header>
       <p class="notePreview">${esc(note.preview || 'Brak treści')}</p>
       <footer class="noteCard__footer">
         <small class="noteCard__updated">Aktualizacja: ${fmt(note.updatedAt)}</small>
-        <span class="noteCard__cta" aria-hidden="true">Zobacz więcej</span>
       </footer>
     </article>
   `).join('');
