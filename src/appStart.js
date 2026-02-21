@@ -2772,6 +2772,7 @@ function initializeApp() {
     const notesModalTitle = document.getElementById('notes-modal-title');
     let notesDirty = false;
     let notesOrderOptions = [];
+    let notesOrderLabelsById = new Map();
 
     const toDateLabel = (value) => {
         if (!value) return '—';
@@ -2817,7 +2818,7 @@ function initializeApp() {
     });
     const getNotesViewModel = () => {
         const filters = readNotesFilters();
-        filters.orderLabelsById = new Map(notesOrderOptions.map((option) => [option.id, option.label]));
+        filters.orderLabelsById = notesOrderLabelsById;
         return buildNotesViewModel({ notes: allNotes, filters });
     };
     const buildNotesOrdersModel = () => buildNoteOrderOptionsModel({
@@ -2851,6 +2852,7 @@ function initializeApp() {
         const current = notesFilterOrder.value;
         const currentModal = notesEditorOrder.value;
         notesOrderOptions = buildNotesOrdersModel();
+        notesOrderLabelsById = new Map(notesOrderOptions.map((option) => [option.id, option.label]));
         const filterOptions = ['<option value="">Wszystkie zlecenia</option>'].concat(
             notesOrderOptions.map((option) => `<option value="${option.id}">${option.label}</option>`)
         );
@@ -5178,14 +5180,39 @@ const applyActivityData = (entries = [], { render = true, status = 'ready' } = {
 };
 
 
+async function hydrateNotesOrderLabels(notes = []) {
+    const uniqueOrderIds = [...new Set((notes || [])
+        .map((note) => note?.orderId || note?.linkedOrderId || null)
+        .filter(Boolean))];
+    if (!uniqueOrderIds.length) {
+        notesOrderLabelsById = new Map();
+        return;
+    }
+    const [orders] = await Promise.all([
+        notesData.listOrdersByIds(uniqueOrderIds)
+    ]);
+    const options = buildNoteOrderOptionsModel({
+        orders,
+        clients: _wszystkieKlienciCache || [],
+        machines: _wszystkieMaszynyCache || []
+    });
+    notesOrderLabelsById = new Map(options.map((option) => [option.id, option.label]));
+}
+
 function nasluchujNaNotatki() {
     notesStatus = 'loading';
     renderNotesList();
     onSnapshot(
         query(collection(db, 'notes'), orderBy('updatedAt', 'desc')),
-        (snapshot) => {
+        async (snapshot) => {
             allNotes = snapshot.docs.map((docSnap) => mapNoteDoc(docSnap)).filter((note) => !note.archived);
-            notesStatus = 'ready';
+            try {
+                await hydrateNotesOrderLabels(allNotes);
+                notesStatus = 'ready';
+            } catch (error) {
+                console.error('Błąd mapowania notatek do zleceń:', error);
+                notesStatus = 'error';
+            }
             renderNotesList();
             renderOrderNotes();
         },

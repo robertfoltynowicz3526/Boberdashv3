@@ -24,7 +24,8 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
       return {
         ...note,
         preview,
-        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? `Zlecenie: ${orderLabel}` : 'Wolna'
+        orderLabel,
+        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? `Zlecenie: ${orderLabel}` : 'Wolna notatka'
       };
     });
 
@@ -50,10 +51,11 @@ export const buildNoteOrderOptionsModel = ({ orders = [], clients = [], machines
   return (orders || []).map((order) => {
     const client = clientsById.get(order.klientId);
     const machine = machinesById.get(order.maszynaId);
-    const clientLabel = client?.nazwa || order.klientNazwa || 'Brak klienta';
-    const machineLabel = [machine?.typMaszyny, machine?.model].filter(Boolean).join(' ').trim() || [order.typMaszyny, order.model].filter(Boolean).join(' ').trim() || 'Brak maszyny';
+    const clientLabel = client?.nazwa || order.klientNazwa || '';
+    const machineLabel = [machine?.typMaszyny, machine?.model].filter(Boolean).join(' ').trim() || [order.typMaszyny, order.model].filter(Boolean).join(' ').trim() || '';
     const orderNumber = String(order.nrZlecenia || order.id || '').trim();
-    const label = `${clientLabel} — ${machineLabel} — #${orderNumber || order.id}`;
+    const labelParts = [`#${orderNumber || order.id}`, clientLabel, machineLabel].filter(Boolean);
+    const label = labelParts.join(' • ');
     const searchTokens = [
       orderNumber,
       clientLabel,
