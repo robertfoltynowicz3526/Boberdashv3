@@ -13,3 +13,8 @@ Trzy warstwy bez skrótów:
 3. **Render** – wyłącznie prezentacja UI.
 
 UI nie liczy statystyk ani nie miesza źródeł danych.
+
+## Notatnik — ręczna checklista regresji UI
+
+- [ ] Notatka 1 linia → fiszka ma normalny rozmiar, bez rozciągania kontenera listy.
+- [ ] Notatka 2000 znaków → fiszka się **nie rozciąga**, treść jest ucięta (preview), a pełna treść widoczna jest po otwarciu edytora (modal).
