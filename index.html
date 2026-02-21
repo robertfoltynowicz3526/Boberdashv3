@@ -108,8 +108,10 @@
                         <label for="notes-filter-order">Konkretne zlecenie</label>
                         <select id="notes-filter-order"><option value="">Wszystkie zlecenia</option></select>
                     </div>
-                    <button type="button" id="notes-export-selected" class="btn-secondary">Eksportuj .txt (wybrana)</button>
-                    <button type="button" id="notes-export-filtered" class="btn-secondary">Eksportuj .txt (lista)</button>
+                    <div class="notes-actions" aria-label="Eksport notatek">
+                        <button type="button" id="notes-export-selected" class="btn-secondary">Eksportuj .txt (wybrana)</button>
+                        <button type="button" id="notes-export-filtered" class="btn-secondary">Eksportuj .txt (lista)</button>
+                    </div>
                 </div>
                 <div class="main">
                     <div id="notes-list" class="notesGrid"></div>
@@ -869,6 +871,7 @@
         <div class="modal-content modal-content-notes">
             <span class="close-button" id="notes-modal-close">&times;</span>
             <h2 id="notes-modal-title">Notatka</h2>
+            <p id="notes-editor-meta" class="notes-editor-meta" aria-live="polite"></p>
             <form id="notes-editor-form" class="modal-body">
                 <input type="hidden" id="notes-editor-id">
                 <div class="form-group"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title"></div>

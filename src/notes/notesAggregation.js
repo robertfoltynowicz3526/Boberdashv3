@@ -25,7 +25,7 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
         ...note,
         preview,
         orderLabel,
-        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? `Zlecenie: ${orderLabel}` : 'Wolna notatka'
+        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? orderLabel : 'Wolna notatka'
       };
     });
 
@@ -54,8 +54,8 @@ export const buildNoteOrderOptionsModel = ({ orders = [], clients = [], machines
     const clientLabel = client?.nazwa || order.klientNazwa || '';
     const machineLabel = [machine?.typMaszyny, machine?.model].filter(Boolean).join(' ').trim() || [order.typMaszyny, order.model].filter(Boolean).join(' ').trim() || '';
     const orderNumber = String(order.nrZlecenia || order.id || '').trim();
-    const labelParts = [`#${orderNumber || order.id}`, clientLabel, machineLabel].filter(Boolean);
-    const label = labelParts.join(' • ');
+    const relationLabel = [clientLabel, machineLabel, orderNumber ? `#${orderNumber}` : `#${order.id}`].filter(Boolean).join(' — ');
+    const label = relationLabel;
     const searchTokens = [
       orderNumber,
       clientLabel,
@@ -65,7 +65,7 @@ export const buildNoteOrderOptionsModel = ({ orders = [], clients = [], machines
     ]
       .map(normalizeToken)
       .filter(Boolean);
-    return { id: order.id, label, searchTokens };
+    return { id: order.id, label, relationLabel, searchTokens };
   });
 };
 

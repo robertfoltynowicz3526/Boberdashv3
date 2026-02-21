@@ -2770,6 +2770,7 @@ function initializeApp() {
     const notesEditorExport = document.getElementById('notes-editor-export');
     const notesModalClose = document.getElementById('notes-modal-close');
     const notesModalTitle = document.getElementById('notes-modal-title');
+    const notesEditorMeta = document.getElementById('notes-editor-meta');
     let notesDirty = false;
     let notesOrderOptions = [];
     let notesOrderLabelsById = new Map();
@@ -2778,6 +2779,10 @@ function initializeApp() {
         if (!value) return '—';
         const d = toDateSafe(value);
         return d ? d.toLocaleString('pl-PL') : '—';
+    };
+    const getNoteRelationLabel = (note) => {
+        if (!note || note.linkType !== NOTE_LINK_TYPES.ORDER) return 'Wolna notatka';
+        return notesOrderLabelsById.get(note.linkedOrderId) || note.linkedOrderId || 'Brak zlecenia';
     };
     const notesFilename = (note) => {
         const date = normalizeDateOnly(note?.updatedAt || new Date());
@@ -2884,6 +2889,10 @@ function initializeApp() {
         notesEditorOrderGroup.hidden = type !== NOTE_LINK_TYPES.ORDER;
         notesEditorDelete.hidden = !draft.id;
         if (notesModalTitle) notesModalTitle.textContent = draft.id ? 'Edytuj notatkę' : 'Nowa notatka';
+        if (notesEditorMeta) {
+            const relation = getNoteRelationLabel(draft);
+            notesEditorMeta.textContent = `Powiązanie: ${relation} • Utworzono: ${toDateLabel(draft.createdAt)} • Aktualizacja: ${toDateLabel(draft.updatedAt)}`;
+        }
         notesDirty = false;
         openModal(notesModal);
     };
