@@ -8,13 +8,25 @@ const toMs = (value) => {
 };
 
 export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
+  const orderLabelsById = filters.orderLabelsById instanceof Map ? filters.orderLabelsById : new Map();
   const q = (filters.search || '').trim().toLowerCase();
   const filtered = (notes || [])
     .filter((note) => !note.archived)
     .filter((note) => (filters.linkType && filters.linkType !== 'all' ? note.linkType === filters.linkType : true))
     .filter((note) => (filters.linkedOrderId ? note.linkedOrderId === filters.linkedOrderId : true))
     .filter((note) => (q ? `${note.title || ''} ${note.content || ''}`.toLowerCase().includes(q) : true))
-    .sort((a, b) => toMs(b.updatedAt) - toMs(a.updatedAt) || String(a.id).localeCompare(String(b.id)));
+    .sort((a, b) => toMs(b.updatedAt) - toMs(a.updatedAt) || String(a.id).localeCompare(String(b.id)))
+    .map((note) => {
+      const preview = String(note.content || '').replace(/\s+/g, ' ').trim();
+      const orderLabel = note.linkType === NOTE_LINK_TYPES.ORDER
+        ? (orderLabelsById.get(note.linkedOrderId) || note.linkedOrderId || 'Brak zlecenia')
+        : '';
+      return {
+        ...note,
+        preview,
+        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? `Zlecenie: ${orderLabel}` : 'Wolna'
+      };
+    });
 
   return {
     results: filtered,

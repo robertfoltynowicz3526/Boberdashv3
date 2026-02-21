@@ -4,6 +4,13 @@ const fmt = (v) => {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pl-PL');
 };
 
+const esc = (value = '') => String(value)
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;');
+
 export const renderNotesListView = ({ host, model, selectedNoteId }) => {
   if (!host) return;
   if (!model?.results?.length) {
@@ -11,13 +18,13 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
     return;
   }
   host.innerHTML = model.results.map((note) => `
-    <article class="note-item ${selectedNoteId === note.id ? 'is-active' : ''}" data-note-id="${note.id}">
+    <article class="note-item ${selectedNoteId === note.id ? 'is-active' : ''}" data-note-id="${note.id}" role="button" tabindex="0" aria-label="Otwórz notatkę: ${esc(note.title || '(bez tytułu)')}">
       <header class="note-item__header">
-        <strong>${note.title || '(bez tytułu)'}</strong>
-        <span class="note-badge">${note.linkType === 'order' ? 'do zlecenia' : 'wolna'}</span>
+        <strong class="note-item__title">${esc(note.title || '(bez tytułu)')}</strong>
       </header>
-      <p>${(note.content || '').slice(0, 180) || '—'}</p>
-      <small>Aktualizacja: ${fmt(note.updatedAt)}</small>
+      <p class="note-item__meta">${esc(note.relationLabel || (note.linkType === 'order' ? 'Zlecenie' : 'Wolna'))}</p>
+      <p class="note-item__preview">${esc(note.preview || '—')}</p>
+      <small class="note-item__updated">Aktualizacja: ${fmt(note.updatedAt)}</small>
     </article>
   `).join('');
 };

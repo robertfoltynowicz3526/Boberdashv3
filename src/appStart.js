@@ -2769,6 +2769,7 @@ function initializeApp() {
     const notesEditorDelete = document.getElementById('notes-editor-delete');
     const notesEditorExport = document.getElementById('notes-editor-export');
     const notesModalClose = document.getElementById('notes-modal-close');
+    const notesModalTitle = document.getElementById('notes-modal-title');
     let notesDirty = false;
     let notesOrderOptions = [];
 
@@ -2814,7 +2815,11 @@ function initializeApp() {
         linkedOrderId: notesFilterOrder?.value || '',
         search: notesSearchInput?.value || ''
     });
-    const getNotesViewModel = () => buildNotesViewModel({ notes: allNotes, filters: readNotesFilters() });
+    const getNotesViewModel = () => {
+        const filters = readNotesFilters();
+        filters.orderLabelsById = new Map(notesOrderOptions.map((option) => [option.id, option.label]));
+        return buildNotesViewModel({ notes: allNotes, filters });
+    };
     const buildNotesOrdersModel = () => buildNoteOrderOptionsModel({
         orders: _wszystkieZleceniaCache || [],
         clients: _wszystkieKlienciCache || [],
@@ -2876,6 +2881,7 @@ function initializeApp() {
         if (radio) radio.checked = true;
         notesEditorOrderGroup.hidden = type !== NOTE_LINK_TYPES.ORDER;
         notesEditorDelete.hidden = !draft.id;
+        if (notesModalTitle) notesModalTitle.textContent = draft.id ? 'Edytuj notatkę' : 'Nowa notatka';
         notesDirty = false;
         openModal(notesModal);
     };
@@ -7157,8 +7163,7 @@ async function obslugaListyCzesci(event) {
     if (notesExportSelectedBtn) notesExportSelectedBtn.addEventListener('click', () => exportSingleNote(allNotes.find((note) => note.id === selectedNoteId)));
     if (notesExportFilteredBtn) notesExportFilteredBtn.addEventListener('click', () => exportManyNotes(getNotesViewModel().results, 'notatki_filtr.txt'));
     if (notesListContainer) {
-        notesListContainer.addEventListener('click', (event) => {
-            const noteCard = event.target.closest('[data-note-id]');
+        const openNoteFromCard = (noteCard) => {
             const noteId = noteCard?.dataset.noteId;
             if (!noteId) return;
             selectedNoteId = noteId;
@@ -7166,6 +7171,16 @@ async function obslugaListyCzesci(event) {
             if (!note) return;
             renderNotesList();
             openNoteEditor(note);
+        };
+        notesListContainer.addEventListener('click', (event) => {
+            openNoteFromCard(event.target.closest('[data-note-id]'));
+        });
+        notesListContainer.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const noteCard = event.target.closest('[data-note-id]');
+            if (!noteCard) return;
+            event.preventDefault();
+            openNoteFromCard(noteCard);
         });
     }
     if (notesEditorForm) {

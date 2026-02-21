@@ -3699,14 +3699,44 @@ body { min-width: 1024px; }
 
 /* Notatnik */
 .notes-layout .main { min-width: 0; }
-#notes-list { display: grid; gap: 10px; }
+#notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .note-item {
   border: 1px solid var(--line-color);
   background: var(--surface-color);
   border-radius: 10px;
-  padding: 10px;
+  padding: 12px;
+  max-height: 150px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
 }
 .note-item.is-active { border-color: var(--color-accent); }
+.note-item__header { display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.note-item__title {
+  margin: 0;
+  font-weight: 700;
+}
+.note-item__meta,
+.note-item__updated {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.note-item__preview {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  text-overflow: ellipsis;
+}
 .note-actions { display: flex; gap: 8px; margin-top: 8px; }
 .order-notes-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 
@@ -3760,7 +3790,5 @@ input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity:
   min-height: 62vh;
   resize: vertical;
 }
-.note-item__header { display:flex; justify-content:space-between; gap:12px; align-items:center; }
-.note-badge { border:1px solid var(--line-color); border-radius:999px; padding:2px 8px; font-size:12px; }
 .metric-skeleton { min-height: 86px; border-radius: 10px; background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.18), rgba(255,255,255,.06)); background-size: 200% 100%; animation: pulse 1.2s infinite; }
 @keyframes pulse { from { background-position: 0 0; } to { background-position: 200% 0; } }
