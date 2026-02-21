@@ -3699,60 +3699,90 @@ body { min-width: 1024px; }
 
 /* Notatnik */
 .notes-layout .main { min-width: 0; }
-#notes-list {
+.notesGrid {
   display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  align-items: start;
 }
-@media (min-width: 720px) {
-  #notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 1200px) {
-  #notes-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-.note-item {
+.noteCard {
   border: 1px solid var(--line-color);
   background: var(--surface-color);
   border-radius: 10px;
   padding: 12px;
-  min-height: 120px;
+  min-height: 150px;
+  max-height: 220px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
   cursor: pointer;
 }
-.note-item.is-active { border-color: var(--color-accent); }
-.note-item__header { display:flex; justify-content:space-between; gap:12px; align-items:center; }
-.note-item__title {
+.noteCard.is-active { border-color: var(--color-accent); }
+.noteCard__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+.noteCard__title {
   margin: 0;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.note-item__meta,
-.note-item__updated {
+.noteCard__meta,
+.noteCard__updated,
+.noteCard__cta {
   margin: 0;
   font-size: 12px;
   color: var(--text-muted);
 }
-.note-item__meta {
+.noteCard__meta {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.note-item__preview {
+.notePreview {
   margin: 0;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
   text-overflow: ellipsis;
+  min-height: 0;
+  flex: 1;
+}
+.noteCard__footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.noteCard__cta {
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .note-actions { display: flex; gap: 8px; margin-top: 8px; }
 .order-notes-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* CSS guard: notatki nie mogą używać 100vh */
+.notesGrid,
+.noteCard,
+.notePreview {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+}
+.noteCard { max-height: 220px; }
+.notePreview { max-height: 6em; }
 
 /* Modale i kontrast */
 body.modal-open { overflow: hidden; }
