@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, documentId, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 
 export const NOTE_LINK_TYPES = {
   NONE: 'none',
@@ -11,6 +11,7 @@ const sanitizeLinkType = (value) => (value === NOTE_LINK_TYPES.ORDER ? NOTE_LINK
 
 export const mapNoteDoc = (snap) => {
   const data = snap.data() || {};
+  const linkedOrderId = data.linkedOrderId || data.orderId || null;
   return {
     id: snap.id,
     title: typeof data.title === 'string' ? data.title : '',
@@ -18,9 +19,16 @@ export const mapNoteDoc = (snap) => {
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || data.createdAt || null,
     linkType: sanitizeLinkType(data.linkType || data.linkedType),
-    linkedOrderId: data.linkedOrderId || null,
+    linkedOrderId,
+    orderId: linkedOrderId,
     archived: Boolean(data.archived)
   };
+};
+
+const chunkArray = (arr = [], size = 10) => {
+  const result = [];
+  for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size));
+  return result;
 };
 
 export const createNotesDataLayer = (db) => {
@@ -64,5 +72,15 @@ export const createNotesDataLayer = (db) => {
     return snapshot.docs.map(mapNoteDoc);
   };
 
-  return { createNote, updateNote, deleteNote, listNotes };
+  const listOrdersByIds = async (orderIds = []) => {
+    const ids = [...new Set((orderIds || []).filter(Boolean).map((id) => String(id)))];
+    if (!ids.length) return [];
+    const batches = chunkArray(ids, 10);
+    const docs = await Promise.all(
+      batches.map((idsBatch) => getDocs(query(collection(db, 'zlecenia'), where(documentId(), 'in', idsBatch))))
+    );
+    return docs.flatMap((snap) => snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+  };
+
+  return { createNote, updateNote, deleteNote, listNotes, listOrdersByIds };
 };

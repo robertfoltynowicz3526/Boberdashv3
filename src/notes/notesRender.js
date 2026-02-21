@@ -22,8 +22,7 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
       <header class="note-item__header">
         <strong class="note-item__title">${esc(note.title || '(bez tytułu)')}</strong>
       </header>
-      <p class="note-item__meta">${esc(note.relationLabel || (note.linkType === 'order' ? 'Zlecenie' : 'Wolna'))}</p>
-      <p class="note-item__preview">${esc(note.preview || '—')}</p>
+      <p class="note-item__meta">${esc(note.orderLabel || (note.linkType === 'order' ? 'Zlecenie' : 'Wolna notatka'))}</p>
       <small class="note-item__updated">Aktualizacja: ${fmt(note.updatedAt)}</small>
     </article>
   `).join('');
