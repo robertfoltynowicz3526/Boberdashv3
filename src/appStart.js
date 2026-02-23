@@ -2771,6 +2771,8 @@ function initializeApp() {
     const notesModalClose = document.getElementById('notes-modal-close');
     const notesModalTitle = document.getElementById('notes-modal-title');
     const notesEditorMeta = document.getElementById('notes-editor-meta');
+    const notesEditorCreated = document.getElementById('notes-editor-created');
+    const notesEditorUpdated = document.getElementById('notes-editor-updated');
     let notesDirty = false;
     let notesOrderOptions = [];
     let notesOrderLabelsById = new Map();
@@ -2778,11 +2780,7 @@ function initializeApp() {
     const toDateLabel = (value) => {
         if (!value) return '—';
         const d = toDateSafe(value);
-        return d ? d.toLocaleString('pl-PL') : '—';
-    };
-    const getNoteRelationLabel = (note) => {
-        if (!note || note.linkType !== NOTE_LINK_TYPES.ORDER) return 'Wolna notatka';
-        return notesOrderLabelsById.get(note.linkedOrderId) || note.linkedOrderId || 'Brak zlecenia';
+        return d ? d.toLocaleDateString('pl-PL') : '—';
     };
     const notesFilename = (note) => {
         const date = normalizeDateOnly(note?.updatedAt || new Date());
@@ -2890,8 +2888,9 @@ function initializeApp() {
         notesEditorDelete.hidden = !draft.id;
         if (notesModalTitle) notesModalTitle.textContent = draft.id ? 'Edytuj notatkę' : 'Nowa notatka';
         if (notesEditorMeta) {
-            const relation = getNoteRelationLabel(draft);
-            notesEditorMeta.textContent = `Powiązanie: ${relation} • Utworzono: ${toDateLabel(draft.createdAt)} • Aktualizacja: ${toDateLabel(draft.updatedAt)}`;
+            notesEditorMeta.hidden = false;
+            if (notesEditorCreated) notesEditorCreated.textContent = toDateLabel(draft.createdAt);
+            if (notesEditorUpdated) notesEditorUpdated.textContent = toDateLabel(draft.updatedAt);
         }
         notesDirty = false;
         openModal(notesModal);
