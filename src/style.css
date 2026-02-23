@@ -3700,16 +3700,21 @@ body { min-width: 1024px; }
 /* Notatnik */
 .notes-layout {
   display: grid;
-  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+  height: auto;
 }
 .notes-layout .side {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.notes-layout .main { min-width: 0; }
+.notes-layout .main {
+  min-width: 0;
+  height: auto;
+  display: block;
+}
 .notes-actions {
   display: flex;
   gap: 8px;
@@ -3720,18 +3725,18 @@ body { min-width: 1024px; }
 }
 .notesGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
   width: 100%;
-  padding: 6px 2px;
-  align-items: stretch;
+  padding: 2px 0;
+  align-items: start;
 }
 .noteCard {
   border: 1px solid var(--line-color);
   background: var(--surface-color);
   border-radius: 12px;
   padding: 14px;
-  height: clamp(190px, 24vh, 230px);
+  min-height: 150px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -3782,23 +3787,11 @@ body { min-width: 1024px; }
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
   text-overflow: ellipsis;
   min-height: 0;
-  flex: 1;
   color: var(--text-muted);
-}
-.noteCard__footer {
-  margin-top: auto;
-  display: flex;
-  justify-content: flex-end;
-}
-.noteCard__updated {
-  margin: 0;
-  font-size: 11px;
-  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
-  text-align: right;
 }
 .note-actions { display: flex; gap: 8px; margin-top: 8px; }
 .order-notes-actions { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -3841,9 +3834,29 @@ input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity:
 #pulpit-activity[hidden] { display: none !important; }
 
 .notes-editor-meta {
-  margin: -2px 0 10px;
-  font-size: 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-color) 92%, transparent);
+  font-size: 13px;
   color: var(--text-muted);
+}
+.notes-editor-meta h3 {
+  margin: 0 0 6px;
+  font-size: 0.88rem;
+  color: var(--text-color);
+}
+.notes-editor-meta p {
+  margin: 0;
+  line-height: 1.45;
+}
+.notes-editor-meta p + p {
+  margin-top: 2px;
+}
+.notes-editor-meta-label {
+  color: var(--text-color);
+  font-weight: 600;
 }
 
 .modal-content-notes {

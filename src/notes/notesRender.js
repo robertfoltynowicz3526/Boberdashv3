@@ -1,9 +1,3 @@
-const fmt = (v) => {
-  if (!v) return '—';
-  const d = v?.toDate ? v.toDate() : new Date(v);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pl-PL');
-};
-
 const esc = (value = '') => String(value)
   .replaceAll('&', '&amp;')
   .replaceAll('<', '&lt;')
@@ -24,11 +18,14 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
         <p class="noteCard__meta"><span class="noteCard__metaLabel">Powiązanie:</span> ${esc(note.relationLabel || (note.linkType === 'order' ? note.orderLabel : 'Wolna notatka'))}</p>
       </header>
       <p class="notePreview">${esc(note.preview || 'Brak treści')}</p>
-      <footer class="noteCard__footer">
-        <small class="noteCard__updated">Aktualizacja: ${fmt(note.updatedAt)}</small>
-      </footer>
     </article>
   `).join('');
+};
+
+const fmt = (v) => {
+  if (!v) return '—';
+  const d = v?.toDate ? v.toDate() : new Date(v);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('pl-PL');
 };
 
 export const buildNoteTxt = (note, orderLabel = '') => `Tytuł: ${note.title || '(bez tytułu)'}\nUtworzono: ${fmt(note.createdAt)}\nZaktualizowano: ${fmt(note.updatedAt)}\nPowiązanie: ${note.linkType === 'order' ? `Zlecenie ${orderLabel || note.linkedOrderId || ''}` : 'Wolna'}\n---\n${note.content || ''}`;

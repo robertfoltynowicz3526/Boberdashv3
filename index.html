@@ -871,7 +871,11 @@
         <div class="modal-content modal-content-notes">
             <span class="close-button" id="notes-modal-close">&times;</span>
             <h2 id="notes-modal-title">Notatka</h2>
-            <p id="notes-editor-meta" class="notes-editor-meta" aria-live="polite"></p>
+            <div id="notes-editor-meta" class="notes-editor-meta" aria-live="polite">
+                <h3>Metryka</h3>
+                <p><span class="notes-editor-meta-label">Utworzono:</span> <span id="notes-editor-created">—</span></p>
+                <p><span class="notes-editor-meta-label">Ostatnia aktualizacja:</span> <span id="notes-editor-updated">—</span></p>
+            </div>
             <form id="notes-editor-form" class="modal-body">
                 <input type="hidden" id="notes-editor-id">
                 <div class="form-group"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title"></div>
