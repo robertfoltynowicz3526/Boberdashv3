@@ -3725,11 +3725,12 @@ body { min-width: 1024px; }
 }
 .notesGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
   width: 100%;
   padding: 2px 0;
   align-items: start;
+  justify-items: stretch;
 }
 .noteCard {
   border: 1px solid var(--line-color);
@@ -3737,6 +3738,7 @@ body { min-width: 1024px; }
   border-radius: 12px;
   padding: 14px;
   min-height: 150px;
+  width: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;

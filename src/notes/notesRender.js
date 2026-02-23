@@ -17,7 +17,6 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
         <strong class="noteCard__title">${esc(note.title || '(bez tytułu)')}</strong>
         <p class="noteCard__meta"><span class="noteCard__metaLabel">Powiązanie:</span> ${esc(note.relationLabel || (note.linkType === 'order' ? note.orderLabel : 'Wolna notatka'))}</p>
       </header>
-      <p class="notePreview">${esc(note.preview || 'Brak treści')}</p>
     </article>
   `).join('');
 };
