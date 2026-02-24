@@ -12,7 +12,7 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
     return;
   }
   host.innerHTML = model.results.map((note) => `
-    <article class="noteCard ${selectedNoteId === note.id ? 'is-active' : ''}" style="background:${esc(note.color || "#ffffff")}" data-note-id="${note.id}" role="button" tabindex="0" aria-label="Otwórz notatkę: ${esc(note.title || '(bez tytułu)')}">
+    <article class="noteCard ${selectedNoteId === note.id ? 'is-active' : ''}" style="--note-accent:${esc(note.color || 'rgba(54, 124, 43, 0.45)')}" data-note-id="${note.id}" role="button" tabindex="0" aria-label="Otwórz notatkę: ${esc(note.title || '(bez tytułu)')}">
       <header class="noteCard__header">
         <div class="noteCard__titleRow"><strong class="noteCard__title">${esc(note.title || '(bez tytułu)')}</strong>${note.pinned ? '<span class="noteCard__pin">📌</span>' : ''}</div>
         <p class="noteCard__meta"><span class="noteCard__metaLabel">Powiązanie:</span> ${esc(note.relationLabel || (note.linkType === 'order' ? note.orderLabel : 'Wolna'))}</p>
