@@ -1,7 +1,7 @@
 import { addDoc, collection, doc, documentId, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 
 export const NOTE_LINK_TYPES = {
-  NONE: 'none',
+  NONE: 'free',
   ORDER: 'order'
 };
 
@@ -9,18 +9,30 @@ const NOTES_COLLECTION = 'notes';
 
 const sanitizeLinkType = (value) => (value === NOTE_LINK_TYPES.ORDER ? NOTE_LINK_TYPES.ORDER : NOTE_LINK_TYPES.NONE);
 
+const stripHtmlToText = (value = '') => String(value)
+  .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+  .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;/gi, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
 export const mapNoteDoc = (snap) => {
   const data = snap.data() || {};
   const linkedOrderId = data.linkedOrderId || data.orderId || null;
   return {
     id: snap.id,
     title: typeof data.title === 'string' ? data.title : '',
-    content: typeof data.content === 'string' ? data.content : '',
+    contentHtml: typeof data.contentHtml === 'string' ? data.contentHtml : (typeof data.content === 'string' ? data.content : ''),
+    contentText: typeof data.contentText === 'string' ? data.contentText : stripHtmlToText(data.contentHtml || data.content || ''),
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || data.createdAt || null,
     linkType: sanitizeLinkType(data.linkType || data.linkedType),
     linkedOrderId,
     orderId: linkedOrderId,
+    orderLabel: typeof data.orderLabel === 'string' ? data.orderLabel : '',
+    pinned: Boolean(data.pinned),
+    color: typeof data.color === 'string' ? data.color : '#ffffff',
     archived: Boolean(data.archived)
   };
 };
@@ -38,11 +50,15 @@ export const createNotesDataLayer = (db) => {
     const now = new Date();
     return addDoc(notesCollection, {
       title: (payload.title || '').trim(),
-      content: payload.content || '',
+      contentHtml: payload.contentHtml || payload.content || '',
+      contentText: payload.contentText || stripHtmlToText(payload.contentHtml || payload.content || ''),
       createdAt: now,
       updatedAt: now,
       linkType: sanitizeLinkType(payload.linkType),
       linkedOrderId: payload.linkedOrderId || null,
+      orderLabel: payload.orderLabel || '',
+      pinned: Boolean(payload.pinned),
+      color: payload.color || '#ffffff',
       archived: false
     });
   };
@@ -51,8 +67,10 @@ export const createNotesDataLayer = (db) => {
     if (!noteId) return;
     return updateDoc(doc(db, NOTES_COLLECTION, noteId), {
       ...patch,
+      contentText: patch.contentText || stripHtmlToText(patch.contentHtml || patch.content || ''),
       linkType: sanitizeLinkType(patch.linkType),
       linkedOrderId: patch.linkType === NOTE_LINK_TYPES.ORDER ? (patch.linkedOrderId || null) : null,
+      orderLabel: patch.linkType === NOTE_LINK_TYPES.ORDER ? (patch.orderLabel || '') : '',
       updatedAt: new Date()
     });
   };

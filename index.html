@@ -93,6 +93,10 @@
             <div class="orders-grid notes-layout">
                 <div class="side">
                     <div class="form-group">
+                        <label for="notes-quick-create">Szybka notatka</label>
+                        <input type="text" id="notes-quick-create" placeholder="Utwórz notatkę…">
+                    </div>
+                    <div class="form-group">
                         <label for="notes-search">Szukaj</label>
                         <input type="search" id="notes-search" placeholder="Tytuł lub treść...">
                     </div>
@@ -100,7 +104,8 @@
                         <label for="notes-filter-type">Filtr</label>
                         <select id="notes-filter-type">
                             <option value="all">Wszystkie</option>
-                            <option value="none">Wolne</option>
+                            <option value="pinned">Przypięte</option>
+                            <option value="free">Wolne</option>
                             <option value="order">Do zlecenia</option>
                         </select>
                     </div>
@@ -881,7 +886,7 @@
                 <div class="form-group"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title"></div>
                 <div class="form-group"><label>Powiąż ze zleceniem</label>
                     <div class="notes-link-toggle">
-                        <label><input type="radio" name="notes-link-type" value="none" checked> Wolna</label>
+                        <label><input type="radio" name="notes-link-type" value="free" checked> Wolna</label>
                         <label><input type="radio" name="notes-link-type" value="order"> Do zlecenia</label>
                     </div>
                 </div>
@@ -896,7 +901,39 @@
                         <div id="notes-editor-order-dropdown" class="combobox-dropdown" role="listbox"></div>
                     </div>
                 </div>
-                <div class="form-group"><label for="notes-editor-content">Treść</label><textarea id="notes-editor-content" rows="16"></textarea></div>
+                <div class="form-group"><label for="notes-editor-content">Treść</label>
+                    <div class="notes-toolbar" id="notes-toolbar">
+                        <button type="button" data-cmd="bold"><b>B</b></button>
+                        <button type="button" data-cmd="italic"><i>I</i></button>
+                        <button type="button" data-cmd="underline"><u>U</u></button>
+                        <button type="button" data-cmd="strikeThrough"><s>S</s></button>
+                        <button type="button" data-cmd="insertUnorderedList">• Lista</button>
+                        <button type="button" data-cmd="insertOrderedList">1. Lista</button>
+                        <button type="button" data-cmd="task">☑ Zadania</button>
+                        <button type="button" data-cmd="h1">H1</button>
+                        <button type="button" data-cmd="h2">H2</button>
+                        <button type="button" data-cmd="createLink">Link</button>
+                        <button type="button" data-cmd="undo">↶</button>
+                        <button type="button" data-cmd="redo">↷</button>
+                        <button type="button" data-cmd="mono">{ }</button>
+                    </div>
+                    <div id="notes-editor-content" class="notes-editor-content" contenteditable="true"></div>
+                </div>
+                <div class="form-group">
+                    <label>Opcje</label>
+                    <div class="notes-link-toggle">
+                        <label><input type="checkbox" id="notes-editor-pinned"> Przypnij</label>
+                        <label for="notes-editor-color">Kolor</label>
+                        <select id="notes-editor-color">
+                            <option value="#ffffff">Biały</option>
+                            <option value="#fff8b8">Żółty</option>
+                            <option value="#d9fdd3">Zielony</option>
+                            <option value="#d7efff">Niebieski</option>
+                            <option value="#fce1ff">Różowy</option>
+                            <option value="#ffe8cc">Pomarańczowy</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn-add">Zapisz</button>
                     <button type="button" id="notes-editor-cancel" class="btn-secondary">Anuluj</button>

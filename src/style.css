@@ -3724,15 +3724,16 @@ body { min-width: 1024px; }
   flex: 1 1 auto;
 }
 .notesGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
+  column-count: 4;
+  column-gap: 16px;
   width: 100%;
   padding: 2px 0;
-  align-items: start;
-  justify-items: stretch;
 }
+@media (max-width: 1500px) { .notesGrid { column-count: 3; } }
+@media (max-width: 1100px) { .notesGrid { column-count: 2; } }
 .noteCard {
+  break-inside: avoid;
+  margin: 0 0 16px;
   border: 1px solid var(--line-color);
   background: var(--surface-color);
   border-radius: 12px;
@@ -3752,6 +3753,8 @@ body { min-width: 1024px; }
   gap: 8px;
   min-height: 0;
 }
+.noteCard__titleRow { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.noteCard__pin { font-size: 15px; }
 .noteCard__title {
   margin: 0;
   font-weight: 700;
@@ -3760,8 +3763,8 @@ body { min-width: 1024px; }
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   text-overflow: ellipsis;
   white-space: normal;
   word-break: break-word;
@@ -3774,8 +3777,8 @@ body { min-width: 1024px; }
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   text-overflow: ellipsis;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -3802,7 +3805,7 @@ body { min-width: 1024px; }
   .notes-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 820px) {
-  .notesGrid { grid-template-columns: minmax(0, 1fr); }
+  .notesGrid { column-count: 1; }
 }
 
 /* Modale i kontrast */
@@ -3883,3 +3886,8 @@ input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity:
 }
 .metric-skeleton { min-height: 86px; border-radius: 10px; background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.18), rgba(255,255,255,.06)); background-size: 200% 100%; animation: pulse 1.2s infinite; }
 @keyframes pulse { from { background-position: 0 0; } to { background-position: 200% 0; } }
+
+.notes-toolbar { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.notes-toolbar button { border:1px solid var(--line-color); background:var(--surface-color); color:var(--text-color); border-radius:8px; padding:4px 8px; cursor:pointer; }
+.notes-editor-content { width:100%; min-height:58vh; border:1px solid var(--line-color); border-radius:10px; padding:10px; overflow:auto; background:var(--surface-color); }
+.notes-editor-content:focus { outline:2px solid color-mix(in srgb, var(--color-accent) 45%, transparent); }
