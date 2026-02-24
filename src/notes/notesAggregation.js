@@ -12,12 +12,12 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
   const q = (filters.search || '').trim().toLowerCase();
   const filtered = (notes || [])
     .filter((note) => !note.archived)
-    .filter((note) => (filters.linkType && filters.linkType !== 'all' ? note.linkType === filters.linkType : true))
+    .filter((note) => (filters.linkType === 'pinned' ? note.pinned : (filters.linkType && filters.linkType !== 'all' ? note.linkType === filters.linkType : true)))
     .filter((note) => (filters.linkedOrderId ? note.linkedOrderId === filters.linkedOrderId : true))
-    .filter((note) => (q ? `${note.title || ''} ${note.content || ''}`.toLowerCase().includes(q) : true))
-    .sort((a, b) => toMs(b.updatedAt) - toMs(a.updatedAt) || String(a.id).localeCompare(String(b.id)))
+    .filter((note) => (q ? `${note.title || ''} ${note.contentText || note.contentHtml || ''}`.toLowerCase().includes(q) : true))
+    .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || toMs(b.updatedAt) - toMs(a.updatedAt) || String(a.id).localeCompare(String(b.id)))
     .map((note) => {
-      const preview = String(note.content || '').replace(/\s+/g, ' ').trim();
+      const preview = String(note.contentText || '').replace(/\s+/g, ' ').trim();
       const orderLabel = note.linkType === NOTE_LINK_TYPES.ORDER
         ? (orderLabelsById.get(note.linkedOrderId) || note.linkedOrderId || 'Brak zlecenia')
         : '';
@@ -25,7 +25,7 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
         ...note,
         preview,
         orderLabel,
-        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? orderLabel : 'Wolna notatka'
+        relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? (orderLabel || note.orderLabel || 'Brak zlecenia') : 'Wolna'
       };
     });
 

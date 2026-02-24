@@ -845,6 +845,7 @@ function initializeApp() {
     const notesFilterType = document.getElementById('notes-filter-type');
     const notesFilterOrder = document.getElementById('notes-filter-order');
     const notesAddBtn = document.getElementById('notes-add-btn');
+    const notesQuickCreateInput = document.getElementById('notes-quick-create');
     const notesExportSelectedBtn = document.getElementById('notes-export-selected');
     const notesExportFilteredBtn = document.getElementById('notes-export-filtered');
     const calendarTitleEl = document.getElementById('calendar-title');
@@ -2760,6 +2761,9 @@ function initializeApp() {
     const notesEditorId = document.getElementById('notes-editor-id');
     const notesEditorTitle = document.getElementById('notes-editor-title');
     const notesEditorContent = document.getElementById('notes-editor-content');
+    const notesToolbar = document.getElementById('notes-toolbar');
+    const notesEditorPinned = document.getElementById('notes-editor-pinned');
+    const notesEditorColor = document.getElementById('notes-editor-color');
     const notesEditorOrder = document.getElementById('notes-editor-order');
     const notesEditorOrderInput = document.getElementById('notes-editor-order-input');
     const notesEditorOrderDropdown = document.getElementById('notes-editor-order-dropdown');
@@ -2803,7 +2807,7 @@ function initializeApp() {
     };
     const exportManyNotes = (notes = [], filename = 'notatki.txt') => {
         if (!notes.length) return alert('Brak notatek do eksportu.');
-        const text = notes.map((note) => buildNoteTxt(note, notesOrderOptions.find((option) => option.id === note.linkedOrderId)?.label || '')).join('\n\n==========================\n\n');
+        const text = notes.map((note) => buildNoteTxt(note, notesOrderOptions.find((option) => option.id === note.linkedOrderId)?.label || '')).join('\n\n---\n\n');
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -2875,10 +2879,12 @@ function initializeApp() {
     };
     const openNoteEditor = (note = null) => {
         if (!notesModal || !notesEditorForm) return;
-        const draft = note || { id: '', title: '', content: '', linkType: NOTE_LINK_TYPES.NONE, linkedOrderId: '' };
+        const draft = note || { id: '', title: '', contentHtml: '', contentText: '', linkType: NOTE_LINK_TYPES.NONE, linkedOrderId: '', pinned: false, color: '#ffffff' };
         notesEditorId.value = draft.id || '';
         notesEditorTitle.value = draft.title || '';
-        notesEditorContent.value = draft.content || '';
+        notesEditorContent.innerHTML = draft.contentHtml || '';
+        if (notesEditorPinned) notesEditorPinned.checked = Boolean(draft.pinned);
+        if (notesEditorColor) notesEditorColor.value = draft.color || '#ffffff';
         notesEditorOrder.value = draft.linkedOrderId || '';
         syncNotesEditorOrderInput();
         const type = draft.linkType || NOTE_LINK_TYPES.NONE;
@@ -5349,7 +5355,7 @@ function renderOrderNotes(orderId = null) {
     const notes = buildNotesViewModel({ notes: allNotes, filters: { linkType: NOTE_LINK_TYPES.ORDER, linkedOrderId: currentOrderId } }).results;
     host.innerHTML = `
         <div class="order-notes-actions"><button type="button" class="btn-secondary" id="order-note-add">Dodaj notatkę</button><button type="button" class="btn-secondary" id="order-notes-export">Eksportuj .txt</button></div>
-        ${notes.length ? notes.map((note) => `<div class="note-item"><strong>${note.title || '(bez tytułu)'}</strong><p>${note.content || ''}</p></div>`).join('') : '<p class="loading-state">Brak notatek do zlecenia.</p>'}
+        ${notes.length ? notes.map((note) => `<div class="note-item"><strong>${note.title || '(bez tytułu)'}</strong><p>${note.contentText || ''}</p></div>`).join('') : '<p class="loading-state">Brak notatek do zlecenia.</p>'}
     `;
     host.querySelector('#order-note-add')?.addEventListener('click', async () => {
         const payload = promptNotePayload();
@@ -7156,6 +7162,14 @@ async function obslugaListyCzesci(event) {
 
 
     if (notesAddBtn) notesAddBtn.addEventListener('click', () => openNoteEditor(null));
+    if (notesQuickCreateInput) {
+        notesQuickCreateInput.addEventListener('focus', () => openNoteEditor({ title: notesQuickCreateInput.value || '' }));
+        notesQuickCreateInput.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            openNoteEditor({ title: notesQuickCreateInput.value || '' });
+        });
+    }
     if (notesSearchInput) notesSearchInput.addEventListener('input', renderNotesList);
     if (notesFilterType) notesFilterType.addEventListener('change', renderNotesList);
     if (notesFilterOrder) notesFilterOrder.addEventListener('change', renderNotesList);
@@ -7232,15 +7246,40 @@ async function obslugaListyCzesci(event) {
             const linkType = notesEditorForm.querySelector('input[name="notes-link-type"]:checked')?.value || NOTE_LINK_TYPES.NONE;
             const payload = {
                 title: notesEditorTitle.value || '',
-                content: notesEditorContent.value || '',
+                contentHtml: notesEditorContent.innerHTML || '',
+                contentText: (notesEditorContent.textContent || '').replace(/\s+/g, ' ').trim(),
                 linkType,
-                linkedOrderId: linkType === NOTE_LINK_TYPES.ORDER ? (notesEditorOrder.value || null) : null
+                linkedOrderId: linkType === NOTE_LINK_TYPES.ORDER ? (notesEditorOrder.value || null) : null,
+                orderLabel: linkType === NOTE_LINK_TYPES.ORDER ? (notesOrderOptions.find((o)=>o.id===notesEditorOrder.value)?.label || '') : '',
+                pinned: Boolean(notesEditorPinned?.checked),
+                color: notesEditorColor?.value || '#ffffff'
             };
-            if (!payload.content.trim()) return alert('Treść notatki jest wymagana.');
+            if (!(payload.contentText || '').trim()) return alert('Treść notatki jest wymagana.');
             if (linkType === NOTE_LINK_TYPES.ORDER && !payload.linkedOrderId) return alert('Wybierz zlecenie do powiązania.');
             if (noteId) await notesData.updateNote(noteId, payload); else await notesData.createNote(payload);
             notesDirty = false;
             hideModal(notesModal);
+        });
+    }
+    if (notesToolbar && notesEditorContent) {
+        notesToolbar.addEventListener('click', (event) => {
+            const btn = event.target.closest('button[data-cmd]');
+            if (!btn) return;
+            const cmd = btn.dataset.cmd;
+            notesEditorContent.focus();
+            if (cmd === 'createLink') {
+                const url = window.prompt('Podaj URL');
+                if (url) document.execCommand('createLink', false, url);
+            } else if (cmd === 'h1' || cmd === 'h2') {
+                document.execCommand('formatBlock', false, cmd.toUpperCase());
+            } else if (cmd === 'task') {
+                document.execCommand('insertHTML', false, '<ul><li>☐ Zadanie</li></ul>');
+            } else if (cmd === 'mono') {
+                document.execCommand('insertHTML', false, '<code>kod</code>');
+            } else {
+                document.execCommand(cmd, false, null);
+            }
+            notesDirty = true;
         });
     }
     if (notesEditorCancel) notesEditorCancel.addEventListener('click', closeNoteEditor);
