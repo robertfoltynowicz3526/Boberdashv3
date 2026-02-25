@@ -5427,10 +5427,6 @@ async function obslugaListyZlecen(event) {
             completeModalForm.reset();
             const completeIdInput = document.getElementById('complete-zlecenie-id');
             if (completeIdInput) completeIdInput.value = docId;
-            const completeEndInput = document.getElementById('complete-zlecenie-end-date');
-            if (completeEndInput) {
-                completeEndInput.value = formatDateForStorage(new Date());
-            }
             const completeServiceDateInput = document.getElementById('complete-zlecenie-service-date');
             if (completeServiceDateInput) {
                 const resolvedServiceDate = resolveServiceDate(zlecenie) || formatDateForStorage(new Date());
@@ -5538,8 +5534,6 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
-    const editStartInput = editZlecenieForm['edit-start-date'];
-    if (editStartInput) editStartInput.value = normalizeDateOnly(zlecenie.startDate || zlecenie.startAt);
     const editEndInput = editZlecenieForm['edit-completion-date'];
     if (editEndInput) editEndInput.value = normalizeDateOnly(zlecenie.completionDate || zlecenie.serviceDate || zlecenie.completedAt);
 
@@ -5557,7 +5551,6 @@ async function zapiszEdycjeZlecenia(event) {
     const nowyOpis = (document.getElementById('edit-zlecenie-opis')?.value || '').trim();
     const nowyKlientId = editZlecenieClientSelect?.value || '';
     const nowaMaszynaId = editZlecenieMachineSelect?.value || '';
-    const noweStartDate = normalizeDateOnly(editZlecenieForm['edit-start-date']?.value || '');
     const noweCompletionDate = normalizeDateOnly(editZlecenieForm['edit-completion-date']?.value || '');
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
@@ -5567,10 +5560,6 @@ async function zapiszEdycjeZlecenia(event) {
     if (!nowyNumerZlecenia) { alert('Numer zlecenia jest wymagany.'); return; }
     if (!nowyKlientId) { alert('Wybierz klienta.'); return; }
     if (!nowaMaszynaId) { alert('Wybierz maszynę.'); return; }
-    if (noweStartDate && noweCompletionDate && noweStartDate > noweCompletionDate) {
-        alert('Data wykonania nie może być wcześniejsza niż data rozpoczęcia.');
-        return;
-    }
     const duplicate = _wszystkieZleceniaCache.find((z) => z.id !== zlecenieId && (z.nrZlecenia || '').trim() === nowyNumerZlecenia);
     if (duplicate) { alert('Numer zlecenia musi być unikalny.'); return; }
 
@@ -5586,7 +5575,6 @@ async function zapiszEdycjeZlecenia(event) {
         const staryOpis = zlecenieData.opis || '';
         const staryKlientId = zlecenieData.klientId || '';
         const staraMaszynaId = zlecenieData.maszynaId || '';
-        const staraStartDate = normalizeDateOnly(zlecenieData.startDate || zlecenieData.startAt);
         const staraCompletionDate = normalizeDateOnly(zlecenieData.completionDate || zlecenieData.serviceDate || zlecenieData.completedAt);
 
         let wpisHistorii = `Edytowano zlecenie: `;
@@ -5602,7 +5590,6 @@ async function zapiszEdycjeZlecenia(event) {
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
-        if (staraStartDate !== noweStartDate) zmiany.push(`Data rozpoczęcia: ${staraStartDate || 'brak'} → ${noweStartDate || 'brak'}`);
         if (staraCompletionDate !== noweCompletionDate) zmiany.push(`Data wykonania: ${staraCompletionDate || 'brak'} → ${noweCompletionDate || 'brak'}`);
         if (zmiany.length === 0) {
             hideModal(editZlecenieModal);
@@ -5625,7 +5612,6 @@ async function zapiszEdycjeZlecenia(event) {
             typZlecenia: nowyTyp,
             nrZlecenia: nowyNumerZlecenia,
             zakonczenieNumerWZ: nowyNumerWz || null,
-            startDate: noweStartDate || null,
             completionDate: noweCompletionDate || null,
             historia: nowaHistoria
         });
@@ -5660,22 +5646,31 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
         }).join(', ')
         : 'Brak';
     const serviceDate = resolveServiceDate(zlecenie);
+    const calendarEntries = (wszystkieWpisyKalendarza || []).slice().sort((a, b) => (b.id || '').localeCompare(a.id || ''));
+    const powiazaneWpisy = [];
+    let sumaFakturowanych = 0;
+    for (const wpis of calendarEntries) {
+        const { powiazane } = normalizujPowiazaneZlecenia(wpis);
+        const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
+        if (!powiazanie) continue;
+        powiazaneWpisy.push({ wpis, powiazanie });
+        sumaFakturowanych += Number(powiazanie.fakturowane) || 0;
+    }
 
     titleEl.textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
     infoDiv.innerHTML = `
         <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
         <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
         <div class="details-group"><strong>Data dodania:</strong> <p>${normalizeDateOnly(zlecenie.createdDate || zlecenie.createdAt) || '—'}</p></div>
-        <div class="details-group"><strong>Data rozpoczęcia:</strong> <p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt) || '—'}</p></div>
-        <div class="details-group"><strong>Zakończono dnia:</strong> <p>${zlecenie.endAt ? formatDateTimeLabel(zlecenie.endAt) : '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
+        <div class="details-group"><strong>Suma fakturowanych (z kalendarza):</strong> <p>${formatujLiczbe(sumaFakturowanych)} h</p></div>
     `;
 
     if (zlecenie.status === 'ukończone') {
          const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         const notatkaHtml = zlecenie.zakonczenieNotatka ? `<div class="details-group"><strong>Notatka przy zakończeniu:</strong> <p>${zlecenie.zakonczenieNotatka}</p></div>` : '';
         infoDiv.innerHTML += `
-            <div class="details-group"><strong>Zakończono dnia:</strong> <p>${serviceDate || '—'}</p></div>
+            <div class="details-group"><strong>Data wykonania:</strong> <p>${serviceDate || '—'}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
@@ -5702,25 +5697,16 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
     }
-    const qKalendarz = query(
-        collection(db, "godziny_pracy"),
-        orderBy("__name__", "desc")
-    );
-    const querySnapshotKalendarz = await getDocs(qKalendarz);
     let kalendarzHtml = '';
-    querySnapshotKalendarz.forEach((docSnap) => {
-        const wpis = docSnap.data();
-        const { powiazane } = normalizujPowiazaneZlecenia(wpis);
-        const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
-        if (!powiazanie) return;
-        const dataWpisu = docSnap.id;
+    for (const { wpis, powiazanie } of powiazaneWpisy) {
+        const dataWpisu = wpis.id || '—';
         kalendarzHtml += `
             <div class="calendar-entry-item">
                 <span class="date">[${dataWpisu}]</span>
                 Praca: ${formatujLiczbe(wpis.praca || 0)}h | Fakturowane dla zlecenia: ${formatujLiczbe(powiazanie.fakturowane)}h | Nadgodziny: ${formatujLiczbe(wpis.nadgodziny || 0)}h | Jazda: ${formatujLiczbe(wpis.jazda || 0)}h
                 ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
             </div>`;
-    });
+    }
     if (kalendarzDiv) {
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
@@ -5862,7 +5848,6 @@ async function obslugaListyCzesci(event) {
             const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
             const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
             const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
-            const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
             const completionDateInput = completeModalForm.querySelector('[name="completionDate"]') || completeModalForm.querySelector('[name="serviceDate"]') || document.getElementById('complete-zlecenie-service-date');
             const completionDateRaw = completionDateInput?.value || '';
             if (!completionDateRaw) {
@@ -5875,7 +5860,7 @@ async function obslugaListyCzesci(event) {
                 return;
             }
             const todayKey = formatDateForStorage(new Date());
-            if (completionDate > todayKey) { alert('Data zakończenia nie może być z przyszłości.'); return; }
+            if (completionDate > todayKey) { alert('Data wykonania nie może być z przyszłości.'); return; }
             const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
             if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
                 alert('Motogodziny muszą być liczbą większą lub równą 0.');
@@ -5896,9 +5881,7 @@ async function obslugaListyCzesci(event) {
             return;
         }
 
-            const fallbackEndAtDate = manualEndAt || new Date();
-            const endAtValue = manualEndAt || serverTimestamp();
-            const closeDateKey = formatDateForStorage(fallbackEndAtDate);
+            const closeDateKey = completionDate;
             const dane = {
                 status: 'ukończone',
                 wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
