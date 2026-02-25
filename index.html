@@ -487,12 +487,8 @@
               <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
             </div>
             <div class="form-group">
-              <label for="complete-zlecenie-end-date">Data zakończenia:</label>
-              <input type="date" id="complete-zlecenie-end-date">
-            </div>
-            <div class="form-group">
               <label for="complete-zlecenie-service-date">Data wykonania:</label>
-              <input type="date" id="complete-zlecenie-service-date">
+              <input type="date" id="complete-zlecenie-service-date" required>
             </div>
             <hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
     </div>
@@ -851,15 +847,9 @@
                         <option value="P">P - Poprawka (0zł)</option>
                     </select>
                 </div>
-                <div class="form-grid form-grid-2">
-                    <div class="form-group">
-                        <label for="edit-start-date">Data rozpoczęcia:</label>
-                        <input type="date" id="edit-start-date">
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-completion-date">Data wykonania:</label>
-                        <input type="date" id="edit-completion-date">
-                    </div>
+                <div class="form-group">
+                    <label for="edit-completion-date">Data wykonania:</label>
+                    <input type="date" id="edit-completion-date">
                 </div>
                 <div class="form-group">
                     <label for="edit-zakonczenie-wz">Numer WZ (opcjonalnie):</label>
