@@ -2503,6 +2503,37 @@ select {
   flex-direction: column;
   gap: 0.8rem;
   max-height: 240px;
+  overflow-y: auto;
+}
+
+.details-collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.details-collapsible-header h3 {
+  margin: 0;
+}
+
+.details-collapsible-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-color);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.details-collapsible-toggle:hover {
+  background: rgba(255, 222, 0, 0.2);
+  border-color: rgba(255, 222, 0, 0.35);
+}
+
+.details-collapsible-content[hidden] {
+  display: none !important;
 }
 
 /* Karta/wiersz podsumowania: Razem */

@@ -5630,8 +5630,11 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     const infoDiv = document.getElementById('details-zlecenie-info');
     const historiaDiv = document.getElementById('details-zlecenie-historia');
     const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
+    const usterkaDiv = document.getElementById('details-zlecenie-usterka');
     const opisDiv = document.getElementById('details-zlecenie-opis');
-    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv || !opisDiv) return;
+    const historiaTitleEl = document.getElementById('details-zlecenie-historia-title');
+    const historiaToggleBtn = document.getElementById('details-zlecenie-historia-toggle');
+    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv || !usterkaDiv || !opisDiv || !historiaTitleEl || !historiaToggleBtn) return;
     closeAllModals(detailsZlecenieModal);
     const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
     const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
@@ -5668,30 +5671,45 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
 
     if (zlecenie.status === 'ukończone') {
          const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
-        const notatkaHtml = zlecenie.zakonczenieNotatka ? `<div class="details-group"><strong>Notatka przy zakończeniu:</strong> <p>${zlecenie.zakonczenieNotatka}</p></div>` : '';
         infoDiv.innerHTML += `
             <div class="details-group"><strong>Data wykonania:</strong> <p>${serviceDate || '—'}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
             <div class="details-group"><strong>Użyte Części:</strong> <p>${uzyteCzesciOpis}</p></div>
-            ${wzHtml}${notatkaHtml}
+            ${wzHtml}
         `;
     }
 
-    if (historiaDiv) {
-        if (zlecenie.historia && zlecenie.historia.length > 0) {
-            historiaDiv.innerHTML = zlecenie.historia
-                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-                .map(wpis => `
-                    <div class="history-item">
-                        <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
-                        ${wpis.akcja}
-                    </div>
-                `).join('');
-        } else {
-            historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>';
-        }
+    usterkaDiv.innerHTML = `<p>${zlecenie.opis || '—'}</p>`;
+
+    const historiaEntries = Array.isArray(zlecenie.historia) ? zlecenie.historia.slice() : [];
+    historiaTitleEl.textContent = `Historia zlecenia (${historiaEntries.length})`;
+    historiaDiv.hidden = true;
+    historiaDiv.classList.remove('is-open');
+    historiaToggleBtn.textContent = 'Pokaż';
+    historiaToggleBtn.setAttribute('aria-expanded', 'false');
+
+    historiaToggleBtn.onclick = () => {
+        const isExpanded = historiaToggleBtn.getAttribute('aria-expanded') === 'true';
+        const nextExpanded = !isExpanded;
+        historiaToggleBtn.setAttribute('aria-expanded', String(nextExpanded));
+        historiaToggleBtn.textContent = nextExpanded ? 'Ukryj' : 'Pokaż';
+        historiaDiv.hidden = !nextExpanded;
+        historiaDiv.classList.toggle('is-open', nextExpanded);
+    };
+
+    if (historiaEntries.length > 0) {
+        historiaDiv.innerHTML = historiaEntries
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .map(wpis => `
+                <div class="history-item">
+                    <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
+                    ${wpis.akcja}
+                </div>
+            `).join('');
+    } else {
+        historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>';
     }
 
     if (kalendarzDiv) {
@@ -5711,8 +5729,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
         kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
     }
     opisDiv.innerHTML = `
-        ${zlecenie.opis ? `<p>${zlecenie.opis}</p>` : '<p>Brak opisu.</p>'}
-        <hr><h4>Notatki</h4><div id="details-order-notes" data-order-id="${zlecenie.id}"></div>
+        ${zlecenie.zakonczenieNotatka ? `<p>${zlecenie.zakonczenieNotatka}</p>` : '<p>Brak opisu.</p>'}
     `;
     renderOrderNotes(zlecenie.id);
 
