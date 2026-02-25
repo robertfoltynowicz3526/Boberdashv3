@@ -5856,29 +5856,33 @@ async function obslugaListyCzesci(event) {
     async function obslugaZakonczeniaZlecenia(event) {
         if (!completeModalForm || !completeModal) return;
         event.preventDefault();
-        const docId = document.getElementById('complete-zlecenie-id').value;
-        const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
-        const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
-        const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
-        const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
-        const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
-        const serviceDateInput = document.getElementById('complete-zlecenie-service-date');
-        const serviceDateRaw = serviceDateInput?.value || '';
-        const normalizedServiceDate = normalizeDayKey(serviceDateRaw, 'serviceDate');
-        if (serviceDateRaw && !normalizedServiceDate) {
-            alert('Wybierz poprawną datę wykonania.');
-            return;
-        }
-        const todayKey = formatDateForStorage(new Date());
-        const serviceDateKey = normalizedServiceDate || todayKey;
-        if (serviceDateKey > todayKey) { alert('Data zakończenia nie może być z przyszłości.'); return; }
-        const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
-        if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
-            alert('Motogodziny muszą być liczbą większą lub równą 0.');
-            return;
-        }
-        const motoHours = Number.isFinite(motoHoursRaw) ? motoHoursRaw : 0;
-        const zlecenieRef = doc(db, "zlecenia", docId);
+        try {
+            const docId = document.getElementById('complete-zlecenie-id').value;
+            const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
+            const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
+            const zakonczenieNotatkaInput = document.getElementById('zakonczenie-notatka');
+            const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
+            const manualEndAt = parseDatetimeInput(document.getElementById('complete-zlecenie-end-at')?.value || '');
+            const completionDateInput = completeModalForm.querySelector('[name="completionDate"]') || completeModalForm.querySelector('[name="serviceDate"]') || document.getElementById('complete-zlecenie-service-date');
+            const completionDateRaw = completionDateInput?.value || '';
+            if (!completionDateRaw) {
+                alert('Wybierz datę wykonania przed zamknięciem zlecenia.');
+                return;
+            }
+            const completionDate = normalizeDayKey(completionDateRaw, 'completionDate');
+            if (!completionDate) {
+                alert('Wybierz poprawną datę wykonania.');
+                return;
+            }
+            const todayKey = formatDateForStorage(new Date());
+            if (completionDate > todayKey) { alert('Data zakończenia nie może być z przyszłości.'); return; }
+            const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
+            if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
+                alert('Motogodziny muszą być liczbą większą lub równą 0.');
+                return;
+            }
+            const motoHours = Number.isFinite(motoHoursRaw) ? motoHoursRaw : 0;
+            const zlecenieRef = doc(db, "zlecenia", docId);
 
         try {
             const zlecenieStartSnap = await getDoc(zlecenieRef);
@@ -5892,32 +5896,32 @@ async function obslugaListyCzesci(event) {
             return;
         }
 
-        const fallbackEndAtDate = manualEndAt || new Date();
-        const endAtValue = manualEndAt || serverTimestamp();
-        const closeDateKey = formatDateForStorage(fallbackEndAtDate);
-        const dane = {
-            status: 'ukończone',
-            wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
-            motoHours: Number(motoHours),
-            typZlecenia: document.getElementById('typ-zlecenia').value,
-            dataUkonczenia: serviceDateKey,
-            serviceDate: serviceDateKey,
-            completionDate: completionDate,
-            closeDate: closeDateKey,
-            uzyteCzesci: czesciDoZlecenia,
-            zakonczenieNotatka: notatka || null,
-            zakonczenieNumerWZ: numerWzValue || null
-        };
-        let zamykaneZlecenieData = null;
-        let staraDataWykonania = null;
-        try {
-            await runTransaction(db, async (t) => {
+            const fallbackEndAtDate = manualEndAt || new Date();
+            const endAtValue = manualEndAt || serverTimestamp();
+            const closeDateKey = formatDateForStorage(fallbackEndAtDate);
+            const dane = {
+                status: 'ukończone',
+                wyfakturowaneGodziny: Number(document.getElementById('wyfakturowane-godziny').value),
+                motoHours: Number(motoHours),
+                typZlecenia: document.getElementById('typ-zlecenia').value,
+                dataUkonczenia: completionDate,
+                serviceDate: completionDate,
+                completionDate,
+                closeDate: closeDateKey,
+                uzyteCzesci: czesciDoZlecenia,
+                zakonczenieNotatka: notatka || null,
+                zakonczenieNumerWZ: numerWzValue || null
+            };
+            let zamykaneZlecenieData = null;
+            let staraDataWykonania = null;
+            try {
+                await runTransaction(db, async (t) => {
                 const zlecenieSnap = await t.get(zlecenieRef);
                 if (!zlecenieSnap.exists()) throw "Zlecenie nie istnieje!";
                 const zlecenieData = zlecenieSnap.data();
                 zamykaneZlecenieData = zlecenieData;
                 staraDataWykonania = resolveServiceDate(zlecenieData);
-                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${serviceDateKey}.`;
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}.`;
                 if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
                 if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
                 const nowaHistoria = [...(zlecenieData.historia || []), {
@@ -5944,40 +5948,44 @@ async function obslugaListyCzesci(event) {
                     t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
                 }
             });
-            if (zamykaneZlecenieData) {
-                const historiaPayload = {
-                    orderId: docId,
-                    clientId: zamykaneZlecenieData.klientId || null,
-                    machineId: zamykaneZlecenieData.maszynaId || null,
-                    orderNo: zamykaneZlecenieData.nrZlecenia || '',
-                    description: zamykaneZlecenieData.opis || '',
-                    motoHours: Number(motoHours),
-                    closedAt: completionDate
-                };
-                try {
-                    await addDoc(collection(db, 'orders_history'), historiaPayload);
-                } catch (historyErr) {
-                    console.warn('Nie udało się zapisać historii zlecenia:', historyErr);
-                }
-                await logActivityEvent({
-                    type: 'ORDER_CLOSED',
-                    refId: docId,
-                    label: `Zamknięto zlecenie ${zamykaneZlecenieData.nrZlecenia || ''} (wykonano ${serviceDateKey})`
-                });
-                if (staraDataWykonania && staraDataWykonania !== serviceDateKey) {
+                if (zamykaneZlecenieData) {
+                    const historiaPayload = {
+                        orderId: docId,
+                        clientId: zamykaneZlecenieData.klientId || null,
+                        machineId: zamykaneZlecenieData.maszynaId || null,
+                        orderNo: zamykaneZlecenieData.nrZlecenia || '',
+                        description: zamykaneZlecenieData.opis || '',
+                        motoHours: Number(motoHours),
+                        closedAt: completionDate
+                    };
+                    try {
+                        await addDoc(collection(db, 'orders_history'), historiaPayload);
+                    } catch (historyErr) {
+                        console.warn('Nie udało się zapisać historii zlecenia:', historyErr);
+                    }
                     await logActivityEvent({
                         type: 'ORDER_CLOSED',
                         refId: docId,
-                        label: `Zmieniono datę wykonania z ${staraDataWykonania} na ${serviceDateKey}`
+                        label: `Zamknięto zlecenie ${zamykaneZlecenieData.nrZlecenia || ''} (wykonano ${completionDate})`
                     });
+                    if (staraDataWykonania && staraDataWykonania !== completionDate) {
+                        await logActivityEvent({
+                            type: 'ORDER_CLOSED',
+                            refId: docId,
+                            label: `Zmieniono datę wykonania z ${staraDataWykonania} na ${completionDate}`
+                        });
+                    }
                 }
+                alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
+                hideModal(completeModal);
+                completeModalForm.reset();
+            } catch (error) {
+                console.error("BŁĄD TRANSAKCJI: ", error);
+                alert(`Wystąpił błąd: ${error.message || error}`);
             }
-            alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
-            hideModal(completeModal);
-            completeModalForm.reset();
         } catch (error) {
-            console.error("BŁĄD TRANSAKCJI: ", error);
-            alert(`Wystąpił błąd: ${error.message || error}`);
+            console.error('Błąd podczas zamykania zlecenia:', error);
+            alert('Wystąpił nieoczekiwany błąd podczas zamykania zlecenia. Spróbuj ponownie.');
         }
     }
 
