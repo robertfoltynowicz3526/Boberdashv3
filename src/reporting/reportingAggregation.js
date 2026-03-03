@@ -63,6 +63,7 @@ export const computeYearReport = ({ year, days = [] }) => {
   const monthMap = new Map();
   const orders = [];
   const clientTotalsMap = new Map();
+  const billedByBillingMonth = new Map();
 
   days.forEach((day) => {
     const dayKey = day?.dayStr;
@@ -72,6 +73,13 @@ export const computeYearReport = ({ year, days = [] }) => {
     const { totals, flags } = computeDayTotals(day);
 
     sumTotals(monthTotals, totals);
+
+    const billedFromOrders = (Array.isArray(day?.orders) ? day.orders : []).reduce((acc, order) => acc + (Number(order?.billed) || 0), 0);
+    const manualBilled = Number(day?.manual?.billed) || 0;
+    monthTotals.billed -= billedFromOrders;
+    if (billedFromOrders === 0) {
+      monthTotals.billed -= manualBilled;
+    }
 
     const isL4 = day?.leaveKind === 'L4' || day?.flags?.l4;
     const isUrlop = day?.leaveKind === 'URL' || day?.flags?.urlop;
@@ -92,6 +100,8 @@ export const computeYearReport = ({ year, days = [] }) => {
           overHours: Number(order?.over) || 0,
           note: day?.note || ''
         };
+        const billingMonth = order?.billingMonth || monthKey;
+        billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
         orders.push(record);
 
         const existing = clientTotalsMap.get(record.clientName) || { work: 0, drive: 0, billed: 0, over: 0 };
@@ -106,11 +116,15 @@ export const computeYearReport = ({ year, days = [] }) => {
 
   const months = [...monthMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([monthKey, totals]) => ({
-      monthKey,
-      totals: { ...totals },
-      absorpcja: totals.billed ? (totals.billed / BASE_MONTHLY_HOURS) * 100 : 0
-    }));
+    .map(([monthKey, totals]) => {
+      const billed = billedByBillingMonth.get(monthKey) || 0;
+      const merged = { ...totals, billed };
+      return {
+        monthKey,
+        totals: merged,
+        absorpcja: merged.billed ? (merged.billed / BASE_MONTHLY_HOURS) * 100 : 0
+      };
+    });
 
   const yearlyTotals = months.reduce(
     (acc, month) => {
