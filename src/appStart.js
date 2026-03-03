@@ -16,7 +16,7 @@ import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
 import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
-import { buildInvoiceStatsByMonth, normalizeOrderForBilling, resolveOrderBillingMonth, resolveOrderExplicitBillingMonth } from './orders/invoiceStats.js';
+import { buildInvoiceStatsByMonth, normalizeMonthKey, normalizeOrderForBilling, resolveOrderBillingMonth, resolveOrderExplicitBillingMonth } from './orders/invoiceStats.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MIN_DATE = '2026-01-01';
@@ -48,6 +48,11 @@ const parsePlNumber = (v) => {
     return Number.isFinite(n) ? n : 0;
 };
 
+
+const deriveBillingMonthFromCompletionDate = (completionDate) => {
+    const normalized = normalizeDateOnly(completionDate || '');
+    return normalized ? normalized.slice(0, 7) : '';
+};
 
 const setDecorations = (decorations) => {
     window.__calendarDecorations = decorations;
@@ -92,6 +97,7 @@ function initializeApp() {
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
     const SUMMARY_BILLING_MODE_STORAGE_KEY = 'summaryBillingMode';
+    const BILLING_MONTH_MIGRATION_KEY = 'migrationBillingMonthFromCompletionDate.v1';
     const CALENDAR_VIEW_STORAGE_KEY = 'lastView';
     const CALENDAR_VIEW_STORAGE_LEGACY_KEY = 'lastCalendarView';
     const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
@@ -3148,14 +3154,14 @@ function initializeApp() {
             .map(p => ({
                 zlecenieId: p.zlecenieId,
                 klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
-                fakturowane: Number(p.fakturowane) || 0
+                fakturowane: Number(p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia ?? p.fakturowane) || 0
             }));
 
         if (!powiazane.length && dane?.zlecenieId) {
             powiazane.push({
                 zlecenieId: dane.zlecenieId,
                 klientNazwa: dane.klientNazwa || pobierzNazwePowiazania(dane.zlecenieId),
-                fakturowane: Number(dane.fakturowane) || 0
+                fakturowane: Number(dane.invoicedForOrderHours ?? dane.fakturowaneDlaZlecenia ?? dane.fakturowane) || 0
             });
         }
 
@@ -5228,6 +5234,7 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
         : [];
     _wszystkieZleceniaCache = normalizedOrders;
     wszystkieZlecenia = normalizedOrders;
+    runBillingMonthMigrationOnce(normalizedOrders).catch((err) => console.error('[Migracja billingMonth] Błąd:', err));
     normalizedOrders.forEach((order) => {
         const needsMigration = !order?.createdOn || (order.status === 'ukończone' && !order?.completedOn);
         if (!needsMigration || !order?.id) return;
@@ -5245,6 +5252,33 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
         updateUnfinishedSummary();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
     }
+};
+
+const runBillingMonthMigrationOnce = async (orders = []) => {
+    try {
+        if (localStorage.getItem(BILLING_MONTH_MIGRATION_KEY) === 'done') return;
+    } catch (_) { }
+
+    const updates = [];
+    (orders || []).forEach((order) => {
+        if (!order?.id) return;
+        const completionDate = normalizeDateOnly(order?.completionDate || order?.serviceDate || order?.dataUkonczenia || order?.completedAt || order?.completedOn);
+        const explicitBillingMonth = normalizeMonthKey(order?.billingMonth);
+        const isClosed = order?.status === 'ukończone' || Boolean(completionDate);
+        if (!isClosed || explicitBillingMonth || !completionDate) return;
+        updates.push(
+            updateDoc(doc(db, 'zlecenia', order.id), { billingMonth: completionDate.slice(0, 7) })
+                .catch((error) => console.warn('[Migracja billingMonth] Nie udało się zaktualizować', order.id, error))
+        );
+    });
+
+    if (updates.length) {
+        await Promise.all(updates);
+    }
+
+    try {
+        localStorage.setItem(BILLING_MONTH_MIGRATION_KEY, 'done');
+    } catch (_) { }
 };
 
 const applyActivityData = (entries = [], { render = true, status = 'ready' } = {}) => {
@@ -5501,8 +5535,16 @@ async function obslugaListyZlecen(event) {
                 const resolvedServiceDate = resolveServiceDate(zlecenie) || formatDateForStorage(new Date());
                 completeServiceDateInput.value = resolvedServiceDate;
                 if (billingMonthInput) {
-                    billingMonthInput.value = resolveOrderExplicitBillingMonth(zlecenie) || '';
+                    const explicitBillingMonth = resolveOrderExplicitBillingMonth(zlecenie) || '';
+                    const defaultBillingMonth = deriveBillingMonthFromCompletionDate(resolvedServiceDate);
+                    billingMonthInput.value = explicitBillingMonth || defaultBillingMonth || '';
                 }
+                completeServiceDateInput.onchange = () => {
+                    if (!billingMonthInput) return;
+                    if ((billingMonthInput.value || '').trim()) return;
+                    const nextDefault = deriveBillingMonthFromCompletionDate(completeServiceDateInput.value);
+                    if (nextDefault) billingMonthInput.value = nextDefault;
+                };
             }
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
@@ -5609,9 +5651,13 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
     const editEndInput = editZlecenieForm['edit-completion-date'];
-    if (editEndInput) editEndInput.value = normalizeDateOnly(zlecenie.completionDate || zlecenie.serviceDate || zlecenie.completedAt);
+    const resolvedCompletionDate = normalizeDateOnly(zlecenie.completionDate || zlecenie.serviceDate || zlecenie.completedAt);
+    if (editEndInput) editEndInput.value = resolvedCompletionDate;
     const editBillingMonthInput = editZlecenieForm['edit-billing-month'];
-    if (editBillingMonthInput) editBillingMonthInput.value = resolveOrderExplicitBillingMonth(zlecenie) || '';
+    if (editBillingMonthInput) {
+        const explicitBillingMonth = resolveOrderExplicitBillingMonth(zlecenie) || '';
+        editBillingMonthInput.value = explicitBillingMonth || deriveBillingMonthFromCompletionDate(resolvedCompletionDate) || '';
+    }
 
     openModal(editZlecenieModal);
 }
@@ -5628,7 +5674,8 @@ async function zapiszEdycjeZlecenia(event) {
     const nowyKlientId = editZlecenieClientSelect?.value || '';
     const nowaMaszynaId = editZlecenieMachineSelect?.value || '';
     const noweCompletionDate = normalizeDateOnly(editZlecenieForm['edit-completion-date']?.value || '');
-    const nowyBillingMonth = (editZlecenieForm['edit-billing-month']?.value || '').trim() || null;
+    const nowyBillingMonthRaw = (editZlecenieForm['edit-billing-month']?.value || '').trim();
+    const nowyBillingMonth = nowyBillingMonthRaw || (noweCompletionDate ? deriveBillingMonthFromCompletionDate(noweCompletionDate) : null) || null;
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
@@ -5755,6 +5802,7 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
          const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         infoDiv.innerHTML += `
             <div class="details-group"><strong>Data wykonania:</strong> <p>${serviceDate || '—'}</p></div>
+            <div class="details-group"><strong>Miesiąc rozliczenia:</strong> <p>${resolveOrderExplicitBillingMonth(zlecenie) || deriveBillingMonthFromCompletionDate(serviceDate) || '—'}</p></div>
             <div class="details-group"><strong>Fakturowane Godziny:</strong> <p>${zlecenie.wyfakturowaneGodziny || 0} h</p></div>
             <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
             <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
@@ -5959,7 +6007,8 @@ async function obslugaListyCzesci(event) {
                 alert('Wybierz poprawną datę wykonania.');
                 return;
             }
-            const billingMonth = (billingMonthInput?.value || '').trim() || null;
+            const billingMonthRaw = (billingMonthInput?.value || '').trim();
+            const billingMonth = billingMonthRaw || deriveBillingMonthFromCompletionDate(completionDate) || null;
             const todayKey = formatDateForStorage(new Date());
             if (completionDate > todayKey) { alert('Data wykonania nie może być z przyszłości.'); return; }
             const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);

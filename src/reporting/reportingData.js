@@ -102,7 +102,7 @@ const readOrderEntries = (dayDoc = {}, orderIndex, resolver) => {
     entries = [{
       zlecenieId: dayDoc.zlecenieId,
       klientNazwa: dayDoc.klientNazwa,
-      fakturowane: parsePlNumber(dayDoc?.fakturowane ?? dayDoc?.billed ?? 0)
+      fakturowane: parsePlNumber(dayDoc?.invoicedForOrderHours ?? dayDoc?.fakturowaneDlaZlecenia ?? dayDoc?.fakturowane ?? dayDoc?.billed ?? 0)
     }];
   }
 
@@ -115,7 +115,7 @@ const readOrderEntries = (dayDoc = {}, orderIndex, resolver) => {
       clientName,
       work: parsePlNumber(entry?.work ?? entry?.praca ?? 0),
       drive: parsePlNumber(entry?.drive ?? entry?.jazda ?? 0),
-      billed: parsePlNumber(entry?.fakturowane ?? entry?.billed ?? 0),
+      billed: parsePlNumber(entry?.invoicedForOrderHours ?? entry?.fakturowaneDlaZlecenia ?? entry?.fakturowane ?? entry?.billed ?? 0),
       over: parsePlNumber(entry?.over ?? entry?.nadgodziny ?? 0),
       billingMonth: resolveOrderExplicitBillingMonth(orderDoc)
     };

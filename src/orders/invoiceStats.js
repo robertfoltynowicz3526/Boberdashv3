@@ -14,6 +14,16 @@ const parseHours = (value) => {
   return Number.isFinite(num) ? num : 0;
 };
 
+const readEntryInvoicedForOrderHours = (entry = {}) => {
+  return parseHours(
+    entry?.invoicedForOrderHours
+    ?? entry?.fakturowaneDlaZlecenia
+    ?? entry?.fakturowane
+    ?? entry?.billed
+    ?? 0
+  );
+};
+
 export const resolveOrderCreatedOn = (order = {}) => {
   return normalizeDateOnly(order?.createdOn || order?.createdDate || order?.createdAt);
 };
@@ -81,6 +91,7 @@ const resolveEntryYear = (dayDoc = {}) => {
 
 export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], options = {}) => {
   const assignmentMode = options?.assignmentMode === 'explicit-only' ? 'explicit-only' : 'fallback';
+  const selectedYear = Number.isFinite(Number(options?.selectedYear)) ? Number(options.selectedYear) : null;
   const monthStats = new Map();
   const orderMonthMap = new Map();
   let unassignedHours = 0;
@@ -97,11 +108,12 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
 
   (calendarEntries || []).forEach((dayDoc) => {
     const entryYear = resolveEntryYear(dayDoc);
+    if (Number.isFinite(selectedYear) && entryYear !== selectedYear) return;
     const entries = extractOrderEntries(dayDoc);
     entries.forEach((entry) => {
       const orderId = entry?.zlecenieId ?? entry?.orderId;
       if (!orderId) return;
-      const billed = parseHours(entry?.fakturowane ?? entry?.billed ?? 0);
+      const billed = readEntryInvoicedForOrderHours(entry);
       if (!billed) return;
       const monthKey = orderMonthMap.get(orderId);
       if (!monthKey) {
@@ -110,6 +122,10 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
           unassignedByYear.set(entryYear, (unassignedByYear.get(entryYear) || 0) + billed);
         }
         return;
+      }
+      if (assignmentMode === 'explicit-only' && Number.isFinite(selectedYear)) {
+        const billingYear = Number(monthKey.slice(0, 4));
+        if (billingYear !== selectedYear) return;
       }
       const current = monthStats.get(monthKey) || { invoicedHours: 0, ordersCount: 0 };
       current.invoicedHours += billed;
