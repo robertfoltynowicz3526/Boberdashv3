@@ -52,7 +52,16 @@ const normalizeOrderStatus = (status) => {
   return normalized;
 };
 
-const resolveEntryMonthKey = (dayDoc = {}) => normalizeMonthKey(dayDoc?.date || dayDoc?.id || '');
+const resolveDayDateKey = (dayDoc = {}) => {
+  const raw = String(dayDoc?.dateKey || dayDoc?.dayStr || dayDoc?.date || dayDoc?.id || '').trim();
+  const dateKey = raw.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : '';
+};
+
+const resolveEntryMonthKey = (dayDoc = {}) => {
+  const dateKey = resolveDayDateKey(dayDoc);
+  return dateKey ? dateKey.slice(0, 7) : '';
+};
 
 export const resolveOrderExplicitBillingMonth = (order = {}) => normalizeMonthKey(order?.billingMonth);
 
@@ -99,79 +108,58 @@ const resolveEntryYear = (dayDoc = {}) => {
 export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], options = {}) => {
   const selectedYear = Number.isFinite(Number(options?.selectedYear)) ? Number(options.selectedYear) : null;
   const debugMonthKey = normalizeMonthKey(options?.debugMonthKey || options?.debugMonth || '');
+  const debugSummaryEnabled = Boolean(options?.debugSummaryEnabled);
   const monthStats = new Map();
-  const orderMetaMap = new Map();
-  const entriesByOrderId = new Map();
-  const debug = { month: debugMonthKey || null, closed: [], active: [], duplicateEntryIds: [] };
+  const debug = {
+    month: debugMonthKey || null,
+    closed: [],
+    active: [],
+    duplicateEntryIds: [],
+    feb2026Entries: []
+  };
   const seenEntryIds = new Set();
-
-  (orders || []).forEach((order) => {
-    const orderId = order?.id;
-    if (!orderId) return;
-    orderMetaMap.set(orderId, {
-      status: normalizeOrderStatus(order?.status),
-      completionMonth: normalizeMonthKey(resolveOrderCompletedOn(order)),
-      fallbackMonth: resolveOrderBillingMonth(order)
-    });
-  });
 
   (calendarEntries || []).forEach((dayDoc) => {
     const entryYear = resolveEntryYear(dayDoc);
     if (Number.isFinite(selectedYear) && entryYear !== selectedYear) return;
+    const dayDateKey = resolveDayDateKey(dayDoc);
+    const entryMonth = dayDateKey ? dayDateKey.slice(0, 7) : resolveEntryMonthKey(dayDoc);
     const entries = extractOrderEntries(dayDoc);
-    const entryMonth = resolveEntryMonthKey(dayDoc);
     entries.forEach((entry, index) => {
       const orderId = entry?.zlecenieId ?? entry?.orderId;
       if (!orderId) return;
       const billed = readEntryInvoicedForOrderHours(entry);
       if (!billed) return;
       const sourceEntryId = String(
-        entry?.id
+        entry?.entryId
+        || entry?.id
         || `${dayDoc?.id || dayDoc?.date || 'unknown-day'}:${index}:${orderId}`
       );
       if (seenEntryIds.has(sourceEntryId)) {
         debug.duplicateEntryIds.push(sourceEntryId);
+        return;
       }
       seenEntryIds.add(sourceEntryId);
-      if (!entriesByOrderId.has(orderId)) entriesByOrderId.set(orderId, []);
-      entriesByOrderId.get(orderId).push({ billed, entryMonth, sourceEntryId });
-    });
-  });
+      if (!entryMonth) return;
 
-  entriesByOrderId.forEach((orderEntries, orderId) => {
-    const orderMeta = orderMetaMap.get(orderId) || null;
-    const status = orderMeta?.status;
-    const totalBilled = orderEntries.reduce((sum, entry) => sum + entry.billed, 0);
-    if (!totalBilled) return;
-
-    if (status === 'closed') {
-      const bucketMonth = orderMeta?.completionMonth || orderEntries[0]?.entryMonth || orderMeta?.fallbackMonth || '';
-      if (!bucketMonth) return;
-      const current = monthStats.get(bucketMonth) || { invoicedHours: 0, ordersCount: 0 };
-      current.invoicedHours += totalBilled;
+      const current = monthStats.get(entryMonth) || { invoicedHours: 0, ordersCount: 0 };
+      current.invoicedHours += billed;
       current.ordersCount += 1;
-      monthStats.set(bucketMonth, current);
+      monthStats.set(entryMonth, current);
 
-      if (debugMonthKey && bucketMonth === debugMonthKey) {
-        debug.closed.push({ orderId, totalBilled, completionMonth: bucketMonth });
+      if (debugMonthKey && entryMonth === debugMonthKey) {
+        debug.active.push({ orderId, monthTotal: billed, entryId: sourceEntryId });
       }
-      return;
-    }
 
-    const activeTotalsByMonth = new Map();
-    orderEntries.forEach((entry) => {
-      const bucketMonth = entry.entryMonth || orderMeta?.fallbackMonth || '';
-      if (!bucketMonth) return;
-      const current = monthStats.get(bucketMonth) || { invoicedHours: 0, ordersCount: 0 };
-      current.invoicedHours += entry.billed;
-      current.ordersCount += 1;
-      monthStats.set(bucketMonth, current);
-      activeTotalsByMonth.set(bucketMonth, (activeTotalsByMonth.get(bucketMonth) || 0) + entry.billed);
+      if (debugSummaryEnabled && selectedYear === 2026 && entryMonth === '2026-02') {
+        debug.feb2026Entries.push({
+          entryId: sourceEntryId,
+          dateKey: dayDateKey,
+          orderId,
+          fakturowane: billed
+        });
+      }
     });
-
-    if (debugMonthKey && activeTotalsByMonth.has(debugMonthKey)) {
-      debug.active.push({ orderId, monthTotal: activeTotalsByMonth.get(debugMonthKey) || 0 });
-    }
   });
 
   if (debugMonthKey) {
@@ -180,10 +168,22 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
   }
 
   if (debug.duplicateEntryIds.length) {
-    console.error('[InvoiceStats] Duplicate entry ids detected during monthly aggregation', {
+    console.warn('[InvoiceStats] Duplicate entry ids detected during monthly aggregation', {
       duplicateCount: debug.duplicateEntryIds.length,
       duplicateEntryIds: debug.duplicateEntryIds
     });
+  }
+
+  if (debugSummaryEnabled && selectedYear === 2026) {
+    const perOrder = debug.feb2026Entries.reduce((acc, item) => {
+      const orderId = String(item.orderId || 'BRAK_ZLECENIA');
+      acc[orderId] = (acc[orderId] || 0) + (Number(item.fakturowane) || 0);
+      return acc;
+    }, {});
+    const totalFeb = debug.feb2026Entries.reduce((sum, item) => sum + (Number(item.fakturowane) || 0), 0);
+    console.info('[DEBUG_SUMMARY][2026-02] entries', debug.feb2026Entries);
+    console.info('[DEBUG_SUMMARY][2026-02] totals', { totalFakturowane: totalFeb, perOrderId: perOrder });
+    console.info('[DEBUG_SUMMARY][2026-02] duplicateEntryIds', debug.duplicateEntryIds);
   }
 
   return { monthStats, debug };
