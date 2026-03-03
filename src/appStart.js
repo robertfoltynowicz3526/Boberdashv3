@@ -96,7 +96,6 @@ function initializeApp() {
     const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
-    const SUMMARY_BILLING_MODE_STORAGE_KEY = 'summaryBillingMode';
     const BILLING_MONTH_MIGRATION_KEY = 'migrationBillingMonthFromCompletionDate.v1';
     const CALENDAR_VIEW_STORAGE_KEY = 'lastView';
     const CALENDAR_VIEW_STORAGE_LEGACY_KEY = 'lastCalendarView';
@@ -190,19 +189,6 @@ function initializeApp() {
         } catch (_) { }
     };
 
-    const readSummaryBillingModeFromStorage = () => {
-        try {
-            const stored = localStorage.getItem(SUMMARY_BILLING_MODE_STORAGE_KEY);
-            return stored === 'calendar' ? 'calendar' : 'settlement';
-        } catch (_) {
-            return 'settlement';
-        }
-    };
-    const persistSummaryBillingMode = (mode) => {
-        try {
-            localStorage.setItem(SUMMARY_BILLING_MODE_STORAGE_KEY, mode === 'calendar' ? 'calendar' : 'settlement');
-        } catch (_) { }
-    };
     const calendarViewKeyToFc = (viewKey) => {
         switch (viewKey) {
             case 'day':
@@ -445,7 +431,7 @@ function initializeApp() {
     let selectedYearNeedsRefresh = true;
     let selectedYearLoadedFor = null;
     let isExportingYearReport = false;
-    let summaryBillingMode = readSummaryBillingModeFromStorage();
+    let summaryBillingMode = 'calendar';
     let availableSummaryYears = [currentYear];
     let openSummaryYears = new Set();
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
@@ -3284,12 +3270,8 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
-        const invoiceStats = summaryBillingMode === 'calendar'
-            ? buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { assignmentMode: 'fallback' })
-            : buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { assignmentMode: 'explicit-only' });
+        const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || []);
         const invoiceByMonth = invoiceStats.monthStats;
-        const unassignedHours = Number(invoiceStats.unassignedHours) || 0;
-        const unassignedByYear = invoiceStats.unassignedByYear || new Map();
         invoiceByMonth.forEach((_, monthKey) => {
             const [yearStr, monthStr] = monthKey.split('-');
             const year = Number(yearStr);
@@ -3307,7 +3289,7 @@ function initializeApp() {
         lata.forEach(year => {
             const months = grouped[year];
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-            const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0, unassignedBilled: 0 };
+            const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
             let absorpcjaSuma = 0;
             const yearMonths = [];
 
@@ -3346,10 +3328,14 @@ function initializeApp() {
                 yearSum.urlopDays += stats.urlopDays;
             });
 
-            const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
-            if (summaryBillingMode === 'settlement') {
-                yearSum.unassignedBilled = Number(unassignedByYear.get(year)) || 0;
+            if (import.meta.env.DEV) {
+                monthNumbers.forEach(month => {
+                    const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
+                    const dbg = invoiceByMonth.get(miesiacKey) || { invoicedHours: 0, ordersCount: 0 };
+                    console.debug('[Podsumowanie Roczne][Wyfakturowane]', miesiacKey, { wyfakturowane: Number(dbg.invoicedHours || 0), zleceniaLubPozycje: Number(dbg.ordersCount || 0) });
+                });
             }
+            const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
             sumyRocznePerRok.push({
                 rok: year,
                 praca: yearSum.work,
@@ -3361,7 +3347,6 @@ function initializeApp() {
                 drive: yearSum.drive,
                 billed: yearSum.billed,
                 urlopDays: yearSum.urlopDays,
-                unassignedBilled: yearSum.unassignedBilled,
                 miesiace: monthNumbers.length,
                 absorpcja: avgAbsorpcja
             });
@@ -3378,7 +3363,6 @@ function initializeApp() {
             work: globalTotals.work,
             drive: globalTotals.drive,
             billed: globalTotals.billed,
-            unassignedBilled: summaryBillingMode === 'settlement' ? unassignedHours : 0,
             l4Days: globalTotals.l4Days,
             urlopDays: globalTotals.urlopDays,
             praca: globalTotals.work,
@@ -3388,7 +3372,7 @@ function initializeApp() {
             absorpcja: obliczAbsorpcja(globalTotals.billed)
         };
 
-        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed, unassignedBilled: summaryBillingMode === 'settlement' ? unassignedHours : 0 };
+        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
     }
 
     const monthYearFormatter = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' });
@@ -3487,7 +3471,6 @@ function initializeApp() {
 
     const formatHours = (value) => `${(Number(value) || 0).toFixed(2)} h`;
 
-    const getBillingModeLabel = () => summaryBillingMode === 'calendar' ? 'Kalendarz' : 'Rozliczenie (premia)';
 
     const buildExportMenuMarkup = (year) => `
         <div class="export-menu">
@@ -3504,7 +3487,7 @@ function initializeApp() {
 
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
-        if (summaryBillingModeSelect) summaryBillingModeSelect.value = summaryBillingMode;
+        if (summaryBillingModeSelect) summaryBillingModeSelect.value = 'calendar';
         const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
         if (!years.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
@@ -3522,8 +3505,7 @@ function initializeApp() {
           <span class="year-quick-sums">
             <span>Praca: ${formatHours(y.sum.work)}</span>
             <span>Jazda: ${formatHours(y.sum.drive)}</span>
-            <span>Wyfakturowane (${getBillingModeLabel()}): ${formatHours(y.sum.billed)}</span>
-            ${summaryBillingMode === 'settlement' ? `<span>Nieprzypisane do rozliczenia: ${formatHours(y.sum.unassignedBilled)}</span>` : ''}
+            <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
             <span>Absorpcja: ${Math.round(y.sum.absorpcja ?? (y.sum.billed/(168*12)*100))}%</span>
             <span>L4: ${y.sum.l4Days} dni</span>
             <span>Urlop: ${y.sum.urlopDays} dni</span>
@@ -3536,7 +3518,7 @@ function initializeApp() {
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane <span title="${summaryBillingMode === 'calendar' ? 'Wyfakturowane liczone wg miesiąca daty wpisu w kalendarzu' : 'Wyfakturowane liczone wg miesiąca rozliczenia zlecenia (premia)'}">ⓘ</span></th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane <span title="Wyfakturowane liczone wg statusu zlecenia: aktywne wg daty wpisu, zakończone wg daty zakończenia">ⓘ</span></th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -3562,7 +3544,6 @@ function initializeApp() {
           </tr>
         </tfoot>
       </table>
-      ${summaryBillingMode === 'settlement' ? `<div class="summary-unassigned"><strong>Nieprzypisane do rozliczenia:</strong> ${y.sum.unassignedBilled.toFixed(2)} h</div>` : ''}
     </div>
   </div>
 `).join('');
@@ -3965,7 +3946,7 @@ function initializeApp() {
                 orderIndex: buildOrderIndex(),
                 resolveClientName: resolveOrderClientName
             });
-            const report = computeYearReport({ ...reportData, billingMode: summaryBillingMode === 'calendar' ? 'calendar' : 'settlement' });
+            const report = computeYearReport({ ...reportData });
             if (type === 'summary-csv') exportYearlySummaryCsv(report);
             if (type === 'orders-csv') exportYearlyOrdersCsv(report);
             if (type === 'pdf') exportYearlyPdf(report);
@@ -7067,12 +7048,10 @@ async function obslugaListyCzesci(event) {
     }
 
     if (summaryBillingModeSelect) {
-        summaryBillingModeSelect.value = summaryBillingMode;
-        summaryBillingModeSelect.addEventListener('change', async () => {
-            summaryBillingMode = summaryBillingModeSelect.value === 'calendar' ? 'calendar' : 'settlement';
-            persistSummaryBillingMode(summaryBillingMode);
-            await odswiezPodsumowania();
-        });
+        summaryBillingMode = 'calendar';
+        summaryBillingModeSelect.value = 'calendar';
+        summaryBillingModeSelect.disabled = true;
+        summaryBillingModeSelect.title = 'Tryb rozliczania został ujednolicony.';
     }
 
     if (vacationAllowanceSaveBtn) {

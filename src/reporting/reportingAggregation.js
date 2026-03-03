@@ -59,12 +59,11 @@ const sumTotals = (target, source) => {
   return target;
 };
 
-export const computeYearReport = ({ year, days = [], billingMode = "settlement" }) => {
+export const computeYearReport = ({ year, days = [] }) => {
   const monthMap = new Map();
   const orders = [];
   const clientTotalsMap = new Map();
   const billedByBillingMonth = new Map();
-  let unassignedBilled = 0;
 
   days.forEach((day) => {
     const dayKey = day?.dayStr;
@@ -93,10 +92,8 @@ export const computeYearReport = ({ year, days = [], billingMode = "settlement" 
       day.orders.forEach((order) => {
         const orderId = order?.orderId || '';
         const billedHours = Number(order?.billed) || 0;
-        if (billingMode === 'settlement') {
-          if (!orderId) return;
-          if (billedHours <= 0) return;
-        }
+        if (!orderId) return;
+        if (billedHours <= 0) return;
         const record = {
           date: dayKey,
           clientName: order?.clientName || orderId || 'Zlecenie',
@@ -107,17 +104,8 @@ export const computeYearReport = ({ year, days = [], billingMode = "settlement" 
           overHours: Number(order?.over) || 0,
           note: day?.note || ''
         };
-        const explicitBillingMonth = order?.billingMonth || "";
-        const billingMonth = billingMode === "calendar" ? monthKey : explicitBillingMonth;
-        if (billingMode === "settlement") {
-          if (!billingMonth) {
-            unassignedBilled += record.billedHours;
-          } else if (Number(billingMonth.slice(0, 4)) === Number(year)) {
-            billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
-          }
-        } else {
-          billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
-        }
+        const billingMonth = monthKey;
+        billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
         orders.push(record);
 
         const existing = clientTotalsMap.get(record.clientName) || { work: 0, drive: 0, billed: 0, over: 0 };
@@ -166,7 +154,5 @@ export const computeYearReport = ({ year, days = [], billingMode = "settlement" 
     yearlyTotals,
     orders,
     clientTotals,
-    unassignedBilled,
-    billingMode
   };
 };
