@@ -21,7 +21,7 @@ test('closed order uses completionDate month, active order uses entry.date month
   assert.equal(closedStats.monthStats.get('2026-03')?.invoicedHours, 93);
   assert.equal(closedStats.monthStats.get('2026-02')?.invoicedHours || 0, 0);
 
-  const reopened = [{ id: orderId, status: 'aktywne', completionDate: null, billingMonth: null }];
+  const reopened = [{ id: orderId, status: 'aktywne', completionDate: null }];
   const reopenedStats = buildInvoiceStatsByMonth(reopened, entries);
   assert.equal(reopenedStats.monthStats.get('2026-02')?.invoicedHours, 93);
   assert.equal(reopenedStats.monthStats.get('2026-03')?.invoicedHours || 0, 0);
@@ -38,4 +38,15 @@ test('reopen aggregation does not duplicate hours', () => {
   const stats = buildInvoiceStatsByMonth(reopened, entries);
   assert.equal(stats.monthStats.get('2026-02')?.invoicedHours, 93);
   assert.equal(stats.monthStats.size, 1);
+});
+
+
+test('closed order without completionDate falls back to entry month', () => {
+  const orderId = 'order-3';
+  const entries = [makeEntry('2026-02-11', orderId, 12)];
+  const closedNoCompletionDate = [{ id: orderId, status: 'ukończone' }];
+
+  const stats = buildInvoiceStatsByMonth(closedNoCompletionDate, entries);
+  assert.equal(stats.monthStats.get('2026-02')?.invoicedHours, 12);
+  assert.equal(stats.monthStats.get('2026-03')?.invoicedHours || 0, 0);
 });

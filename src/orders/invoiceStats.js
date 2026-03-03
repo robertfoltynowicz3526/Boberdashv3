@@ -39,8 +39,6 @@ export const resolveOrderCompletedOn = (order = {}) => {
 };
 
 export const resolveOrderBillingMonth = (order = {}) => {
-  const explicit = normalizeMonthKey(order?.billingMonth);
-  if (explicit) return explicit;
   const completedOn = resolveOrderCompletedOn(order);
   if (completedOn) return completedOn.slice(0, 7);
   const createdOn = resolveOrderCreatedOn(order);
@@ -99,12 +97,9 @@ const resolveEntryYear = (dayDoc = {}) => {
 };
 
 export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], options = {}) => {
-  const assignmentMode = options?.assignmentMode === 'explicit-only' ? 'explicit-only' : 'fallback';
   const selectedYear = Number.isFinite(Number(options?.selectedYear)) ? Number(options.selectedYear) : null;
   const monthStats = new Map();
   const orderMetaMap = new Map();
-  let unassignedHours = 0;
-  const unassignedByYear = new Map();
 
   (orders || []).forEach((order) => {
     const orderId = order?.id;
@@ -112,9 +107,7 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
     orderMetaMap.set(orderId, {
       status: normalizeOrderStatus(order?.status),
       completionMonth: normalizeMonthKey(resolveOrderCompletedOn(order)),
-      fallbackMonth: assignmentMode === 'explicit-only'
-        ? resolveOrderExplicitBillingMonth(order)
-        : resolveOrderBillingMonth(order)
+      fallbackMonth: resolveOrderBillingMonth(order)
     });
   });
 
@@ -130,19 +123,9 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
       if (!billed) return;
       const orderMeta = orderMetaMap.get(orderId) || null;
       const monthKey = orderMeta?.status === 'closed'
-        ? (orderMeta?.completionMonth || orderMeta?.fallbackMonth || '')
+        ? (orderMeta?.completionMonth || entryMonth || orderMeta?.fallbackMonth || '')
         : (entryMonth || orderMeta?.fallbackMonth || '');
-      if (!monthKey) {
-        unassignedHours += billed;
-        if (Number.isFinite(entryYear)) {
-          unassignedByYear.set(entryYear, (unassignedByYear.get(entryYear) || 0) + billed);
-        }
-        return;
-      }
-      if (assignmentMode === 'explicit-only' && Number.isFinite(selectedYear)) {
-        const billingYear = Number(monthKey.slice(0, 4));
-        if (billingYear !== selectedYear) return;
-      }
+      if (!monthKey) return;
       const current = monthStats.get(monthKey) || { invoicedHours: 0, ordersCount: 0 };
       current.invoicedHours += billed;
       current.ordersCount += 1;
@@ -150,5 +133,5 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
     });
   });
 
-  return { monthStats, unassignedHours, unassignedByYear };
+  return { monthStats, unassignedHours: 0, unassignedByYear: new Map() };
 };
