@@ -91,20 +91,30 @@ export const computeYearReport = ({ year, days = [], billingMode = "settlement" 
 
     if (!flags.isLeave && Array.isArray(day?.orders)) {
       day.orders.forEach((order) => {
+        const orderId = order?.orderId || '';
+        const billedHours = Number(order?.billed) || 0;
+        if (billingMode === 'settlement') {
+          if (!orderId) return;
+          if (billedHours <= 0) return;
+        }
         const record = {
           date: dayKey,
-          clientName: order?.clientName || order?.orderId || 'Zlecenie',
-          orderId: order?.orderId || '',
+          clientName: order?.clientName || orderId || 'Zlecenie',
+          orderId,
           workHours: Number(order?.work) || 0,
           driveHours: Number(order?.drive) || 0,
-          billedHours: Number(order?.billed) || 0,
+          billedHours,
           overHours: Number(order?.over) || 0,
           note: day?.note || ''
         };
         const explicitBillingMonth = order?.billingMonth || "";
         const billingMonth = billingMode === "calendar" ? monthKey : explicitBillingMonth;
-        if (billingMode === "settlement" && !billingMonth) {
-          unassignedBilled += record.billedHours;
+        if (billingMode === "settlement") {
+          if (!billingMonth) {
+            unassignedBilled += record.billedHours;
+          } else if (Number(billingMonth.slice(0, 4)) === Number(year)) {
+            billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
+          }
         } else {
           billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
         }
