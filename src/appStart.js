@@ -2332,6 +2332,7 @@ function initializeApp() {
                 return;
             }
             multiZlecenia[multiEdytowanyIndex] = {
+                entryId: multiZlecenia[multiEdytowanyIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
                 fakturowane: Number(godziny) || 0
@@ -2343,6 +2344,7 @@ function initializeApp() {
                 return;
             }
             multiZlecenia.push({
+                entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
                 fakturowane: Number(godziny) || 0
@@ -2391,7 +2393,8 @@ function initializeApp() {
         if (!kalendarzForm || !kalendarzModal) return;
         event.preventDefault();
         const data = kalendarzForm['kalendarz-data'].value;
-        const powiazane = multiZlecenia.map(p => ({
+        const powiazane = multiZlecenia.map((p, index) => ({
+            entryId: String(p.entryId || `${data}:${p.zlecenieId}:${index}`),
             zlecenieId: p.zlecenieId,
             klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
             fakturowane: Number(p.fakturowane) || 0
@@ -3140,7 +3143,8 @@ function initializeApp() {
         const lista = Array.isArray(dane?.zleceniaPowiazane) ? dane.zleceniaPowiazane : [];
         const powiazane = lista
             .filter(p => p && p.zlecenieId)
-            .map(p => ({
+            .map((p, index) => ({
+                entryId: String(p.entryId || p.id || `${dane?.date || dane?.id || 'unknown-day'}:${p.zlecenieId}:${index}`),
                 zlecenieId: p.zlecenieId,
                 klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
                 fakturowane: Number(p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia ?? p.fakturowane) || 0
@@ -3148,6 +3152,7 @@ function initializeApp() {
 
         if (!powiazane.length && dane?.zlecenieId) {
             powiazane.push({
+                entryId: String(dane?.entryId || dane?.id || `${dane?.date || dane?.zlecenieId || 'unknown-day'}:${dane.zlecenieId}:0`),
                 zlecenieId: dane.zlecenieId,
                 klientNazwa: dane.klientNazwa || pobierzNazwePowiazania(dane.zlecenieId),
                 fakturowane: Number(dane.invoicedForOrderHours ?? dane.fakturowaneDlaZlecenia ?? dane.fakturowane) || 0
@@ -3271,7 +3276,12 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
-        const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { debugMonthKey: SUMMARY_INVOICED_DEBUG_MONTH });
+        const debugSummaryEnabled = Boolean(window?.DEBUG_SUMMARY);
+        const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], {
+            debugMonthKey: SUMMARY_INVOICED_DEBUG_MONTH,
+            selectedYear,
+            debugSummaryEnabled
+        });
         const invoiceByMonth = invoiceStats.monthStats;
         invoiceByMonth.forEach((_, monthKey) => {
             const [yearStr, monthStr] = monthKey.split('-');
