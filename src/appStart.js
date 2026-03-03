@@ -460,6 +460,7 @@ function initializeApp() {
     let notesActivityCollapsed = true;
     let hasEnsuredDefaultStock = false;
     const monthStatsCache = createMonthStatsCache();
+    const invalidateMonthStatsCache = () => monthStatsCache.clear();
     let calendar;
     window.calendar = null;
     window.__calendarApi = null;
@@ -2540,6 +2541,7 @@ function initializeApp() {
         });
 
         if (render) {
+            invalidateMonthStatsCache();
             rebuildCalendarDecorations();
             updateUnfinishedSummary();
             selectedYearNeedsRefresh = true;
@@ -5246,6 +5248,7 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
             .catch((error) => console.warn('[Migracja dat zlecenia] Nie udało się zaktualizować', order.id, error));
     });
     if (render) {
+        invalidateMonthStatsCache();
         wyswietlZlecenia();
         odswiezPodsumowania();
         rebuildCalendarDecorations();
@@ -5571,20 +5574,31 @@ async function obslugaListyZlecen(event) {
             }];
             await updateDoc(zlecenieRef, {
                 status: 'aktywne',
+                completionDate: null,
                 dataUkonczenia: null,
                 serviceDate: null,
+                performedAt: null,
                 endAt: null,
+                endDate: null,
                 completedAt: null,
+                completionTimestamp: null,
                 closeDate: null,
                 closedAt: null,
                 completedOn: null,
+                isClosed: null,
+                closedMonth: null,
                 billingMonth: null,
+                completed: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
-                zakonczenieNumerWZ: null,               
+                zakonczenieNumerWZ: null,
                 historia: nowaHistoria
             });
+            invalidateMonthStatsCache();
+            odswiezPodsumowania({ skipRender: false });
+            wyswietlZlecenia();
+            renderPulpit();
         } catch (e) {
             console.error("Błąd przy ponownym otwieraniu:", e);
             alert("Nie udało się ponownie otworzyć zlecenia.");

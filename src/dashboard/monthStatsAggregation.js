@@ -41,5 +41,11 @@ export const createMonthStatsCache = (storageKey = 'dashboardMonthStatsCache') =
     } catch (_) {}
     return record;
   };
-  return { read, write };
+  const clear = () => {
+    memory.clear();
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (_) {}
+  };
+  return { read, write, clear };
 };
