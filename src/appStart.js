@@ -103,6 +103,7 @@ function initializeApp() {
     const CALENDAR_RETURN_VIEW_KEY = 'calendarReturnView';
     const CALENDAR_RETURN_DATE_KEY = 'calendarReturnDate';
     const CALENDAR_DAYGRID_VIEWS = new Set(['dayGridDay', 'dayGridWeek', 'dayGridMonth']);
+    const SUMMARY_INVOICED_DEBUG_MONTH = import.meta.env.DEV ? '2026-02' : '';
     const SELECTED_YEAR_URL_PARAM = 'summaryYear';
     const getYearFromValue = (value) => {
         if (!value) return null;
@@ -2943,7 +2944,7 @@ function initializeApp() {
         const startedAt = performance.now();
         setTimeout(() => {
             const podsumowanie = aggregateMonthStats(wszystkieWpisyKalendarza, monthKey);
-            const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wszystkieWpisyKalendarza);
+            const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wszystkieWpisyKalendarza, { debugMonthKey: SUMMARY_INVOICED_DEBUG_MONTH });
             podsumowanie.wyfakturowaneGodziny = invoiceStats.monthStats.get(monthKey)?.invoicedHours ?? 0;
             podsumowanie.absorpcja = obliczAbsorpcja(podsumowanie.wyfakturowaneGodziny);
             monthStatsCache.write(monthKey, podsumowanie);
@@ -3270,7 +3271,7 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
-        const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || []);
+        const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { debugMonthKey: SUMMARY_INVOICED_DEBUG_MONTH });
         const invoiceByMonth = invoiceStats.monthStats;
         invoiceByMonth.forEach((_, monthKey) => {
             const [yearStr, monthStr] = monthKey.split('-');
@@ -3334,6 +3335,13 @@ function initializeApp() {
                     const dbg = invoiceByMonth.get(miesiacKey) || { invoicedHours: 0, ordersCount: 0 };
                     console.debug('[Podsumowanie Roczne][Wyfakturowane]', miesiacKey, { wyfakturowane: Number(dbg.invoicedHours || 0), zleceniaLubPozycje: Number(dbg.ordersCount || 0) });
                 });
+                if (invoiceStats.debug?.month === SUMMARY_INVOICED_DEBUG_MONTH) {
+                    console.debug('[Podsumowanie Roczne][Wyfakturowane][DebugMonth]', SUMMARY_INVOICED_DEBUG_MONTH, {
+                        closed: invoiceStats.debug.closed,
+                        active: invoiceStats.debug.active,
+                        duplicates: invoiceStats.debug.duplicateEntryIds
+                    });
+                }
             }
             const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
             sumyRocznePerRok.push({
