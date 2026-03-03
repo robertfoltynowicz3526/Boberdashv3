@@ -37,15 +37,19 @@ export const resolveOrderBillingMonth = (order = {}) => {
   return createdOn ? createdOn.slice(0, 7) : '';
 };
 
+export const resolveOrderExplicitBillingMonth = (order = {}) => normalizeMonthKey(order?.billingMonth);
+
 export const normalizeOrderForBilling = (order = {}) => {
   const createdOn = resolveOrderCreatedOn(order);
   const completedOn = resolveOrderCompletedOn(order);
-  const billingMonth = resolveOrderBillingMonth({ ...order, createdOn, completedOn });
+  const explicitBillingMonth = resolveOrderExplicitBillingMonth(order);
+  const resolvedBillingMonth = resolveOrderBillingMonth({ ...order, createdOn, completedOn });
   return {
     ...order,
     createdOn: createdOn || order?.createdOn || '',
     completedOn: completedOn || order?.completedOn || null,
-    billingMonth: billingMonth || order?.billingMonth || ''
+    billingMonth: explicitBillingMonth || null,
+    resolvedBillingMonth: resolvedBillingMonth || null
   };
 };
 
@@ -66,37 +70,53 @@ const extractOrderEntries = (dayDoc = {}) => {
   return entries;
 };
 
-export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = []) => {
+const resolveEntryYear = (dayDoc = {}) => {
+  const key = String(dayDoc?.date || dayDoc?.id || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+    const year = Number(key.slice(0, 4));
+    return Number.isFinite(year) ? year : null;
+  }
+  return null;
+};
+
+export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], options = {}) => {
+  const assignmentMode = options?.assignmentMode === 'explicit-only' ? 'explicit-only' : 'fallback';
   const monthStats = new Map();
   const orderMonthMap = new Map();
+  let unassignedHours = 0;
+  const unassignedByYear = new Map();
 
   (orders || []).forEach((order) => {
     const orderId = order?.id;
     if (!orderId) return;
-    const monthKey = resolveOrderBillingMonth(order);
+    const monthKey = assignmentMode === 'explicit-only'
+      ? resolveOrderExplicitBillingMonth(order)
+      : resolveOrderBillingMonth(order);
     if (monthKey) orderMonthMap.set(orderId, monthKey);
   });
 
-  const billedByOrderId = new Map();
   (calendarEntries || []).forEach((dayDoc) => {
+    const entryYear = resolveEntryYear(dayDoc);
     const entries = extractOrderEntries(dayDoc);
     entries.forEach((entry) => {
       const orderId = entry?.zlecenieId ?? entry?.orderId;
       if (!orderId) return;
       const billed = parseHours(entry?.fakturowane ?? entry?.billed ?? 0);
       if (!billed) return;
-      billedByOrderId.set(orderId, (billedByOrderId.get(orderId) || 0) + billed);
+      const monthKey = orderMonthMap.get(orderId);
+      if (!monthKey) {
+        unassignedHours += billed;
+        if (Number.isFinite(entryYear)) {
+          unassignedByYear.set(entryYear, (unassignedByYear.get(entryYear) || 0) + billed);
+        }
+        return;
+      }
+      const current = monthStats.get(monthKey) || { invoicedHours: 0, ordersCount: 0 };
+      current.invoicedHours += billed;
+      current.ordersCount += 1;
+      monthStats.set(monthKey, current);
     });
   });
 
-  billedByOrderId.forEach((invoicedHours, orderId) => {
-    const monthKey = orderMonthMap.get(orderId);
-    if (!monthKey) return;
-    const current = monthStats.get(monthKey) || { invoicedHours: 0, ordersCount: 0 };
-    current.invoicedHours += invoicedHours;
-    current.ordersCount += 1;
-    monthStats.set(monthKey, current);
-  });
-
-  return monthStats;
+  return { monthStats, unassignedHours, unassignedByYear };
 };

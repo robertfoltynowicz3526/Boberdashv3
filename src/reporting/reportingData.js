@@ -1,5 +1,5 @@
 import { collection, query, orderBy, startAt, endBefore, getDocs } from "firebase/firestore";
-import { resolveOrderBillingMonth } from "../orders/invoiceStats.js";
+import { resolveOrderExplicitBillingMonth } from "../orders/invoiceStats.js";
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -117,7 +117,7 @@ const readOrderEntries = (dayDoc = {}, orderIndex, resolver) => {
       drive: parsePlNumber(entry?.drive ?? entry?.jazda ?? 0),
       billed: parsePlNumber(entry?.fakturowane ?? entry?.billed ?? 0),
       over: parsePlNumber(entry?.over ?? entry?.nadgodziny ?? 0),
-      billingMonth: resolveOrderBillingMonth(orderDoc)
+      billingMonth: resolveOrderExplicitBillingMonth(orderDoc)
     };
   });
 

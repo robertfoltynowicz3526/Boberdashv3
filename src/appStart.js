@@ -16,7 +16,7 @@ import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
 import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
-import { buildInvoiceStatsByMonth, normalizeOrderForBilling, resolveOrderBillingMonth } from './orders/invoiceStats.js';
+import { buildInvoiceStatsByMonth, normalizeOrderForBilling, resolveOrderBillingMonth, resolveOrderExplicitBillingMonth } from './orders/invoiceStats.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MIN_DATE = '2026-01-01';
@@ -91,6 +91,7 @@ function initializeApp() {
     const SELECTED_YEAR_STORAGE_KEY = 'summarySelectedYear';
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
+    const SUMMARY_BILLING_MODE_STORAGE_KEY = 'summaryBillingMode';
     const CALENDAR_VIEW_STORAGE_KEY = 'lastView';
     const CALENDAR_VIEW_STORAGE_LEGACY_KEY = 'lastCalendarView';
     const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
@@ -180,6 +181,20 @@ function initializeApp() {
     const persistVacationTab = (tab) => {
         try {
             localStorage.setItem(VACATION_TAB_STORAGE_KEY, tab);
+        } catch (_) { }
+    };
+
+    const readSummaryBillingModeFromStorage = () => {
+        try {
+            const stored = localStorage.getItem(SUMMARY_BILLING_MODE_STORAGE_KEY);
+            return stored === 'calendar' ? 'calendar' : 'settlement';
+        } catch (_) {
+            return 'settlement';
+        }
+    };
+    const persistSummaryBillingMode = (mode) => {
+        try {
+            localStorage.setItem(SUMMARY_BILLING_MODE_STORAGE_KEY, mode === 'calendar' ? 'calendar' : 'settlement');
         } catch (_) { }
     };
     const calendarViewKeyToFc = (viewKey) => {
@@ -424,6 +439,7 @@ function initializeApp() {
     let selectedYearNeedsRefresh = true;
     let selectedYearLoadedFor = null;
     let isExportingYearReport = false;
+    let summaryBillingMode = readSummaryBillingModeFromStorage();
     let availableSummaryYears = [currentYear];
     let openSummaryYears = new Set();
     window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
@@ -883,6 +899,7 @@ function initializeApp() {
     const l4SummaryContainer = document.getElementById('l4-summary');
     const summaryYearSelect = document.getElementById('summary-year-select');
     const annualSummaryExportBtn = document.getElementById('annual-summary-export');
+    const summaryBillingModeSelect = document.getElementById('summary-billing-mode');
     const vacationYearSelect = document.getElementById('vacation-year');
     const vacationAllowanceInput = document.getElementById('vacation-allowance-input');
     const vacationAllowanceSaveBtn = document.getElementById('vacation-allowance-save');
@@ -2932,8 +2949,8 @@ function initializeApp() {
         const startedAt = performance.now();
         setTimeout(() => {
             const podsumowanie = aggregateMonthStats(wszystkieWpisyKalendarza, monthKey);
-            const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wszystkieWpisyKalendarza);
-            podsumowanie.wyfakturowaneGodziny = invoiceByMonth.get(monthKey)?.invoicedHours ?? 0;
+            const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wszystkieWpisyKalendarza);
+            podsumowanie.wyfakturowaneGodziny = invoiceStats.monthStats.get(monthKey)?.invoicedHours ?? 0;
             podsumowanie.absorpcja = obliczAbsorpcja(podsumowanie.wyfakturowaneGodziny);
             monthStatsCache.write(monthKey, podsumowanie);
             renderPulpitStatystykiMiesiaca(podsumowanie);
@@ -3259,7 +3276,12 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
-        const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || []);
+        const invoiceStats = summaryBillingMode === 'calendar'
+            ? buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { assignmentMode: 'fallback' })
+            : buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || [], { assignmentMode: 'explicit-only' });
+        const invoiceByMonth = invoiceStats.monthStats;
+        const unassignedHours = Number(invoiceStats.unassignedHours) || 0;
+        const unassignedByYear = invoiceStats.unassignedByYear || new Map();
         invoiceByMonth.forEach((_, monthKey) => {
             const [yearStr, monthStr] = monthKey.split('-');
             const year = Number(yearStr);
@@ -3277,7 +3299,7 @@ function initializeApp() {
         lata.forEach(year => {
             const months = grouped[year];
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-            const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0 };
+            const yearSum = { work: 0, drive: 0, billed: 0, l4Days: 0, urlopDays: 0, unassignedBilled: 0 };
             let absorpcjaSuma = 0;
             const yearMonths = [];
 
@@ -3317,6 +3339,9 @@ function initializeApp() {
             });
 
             const avgAbsorpcja = monthNumbers.length ? absorpcjaSuma / monthNumbers.length : 0;
+            if (summaryBillingMode === 'settlement') {
+                yearSum.unassignedBilled = Number(unassignedByYear.get(year)) || 0;
+            }
             sumyRocznePerRok.push({
                 rok: year,
                 praca: yearSum.work,
@@ -3328,6 +3353,7 @@ function initializeApp() {
                 drive: yearSum.drive,
                 billed: yearSum.billed,
                 urlopDays: yearSum.urlopDays,
+                unassignedBilled: yearSum.unassignedBilled,
                 miesiace: monthNumbers.length,
                 absorpcja: avgAbsorpcja
             });
@@ -3344,6 +3370,7 @@ function initializeApp() {
             work: globalTotals.work,
             drive: globalTotals.drive,
             billed: globalTotals.billed,
+            unassignedBilled: summaryBillingMode === 'settlement' ? unassignedHours : 0,
             l4Days: globalTotals.l4Days,
             urlopDays: globalTotals.urlopDays,
             praca: globalTotals.work,
@@ -3353,7 +3380,7 @@ function initializeApp() {
             absorpcja: obliczAbsorpcja(globalTotals.billed)
         };
 
-        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
+        return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed, unassignedBilled: summaryBillingMode === 'settlement' ? unassignedHours : 0 };
     }
 
     const monthYearFormatter = new Intl.DateTimeFormat('pl-PL', { month: 'long', year: 'numeric' });
@@ -3452,6 +3479,8 @@ function initializeApp() {
 
     const formatHours = (value) => `${(Number(value) || 0).toFixed(2)} h`;
 
+    const getBillingModeLabel = () => summaryBillingMode === 'calendar' ? 'Kalendarz' : 'Rozliczenie (premia)';
+
     const buildExportMenuMarkup = (year) => `
         <div class="export-menu">
           <button type="button" class="export-trigger" data-export-year="${year}" aria-haspopup="true" aria-expanded="false">
@@ -3467,6 +3496,7 @@ function initializeApp() {
 
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
+        if (summaryBillingModeSelect) summaryBillingModeSelect.value = summaryBillingMode;
         const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
         if (!years.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
@@ -3484,7 +3514,8 @@ function initializeApp() {
           <span class="year-quick-sums">
             <span>Praca: ${formatHours(y.sum.work)}</span>
             <span>Jazda: ${formatHours(y.sum.drive)}</span>
-            <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
+            <span>Wyfakturowane (${getBillingModeLabel()}): ${formatHours(y.sum.billed)}</span>
+            ${summaryBillingMode === 'settlement' ? `<span>Nieprzypisane do rozliczenia: ${formatHours(y.sum.unassignedBilled)}</span>` : ''}
             <span>Absorpcja: ${Math.round(y.sum.absorpcja ?? (y.sum.billed/(168*12)*100))}%</span>
             <span>L4: ${y.sum.l4Days} dni</span>
             <span>Urlop: ${y.sum.urlopDays} dni</span>
@@ -3497,7 +3528,7 @@ function initializeApp() {
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane <span title="Wyfakturowane liczone wg miesiąca rozliczenia zlecenia">ⓘ</span></th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane <span title="${summaryBillingMode === 'calendar' ? 'Wyfakturowane liczone wg miesiąca daty wpisu w kalendarzu' : 'Wyfakturowane liczone wg miesiąca rozliczenia zlecenia (premia)'}">ⓘ</span></th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -3523,6 +3554,7 @@ function initializeApp() {
           </tr>
         </tfoot>
       </table>
+      ${summaryBillingMode === 'settlement' ? `<div class="summary-unassigned"><strong>Nieprzypisane do rozliczenia:</strong> ${y.sum.unassignedBilled.toFixed(2)} h</div>` : ''}
     </div>
   </div>
 `).join('');
@@ -3925,7 +3957,7 @@ function initializeApp() {
                 orderIndex: buildOrderIndex(),
                 resolveClientName: resolveOrderClientName
             });
-            const report = computeYearReport(reportData);
+            const report = computeYearReport({ ...reportData, billingMode: summaryBillingMode === 'calendar' ? 'calendar' : 'settlement' });
             if (type === 'summary-csv') exportYearlySummaryCsv(report);
             if (type === 'orders-csv') exportYearlyOrdersCsv(report);
             if (type === 'pdf') exportYearlyPdf(report);
@@ -5197,15 +5229,14 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
     _wszystkieZleceniaCache = normalizedOrders;
     wszystkieZlecenia = normalizedOrders;
     normalizedOrders.forEach((order) => {
-        const needsMigration = !order?.billingMonth || !order?.createdOn || (order.status === 'ukończone' && !order?.completedOn);
+        const needsMigration = !order?.createdOn || (order.status === 'ukończone' && !order?.completedOn);
         if (!needsMigration || !order?.id) return;
         const payload = {
-            billingMonth: order.billingMonth || null,
             createdOn: order.createdOn || null,
             completedOn: order.completedOn || null
         };
         updateDoc(doc(db, 'zlecenia', order.id), payload)
-            .catch((error) => console.warn('[Migracja billingMonth] Nie udało się zaktualizować', order.id, error));
+            .catch((error) => console.warn('[Migracja dat zlecenia] Nie udało się zaktualizować', order.id, error));
     });
     if (render) {
         wyswietlZlecenia();
@@ -5470,8 +5501,7 @@ async function obslugaListyZlecen(event) {
                 const resolvedServiceDate = resolveServiceDate(zlecenie) || formatDateForStorage(new Date());
                 completeServiceDateInput.value = resolvedServiceDate;
                 if (billingMonthInput) {
-                    const fallbackMonth = resolvedServiceDate.slice(0, 7);
-                    billingMonthInput.value = resolveOrderBillingMonth(zlecenie) || fallbackMonth;
+                    billingMonthInput.value = resolveOrderExplicitBillingMonth(zlecenie) || '';
                 }
             }
             czesciDoZlecenia = [];
@@ -5580,6 +5610,8 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
     const editEndInput = editZlecenieForm['edit-completion-date'];
     if (editEndInput) editEndInput.value = normalizeDateOnly(zlecenie.completionDate || zlecenie.serviceDate || zlecenie.completedAt);
+    const editBillingMonthInput = editZlecenieForm['edit-billing-month'];
+    if (editBillingMonthInput) editBillingMonthInput.value = resolveOrderExplicitBillingMonth(zlecenie) || '';
 
     openModal(editZlecenieModal);
 }
@@ -5596,6 +5628,7 @@ async function zapiszEdycjeZlecenia(event) {
     const nowyKlientId = editZlecenieClientSelect?.value || '';
     const nowaMaszynaId = editZlecenieMachineSelect?.value || '';
     const noweCompletionDate = normalizeDateOnly(editZlecenieForm['edit-completion-date']?.value || '');
+    const nowyBillingMonth = (editZlecenieForm['edit-billing-month']?.value || '').trim() || null;
 
     if (isNaN(noweGodziny) || noweGodziny < 0) {
         alert("Podaj poprawną liczbę godzin.");
@@ -5620,7 +5653,7 @@ async function zapiszEdycjeZlecenia(event) {
         const staryKlientId = zlecenieData.klientId || '';
         const staraMaszynaId = zlecenieData.maszynaId || '';
         const staraCompletionDate = normalizeDateOnly(zlecenieData.completionDate || zlecenieData.serviceDate || zlecenieData.completedAt);
-        const previousBillingMonth = resolveOrderBillingMonth(zlecenieData);
+        const previousBillingMonth = resolveOrderExplicitBillingMonth(zlecenieData);
 
         let wpisHistorii = `Edytowano zlecenie: `;
         const zmiany = [];
@@ -5636,7 +5669,7 @@ async function zapiszEdycjeZlecenia(event) {
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
         if (staraCompletionDate !== noweCompletionDate) zmiany.push(`Data wykonania: ${staraCompletionDate || 'brak'} → ${noweCompletionDate || 'brak'}`);
-        const nextBillingMonth = resolveOrderBillingMonth({ ...zlecenieData, completedOn: noweCompletionDate, completionDate: noweCompletionDate });
+        const nextBillingMonth = nowyBillingMonth;
         if (previousBillingMonth !== nextBillingMonth) zmiany.push(`Miesiąc rozliczenia: ${previousBillingMonth || 'brak'} → ${nextBillingMonth || 'brak'}`);
         if (zmiany.length === 0) {
             hideModal(editZlecenieModal);
@@ -5926,7 +5959,7 @@ async function obslugaListyCzesci(event) {
                 alert('Wybierz poprawną datę wykonania.');
                 return;
             }
-            const billingMonth = (billingMonthInput?.value || '').trim() || completionDate.slice(0, 7);
+            const billingMonth = (billingMonthInput?.value || '').trim() || null;
             const todayKey = formatDateForStorage(new Date());
             if (completionDate > todayKey) { alert('Data wykonania nie może być z przyszłości.'); return; }
             const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
@@ -5974,7 +6007,7 @@ async function obslugaListyCzesci(event) {
                 const zlecenieData = zlecenieSnap.data();
                 zamykaneZlecenieData = zlecenieData;
                 staraDataWykonania = resolveServiceDate(zlecenieData);
-                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}. Miesiąc rozliczenia: ${billingMonth}.`;
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}. Miesiąc rozliczenia: ${billingMonth || 'brak'}.`;
                 if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
                 if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
                 const nowaHistoria = [...(zlecenieData.historia || []), {
@@ -6967,6 +7000,15 @@ async function obslugaListyCzesci(event) {
     if (vacationYearSelect) {
         vacationYearSelect.addEventListener('change', () => {
             applySelectedYear(vacationYearSelect.value);
+        });
+    }
+
+    if (summaryBillingModeSelect) {
+        summaryBillingModeSelect.value = summaryBillingMode;
+        summaryBillingModeSelect.addEventListener('change', async () => {
+            summaryBillingMode = summaryBillingModeSelect.value === 'calendar' ? 'calendar' : 'settlement';
+            persistSummaryBillingMode(summaryBillingMode);
+            await odswiezPodsumowania();
         });
     }
 
