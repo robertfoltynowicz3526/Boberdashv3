@@ -30,7 +30,7 @@ const downloadBlob = (blob, filename) => {
   URL.revokeObjectURL(link.href);
 };
 
-const buildSummaryRows = ({ months = [], yearlyTotals }) => {
+const buildSummaryRows = ({ months = [], yearlyTotals, unassignedBilled = 0, billingMode = "settlement" }) => {
   const summaryRows = months.map((month) => ({
     'Miesiąc': month.monthKey,
     'Praca(h)': formatNumber(month.totals.work),
@@ -43,6 +43,19 @@ const buildSummaryRows = ({ months = [], yearlyTotals }) => {
   }));
 
   if (months.length) {
+    if (billingMode === 'settlement' && (Number(unassignedBilled) || 0) > 0) {
+      summaryRows.push({
+        'Miesiąc': 'Nieprzypisane do rozliczenia',
+        'Praca(h)': '',
+        'Jazda(h)': '',
+        'Wyfakturowane(h)': formatNumber(unassignedBilled),
+        'Nadgodziny(h)': '',
+        'Absorpcja(%)': '',
+        'L4(dni)': '',
+        'Urlop(dni)': ''
+      });
+    }
+
     summaryRows.push({
       'Miesiąc': 'Razem',
       'Praca(h)': formatNumber(yearlyTotals.work),
@@ -69,7 +82,7 @@ const buildOrdersRows = ({ orders = [] }) =>
     'Notatka': order.note || ''
   }));
 
-export const exportYearlySummaryCsv = ({ year, months = [], yearlyTotals }) => {
+export const exportYearlySummaryCsv = ({ year, months = [], yearlyTotals, unassignedBilled = 0, billingMode = "settlement" }) => {
   const summaryColumns = [
     'Miesiąc',
     'Praca(h)',
@@ -80,13 +93,13 @@ export const exportYearlySummaryCsv = ({ year, months = [], yearlyTotals }) => {
     'L4(dni)',
     'Urlop(dni)'
   ];
-  const summaryRows = buildSummaryRows({ months, yearlyTotals });
+  const summaryRows = buildSummaryRows({ months, yearlyTotals, unassignedBilled, billingMode });
   const summaryCsv = buildCsv(summaryColumns, summaryRows);
   const summaryBlob = new Blob([`\uFEFF${summaryCsv}`], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(summaryBlob, `yearly_summary_${year}.csv`);
+  downloadBlob(summaryBlob, `yearly_summary_${year}_${billingMode}.csv`);
 };
 
-export const exportYearlyOrdersCsv = ({ year, orders = [] }) => {
+export const exportYearlyOrdersCsv = ({ year, orders = [], billingMode = "settlement" }) => {
   const ordersColumns = [
     'Data',
     'Klient',
@@ -99,12 +112,12 @@ export const exportYearlyOrdersCsv = ({ year, orders = [] }) => {
   const ordersRows = buildOrdersRows({ orders });
   const ordersCsv = buildCsv(ordersColumns, ordersRows);
   const ordersBlob = new Blob([`\uFEFF${ordersCsv}`], { type: 'text/csv;charset=utf-8;' });
-  downloadBlob(ordersBlob, `orders_${year}.csv`);
+  downloadBlob(ordersBlob, `orders_${year}_${billingMode}.csv`);
 };
 
-export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [] }) => {
-  exportYearlySummaryCsv({ year, months, yearlyTotals });
-  exportYearlyOrdersCsv({ year, orders });
+export const exportYearlyCsv = ({ year, months = [], yearlyTotals, orders = [], unassignedBilled = 0, billingMode = "settlement" }) => {
+  exportYearlySummaryCsv({ year, months, yearlyTotals, unassignedBilled, billingMode });
+  exportYearlyOrdersCsv({ year, orders, billingMode });
 };
 
 const drawTable = (doc, { startY, columns, rows }) => {
@@ -167,7 +180,7 @@ const buildClientSummaryRows = (clientTotals = []) => {
   return [...top, { clientName: 'Pozostali', totals: rest }];
 };
 
-export const exportYearlyPdf = ({ year, months = [], yearlyTotals, clientTotals = [] }) => {
+export const exportYearlyPdf = ({ year, months = [], yearlyTotals, clientTotals = [], unassignedBilled = 0, billingMode = "settlement" }) => {
   const jsPDF = window?.jspdf?.jsPDF;
   if (!jsPDF) {
     alert('Eksport PDF jest niedostępny (brak biblioteki).');
@@ -179,7 +192,7 @@ export const exportYearlyPdf = ({ year, months = [], yearlyTotals, clientTotals 
 
   doc.setFontSize(18);
   doc.setTextColor(10, 10, 10);
-  doc.text(`Raport roczny ${year}`, margin, y);
+  doc.text(`Raport roczny ${year} (${billingMode === 'calendar' ? 'kalendarz' : 'rozliczenie'})`, margin, y);
   y += 24;
 
   doc.setFontSize(12);
@@ -197,6 +210,18 @@ export const exportYearlyPdf = ({ year, months = [], yearlyTotals, clientTotals 
       l4: String(month.totals.l4Days),
       urlop: String(month.totals.urlopDays)
     }));
+    if (billingMode === 'settlement' && (Number(unassignedBilled) || 0) > 0) {
+      monthRows.push({
+        month: 'Nieprzypisane do rozliczenia',
+        work: '',
+        drive: '',
+        billed: formatNumber(unassignedBilled),
+        over: '',
+        absorpcja: '',
+        l4: '',
+        urlop: ''
+      });
+    }
     monthRows.push({
       month: 'Razem',
       work: formatNumber(yearlyTotals.work),
@@ -258,5 +283,5 @@ export const exportYearlyPdf = ({ year, months = [], yearlyTotals, clientTotals 
     doc.text('Brak danych klientów dla wskazanego roku.', margin, y + 20);
   }
 
-  doc.save(`raport_${year}.pdf`);
+  doc.save(`raport_${year}_${billingMode}.pdf`);
 };

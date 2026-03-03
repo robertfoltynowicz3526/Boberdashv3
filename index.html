@@ -325,6 +325,7 @@
                             </div>
                         </div>
                     </div>
+                    <div class="summary-toolbar"><div class="summary-toolbar-left"><label for="summary-billing-mode">Wyfakturowane:</label><select id="summary-billing-mode"><option value="calendar">Kalendarz</option><option value="settlement">Rozliczenie (premia)</option></select></div></div>
                     <p class="summary-info">Zestawienie miesięcy z ewidencji czasu pracy, widoczne dla wszystkich dostępnych lat.</p>
                     <div id="annual-summary"></div>
                 </div>
@@ -492,7 +493,7 @@
             </div>
             <div class="form-group">
               <label for="complete-zlecenie-billing-month">Miesiąc rozliczenia (premia):</label>
-              <input type="month" id="complete-zlecenie-billing-month" required>
+              <input type="month" id="complete-zlecenie-billing-month">
             </div>
             <hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
     </div>
@@ -865,6 +866,10 @@
                 <div class="form-group">
                     <label for="edit-completion-date">Data wykonania:</label>
                     <input type="date" id="edit-completion-date">
+                </div>
+                <div class="form-group">
+                    <label for="edit-billing-month">Miesiąc rozliczenia (premia):</label>
+                    <input type="month" id="edit-billing-month">
                 </div>
                 <div class="form-group">
                     <label for="edit-zakonczenie-wz">Numer WZ (opcjonalnie):</label>
