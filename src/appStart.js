@@ -15,7 +15,8 @@ import { buildNotesViewModel, buildNoteOrderOptionsModel, filterNoteOrderOptions
 import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
 import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
-import { getCompletionMonthKey, normalizeDateOnly } from './orders/orderDates.js';
+import { normalizeDateOnly } from './orders/orderDates.js';
+import { buildInvoiceStatsByMonth, normalizeOrderForBilling, resolveOrderBillingMonth } from './orders/invoiceStats.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MIN_DATE = '2026-01-01';
@@ -2931,6 +2932,9 @@ function initializeApp() {
         const startedAt = performance.now();
         setTimeout(() => {
             const podsumowanie = aggregateMonthStats(wszystkieWpisyKalendarza, monthKey);
+            const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wszystkieWpisyKalendarza);
+            podsumowanie.wyfakturowaneGodziny = invoiceByMonth.get(monthKey)?.invoicedHours ?? 0;
+            podsumowanie.absorpcja = obliczAbsorpcja(podsumowanie.wyfakturowaneGodziny);
             monthStatsCache.write(monthKey, podsumowanie);
             renderPulpitStatystykiMiesiaca(podsumowanie);
             if (import.meta.env.DEV) console.info('[perf] month-stats', monthKey, `${Math.round(performance.now() - startedAt)}ms`);
@@ -3255,6 +3259,15 @@ function initializeApp() {
 
     function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
+        const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache, wpisy || []);
+        invoiceByMonth.forEach((_, monthKey) => {
+            const [yearStr, monthStr] = monthKey.split('-');
+            const year = Number(yearStr);
+            const month = Number(monthStr);
+            if (!Number.isFinite(year) || !Number.isFinite(month)) return;
+            if (!grouped[year]) grouped[year] = {};
+            if (!grouped[year][month]) grouped[year][month] = [];
+        });
         const miesiace = [];
         const sumyRocznePerRok = [];
         const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
@@ -3270,8 +3283,11 @@ function initializeApp() {
 
             monthNumbers.forEach(month => {
                 const stats = monthStats(months[month]);
-                absorpcjaSuma += stats.absorpcja;
                 const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
+                const invoicedByBillingMonth = invoiceByMonth.get(miesiacKey)?.invoicedHours ?? 0;
+                stats.billed = invoicedByBillingMonth;
+                stats.absorpcja = stats.billed ? Math.round((stats.billed / BAZA_MIESIECZNA_GODZIN) * 100) : 0;
+                absorpcjaSuma += stats.absorpcja;
                 const label = formatujMiesiac(miesiacKey);
                 const monthRecord = {
                     miesiac: miesiacKey,
@@ -3376,7 +3392,7 @@ function initializeApp() {
 
 
         return wszystkieZlecenia
-            .filter(z => z?.status === 'ukończone' && resolveServiceDate(z)?.startsWith(miesiac))
+            .filter(z => z?.status === 'ukończone' && resolveOrderBillingMonth(z)?.startsWith(miesiac))
             .reduce((acc, z) => {
                 const godziny = Number(z.wyfakturowaneGodziny) || 0;
                 const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
@@ -3481,7 +3497,7 @@ function initializeApp() {
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane <span title="Wyfakturowane liczone wg miesiąca rozliczenia zlecenia">ⓘ</span></th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -3861,7 +3877,8 @@ function initializeApp() {
             }
         }
         const yearsFromData = getAvailableYears(wszystkieWpisyKalendarza);
-        availableSummaryYears = getYearsSortedDesc([...yearsFromData, currentYear]);
+        const yearsFromInvoices = (ostatnieZestawienieMiesieczne.lata || []).map(Number).filter(Number.isFinite);
+        availableSummaryYears = getYearsSortedDesc([...yearsFromData, ...yearsFromInvoices, currentYear]);
         if (!availableSummaryYears.includes(selectedYear)) {
             selectedYear = currentYear;
             persistSelectedYear(selectedYear);
@@ -5129,7 +5146,7 @@ function wyswietlZlecenia() {
             ));
         } else if (zlecenie.status === 'ukończone') {
             const serviceDate = resolveServiceDate(zlecenie);
-            if (getCompletionMonthKey(zlecenie) !== selectedMonth) {
+            if (resolveOrderBillingMonth(zlecenie) !== selectedMonth) {
                 return;
             }
             const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
@@ -5174,8 +5191,22 @@ function wyswietlZlecenia() {
 
 
 const applyOrdersData = (orders = [], { render = true } = {}) => {
-    _wszystkieZleceniaCache = Array.isArray(orders) ? orders : [];
-    wszystkieZlecenia = Array.isArray(orders) ? orders : [];
+    const normalizedOrders = Array.isArray(orders)
+        ? orders.map(order => normalizeOrderForBilling(order))
+        : [];
+    _wszystkieZleceniaCache = normalizedOrders;
+    wszystkieZlecenia = normalizedOrders;
+    normalizedOrders.forEach((order) => {
+        const needsMigration = !order?.billingMonth || !order?.createdOn || (order.status === 'ukończone' && !order?.completedOn);
+        if (!needsMigration || !order?.id) return;
+        const payload = {
+            billingMonth: order.billingMonth || null,
+            createdOn: order.createdOn || null,
+            completedOn: order.completedOn || null
+        };
+        updateDoc(doc(db, 'zlecenia', order.id), payload)
+            .catch((error) => console.warn('[Migracja billingMonth] Nie udało się zaktualizować', order.id, error));
+    });
     if (render) {
         wyswietlZlecenia();
         odswiezPodsumowania();
@@ -5300,8 +5331,11 @@ async function dodajZlecenie(event) {
             opis: zlecenieForm['opis-usterki'].value,
             motoHours: 0,
             createdDate: todayDate,
+            createdOn: todayDate,
             startDate: todayDate,
             completionDate: null,
+            completedOn: null,
+            billingMonth: null,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -5319,8 +5353,11 @@ async function dodajZlecenie(event) {
             motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
             motoHours: Number(zlecenieForm.motogodziny.value) || 0,
             createdDate: todayDate,
+            createdOn: todayDate,
             startDate: todayDate,
             completionDate: null,
+            completedOn: null,
+            billingMonth: null,
             historia,
             createdAt: new Date(),
             zakonczenieNotatka: null,
@@ -5428,9 +5465,14 @@ async function obslugaListyZlecen(event) {
             const completeIdInput = document.getElementById('complete-zlecenie-id');
             if (completeIdInput) completeIdInput.value = docId;
             const completeServiceDateInput = document.getElementById('complete-zlecenie-service-date');
+            const billingMonthInput = document.getElementById('complete-zlecenie-billing-month');
             if (completeServiceDateInput) {
                 const resolvedServiceDate = resolveServiceDate(zlecenie) || formatDateForStorage(new Date());
                 completeServiceDateInput.value = resolvedServiceDate;
+                if (billingMonthInput) {
+                    const fallbackMonth = resolvedServiceDate.slice(0, 7);
+                    billingMonthInput.value = resolveOrderBillingMonth(zlecenie) || fallbackMonth;
+                }
             }
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
@@ -5463,6 +5505,8 @@ async function obslugaListyZlecen(event) {
                 completedAt: null,
                 closeDate: null,
                 closedAt: null,
+                completedOn: null,
+                billingMonth: null,
                 wyfakturowaneGodziny: null,
                 typZlecenia: null,
                 zakonczenieNotatka: null,
@@ -5576,6 +5620,7 @@ async function zapiszEdycjeZlecenia(event) {
         const staryKlientId = zlecenieData.klientId || '';
         const staraMaszynaId = zlecenieData.maszynaId || '';
         const staraCompletionDate = normalizeDateOnly(zlecenieData.completionDate || zlecenieData.serviceDate || zlecenieData.completedAt);
+        const previousBillingMonth = resolveOrderBillingMonth(zlecenieData);
 
         let wpisHistorii = `Edytowano zlecenie: `;
         const zmiany = [];
@@ -5591,6 +5636,8 @@ async function zapiszEdycjeZlecenia(event) {
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
         if (staraCompletionDate !== noweCompletionDate) zmiany.push(`Data wykonania: ${staraCompletionDate || 'brak'} → ${noweCompletionDate || 'brak'}`);
+        const nextBillingMonth = resolveOrderBillingMonth({ ...zlecenieData, completedOn: noweCompletionDate, completionDate: noweCompletionDate });
+        if (previousBillingMonth !== nextBillingMonth) zmiany.push(`Miesiąc rozliczenia: ${previousBillingMonth || 'brak'} → ${nextBillingMonth || 'brak'}`);
         if (zmiany.length === 0) {
             hideModal(editZlecenieModal);
             return;
@@ -5613,6 +5660,8 @@ async function zapiszEdycjeZlecenia(event) {
             nrZlecenia: nowyNumerZlecenia,
             zakonczenieNumerWZ: nowyNumerWz || null,
             completionDate: noweCompletionDate || null,
+            completedOn: noweCompletionDate || null,
+            billingMonth: nextBillingMonth || null,
             historia: nowaHistoria
         });
         hideModal(editZlecenieModal);
@@ -5867,6 +5916,7 @@ async function obslugaListyCzesci(event) {
             const notatka = zakonczenieNotatkaInput && 'value' in zakonczenieNotatkaInput ? zakonczenieNotatkaInput.value.trim() : '';
             const completionDateInput = completeModalForm.querySelector('[name="completionDate"]') || completeModalForm.querySelector('[name="serviceDate"]') || document.getElementById('complete-zlecenie-service-date');
             const completionDateRaw = completionDateInput?.value || '';
+            const billingMonthInput = document.getElementById('complete-zlecenie-billing-month');
             if (!completionDateRaw) {
                 alert('Wybierz datę wykonania przed zamknięciem zlecenia.');
                 return;
@@ -5876,6 +5926,7 @@ async function obslugaListyCzesci(event) {
                 alert('Wybierz poprawną datę wykonania.');
                 return;
             }
+            const billingMonth = (billingMonthInput?.value || '').trim() || completionDate.slice(0, 7);
             const todayKey = formatDateForStorage(new Date());
             if (completionDate > todayKey) { alert('Data wykonania nie może być z przyszłości.'); return; }
             const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
@@ -5907,6 +5958,8 @@ async function obslugaListyCzesci(event) {
                 dataUkonczenia: completionDate,
                 serviceDate: completionDate,
                 completionDate,
+                completedOn: completionDate,
+                billingMonth,
                 closeDate: closeDateKey,
                 uzyteCzesci: czesciDoZlecenia,
                 zakonczenieNotatka: notatka || null,
@@ -5921,7 +5974,7 @@ async function obslugaListyCzesci(event) {
                 const zlecenieData = zlecenieSnap.data();
                 zamykaneZlecenieData = zlecenieData;
                 staraDataWykonania = resolveServiceDate(zlecenieData);
-                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}.`;
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}. Miesiąc rozliczenia: ${billingMonth}.`;
                 if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
                 if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
                 const nowaHistoria = [...(zlecenieData.historia || []), {
