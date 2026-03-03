@@ -47,7 +47,7 @@ export const resolveOrderBillingMonth = (order = {}) => {
 
 const normalizeOrderStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
-  if (normalized === 'ukończone' || normalized === 'ukonczone' || normalized === 'closed') return 'closed';
+  if (normalized === 'ukończone' || normalized === 'ukonczone' || normalized === 'zakończone' || normalized === 'zakonczone' || normalized === 'closed') return 'closed';
   if (normalized === 'aktywne' || normalized === 'active') return 'active';
   return normalized;
 };
@@ -98,8 +98,12 @@ const resolveEntryYear = (dayDoc = {}) => {
 
 export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], options = {}) => {
   const selectedYear = Number.isFinite(Number(options?.selectedYear)) ? Number(options.selectedYear) : null;
+  const debugMonthKey = normalizeMonthKey(options?.debugMonthKey || options?.debugMonth || '');
   const monthStats = new Map();
   const orderMetaMap = new Map();
+  const entriesByOrderId = new Map();
+  const debug = { month: debugMonthKey || null, closed: [], active: [], duplicateEntryIds: [] };
+  const seenEntryIds = new Set();
 
   (orders || []).forEach((order) => {
     const orderId = order?.id;
@@ -116,22 +120,71 @@ export const buildInvoiceStatsByMonth = (orders = [], calendarEntries = [], opti
     if (Number.isFinite(selectedYear) && entryYear !== selectedYear) return;
     const entries = extractOrderEntries(dayDoc);
     const entryMonth = resolveEntryMonthKey(dayDoc);
-    entries.forEach((entry) => {
+    entries.forEach((entry, index) => {
       const orderId = entry?.zlecenieId ?? entry?.orderId;
       if (!orderId) return;
       const billed = readEntryInvoicedForOrderHours(entry);
       if (!billed) return;
-      const orderMeta = orderMetaMap.get(orderId) || null;
-      const monthKey = orderMeta?.status === 'closed'
-        ? (orderMeta?.completionMonth || entryMonth || orderMeta?.fallbackMonth || '')
-        : (entryMonth || orderMeta?.fallbackMonth || '');
-      if (!monthKey) return;
-      const current = monthStats.get(monthKey) || { invoicedHours: 0, ordersCount: 0 };
-      current.invoicedHours += billed;
-      current.ordersCount += 1;
-      monthStats.set(monthKey, current);
+      const sourceEntryId = String(
+        entry?.id
+        || `${dayDoc?.id || dayDoc?.date || 'unknown-day'}:${index}:${orderId}`
+      );
+      if (seenEntryIds.has(sourceEntryId)) {
+        debug.duplicateEntryIds.push(sourceEntryId);
+      }
+      seenEntryIds.add(sourceEntryId);
+      if (!entriesByOrderId.has(orderId)) entriesByOrderId.set(orderId, []);
+      entriesByOrderId.get(orderId).push({ billed, entryMonth, sourceEntryId });
     });
   });
 
-  return { monthStats, unassignedHours: 0, unassignedByYear: new Map() };
+  entriesByOrderId.forEach((orderEntries, orderId) => {
+    const orderMeta = orderMetaMap.get(orderId) || null;
+    const status = orderMeta?.status;
+    const totalBilled = orderEntries.reduce((sum, entry) => sum + entry.billed, 0);
+    if (!totalBilled) return;
+
+    if (status === 'closed') {
+      const bucketMonth = orderMeta?.completionMonth || orderEntries[0]?.entryMonth || orderMeta?.fallbackMonth || '';
+      if (!bucketMonth) return;
+      const current = monthStats.get(bucketMonth) || { invoicedHours: 0, ordersCount: 0 };
+      current.invoicedHours += totalBilled;
+      current.ordersCount += 1;
+      monthStats.set(bucketMonth, current);
+
+      if (debugMonthKey && bucketMonth === debugMonthKey) {
+        debug.closed.push({ orderId, totalBilled, completionMonth: bucketMonth });
+      }
+      return;
+    }
+
+    const activeTotalsByMonth = new Map();
+    orderEntries.forEach((entry) => {
+      const bucketMonth = entry.entryMonth || orderMeta?.fallbackMonth || '';
+      if (!bucketMonth) return;
+      const current = monthStats.get(bucketMonth) || { invoicedHours: 0, ordersCount: 0 };
+      current.invoicedHours += entry.billed;
+      current.ordersCount += 1;
+      monthStats.set(bucketMonth, current);
+      activeTotalsByMonth.set(bucketMonth, (activeTotalsByMonth.get(bucketMonth) || 0) + entry.billed);
+    });
+
+    if (debugMonthKey && activeTotalsByMonth.has(debugMonthKey)) {
+      debug.active.push({ orderId, monthTotal: activeTotalsByMonth.get(debugMonthKey) || 0 });
+    }
+  });
+
+  if (debugMonthKey) {
+    debug.closed.sort((a, b) => String(a.orderId).localeCompare(String(b.orderId)));
+    debug.active.sort((a, b) => String(a.orderId).localeCompare(String(b.orderId)));
+  }
+
+  if (debug.duplicateEntryIds.length) {
+    console.error('[InvoiceStats] Duplicate entry ids detected during monthly aggregation', {
+      duplicateCount: debug.duplicateEntryIds.length,
+      duplicateEntryIds: debug.duplicateEntryIds
+    });
+  }
+
+  return { monthStats, debug };
 };
