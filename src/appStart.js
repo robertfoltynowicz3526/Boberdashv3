@@ -25,6 +25,7 @@ import {
     getOrderInvoicedHours,
     getOrderGrossAmount,
     getOrderNetAmount,
+    computeOrderAmounts,
     isOrderClosed
 } from './orders/invoiceStats.js';
 
@@ -3484,12 +3485,30 @@ function initializeApp() {
         const pustyWynik = { sumaGodzin: 0, sumaBrutto: 0, sumaNetto: 0 };
         if (!miesiac) return pustyWynik;
 
+        if (import.meta.env.DEV) {
+            const debugOrders = (wszystkieZlecenia || []).filter(z => isOrderClosed(z)).slice(0, 3);
+            debugOrders.forEach((order) => {
+                const amounts = computeOrderAmounts(order);
+                console.info('[billing-debug]', {
+                    id: order?.id,
+                    wyfakturowaneGodziny: getOrderInvoicedHours(order),
+                    stawka: order?.stawka ?? STAWKI[order?.typZlecenia]?.stawka ?? null,
+                    grossOrder: order?.grossAmount ?? order?.kwotaBrutto ?? order?.brutto ?? order?.gross ?? order?.valueGross ?? null,
+                    netOrder: order?.netAmount ?? order?.kwotaNetto ?? order?.netto ?? order?.net ?? order?.valueNet ?? null,
+                    grossComputed: amounts.grossCents / 100,
+                    netComputed: amounts.netCents / 100,
+                    source: amounts.source
+                });
+            });
+        }
+
         return wszystkieZlecenia
             .filter(z => isOrderClosed(z) && resolveOrderSettlementMonth(z) === miesiac)
             .reduce((acc, z) => {
+                const amounts = computeOrderAmounts(z);
                 acc.sumaGodzin += getOrderInvoicedHours(z);
-                acc.sumaBrutto += getOrderGrossAmount(z);
-                acc.sumaNetto += getOrderNetAmount(z);
+                acc.sumaBrutto += amounts.grossCents / 100;
+                acc.sumaNetto += amounts.netCents / 100;
                 return acc;
             }, { ...pustyWynik });
     }
@@ -5284,6 +5303,7 @@ function wyswietlZlecenia() {
                 if (resolveOrderBillingMonth(zlecenie) !== selectedMonth) {
                     return;
                 }
+                const amounts = computeOrderAmounts(zlecenie);
                 const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
                 const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
                 const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
@@ -5296,6 +5316,7 @@ function wyswietlZlecenia() {
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
                     <em>Wykonano (${serviceDate || 'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
+                    <br><small>Brutto: ${(amounts.grossCents / 100).toFixed(2)} zł | Netto: ${(amounts.netCents / 100).toFixed(2)} zł</small>
                     ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
                     ${motoHtml}
                 `,
