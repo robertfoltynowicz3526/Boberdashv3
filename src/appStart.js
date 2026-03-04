@@ -21,6 +21,7 @@ import {
     normalizeMonthKey,
     normalizeOrderForBilling,
     resolveOrderSettlementMonth,
+    resolveOrderBillingMonth,
     getOrderInvoicedHours,
     getOrderGrossAmount,
     getOrderNetAmount,
@@ -1369,17 +1370,25 @@ function initializeApp() {
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
                 powiazane.forEach((entry) => {
-                    const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
-                    const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
-                    orderEvents.push({
-                        id: `client_${normalizedDay}_${idSuffix}`,
-                        start: normalizedDay,
-                        allDay: true,
-                        title: clientName || 'Zlecenie',
-                        classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
-                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
-                        sortOrder: 1
-                    });
+                    try {
+                        const clientName = resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex);
+                        const idSuffix = entry.zlecenieId || hashString(clientName || 'client');
+                        orderEvents.push({
+                            id: `client_${normalizedDay}_${idSuffix}`,
+                            start: normalizedDay,
+                            allDay: true,
+                            title: clientName || 'Zlecenie',
+                            classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
+                            extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || null, type: 'client' },
+                            sortOrder: 1
+                        });
+                    } catch (error) {
+                        console.error('[rebuildCalendarDecorations] Pomijam wpis powiązanego zlecenia po błędzie', {
+                            day: normalizedDay,
+                            orderId: entry?.zlecenieId,
+                            error
+                        });
+                    }
                 });
             }
             if (hasAnyData) {
@@ -5243,59 +5252,63 @@ function wyswietlZlecenia() {
     });
 
     przefiltrowaneZlecenia.forEach(zlecenie => {
-        wszystkieZlecenia.push(zlecenie);
+        try {
+            wszystkieZlecenia.push(zlecenie);
 
-        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-        const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
-        const startLabel = normalizeDateOnly(zlecenie.startDate || zlecenie.startAt);
-        const endLabel = normalizeDateOnly(zlecenie.completionDate || zlecenie.endAt || zlecenie.serviceDate);
-        const timelineHtml = (startLabel || endLabel)
-            ? `<br><small>Start: ${startLabel || '—'}${endLabel ? ` → Koniec: ${endLabel}` : ''}</small>`
-            : '';
+            const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+            const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+            const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+            const startLabel = normalizeDateOnly(zlecenie.startDate || zlecenie.startAt);
+            const endLabel = normalizeDateOnly(zlecenie.completionDate || zlecenie.endAt || zlecenie.serviceDate);
+            const timelineHtml = (startLabel || endLabel)
+                ? `<br><small>Start: ${startLabel || '—'}${endLabel ? ` → Koniec: ${endLabel}` : ''}</small>`
+                : '';
 
-        if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
-            const przycisk = zlecenie.status === 'nieprzypisane'
-                ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
-                : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`;
-            const opisHtml = `<em>${zlecenie.opis || 'Brak opisu'}</em>`;
-            aktywneElements.push(createZlecenieListItem(
-                zlecenie,
-                `<strong>${nazwa}</strong><br>${opisHtml}${timelineHtml}`,
-                `
+            if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
+                const przycisk = zlecenie.status === 'nieprzypisane'
+                    ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
+                    : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`;
+                const opisHtml = `<em>${zlecenie.opis || 'Brak opisu'}</em>`;
+                aktywneElements.push(createZlecenieListItem(
+                    zlecenie,
+                    `<strong>${nazwa}</strong><br>${opisHtml}${timelineHtml}`,
+                    `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     ${przycisk}
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
-            ));
-        } else if (zlecenie.status === 'zakończone') {
-            const serviceDate = resolveServiceDate(zlecenie);
-            if (resolveOrderBillingMonth(zlecenie) !== selectedMonth) {
-                return;
-            }
-            const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
-            const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-            const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
-            const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
-            const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
-            const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="meta">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
-            ukonczoneElements.push(createZlecenieListItem(
-                zlecenie,
-                `
+                ));
+            } else if (zlecenie.status === 'zakończone') {
+                const serviceDate = resolveServiceDate(zlecenie);
+                if (resolveOrderBillingMonth(zlecenie) !== selectedMonth) {
+                    return;
+                }
+                const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
+                const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
+                const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
+                const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
+                const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
+                const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="meta">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
+                ukonczoneElements.push(createZlecenieListItem(
+                    zlecenie,
+                    `
                     <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
                     <em>Wykonano (${serviceDate || 'b.d.'})</em><br>
                     Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
                     ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
                     ${motoHtml}
                 `,
-                `
+                    `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
-            ));
+                ));
+            }
+        } catch (error) {
+            console.error('[wyswietlZlecenia] Pomijam rekord po błędzie', { orderId: zlecenie?.id, error });
         }
     });
 
