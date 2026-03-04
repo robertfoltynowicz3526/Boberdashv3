@@ -48,6 +48,45 @@ export const resolveOrderSettlementMonth = (order = {}) => {
   return completedOn ? completedOn.slice(0, 7) : '';
 };
 
+const toBillingMonthFromDate = (value) => {
+  const normalized = normalizeDateOnly(value);
+  if (normalized) return normalized.slice(0, 7);
+  return normalizeMonthKey(value);
+};
+
+export const resolveOrderBillingMonth = (order = {}, entryDate = null) => {
+  const explicitBillingMonth = normalizeMonthKey(
+    order?.billingMonth
+    || order?.billingMonthKey
+    || order?.settlementMonth
+  );
+  if (explicitBillingMonth) return explicitBillingMonth;
+
+  const normalizedStatus = normalizeOrderStatus(order?.status);
+  if (normalizedStatus === 'zakończone') {
+    const completedMonth = toBillingMonthFromDate(
+      order?.completedDate
+      || order?.completionDate
+      || order?.completedOn
+      || order?.completedAt
+      || order?.serviceDate
+      || order?.dataUkonczenia
+    );
+    if (completedMonth) return completedMonth;
+  }
+
+  const fallbackMonth = toBillingMonthFromDate(
+    entryDate
+    || order?.entryDate
+    || order?.createdOn
+    || order?.createdDate
+    || order?.createdAt
+    || new Date()
+  );
+
+  return fallbackMonth || toBillingMonthFromDate(new Date());
+};
+
 export const isOrderClosed = (order = {}) => normalizeOrderStatus(order?.status) === 'zakończone';
 
 export const getOrderInvoicedHours = (order = {}) => parseHours(order?.invoicedHours ?? order?.wyfakturowaneGodziny ?? order?.wyfakturowane ?? 0);
