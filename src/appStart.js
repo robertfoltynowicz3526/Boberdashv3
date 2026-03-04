@@ -10,6 +10,7 @@ import { aggregateDayData, computeDayTotals, configureDayTotals } from './calend
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
+import { resolveOrderBillingMonth } from './utils/billingMonth.js';
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MIN_DATE = '2026-01-01';
@@ -1316,29 +1317,34 @@ function initializeApp() {
                 ? normalizujPowiazaneZlecenia(dayDoc).powiazane
                 : (Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : []);
             const clientsForDayMap = new Map();
-            normalizedOrders.forEach((entry) => {
-                const clientName = resolveOrderClientName(entry.zlecenieId || entry.orderId, entry.klientNazwa || entry.clientName, orderIndex);
-                const normalizedClient = clientName || 'Zlecenie';
-                if (!clientsForDayMap.has(normalizedClient)) {
-                    clientsForDayMap.set(normalizedClient, { name: normalizedClient, praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
-                }
-                const current = clientsForDayMap.get(normalizedClient);
-                current.praca += parsePlNumber(entry?.work ?? 0);
-                current.jazda += parsePlNumber(entry?.drive ?? 0);
-                current.fakturowane += parsePlNumber(entry?.fakturowane ?? entry?.billed ?? 0);
-                current.nadgodziny += parsePlNumber(entry?.over ?? 0);
+            normalizedOrders.forEach((entry, index) => {
+                try {
+                    const clientName = resolveOrderClientName(entry.zlecenieId || entry.orderId, entry.klientNazwa || entry.clientName, orderIndex);
+                    const normalizedClient = clientName || 'Zlecenie';
+                    if (!clientsForDayMap.has(normalizedClient)) {
+                        clientsForDayMap.set(normalizedClient, { name: normalizedClient, praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
+                    }
+                    const current = clientsForDayMap.get(normalizedClient);
+                    current.praca += parsePlNumber(entry?.work ?? 0);
+                    current.jazda += parsePlNumber(entry?.drive ?? 0);
+                    current.fakturowane += parsePlNumber(entry?.fakturowane ?? entry?.billed ?? 0);
+                    current.nadgodziny += parsePlNumber(entry?.over ?? 0);
 
-                const idSuffix = entry.zlecenieId || entry.orderId || hashString(normalizedClient || 'client');
-                if (!isMonthView) {
-                    orderEvents.push({
-                        id: `client_${normalizedDay}_${idSuffix}`,
-                        start: normalizedDay,
-                        allDay: true,
-                        title: normalizedClient,
-                        classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
-                        extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || entry.orderId || null, type: 'client' },
-                        sortOrder: 1
-                    });
+                    const idSuffix = entry.zlecenieId || entry.orderId || hashString(normalizedClient || 'client');
+                    if (!isMonthView) {
+                        orderEvents.push({
+                            id: `client_${normalizedDay}_${idSuffix}`,
+                            start: normalizedDay,
+                            allDay: true,
+                            title: normalizedClient,
+                            classNames: ['order-event', 'fc-client-chip', 'client-chip', 'bober-chip', 'bober-chip--client'],
+                            extendedProps: { day: normalizedDay, orderId: entry.zlecenieId || entry.orderId || null, type: 'client' },
+                            sortOrder: 1
+                        });
+                    }
+                } catch (error) {
+                    const recordId = entry?.zlecenieId || entry?.orderId || entry?.id || `${normalizedDay}#${index}`;
+                    console.error('[calendar] failed to process order event record', { recordId, day: normalizedDay, error });
                 }
             });
             if (clientsForDayMap.size) {
@@ -3199,14 +3205,22 @@ function initializeApp() {
 
 
         return wszystkieZlecenia
-            .filter(z => z?.status === 'ukończone' && resolveServiceDate(z)?.startsWith(miesiac))
-            .reduce((acc, z) => {
-                const godziny = Number(z.wyfakturowaneGodziny) || 0;
-                const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
-                const kwotaBrutto = godziny * stawka;
-                acc.sumaGodzin += godziny;
-                acc.sumaBrutto += kwotaBrutto;
-                acc.sumaNetto += kwotaBrutto * 0.7;
+            .reduce((acc, z, index) => {
+                try {
+                    if (z?.status !== 'ukończone') return acc;
+                    const billingMonth = resolveOrderBillingMonth(z, resolveServiceDate(z));
+                    if (!billingMonth || !billingMonth.startsWith(miesiac)) return acc;
+
+                    const godziny = Number(z.wyfakturowaneGodziny) || 0;
+                    const stawka = STAWKI[z.typZlecenia]?.stawka || 0;
+                    const kwotaBrutto = godziny * stawka;
+                    acc.sumaGodzin += godziny;
+                    acc.sumaBrutto += kwotaBrutto;
+                    acc.sumaNetto += kwotaBrutto * 0.7;
+                } catch (error) {
+                    const recordId = z?.id || z?.nrZlecenia || `order#${index}`;
+                    console.error('[summary] failed to aggregate order', { recordId, error });
+                }
                 return acc;
             }, { ...pustyWynik });
     }
@@ -6533,12 +6547,23 @@ async function obslugaListyCzesci(event) {
     if (exportZleceniaBtn && miesiacSummaryInput) {
         exportZleceniaBtn.addEventListener('click', () => {
             const miesiac = getSelectedMonth();
-            const dane = _wszystkieZleceniaCache
-                .filter(z => z.status === 'ukończone' && resolveServiceDate(z) && resolveServiceDate(z).startsWith(miesiac))
-                .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
-                    ...rest,
-                    uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
-                }));
+            const dane = _wszystkieZleceniaCache.reduce((acc, z, index) => {
+                try {
+                    if (z?.status !== 'ukończone') return acc;
+                    const entryDate = resolveServiceDate(z);
+                    const billingMonth = resolveOrderBillingMonth(z, entryDate);
+                    if (!billingMonth || !billingMonth.startsWith(miesiac)) return acc;
+                    const { id, createdAt, status, uzyteCzesci, historia, ...rest } = z;
+                    acc.push({
+                        ...rest,
+                        uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
+                    });
+                } catch (error) {
+                    const recordId = z?.id || z?.nrZlecenia || `order#${index}`;
+                    console.error('[export] failed to map order record', { recordId, error });
+                }
+                return acc;
+            }, []);
             eksportujDoCSV(dane, `zlecenia_${miesiac}.csv`);
         });
     }
