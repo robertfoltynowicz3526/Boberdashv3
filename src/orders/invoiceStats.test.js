@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildInvoiceStatsByMonth, normalizeOrderForBilling } from './invoiceStats.js';
+import { buildInvoiceStatsByMonth, normalizeOrderForBilling, computeOrderAmounts } from './invoiceStats.js';
 
 test('aggregates invoiced, gross and net from closed orders by settlementMonth', () => {
   const orders = [
@@ -16,4 +16,32 @@ test('aggregates invoiced, gross and net from closed orders by settlementMonth',
   assert.equal(stats.monthStats.get('2026-02')?.grossAmount, 1050);
   assert.equal(stats.monthStats.get('2026-02')?.netAmount, 840);
   assert.equal(stats.monthStats.get('2026-03')?.invoicedHours, 10);
+});
+
+test('supports legacy gross/net field names when computing order amounts', () => {
+  const order = normalizeOrderForBilling({
+    id: 'legacy',
+    status: 'zakończone',
+    settlementMonth: '2026-02',
+    valueGross: '1234.56',
+    valueNet: '987.65'
+  });
+  const amounts = computeOrderAmounts(order);
+  assert.equal(amounts.grossCents, 123456);
+  assert.equal(amounts.netCents, 98765);
+  assert.equal(amounts.source, 'stored:gross+net');
+});
+
+test('falls back to invoicedHours * order rate when gross/net are missing', () => {
+  const order = normalizeOrderForBilling({
+    id: 'derived',
+    status: 'zakończone',
+    settlementMonth: '2026-02',
+    invoicedHours: 10,
+    typZlecenia: 'S'
+  });
+  const amounts = computeOrderAmounts(order);
+  assert.equal(amounts.grossCents, 45000);
+  assert.equal(amounts.netCents, 31500);
+  assert.equal(amounts.source, 'derived:hours*rate');
 });
