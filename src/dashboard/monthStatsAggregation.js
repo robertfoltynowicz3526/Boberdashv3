@@ -4,17 +4,27 @@ const toMonthKey = (value) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-export const aggregateMonthStats = (entries = [], monthKey) => {
+const readEntryLinks = (entry = {}) => {
+  if (Array.isArray(entry?.zleceniaPowiazane)) return entry.zleceniaPowiazane;
+  if (Array.isArray(entry?.powiazane)) return entry.powiazane;
+  if (entry?.zlecenieId) return [{ zlecenieId: entry.zlecenieId }];
+  return [];
+};
+
+export const aggregateMonthStats = (entries = [], monthKey, options = {}) => {
+  const closedOrderIds = new Set(options?.closedOrderIds || []);
   const totals = entries.reduce((acc, entry) => {
     if (toMonthKey(entry?.id || entry?.date) !== monthKey) return acc;
     if (entry?.leaveKind || entry?.flags?.urlop || entry?.flags?.l4 || entry?.flags?.swieto || entry?.flags?.wolne || entry?.flags?.szkolenie) return acc;
     acc.praca += Number(entry.praca || 0);
-    acc.wyfakturowaneGodziny += Number(entry.fakturowane || entry.billed || 0);
+    const linkedToClosedOrder = readEntryLinks(entry).some((link) => closedOrderIds.has(String(link?.zlecenieId || link?.orderId || '')));
+    if (!linkedToClosedOrder) {
+      acc.fakturowanePlanowane += Number(entry.fakturowane || entry.billed || 0);
+    }
     acc.nadgodziny += Number(entry.nadgodziny || 0);
     acc.jazda += Number(entry.jazda || 0);
     return acc;
-  }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
-  totals.absorpcja = totals.wyfakturowaneGodziny > 0 ? (totals.wyfakturowaneGodziny / 168) * 100 : 0;
+  }, { praca: 0, fakturowanePlanowane: 0, fakturowaneRozliczone: 0, nadgodziny: 0, jazda: 0 });
   return totals;
 };
 
