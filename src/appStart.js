@@ -5596,10 +5596,6 @@ async function obslugaListyZlecen(event) {
                     billingMonthInput.value = nextDefault || '';
                 };
             }
-            const grossInput = document.getElementById('gross-amount');
-            const netInput = document.getElementById('net-amount');
-            if (grossInput) grossInput.value = String(getOrderGrossAmount(zlecenie));
-            if (netInput) netInput.value = String(getOrderNetAmount(zlecenie));
             const invInput = document.getElementById('wyfakturowane-godziny');
             if (invInput) invInput.value = String(getOrderInvoicedHours(zlecenie));
             czesciDoZlecenia = [];
@@ -6082,18 +6078,10 @@ async function obslugaListyCzesci(event) {
             const billingMonthRaw = (billingMonthInput?.value || '').trim();
             const settlementMonth = billingMonthRaw || deriveBillingMonthFromCompletionDate(completionDate) || null;
             const invoicedHoursInput = document.getElementById('wyfakturowane-godziny');
-            const grossAmountInput = document.getElementById('gross-amount');
-            const netAmountInput = document.getElementById('net-amount');
             const invoicedHoursRaw = (invoicedHoursInput?.value ?? '').toString().trim();
-            const grossAmountRaw = (grossAmountInput?.value ?? '').toString().trim();
-            const netAmountRaw = (netAmountInput?.value ?? '').toString().trim();
             const invoicedHours = Number(invoicedHoursRaw);
-            const grossAmount = Number(grossAmountRaw);
-            const netAmount = Number(netAmountRaw);
             if (!settlementMonth) { alert('Wybierz miesiąc rozliczenia.'); return; }
             if (!invoicedHoursRaw || !Number.isFinite(invoicedHours)) { alert('Wyfakturowane godziny są wymagane.'); return; }
-            if (!grossAmountRaw || !Number.isFinite(grossAmount)) { alert('Brutto jest wymagane.'); return; }
-            if (!netAmountRaw || !Number.isFinite(netAmount)) { alert('Netto jest wymagane.'); return; }
             const todayKey = formatDateForStorage(new Date());
             if (completionDate > todayKey) { alert('Data wykonania nie może być z przyszłości.'); return; }
             const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
@@ -6129,8 +6117,6 @@ async function obslugaListyCzesci(event) {
                 completedOn: completionDate,
                 settlementMonth,
                 billingMonth: settlementMonth,
-                grossAmount,
-                netAmount,
                 closeDate: closeDateKey,
                 uzyteCzesci: czesciDoZlecenia,
                 zakonczenieNotatka: notatka || null,
@@ -6145,7 +6131,7 @@ async function obslugaListyCzesci(event) {
                 const zlecenieData = zlecenieSnap.data();
                 zamykaneZlecenieData = zlecenieData;
                 staraDataWykonania = resolveServiceDate(zlecenieData);
-                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}. Miesiąc rozliczenia: ${settlementMonth || 'brak'}. Brutto: ${grossAmount.toFixed(2)}. Netto: ${netAmount.toFixed(2)}.`;
+                let wpisHistorii = `Zakończono zlecenie. Godziny: ${dane.wyfakturowaneGodziny}h. Typ: ${dane.typZlecenia}. Motogodziny: ${motoHours.toFixed(1)}h. Wykonano: ${completionDate}. Miesiąc rozliczenia: ${settlementMonth || 'brak'}.`;
                 if (dane.zakonczenieNumerWZ) wpisHistorii += ` WZ: ${dane.zakonczenieNumerWZ}.`;
                 if (notatka) wpisHistorii += ` Notatka: ${notatka}`;
                 const nowaHistoria = [...(zlecenieData.historia || []), {
