@@ -502,35 +502,6 @@
             </div>
             <hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
     </div>
-    <div id="summary-adjustments-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2>Korekty miesiąca</h2>
-            <form id="summary-adjustments-form" class="modal-body">
-                <p><strong>Miesiąc:</strong> <span id="summary-adjustments-month">—</span></p>
-                <div class="form-grid form-grid-2">
-                    <div class="form-group">
-                        <label for="summary-adjustments-gross">Korekta brutto (PLN):</label>
-                        <input type="number" step="0.01" id="summary-adjustments-gross" value="0" inputmode="decimal">
-                    </div>
-                    <div class="form-group">
-                        <label for="summary-adjustments-net">Korekta netto (PLN):</label>
-                        <input type="number" step="0.01" id="summary-adjustments-net" value="0" inputmode="decimal">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="summary-adjustments-comment">Komentarz:</label>
-                    <textarea id="summary-adjustments-comment" rows="3" required placeholder="Powód korekty"></textarea>
-                </div>
-                <div class="modal-actions">
-                    <button type="submit" class="btn-add">Dodaj korektę</button>
-                </div>
-                <hr>
-                <h3>Historia</h3>
-                <div id="summary-adjustments-history"></div>
-            </form>
-        </div>
-    </div>
     <div id="stock-change-modal" class="modal">
         <div class="modal-content"><span class="close-button">&times;</span><h2 id="stock-modal-title">Zmień stan</h2><form id="stock-change-form" class="modal-body"><input type="hidden" id="stock-change-id"><p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p><p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p><div class="form-group"><label for="stock-change-qty">Ilość:</label><input type="number" step="1" id="stock-change-qty" required inputmode="numeric"></div><div class="modal-actions"><button type="submit">Zatwierdź Zmianę</button></div></form></div>
     </div>
