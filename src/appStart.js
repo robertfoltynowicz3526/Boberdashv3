@@ -405,7 +405,6 @@ function initializeApp() {
         { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false, typProdukt: PRODUCT_TYPE_ZMYWACZ }
     ];
     const NOTES_STORAGE_KEY = 'notesActivityCollapsed';
-    const SUMMARY_ADJUSTMENTS_COLLECTION = 'summaryAdjustments';
     function obliczAbsorpcja(wyfakturowaneGodziny, godzinyPracy = BAZA_MIESIECZNA_GODZIN) {
         const billed = Number(wyfakturowaneGodziny || 0);
         const work = Number(godzinyPracy || 0);
@@ -462,7 +461,6 @@ function initializeApp() {
     let hasEnsuredDefaultStock = false;
     const monthStatsCache = createMonthStatsCache();
     const invalidateMonthStatsCache = () => monthStatsCache.clear();
-    let currentSummaryAdjustmentMonth = null;
     let calendar;
     window.calendar = null;
     window.__calendarApi = null;
@@ -902,13 +900,6 @@ function initializeApp() {
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
-    const summaryAdjustmentsModal = document.getElementById('summary-adjustments-modal');
-    const summaryAdjustmentsForm = document.getElementById('summary-adjustments-form');
-    const summaryAdjustmentsMonthLabel = document.getElementById('summary-adjustments-month');
-    const summaryAdjustmentsGrossInput = document.getElementById('summary-adjustments-gross');
-    const summaryAdjustmentsNetInput = document.getElementById('summary-adjustments-net');
-    const summaryAdjustmentsCommentInput = document.getElementById('summary-adjustments-comment');
-    const summaryAdjustmentsHistory = document.getElementById('summary-adjustments-history');
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
     const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
     const annualSummaryContainer = document.getElementById('annual-summary');
@@ -3303,20 +3294,6 @@ function initializeApp() {
         return { work, drive, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
     }
 
-    const getSummaryAdjustmentsEntriesCollection = (yearMonth) => collection(db, SUMMARY_ADJUSTMENTS_COLLECTION, yearMonth, 'entries');
-
-    async function readSummaryAdjustments(yearMonth) {
-        const q = query(getSummaryAdjustmentsEntriesCollection(yearMonth), orderBy('createdAtServer', 'desc'));
-        const snapshot = await getDocs(q);
-        const entries = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
-        const totals = entries.reduce((acc, entry) => {
-            acc.grossDelta += Number(entry.grossDelta || 0);
-            acc.netDelta += Number(entry.netDelta || 0);
-            return acc;
-        }, { grossDelta: 0, netDelta: 0 });
-        return { entries, totals };
-    }
-
     async function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
         const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache);
@@ -3329,18 +3306,6 @@ function initializeApp() {
             if (!grouped[year]) grouped[year] = {};
             if (!grouped[year][month]) grouped[year][month] = [];
         });
-
-        const allMonthKeys = [];
-        Object.keys(grouped).forEach((yearKey) => {
-            const year = Number(yearKey);
-            Object.keys(grouped[year] || {}).forEach((monthKey) => {
-                allMonthKeys.push(`${year}-${String(Number(monthKey)).padStart(2, '0')}`);
-            });
-        });
-        const adjustmentsByMonth = new Map();
-        await Promise.all([...new Set(allMonthKeys)].map(async (monthKey) => {
-            adjustmentsByMonth.set(monthKey, await readSummaryAdjustments(monthKey));
-        }));
 
         const miesiace = [];
         const sumyRocznePerRok = [];
@@ -3358,16 +3323,11 @@ function initializeApp() {
                 const stats = monthStats(months[month]);
                 const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
                 const invoiceMonth = invoiceByMonth.get(miesiacKey) || { invoicedHours: 0, grossAmount: 0, netAmount: 0 };
-                const adj = adjustmentsByMonth.get(miesiacKey)?.totals || { grossDelta: 0, netDelta: 0 };
                 const baseGross = Number(invoiceMonth.grossAmount) || 0;
                 const baseNet = Number(invoiceMonth.netAmount) || 0;
                 stats.billed = Number(invoiceMonth.invoicedHours) || 0;
-                stats.gross = baseGross + (Number(adj.grossDelta) || 0);
-                stats.net = baseNet + (Number(adj.netDelta) || 0);
-                stats.baseGross = baseGross;
-                stats.baseNet = baseNet;
-                stats.grossDelta = Number(adj.grossDelta) || 0;
-                stats.netDelta = Number(adj.netDelta) || 0;
+                stats.gross = baseGross;
+                stats.net = baseNet;
                 stats.absorpcja = stats.work > 0 ? ((stats.billed / stats.work) * 100) : 0;
                 const label = formatujMiesiac(miesiacKey);
                 const monthRecord = {
@@ -3381,10 +3341,6 @@ function initializeApp() {
                     billed: stats.billed,
                     gross: stats.gross,
                     net: stats.net,
-                    baseGross,
-                    baseNet,
-                    grossDelta: stats.grossDelta,
-                    netDelta: stats.netDelta,
                     l4Days: stats.l4Days,
                     urlopDays: stats.urlopDays,
                     absorpcja: stats.absorpcja,
@@ -3611,7 +3567,7 @@ function initializeApp() {
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th><th></th>
+          <th>Wyfakturowane</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -3625,7 +3581,6 @@ function initializeApp() {
               <td><span class="badge-value">${(Number(m.absorpcja)||0).toFixed(1)}%</span></td>
               <td>${m.l4Days}</td>
               <td>${m.urlopDays}</td>
-              <td><button type="button" class="btn-ghost btn-small summary-adjustment-btn" data-month="${m.miesiac}">Korekty</button></td>
             </tr>`).join('')}
         </tbody>
         <tfoot>
@@ -3639,7 +3594,6 @@ function initializeApp() {
             <td><span class="badge-value">${(Number(y.sum.absorpcja)||0).toFixed(1)}%</span></td>
             <td>${y.sum.l4Days}</td>
             <td>${y.sum.urlopDays}</td>
-            <td></td>
           </tr>
         </tfoot>
       </table>
@@ -3650,39 +3604,6 @@ function initializeApp() {
             const latestYear = Math.max(...years.map(y => Number(y.year)).filter(Number.isFinite));
             annualSummaryExportBtn.dataset.exportYear = Number.isFinite(latestYear) ? String(latestYear) : '';
         }
-    }
-
-    async function renderSummaryAdjustmentsHistory(monthKey) {
-        if (!summaryAdjustmentsHistory) return;
-        try {
-            const { entries } = await readSummaryAdjustments(monthKey);
-            if (!entries.length) {
-                summaryAdjustmentsHistory.innerHTML = '<p>Brak korekt dla tego miesiąca.</p>';
-                return;
-            }
-            summaryAdjustmentsHistory.innerHTML = `<ul class="adjustments-list">${entries.map((entry) => {
-                const ts = entry.createdAtServer?.toDate ? entry.createdAtServer.toDate().toISOString().slice(0, 16).replace('T', ' ') : 'brak daty';
-                const user = entry.userEmail || entry.userId || '—';
-                const gross = Number(entry.grossDelta || 0).toFixed(2);
-                const net = Number(entry.netDelta || 0).toFixed(2);
-                const comment = entry.comment || '—';
-                return `<li><span>${ts} — ${user} — brutto: ${gross} zł, netto: ${net} zł — ${comment}</span></li>`;
-            }).join('')}</ul>`;
-        } catch (error) {
-            console.error('Błąd ładowania historii korekt:', error);
-            summaryAdjustmentsHistory.innerHTML = '<p>Nie udało się pobrać historii korekt.</p>';
-        }
-    }
-
-    async function openSummaryAdjustmentsModal(monthKey) {
-        if (!summaryAdjustmentsModal || !summaryAdjustmentsForm) return;
-        currentSummaryAdjustmentMonth = monthKey;
-        if (summaryAdjustmentsMonthLabel) summaryAdjustmentsMonthLabel.textContent = monthKey;
-        if (summaryAdjustmentsGrossInput) summaryAdjustmentsGrossInput.value = '0';
-        if (summaryAdjustmentsNetInput) summaryAdjustmentsNetInput.value = '0';
-        if (summaryAdjustmentsCommentInput) summaryAdjustmentsCommentInput.value = '';
-        await renderSummaryAdjustmentsHistory(monthKey);
-        openModal(summaryAdjustmentsModal);
     }
 
     const calcVacationRemaining = (allowance, usedFromCalendar, adjustmentsSum) => {
@@ -7259,41 +7180,8 @@ async function obslugaListyCzesci(event) {
         });
     }
 
-    if (summaryAdjustmentsForm) {
-        summaryAdjustmentsForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            if (!currentSummaryAdjustmentMonth) return;
-            const grossDelta = Number(summaryAdjustmentsGrossInput?.value || 0);
-            const netDelta = Number(summaryAdjustmentsNetInput?.value || 0);
-            const comment = (summaryAdjustmentsCommentInput?.value || '').trim();
-            if (!comment) { alert('Komentarz jest wymagany.'); return; }
-            if (!Number.isFinite(grossDelta) || !Number.isFinite(netDelta)) { alert('Podaj poprawne kwoty korekty.'); return; }
-            if (grossDelta === 0 && netDelta === 0) { alert('Korekta 0/0 nie zostanie zapisana.'); return; }
-            await addDoc(getSummaryAdjustmentsEntriesCollection(currentSummaryAdjustmentMonth), {
-                createdAtServer: serverTimestamp(),
-                userId: auth?.currentUser?.uid || null,
-                userEmail: auth?.currentUser?.email || null,
-                grossDelta,
-                netDelta,
-                comment
-            });
-            await renderSummaryAdjustmentsHistory(currentSummaryAdjustmentMonth);
-            selectedYearNeedsRefresh = true;
-            await odswiezPodsumowania({ skipRender: false });
-            renderPulpit();
-            if (summaryAdjustmentsGrossInput) summaryAdjustmentsGrossInput.value = '0';
-            if (summaryAdjustmentsNetInput) summaryAdjustmentsNetInput.value = '0';
-            if (summaryAdjustmentsCommentInput) summaryAdjustmentsCommentInput.value = '';
-        });
-    }
-
     if (annualSummaryContainer) {
         annualSummaryContainer.addEventListener('click', (event) => {
-            const adjustmentBtn = event.target.closest('.summary-adjustment-btn');
-            if (adjustmentBtn?.dataset?.month) {
-                openSummaryAdjustmentsModal(adjustmentBtn.dataset.month);
-                return;
-            }
             const toggle = event.target.closest('.year-toggle');
             if (!toggle) return;
             const year = Number(toggle.dataset.year);
