@@ -4394,20 +4394,68 @@ async function obslugaListyKlientow(event) {
         openModal(machineHistoryModal);
 
         try {
-            const qMasz = query(
-                collection(db, "zlecenia"),
-                where("maszynaId", "==", maszynaId),
-                where("status", "==", "zakończone"),
-                orderBy("serviceDate", "desc")
-            );
-            const querySnapshot = await getDocs(qMasz);
+            const machineId = String(maszynaId || '').trim();
+            const closedStatuses = ['zakończone', 'zakonczone', 'ukończone', 'closed'];
+            console.debug('[machines:history] start', { machineId, closedStatuses });
+            if (!machineId) {
+                machineHistoryList.innerHTML = '<p style="color: red;">Nieprawidłowy identyfikator maszyny.</p>';
+                return;
+            }
 
+            const historySnapshots = await Promise.allSettled([
+                getDocs(query(
+                    collection(db, "zlecenia"),
+                    where("maszynaId", "==", machineId),
+                    where("status", "in", closedStatuses)
+                )),
+                getDocs(query(
+                    collection(db, "zlecenia"),
+                    where("machineId", "==", machineId),
+                    where("status", "in", closedStatuses)
+                ))
+            ]);
+
+            const historyDocsMap = new Map();
+            let hasAtLeastOneQuerySuccess = false;
+            historySnapshots.forEach((result) => {
+                if (result.status !== 'fulfilled') return;
+                hasAtLeastOneQuerySuccess = true;
+                result.value.forEach((docSnap) => {
+                    historyDocsMap.set(docSnap.id, docSnap);
+                });
+            });
+            if (!hasAtLeastOneQuerySuccess) {
+                const firstError = historySnapshots.find((res) => res.status === 'rejected')?.reason;
+                throw firstError || new Error('Nie udało się pobrać historii serwisowej.');
+            }
+
+            const historyDocs = [...historyDocsMap.values()];
+            console.debug('[machines:history] query result', { machineId, records: historyDocs.length });
+
+            const fallbackHistory = historyDocs.length === 0
+                ? (_wszystkieZleceniaCache || [])
+                    .filter((order) => {
+                        const orderMachineId = String(order?.maszynaId || order?.machineId || '').trim();
+                        return orderMachineId === machineId && (isOrderClosed(order) || closedStatuses.includes((order?.status || '').toLowerCase()));
+                    })
+                    .map((order) => ({ id: order.id, data: () => order }))
+                : [];
+            const historyRows = historyDocs.length > 0 ? historyDocs : fallbackHistory;
+
+            historyRows.sort((a, b) => {
+                const aDate = resolveServiceDate(a.data()) || '';
+                const bDate = resolveServiceDate(b.data()) || '';
+                return bDate.localeCompare(aDate);
+            });
 
             let rowsHtml = '';
-            if (!querySnapshot.empty) {
-                querySnapshot.forEach((d) => {
+            if (historyRows.length > 0) {
+                historyRows.forEach((d) => {
                     const zlecenie = d.data();
                     const serviceDate = resolveServiceDate(zlecenie);
+                    const klient = _wszystkieKlienciCache.find((item) => item.id === zlecenie.klientId);
+                    const clientLabel = zlecenie.klientNazwa || klient?.nazwa || '—';
+                    const invoicedHours = Number(zlecenie.wyfakturowaneGodziny ?? zlecenie.invoicedHours ?? 0) || 0;
                     const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0
                         ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>`
                         : '';
@@ -4418,9 +4466,11 @@ async function obslugaListyKlientow(event) {
                         <tr data-id="${d.id}">
                             <td>${serviceDate || 'b.d.'}</td>
                             <td>${zlecenie.nrZlecenia || '—'}</td>
+                            <td>${clientLabel}</td>
+                            <td><strong>${invoicedHours}h</strong></td>
                             <td>
                                 <div><em>${zlecenie.opis || 'Brak'}</em></div>
-                                <div>Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}</div>
+                                <div>Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}</div>
                             </td>
                             <td>${motoHoursVal.toFixed(1)} h</td>
                             <td class="actions">
@@ -4432,12 +4482,12 @@ async function obslugaListyKlientow(event) {
             }
 
             machineHistoryList.innerHTML = rowsHtml
-                ? `<table class="table machine-history-table"><thead><tr><th>Data</th><th>Nr zlecenia</th><th>Opis</th><th>Motogodziny</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`
-                : '<p>Brak historii serwisowej (zakończonych zleceń) dla tej maszyny.</p>';
+                ? `<table class="table machine-history-table"><thead><tr><th>Data</th><th>Nr zlecenia</th><th>Klient</th><th>Fakturowane godziny</th><th>Opis</th><th>Motogodziny</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>`
+                : '<p>Brak historii serwisowej dla tej maszyny.</p>';
 
 
         } catch (error) {
-            console.error("Błąd podczas pobierania historii serwisowej:", error);
+            console.error("Błąd podczas pobierania historii serwisowej:", error?.message || error);
             machineHistoryList.innerHTML = '<p style="color: red;">Wystąpił błąd podczas ładowania historii.</p>';
         }
     }
