@@ -606,17 +606,25 @@
             <form id="assign-zlecenie-form" class="modal-body">
                 <input type="hidden" id="assign-zlecenie-id">
                 <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
-                <div class="form-group"><label for="assign-klient-select">1. Wybierz istniejącego klienta:</label><select id="assign-klient-select"></select></div>
-                <p>...lub dodaj nowego:</p>
-                <div class="form-group"><label for="assign-nowy-klient">Nazwa nowego klienta:</label><input type="text" id="assign-nowy-klient"></div><hr>
-                <div id="assign-machine-section" style="display: none;">
-                    <div class="form-group"><label for="assign-maszyna-select">2. Wybierz maszynę klienta:</label><select id="assign-maszyna-select"></select></div>
-                    <p>...lub dodaj nową:</p>
-                    <div class="form-group"><label for="assign-nowa-maszyna-typ">Typ:</label><select id="assign-nowa-maszyna-typ"><option value="">Wybierz</option><option value="Traktor">Traktor</option><option value="Kombajn">Kombajn</option><option value="Prasa">Prasa</option><option value="Inna">Inna</option></select></div>
-                    <div class="form-group"><label for="assign-nowa-maszyna-model">Model:</label><input type="text" id="assign-nowa-maszyna-model"></div>
+                <div class="form-group">
+                    <label for="assign-tryb-select">Tryb przypisania</label>
+                    <select id="assign-tryb-select">
+                        <option value="normal">Przypisz do klienta</option>
+                        <option value="quick">Szybkie (bez klienta)</option>
+                    </select>
                 </div>
+                <div class="form-group" id="assign-client-group">
+                    <label for="assign-klient-select">Klient</label>
+                    <select id="assign-klient-select"></select>
+                </div>
+                <div class="form-group">
+                    <label for="assign-machine-model-text">Model traktora</label>
+                    <input type="text" id="assign-machine-model-text" placeholder="Np. John Deere 6155M">
+                </div>
+                <p id="assign-form-error" class="field-hint" style="color:#ef4444; display:none;"></p>
                 <div class="modal-actions">
-                    <button type="submit">Przypisz i Zapisz</button>
+                    <button type="button" id="assign-cancel-btn">Anuluj</button>
+                    <button type="submit">Zapisz</button>
                 </div>
             </form>
         </div>

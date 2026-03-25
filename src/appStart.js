@@ -405,11 +405,10 @@ function initializeApp() {
         { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false, typProdukt: PRODUCT_TYPE_ZMYWACZ }
     ];
     const NOTES_STORAGE_KEY = 'notesActivityCollapsed';
-    function obliczAbsorpcja(wyfakturowaneGodziny, godzinyPracy = BAZA_MIESIECZNA_GODZIN) {
+    function obliczAbsorpcja(wyfakturowaneGodziny) {
         const billed = Number(wyfakturowaneGodziny || 0);
-        const work = Number(godzinyPracy || 0);
-        if (work <= 0 || billed <= 0) return 0;
-        return (billed / work) * 100;
+        if (billed <= 0) return 0;
+        return (billed / BAZA_MIESIECZNA_GODZIN) * 100;
     }
     function fmtPct(x, places = 1) {
         return `${(Number(x) || 0).toFixed(places)}%`;
@@ -883,6 +882,12 @@ function initializeApp() {
     const unfinishedButtonSlot = document.getElementById('unfinished-button-slot');
     const assignModal = document.getElementById('assign-zlecenie-modal');
     const assignForm = document.getElementById('assign-zlecenie-form');
+    const assignCloseButton = assignModal ? assignModal.querySelector('.close-button') : null;
+    const assignModeSelect = document.getElementById('assign-tryb-select');
+    const assignClientGroup = document.getElementById('assign-client-group');
+    const assignCancelBtn = document.getElementById('assign-cancel-btn');
+    const assignMachineModelInput = document.getElementById('assign-machine-model-text');
+    const assignFormError = document.getElementById('assign-form-error');
     const klientForm = document.getElementById('klient-form');
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
@@ -3361,7 +3366,7 @@ function initializeApp() {
                 yearSum.urlopDays += stats.urlopDays;
             });
 
-            const yearAbsorpcja = yearSum.work > 0 ? ((yearSum.billed / yearSum.work) * 100) : 0;
+            const yearAbsorpcja = yearSum.billed > 0 ? ((yearSum.billed / (BAZA_MIESIECZNA_GODZIN * 12)) * 100) : 0;
             sumyRocznePerRok.push({
                 rok: year,
                 praca: yearSum.work,
@@ -3401,7 +3406,7 @@ function initializeApp() {
             jazda: globalTotals.drive,
             wyfakturowaneGodziny: globalTotals.billed,
             urlopDaysUsed: globalTotals.urlopDays,
-            absorpcja: globalTotals.work > 0 ? ((globalTotals.billed / globalTotals.work) * 100) : 0
+            absorpcja: globalTotals.billed > 0 ? ((globalTotals.billed / (BAZA_MIESIECZNA_GODZIN * 12)) * 100) : 0
         };
 
         return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
@@ -3475,8 +3480,7 @@ function initializeApp() {
         if (!zakonczoneSummaryContainer) return;
 
         const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
-        const pracaMiesiaca = (ostatnieZestawienieMiesieczne.miesiace || []).find(m => m.miesiac === wybranyMiesiac)?.work || 0;
-        const absorpcja = obliczAbsorpcja(sumaGodzin, pracaMiesiaca);
+        const absorpcja = obliczAbsorpcja(sumaGodzin);
 
         zakonczoneSummaryContainer.classList.add('orders-summary');
 
@@ -3999,7 +4003,7 @@ function initializeApp() {
                 orderIndex: buildOrderIndex(),
                 resolveClientName: resolveOrderClientName
             });
-            const report = computeYearReport({ ...reportData });
+            const report = computeYearReport({ ...reportData, orders: _wszystkieZleceniaCache });
             if (type === 'summary-csv') exportYearlySummaryCsv(report);
             if (type === 'orders-csv') exportYearlyOrdersCsv(report);
             if (type === 'pdf') exportYearlyPdf(report);
@@ -5236,8 +5240,10 @@ function wyswietlZlecenia() {
         if (!frazaWyszukiwania) return true;
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-        const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
-        const tekst = `${nazwa} ${zlecenie.nrZlecenia} ${klient ? klient.nazwa : ''} ${maszyna ? maszyna.model : ''} ${maszyna ? maszyna.typMaszyny : ''}`.toLowerCase();
+        const quickMachineModel = (zlecenie.machineModelText || '').trim();
+        const quickLabel = quickMachineModel ? `${zlecenie.nrZlecenia || 'Szybkie zlecenie'} - ${quickMachineModel}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+        const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : quickLabel;
+        const tekst = `${nazwa} ${zlecenie.nrZlecenia} ${klient ? klient.nazwa : ''} ${maszyna ? maszyna.model : ''} ${maszyna ? maszyna.typMaszyny : ''} ${quickMachineModel}`.toLowerCase();
         return tekst.includes(frazaWyszukiwania);
     });
 
@@ -5247,7 +5253,9 @@ function wyswietlZlecenia() {
 
             const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
             const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-            const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+            const quickMachineModel = (zlecenie.machineModelText || '').trim();
+            const quickLabel = quickMachineModel ? `${zlecenie.nrZlecenia || 'Szybkie zlecenie'} - ${quickMachineModel}` : (zlecenie.nrZlecenia || 'Szybkie zlecenie');
+            const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : quickLabel;
             const startLabel = normalizeDateOnly(zlecenie.startDate || zlecenie.startAt);
             const endLabel = normalizeDateOnly(zlecenie.completionDate || zlecenie.endAt || zlecenie.serviceDate);
             const timelineHtml = (startLabel || endLabel)
@@ -5606,11 +5614,16 @@ async function obslugaListyZlecen(event) {
         if (zlecenie && assignForm && assignModal) {
             const assignIdInput = assignForm.querySelector('#assign-zlecenie-id');
             const assignOpis = document.getElementById('assign-zlecenie-opis');
-            const assignMachineSection = document.getElementById('assign-machine-section');
             if (assignIdInput) assignIdInput.value = docId;
             if (assignOpis) assignOpis.textContent = zlecenie.nrZlecenia;
-            if (assignMachineSection) assignMachineSection.style.display = 'none';
             assignForm.reset();
+            if (assignModeSelect) assignModeSelect.value = 'normal';
+            if (assignMachineModelInput) assignMachineModelInput.value = zlecenie.machineModelText || '';
+            if (assignFormError) {
+                assignFormError.textContent = '';
+                assignFormError.style.display = 'none';
+            }
+            updateAssignModeUI();
             openModal(assignModal);
         }
         return;
@@ -5986,58 +5999,79 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     }
 }
 
+function updateAssignModeUI() {
+    const mode = assignModeSelect?.value === 'quick' ? 'quick' : 'normal';
+    if (assignClientGroup) assignClientGroup.style.display = mode === 'quick' ? 'none' : '';
+    if (assignMachineModelInput) {
+        assignMachineModelInput.required = mode === 'quick';
+        assignMachineModelInput.placeholder = mode === 'quick' ? 'Wymagane w trybie szybkim' : 'Opcjonalnie';
+    }
+}
+
+function setAssignFormError(message = '') {
+    if (!assignFormError) return;
+    assignFormError.textContent = message;
+    assignFormError.style.display = message ? '' : 'none';
+}
+
 async function zapiszPrzypisanie(event) {
     if (!assignForm || !assignModal) return;
     event.preventDefault();
     const zlecenieId = assignForm['assign-zlecenie-id'].value;
-    let klientId = assignForm['assign-klient-select'].value;
-    let maszynaId = assignForm['assign-maszyna-select'].value;
-    const nowyKlientNazwa = assignForm['assign-nowy-klient'].value.trim();
-    const nowaMaszynaTyp = assignForm['assign-nowa-maszyna-typ'].value;
-    const nowaMaszynaModel = assignForm['assign-nowa-maszyna-model'].value.trim();
+    const mode = assignModeSelect?.value === 'quick' ? 'quick' : 'normal';
+    const klientId = assignForm['assign-klient-select']?.value || '';
+    const machineModelText = (assignMachineModelInput?.value || '').trim();
+    setAssignFormError('');
     try {
-        if (!klientId && nowyKlientNazwa) {
-            const nowyKlientDoc = await addDoc(collection(db, "klienci"), { nazwa: nowyKlientNazwa, createdAt: new Date() });
-            klientId = nowyKlientDoc.id;
-        }
-        if (!klientId) { alert("Musisz wybrać lub dodać klienta."); return; }
-        if (!maszynaId && nowaMaszynaModel && nowaMaszynaTyp) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const klient = _wszystkieKlienciCache.find(k => k.id === klientId);
-            if (!klient) { alert("Błąd: Nie znaleziono danych nowo dodanego klienta. Spróbuj ponownie."); return; }
-            const nowaMaszynaDoc = await addDoc(collection(db, "maszyny"), {
-                klientId: klientId, klientNazwa: klient.nazwa,
-                typMaszyny: nowaMaszynaTyp, model: nowaMaszynaModel, createdAt: new Date()
-            });
-            maszynaId = nowaMaszynaDoc.id;
-        }
-        if (!maszynaId) { alert("Musisz wybrać lub dodać maszynę."); return; }
-
-        await new Promise(resolve => setTimeout(resolve, 700));
-
-        const maszyna = _wszystkieMaszynyCache.find(m => m.id === maszynaId);
-        if (!maszyna) { alert("Błąd: Nie znaleziono danych wybranej/dodanej maszyny. Spróbuj ponownie."); return; }
-
         const zlecenieRef = doc(db, "zlecenia", zlecenieId);
         const zlecenieSnap = await getDoc(zlecenieRef);
-        if (!zlecenieSnap.exists()) { alert("Błąd: Nie znaleziono zlecenia do przypisania."); return; }
+        if (!zlecenieSnap.exists()) {
+            setAssignFormError("Nie znaleziono zlecenia do przypisania.");
+            return;
+        }
         const zlecenieData = zlecenieSnap.data();
-        const nowaHistoria = [...(zlecenieData.historia || []), {
-            timestamp: new Date().toISOString(),
-            akcja: `Przypisano do klienta: ${maszyna.klientNazwa} (Maszyna: ${maszyna.model})`
-        }];
-
-        const daneDoAktualizacji = {
-            maszynaId: maszynaId, klientId: maszyna.klientId,
-            klientNazwa: maszyna.klientNazwa, typMaszyny: maszyna.typMaszyny,
-            model: maszyna.model, status: 'aktywne',
-            historia: nowaHistoria
+        const historia = Array.isArray(zlecenieData.historia) ? zlecenieData.historia : [];
+        const payload = {
+            status: 'aktywne'
         };
-        await updateDoc(zlecenieRef, daneDoAktualizacji);
+
+        if (mode === 'normal') {
+            if (!klientId) {
+                setAssignFormError("W trybie normalnym wybór klienta jest wymagany.");
+                return;
+            }
+            const klient = _wszystkieKlienciCache.find((item) => item.id === klientId);
+            payload.klientId = klientId;
+            payload.klientNazwa = klient?.nazwa || zlecenieData.klientNazwa || '';
+            payload.historia = [...historia, {
+                timestamp: new Date().toISOString(),
+                akcja: `Przypisano do klienta: ${payload.klientNazwa || klientId}`
+            }];
+            payload.machineModelText = machineModelText || null;
+        } else {
+            if (!machineModelText) {
+                setAssignFormError("W trybie szybkim pole „Model traktora” jest wymagane.");
+                return;
+            }
+            payload.klientId = null;
+            payload.klientNazwa = null;
+            payload.machineModelText = machineModelText;
+            payload.historia = [...historia, {
+                timestamp: new Date().toISOString(),
+                akcja: `Przypisano w trybie szybkim (model: ${machineModelText})`
+            }];
+        }
+
+        if (import.meta.env.DEV) console.debug('[assign-save] payload', payload);
+        await updateDoc(zlecenieRef, payload);
+        if (import.meta.env.DEV) console.debug('[assign-save] success', { zlecenieId, mode });
+        invalidateMonthStatsCache();
+        wyswietlZlecenia();
         hideModal(assignModal);
     } catch (error) {
+        if (import.meta.env.DEV) console.debug('[assign-save] error', error);
         console.error("Błąd podczas przypisywania:", error);
-        alert(`Wystąpił błąd: ${error.message}`);
+        setAssignFormError(`Wystąpił błąd: ${error.message}`);
     }
 }
 
@@ -7053,6 +7087,14 @@ async function obslugaListyCzesci(event) {
 
     // ZLECENIA
     if (zlecenieForm) zlecenieForm.addEventListener('submit', dodajZlecenie);
+    if (assignForm) assignForm.addEventListener('submit', zapiszPrzypisanie);
+    if (assignModeSelect) assignModeSelect.addEventListener('change', updateAssignModeUI);
+    if (assignCloseButton && assignModal) {
+        assignCloseButton.onclick = () => { hideModal(assignModal); };
+    }
+    if (assignCancelBtn && assignModal) {
+        assignCancelBtn.addEventListener('click', () => hideModal(assignModal));
+    }
     if (zlecenieKlientIdInput) {
         zlecenieKlientIdInput.addEventListener('change', aktualizujMaszynyDlaZlecenia);
         zlecenieKlientIdInput.dispatchEvent(new Event('change'));
