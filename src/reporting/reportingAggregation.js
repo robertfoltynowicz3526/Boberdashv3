@@ -1,3 +1,5 @@
+import { buildInvoiceStatsByMonth, isOrderClosed, resolveOrderSettlementMonth, getOrderInvoicedHours } from '../orders/invoiceStats.js';
+
 const BASE_MONTHLY_HOURS = 168;
 
 const sumOrders = (orders = []) =>
@@ -59,11 +61,18 @@ const sumTotals = (target, source) => {
   return target;
 };
 
-export const computeYearReport = ({ year, days = [] }) => {
+export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput = [] }) => {
   const monthMap = new Map();
-  const orders = [];
+  const orderRows = [];
   const clientTotalsMap = new Map();
-  const billedByBillingMonth = new Map();
+  const sourceOrders = Array.isArray(sourceOrdersInput) ? sourceOrdersInput : [];
+  const invoiceByMonth = buildInvoiceStatsByMonth(sourceOrders).monthStats;
+  const yearlyBilledFromClosedOrders = sourceOrders.reduce((acc, order) => {
+    if (!isOrderClosed(order)) return acc;
+    const monthKey = resolveOrderSettlementMonth(order);
+    if (!monthKey || !monthKey.startsWith(`${year}-`)) return acc;
+    return acc + getOrderInvoicedHours(order);
+  }, 0);
 
   days.forEach((day) => {
     const dayKey = day?.dayStr;
@@ -104,9 +113,7 @@ export const computeYearReport = ({ year, days = [] }) => {
           overHours: Number(order?.over) || 0,
           note: day?.note || ''
         };
-        const billingMonth = monthKey;
-        billedByBillingMonth.set(billingMonth, (billedByBillingMonth.get(billingMonth) || 0) + record.billedHours);
-        orders.push(record);
+        orderRows.push(record);
 
         const existing = clientTotalsMap.get(record.clientName) || { work: 0, drive: 0, billed: 0, over: 0 };
         existing.work += record.workHours;
@@ -121,7 +128,7 @@ export const computeYearReport = ({ year, days = [] }) => {
   const months = [...monthMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([monthKey, totals]) => {
-      const billed = billedByBillingMonth.get(monthKey) || 0;
+      const billed = Number(invoiceByMonth.get(monthKey)?.invoicedHours || 0);
       const merged = { ...totals, billed };
       return {
         monthKey,
@@ -142,6 +149,7 @@ export const computeYearReport = ({ year, days = [] }) => {
     },
     { work: 0, drive: 0, billed: 0, over: 0, l4Days: 0, urlopDays: 0 }
   );
+  yearlyTotals.billed = yearlyBilledFromClosedOrders;
   yearlyTotals.absorpcja = yearlyTotals.billed ? (yearlyTotals.billed / (BASE_MONTHLY_HOURS * 12)) * 100 : 0;
 
   const clientTotals = [...clientTotalsMap.entries()]
@@ -152,7 +160,7 @@ export const computeYearReport = ({ year, days = [] }) => {
     year,
     months,
     yearlyTotals,
-    orders,
+    orders: orderRows,
     clientTotals,
   };
 };
