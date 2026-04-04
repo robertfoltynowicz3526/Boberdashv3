@@ -410,6 +410,21 @@ function initializeApp() {
         if (billed <= 0 || worked <= 0) return 0;
         return (billed / worked) * 100;
     }
+    const ABSORPTION_MONTHLY_BASE_HOURS = 168;
+    function obliczAbsorpcjaDoBazy(wyfakturowaneGodziny, baseHours) {
+        const billed = Number(wyfakturowaneGodziny || 0);
+        const base = Number(baseHours || 0);
+        if (billed <= 0 || base <= 0) return 0;
+        return (billed / base) * 100;
+    }
+    function getElapsedMonthsForYearAbsorption(year, now = new Date()) {
+        const targetYear = Number(year);
+        if (!Number.isFinite(targetYear)) return 0;
+        const currentYear = now.getFullYear();
+        if (targetYear < currentYear) return 12;
+        if (targetYear > currentYear) return 0;
+        return now.getMonth();
+    }
     function fmtPct(x, places = 1) {
         return `${(Number(x) || 0).toFixed(places)}%`;
     }
@@ -3392,7 +3407,7 @@ function initializeApp() {
                 stats.billed = Number(invoiceMonth.invoicedHours) || 0;
                 stats.gross = baseGross;
                 stats.net = baseNet;
-                stats.absorpcja = stats.work > 0 ? ((stats.billed / stats.work) * 100) : 0;
+                stats.absorpcja = obliczAbsorpcjaDoBazy(stats.billed, ABSORPTION_MONTHLY_BASE_HOURS);
                 const label = formatujMiesiac(miesiacKey);
                 const monthRecord = {
                     miesiac: miesiacKey,
@@ -3425,7 +3440,9 @@ function initializeApp() {
                 yearSum.urlopDays += stats.urlopDays;
             });
 
-            const yearAbsorpcja = obliczAbsorpcja(yearSum.billed, yearSum.work);
+            const elapsedMonths = getElapsedMonthsForYearAbsorption(year);
+            const yearlyBaseHours = elapsedMonths * ABSORPTION_MONTHLY_BASE_HOURS;
+            const yearAbsorpcja = obliczAbsorpcjaDoBazy(yearSum.billed, yearlyBaseHours);
             sumyRocznePerRok.push({
                 rok: year,
                 praca: yearSum.work,
@@ -3440,9 +3457,20 @@ function initializeApp() {
                 billed: yearSum.billed,
                 urlopDays: yearSum.urlopDays,
                 miesiace: monthNumbers.length,
-                absorpcja: yearAbsorpcja
+                absorpcja: yearAbsorpcja,
+                absorpcjaBaseHours: yearlyBaseHours,
+                absorpcjaElapsedMonths: elapsedMonths
             });
-            yearsDetailed.push({ year, months: yearMonths, sum: { ...yearSum, absorpcja: yearAbsorpcja } });
+            yearsDetailed.push({
+                year,
+                months: yearMonths,
+                sum: {
+                    ...yearSum,
+                    absorpcja: yearAbsorpcja,
+                    absorpcjaBaseHours: yearlyBaseHours,
+                    absorpcjaElapsedMonths: elapsedMonths
+                }
+            });
 
             globalTotals.work += yearSum.work;
             globalTotals.drive += yearSum.drive;

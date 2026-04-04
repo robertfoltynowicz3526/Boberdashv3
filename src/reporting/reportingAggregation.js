@@ -59,14 +59,25 @@ const sumTotals = (target, source) => {
   return target;
 };
 
-const computeAbsorption = (billed, work) => {
+const ABSORPTION_MONTHLY_BASE_HOURS = 168;
+
+const computeAbsorption = (billed, baseHours) => {
   const billedHours = Number(billed) || 0;
-  const workHours = Number(work) || 0;
-  if (billedHours <= 0 || workHours <= 0) return 0;
-  return (billedHours / workHours) * 100;
+  const base = Number(baseHours) || 0;
+  if (billedHours <= 0 || base <= 0) return 0;
+  return (billedHours / base) * 100;
 };
 
 const normalizeLeaveAmount = (value) => (Number(value) === 0.5 ? 0.5 : 1);
+
+const getElapsedMonthsForYearAbsorption = (year, now = new Date()) => {
+  const targetYear = Number(year);
+  if (!Number.isFinite(targetYear)) return 0;
+  const currentYear = now.getFullYear();
+  if (targetYear < currentYear) return 12;
+  if (targetYear > currentYear) return 0;
+  return now.getMonth();
+};
 
 export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput = [] }) => {
   const monthMap = new Map();
@@ -140,7 +151,7 @@ export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput =
       return {
         monthKey,
         totals: merged,
-        absorpcja: computeAbsorption(merged.billed, merged.work)
+        absorpcja: computeAbsorption(merged.billed, ABSORPTION_MONTHLY_BASE_HOURS)
       };
     });
 
@@ -157,7 +168,11 @@ export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput =
     { work: 0, drive: 0, billed: 0, over: 0, l4Days: 0, urlopDays: 0 }
   );
   yearlyTotals.billed = yearlyBilledFromClosedOrders;
-  yearlyTotals.absorpcja = computeAbsorption(yearlyTotals.billed, yearlyTotals.work);
+  const elapsedMonths = getElapsedMonthsForYearAbsorption(year);
+  const yearlyBaseHours = elapsedMonths * ABSORPTION_MONTHLY_BASE_HOURS;
+  yearlyTotals.absorpcja = computeAbsorption(yearlyTotals.billed, yearlyBaseHours);
+  yearlyTotals.absorpcjaBaseHours = yearlyBaseHours;
+  yearlyTotals.absorpcjaElapsedMonths = elapsedMonths;
 
   const clientTotals = [...clientTotalsMap.entries()]
     .map(([clientName, totals]) => ({ clientName, totals }))
