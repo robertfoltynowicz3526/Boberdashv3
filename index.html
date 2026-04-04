@@ -251,7 +251,6 @@
                     </div>
                     <div class="form-group"><label for="nr-zlecenia">Nr zlecenia / Nazwa dla szybkiego zlecenia:</label><input type="text" id="nr-zlecenia" required></div>
                     <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
-                    <div class="form-group"><label for="motogodziny">Motogodziny (opcjonalnie):</label><input type="number" id="motogodziny" step="0.1" inputmode="decimal"></div>
                     <button type="submit">Dodaj Zlecenie</button>
                 </form>
             </div>
@@ -372,6 +371,8 @@
                                     </select>
                                     <label for="planned-leave-note">Notatka</label>
                                     <input type="text" id="planned-leave-note" placeholder="Opcjonalna notatka">
+                                    <label for="planned-leave-days">Liczba dni (opcjonalnie)</label>
+                                    <input type="number" id="planned-leave-days" min="0.5" step="0.5" inputmode="decimal" placeholder="np. 0.5">
                                     <label class="planned-leave-working">
                                         <input type="checkbox" id="planned-leave-working-days">
                                         Licz tylko dni robocze
@@ -418,13 +419,6 @@
             <span class="close-button">&times;</span><h2 id="kalendarz-modal-title">Ewidencja Czasu</h2>
             <form id="kalendarz-form" class="modal-body calendar-day-form">
                 <input type="hidden" id="kalendarz-data">
-                <section class="calendar-day-form__section calendar-day-form__section--summary">
-                    <div class="calendar-day-form__section-header">
-                        <h4>Podsumowanie dnia</h4>
-                        <span id="kalendarz-status-badge" class="day-status-badge is-hidden" aria-live="polite"></span>
-                    </div>
-                    <div id="kalendarz-summary-tiles" class="calendar-day-panel__summary-tiles"></div>
-                </section>
                 <section class="calendar-day-form__section calendar-day-form__section--orders">
                     <div class="calendar-day-form__section-header">
                         <h4>Zlecenia</h4>
@@ -468,6 +462,10 @@
                             <label><input type="radio" name="dayLeave" value="L4"> L4</label>
                             <label><input type="radio" name="dayLeave" value="SWIETO"> Święto</label>
                             <label><input type="radio" name="dayLeave" value="SZKOLENIE"> Szkolenie</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="day-leave-amount">Wymiar urlopu (dni):</label>
+                            <input type="number" id="day-leave-amount" value="1" min="0.5" max="1" step="0.5" inputmode="decimal" disabled>
                         </div>
                     </div>
                 </section>

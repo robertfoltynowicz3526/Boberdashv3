@@ -1,7 +1,5 @@
 import { buildInvoiceStatsByMonth, isOrderClosed, resolveOrderSettlementMonth, getOrderInvoicedHours } from '../orders/invoiceStats.js';
 
-const BASE_MONTHLY_HOURS = 168;
-
 const sumOrders = (orders = []) =>
   orders.reduce(
     (acc, order) => {
@@ -61,6 +59,15 @@ const sumTotals = (target, source) => {
   return target;
 };
 
+const computeAbsorption = (billed, work) => {
+  const billedHours = Number(billed) || 0;
+  const workHours = Number(work) || 0;
+  if (billedHours <= 0 || workHours <= 0) return 0;
+  return (billedHours / workHours) * 100;
+};
+
+const normalizeLeaveAmount = (value) => (Number(value) === 0.5 ? 0.5 : 1);
+
 export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput = [] }) => {
   const monthMap = new Map();
   const orderRows = [];
@@ -93,7 +100,7 @@ export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput =
     const isL4 = day?.leaveKind === 'L4' || day?.flags?.l4;
     const isUrlop = day?.leaveKind === 'URL' || day?.flags?.urlop;
     if (isL4) monthTotals.l4Days += 1;
-    if (isUrlop) monthTotals.urlopDays += 1;
+    if (isUrlop) monthTotals.urlopDays += normalizeLeaveAmount(day?.leaveAmount);
 
     monthMap.set(monthKey, monthTotals);
 
@@ -133,7 +140,7 @@ export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput =
       return {
         monthKey,
         totals: merged,
-        absorpcja: merged.billed ? (merged.billed / BASE_MONTHLY_HOURS) * 100 : 0
+        absorpcja: computeAbsorption(merged.billed, merged.work)
       };
     });
 
@@ -150,7 +157,7 @@ export const computeYearReport = ({ year, days = [], orders: sourceOrdersInput =
     { work: 0, drive: 0, billed: 0, over: 0, l4Days: 0, urlopDays: 0 }
   );
   yearlyTotals.billed = yearlyBilledFromClosedOrders;
-  yearlyTotals.absorpcja = yearlyTotals.billed ? (yearlyTotals.billed / (BASE_MONTHLY_HOURS * 12)) * 100 : 0;
+  yearlyTotals.absorpcja = computeAbsorption(yearlyTotals.billed, yearlyTotals.work);
 
   const clientTotals = [...clientTotalsMap.entries()]
     .map(([clientName, totals]) => ({ clientName, totals }))

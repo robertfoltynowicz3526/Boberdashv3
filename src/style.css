@@ -2055,8 +2055,14 @@ select {
 
 .client-machines {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.4rem;
+}
+
+.client-machine-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .client-machine-link {
@@ -2777,6 +2783,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .day-status .ds-group{ display:flex; flex-wrap:wrap; gap:12px; font-size:.95rem; }
 .day-status .ds-group label{ display:flex; align-items:center; gap:6px; font-size:.95rem; color:var(--ab-text); cursor:pointer; }
 .day-status input[type=radio]{ accent-color:var(--ab-accent); }
+.day-status #day-leave-amount{ max-width:120px; }
 
 /* Kalendarz – klucz do niewylewania się eventów */
 .ev-chip{ display:flex; justify-content:space-between; gap:6px; align-items:center; }

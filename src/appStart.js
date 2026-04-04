@@ -379,7 +379,6 @@ function initializeApp() {
     </div>`;
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
-    const BAZA_MIESIECZNA_GODZIN = 168;
     const DEFAULT_VACATION_ALLOWANCE = 26;
     const LEAVE_EVENT_PREFIX = 'leave_';
     const DAY_LEAVE_NONE = 'NONE';
@@ -405,10 +404,11 @@ function initializeApp() {
         { index: 'ZMYWACZ', nazwa: 'Zmywacz', jestOlejem: false, typProdukt: PRODUCT_TYPE_ZMYWACZ }
     ];
     const NOTES_STORAGE_KEY = 'notesActivityCollapsed';
-    function obliczAbsorpcja(wyfakturowaneGodziny) {
+    function obliczAbsorpcja(wyfakturowaneGodziny, przepracowaneGodziny) {
         const billed = Number(wyfakturowaneGodziny || 0);
-        if (billed <= 0) return 0;
-        return (billed / BAZA_MIESIECZNA_GODZIN) * 100;
+        const worked = Number(przepracowaneGodziny || 0);
+        if (billed <= 0 || worked <= 0) return 0;
+        return (billed / worked) * 100;
     }
     function fmtPct(x, places = 1) {
         return `${(Number(x) || 0).toFixed(places)}%`;
@@ -856,6 +856,7 @@ function initializeApp() {
     const kalendarzModalCloseButton = kalendarzModal ? kalendarzModal.querySelector('.close-button') : null;
     const kalendarzSummaryTiles = document.getElementById('kalendarz-summary-tiles');
     const kalendarzStatusBadge = document.getElementById('kalendarz-status-badge');
+    const dayLeaveAmountInput = document.getElementById('day-leave-amount');
     const kalendarzPodsumowanieDiv = document.getElementById('kalendarz-podsumowanie');
     const pulpitQuickActionsContainer = document.getElementById('pulpit-quick-actions');
     const pulpitWeeklyContainer = document.getElementById('pulpit-weekly-preview');
@@ -931,6 +932,7 @@ function initializeApp() {
     const plannedLeaveTypeSelect = document.getElementById('planned-leave-type');
     const plannedLeaveNoteInput = document.getElementById('planned-leave-note');
     const plannedLeaveWorkingDaysInput = document.getElementById('planned-leave-working-days');
+    const plannedLeaveDaysInput = document.getElementById('planned-leave-days');
     const plannedLeaveSubmitBtn = document.getElementById('planned-leave-submit');
     const plannedLeaveCancelBtn = document.getElementById('planned-leave-cancel');
     const plannedLeaveList = document.getElementById('planned-leave-list');
@@ -1129,6 +1131,7 @@ function initializeApp() {
             const fallback = kalendarzForm.querySelector('input[name="dayLeave"][value="NONE"]');
             if (fallback) fallback.checked = true;
         }
+        syncDayLeaveAmountState();
     };
 
     const getSelectedDayLeaveValue = () => {
@@ -1137,6 +1140,57 @@ function initializeApp() {
         if (!checked) return null;
         const normalized = normalizeDayLeaveValue(checked.value);
         return normalized === DAY_LEAVE_NONE ? null : normalized;
+    };
+
+    const parseLeaveAmount = (value, fallback = 1) => {
+        const amount = Number(value);
+        if (!Number.isFinite(amount) || amount <= 0) return fallback;
+        return amount === 0.5 ? 0.5 : 1;
+    };
+
+    const setDayLeaveAmountValue = (value = 1) => {
+        if (!dayLeaveAmountInput) return;
+        dayLeaveAmountInput.value = String(parseLeaveAmount(value, 1));
+    };
+
+    const syncDayLeaveAmountState = () => {
+        if (!dayLeaveAmountInput) return;
+        const selectedLeaveKind = getSelectedDayLeaveValue();
+        const enabled = selectedLeaveKind === 'URL';
+        dayLeaveAmountInput.disabled = !enabled;
+        if (!enabled) setDayLeaveAmountValue(1);
+    };
+
+    const copyTextToClipboard = async (value) => {
+        const text = String(value || '').trim();
+        if (!text) return false;
+        try {
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (_) { }
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        temp.setAttribute('readonly', '');
+        temp.style.position = 'absolute';
+        temp.style.left = '-9999px';
+        document.body.appendChild(temp);
+        temp.select();
+        const copied = document.execCommand('copy');
+        document.body.removeChild(temp);
+        return copied;
+    };
+
+    const showCopyFeedback = (button, text = 'Skopiowano') => {
+        if (!button) return;
+        const previous = button.dataset.copyLabel || button.textContent || '';
+        button.dataset.copyLabel = previous;
+        button.textContent = text;
+        clearTimeout(button._copyTimer);
+        button._copyTimer = setTimeout(() => {
+            button.textContent = previous;
+        }, 1200);
     };
 
     const listDaysInRange = (start, end) => {
@@ -2197,6 +2251,7 @@ function initializeApp() {
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
         kalendarzForm.reset();
         setDayLeaveValue(DAY_LEAVE_NONE);
+        setDayLeaveAmountValue(1);
         const kalendarzDataInput = document.getElementById('kalendarz-data');
         if (kalendarzDataInput) kalendarzDataInput.value = data;
 
@@ -2233,6 +2288,7 @@ function initializeApp() {
                 }
                 const leaveToSet = normalized.leaveKind || (normalized.flags?.urlop ? 'URL' : normalized.flags?.l4 ? 'L4' : normalized.flags?.swieto ? 'SWIETO' : normalized.flags?.wolne ? 'WOLNE' : normalized.flags?.szkolenie ? 'SZKOLENIE' : DAY_LEAVE_NONE);
                 setDayLeaveValue(leaveToSet || DAY_LEAVE_NONE);
+                setDayLeaveAmountValue(dane.leaveAmount || 1);
                 if (dayKey) {
                     const orderIndex = buildOrderIndex();
                     const dayDocForTotals = buildDayDocForTotals({
@@ -2431,6 +2487,7 @@ function initializeApp() {
         manualFakturowaneValue = fakturowaneDoZapisu;
 
         const selectedLeaveKind = getSelectedDayLeaveValue();
+        const leaveAmount = selectedLeaveKind === 'URL' ? parseLeaveAmount(dayLeaveAmountInput?.value, 1) : 0;
         const flags = {
             urlop: selectedLeaveKind === 'URL',
             l4: selectedLeaveKind === 'L4',
@@ -2452,6 +2509,7 @@ function initializeApp() {
             zlecenieId: powiazane.length === 1 ? powiazane[0].zlecenieId : null,
             klientNazwa: powiazane.length === 1 ? (powiazane[0].klientNazwa || null) : null,
             leaveKind: selectedLeaveKind || null,
+            leaveAmount,
             flags
         };
         try {
@@ -2608,7 +2666,7 @@ function initializeApp() {
         }, { praca: 0, wyfakturowaneGodziny: 0, nadgodziny: 0, jazda: 0 });
         return {
             ...sumyMies,
-            absorpcja: obliczAbsorpcja(sumyMies.wyfakturowaneGodziny)
+            absorpcja: obliczAbsorpcja(sumyMies.wyfakturowaneGodziny, sumyMies.praca)
         };
     }
 
@@ -3234,7 +3292,8 @@ function initializeApp() {
             drive: Number(dane.drive ?? dane.jazda) || 0,
             billed: Number(dane.billed ?? dane.fakturowane) || 0,
             flags,
-            leaveKind: leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE ? leaveKindNormalized : null
+            leaveKind: leaveKindNormalized && leaveKindNormalized !== DAY_LEAVE_NONE ? leaveKindNormalized : null,
+            leaveAmount: leaveKindNormalized === 'URL' ? parseLeaveAmount(dane.leaveAmount, 1) : 0
         };
     }
 
@@ -3285,15 +3344,15 @@ function initializeApp() {
 
             const key = normalized.date;
             if (!key) return;
-            if (!uniqByDate.has(key)) uniqByDate.set(key, { l4: false, urlop: false });
+            if (!uniqByDate.has(key)) uniqByDate.set(key, { l4: false, urlop: 0 });
             const agg = uniqByDate.get(key);
             if (normalized.flags?.l4) agg.l4 = true;
-            if (normalized.flags?.urlop) agg.urlop = true;
+            if (normalized.flags?.urlop) agg.urlop = Math.min(1, Number(agg.urlop || 0) + parseLeaveAmount(normalized.leaveAmount, 1));
         });
 
         for (const v of uniqByDate.values()) {
             if (v.l4) l4Days++;
-            if (v.urlop) urlopDays++;
+            urlopDays += Number(v.urlop) || 0;
         }
 
         return { work, drive, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
@@ -3366,7 +3425,7 @@ function initializeApp() {
                 yearSum.urlopDays += stats.urlopDays;
             });
 
-            const yearAbsorpcja = yearSum.billed > 0 ? ((yearSum.billed / (BAZA_MIESIECZNA_GODZIN * 12)) * 100) : 0;
+            const yearAbsorpcja = obliczAbsorpcja(yearSum.billed, yearSum.work);
             sumyRocznePerRok.push({
                 rok: year,
                 praca: yearSum.work,
@@ -3406,7 +3465,7 @@ function initializeApp() {
             jazda: globalTotals.drive,
             wyfakturowaneGodziny: globalTotals.billed,
             urlopDaysUsed: globalTotals.urlopDays,
-            absorpcja: globalTotals.billed > 0 ? ((globalTotals.billed / (BAZA_MIESIECZNA_GODZIN * 12)) * 100) : 0
+            absorpcja: obliczAbsorpcja(globalTotals.billed, globalTotals.work)
         };
 
         return { miesiace, sumyRoczne, sumyRocznePerRok, lata, yearlyGrouped: grouped, years: yearsDetailed };
@@ -3474,13 +3533,22 @@ function initializeApp() {
             }, { ...pustyWynik });
     }
 
+    function pobierzPraceZMiesiaca(miesiac) {
+        if (!miesiac) return 0;
+        return (wszystkieWpisyKalendarza || []).reduce((acc, wpis) => {
+            const normalized = normalizeDayRecord(wpis.id || wpis.date, wpis);
+            if (String(normalized.date || '').slice(0, 7) !== miesiac) return acc;
+            return acc + (Number(normalized.work) || 0);
+        }, 0);
+    }
+
     function obliczIPokazPodsumowanieFinansowe() {
         const wybranyMiesiac = getSelectedMonth();
         const finansowe = obliczPodsumowanieFinansowe(wybranyMiesiac, _wszystkieZleceniaCache);
         if (!zakonczoneSummaryContainer) return;
 
         const { sumaGodzin, sumaBrutto, sumaNetto } = finansowe;
-        const absorpcja = obliczAbsorpcja(sumaGodzin);
+        const absorpcja = obliczAbsorpcja(sumaGodzin, pobierzPraceZMiesiaca(wybranyMiesiac));
 
         zakonczoneSummaryContainer.classList.add('orders-summary');
 
@@ -3645,7 +3713,7 @@ function initializeApp() {
     }
 
     const getUsedLeaveDays = (entries = [], year) => {
-        const days = new Set();
+        const days = new Map();
         (entries || []).forEach(entry => {
             const normalized = normalizeDayRecord(entry.id || entry.date, entry);
             const isLeave = normalized.flags?.urlop || normalized.leaveKind === 'URL';
@@ -3653,9 +3721,12 @@ function initializeApp() {
             const key = normalizeDayKey(normalized.date || normalized.id, 'vacation.used');
             if (!key) return;
             if (Number(key.slice(0, 4)) !== Number(year)) return;
-            days.add(key);
+            const amount = parseLeaveAmount(normalized.leaveAmount, 1);
+            days.set(key, Math.max(Number(days.get(key) || 0), amount));
         });
-        return [...days].sort();
+        return [...days.entries()]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, amount]) => ({ date, amount }));
     };
 
     const groupDatesByMonth = (dates = []) => {
@@ -3674,7 +3745,9 @@ function initializeApp() {
         return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    const countDaysInRange = (startDate, endDate, workingOnly = false) => {
+    const countDaysInRange = (startDate, endDate, workingOnly = false, explicitDays = null) => {
+        const explicit = Number(explicitDays);
+        if (Number.isFinite(explicit) && explicit > 0) return explicit;
         const days = listDaysInclusive(startDate, endDate);
         if (!workingOnly) return days.length;
         return days.filter(day => !isWeekendDay(day)).length;
@@ -3687,11 +3760,15 @@ function initializeApp() {
             vacationUsedList.innerHTML = '<p>Brak wykorzystanych dni urlopu w wybranym roku.</p>';
             return;
         }
-        const grouped = groupDatesByMonth(usedDays);
+        const grouped = groupDatesByMonth(usedDays.map(item => item.date));
         const blocks = [];
         grouped.forEach((dates, monthKey) => {
             const label = formatujMiesiac(monthKey);
-            const items = dates.map(day => `<li>${formatDateLabel(day)}</li>`).join('');
+            const items = dates.map(day => {
+                const matched = usedDays.find(item => item.date === day);
+                const suffix = matched && Number(matched.amount) < 1 ? ` (${formatujLiczbe(matched.amount)} dnia)` : '';
+                return `<li>${formatDateLabel(day)}${suffix}</li>`;
+            }).join('');
             blocks.push(`
                 <div class="month-group">
                     <h5>${label}</h5>
@@ -3729,6 +3806,7 @@ function initializeApp() {
             note: data.note || '',
             type: data.type || 'Urlop planowany',
             countWorkingDays: Boolean(data.countWorkingDays),
+            leaveDays: Number(data.leaveDays) > 0 ? Number(data.leaveDays) : null,
             createdAt: data.createdAt || null
         };
     };
@@ -3751,6 +3829,7 @@ function initializeApp() {
         if (plannedLeaveTypeSelect) plannedLeaveTypeSelect.value = entry.type || 'Urlop planowany';
         if (plannedLeaveNoteInput) plannedLeaveNoteInput.value = entry.note || '';
         if (plannedLeaveWorkingDaysInput) plannedLeaveWorkingDaysInput.checked = Boolean(entry.countWorkingDays);
+        if (plannedLeaveDaysInput) plannedLeaveDaysInput.value = entry.leaveDays ? String(entry.leaveDays) : '';
     };
 
     const clearPlannedLeaveForm = () => {
@@ -3775,11 +3854,11 @@ function initializeApp() {
             refreshPlannedLeaveDecorations();
             return;
         }
-        const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays), 0);
+        const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays), 0);
         plannedLeaveTotalSpan.textContent = formatujLiczbe(totalDays);
         plannedLeaveList.innerHTML = plannedLeaveEntries.map(entry => {
             const rangeLabel = `${entry.startDate || '—'} → ${entry.endDate || '—'}`;
-            const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays);
+            const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays);
             const metaBits = [
                 `${formatujLiczbe(count)} dni`,
                 entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'
@@ -4170,7 +4249,12 @@ function wyswietlKlientow() {
         ? maszyny.map(m => {
           const sn = (m.nrSeryjny && m.nrSeryjny !== '---') ? m.nrSeryjny : '—';
           const naz = `${m.typMaszyny || ''} ${m.model || ''}`.trim();
-          return `<button type="button" class="client-machine-link" data-maszyna-id="${m.id}" data-client-id="${klient.id}">${naz || 'Maszyna'} • S/N: ${sn}</button>`;
+          return `
+            <div class="client-machine-row">
+              <button type="button" class="client-machine-link" data-maszyna-id="${m.id}" data-client-id="${klient.id}">${naz || 'Maszyna'} • S/N: ${sn}</button>
+              <button type="button" class="btn-secondary btn-small copy-serial-btn" data-serial="${sn}" title="Kopiuj numer seryjny">Kopiuj numer seryjny</button>
+            </div>
+          `;
         }).join('')
         : '<span class="client-meta">Brak maszyn</span>';
       const isOpen = expandedSet.has(klient.id);
@@ -4343,6 +4427,24 @@ const closeClientActionMenus = (except = null) => {
     });
 };
 async function obslugaListyKlientow(event) {
+  const copySerialBtn = event.target.closest('.copy-serial-btn');
+  if (copySerialBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const serial = copySerialBtn.dataset.serial;
+    if (!serial || serial === '—') {
+      alert('Brak numeru seryjnego do skopiowania.');
+      return;
+    }
+    const copied = await copyTextToClipboard(serial);
+    if (copied) {
+      showCopyFeedback(copySerialBtn, 'Skopiowano');
+    } else {
+      alert('Nie udało się skopiować numeru seryjnego.');
+    }
+    return;
+  }
+
   const menuTrigger = event.target.closest('[data-client-action="menu"]');
   if (menuTrigger) {
     const menu = menuTrigger.closest('.row-action');
@@ -4959,6 +5061,7 @@ async function obslugaListyKlientow(event) {
                             <div class="machine-row-meta">${metaParts.join(' • ')}</div>
                         </div>
                         <div class="machine-row-actions">
+                            <button type="button" class="btn-secondary btn-small copy-serial-btn" data-serial="${sn}" title="Kopiuj numer seryjny">Kopiuj numer seryjny</button>
                             <button type="button" class="machine-edit-link" data-maszyna-id="${maszyna.id}">Edytuj</button>
                         </div>
                     </div>
@@ -5066,6 +5169,24 @@ async function obslugaListyKlientow(event) {
     const maszynaId = el.dataset.maszynaId;
     if (!maszynaId) return;
     otworzModalEdycjiMaszyny(maszynaId);
+    return;
+  }
+
+  const copySerialBtn = el.closest('.copy-serial-btn');
+  if (copySerialBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const serial = copySerialBtn.dataset.serial;
+    if (!serial || serial === '—') {
+      alert('Brak numeru seryjnego do skopiowania.');
+      return;
+    }
+    const copied = await copyTextToClipboard(serial);
+    if (copied) {
+      showCopyFeedback(copySerialBtn, 'Skopiowano');
+    } else {
+      alert('Nie udało się skopiować numeru seryjnego.');
+    }
     return;
   }
 
@@ -5520,8 +5641,8 @@ async function dodajZlecenie(event) {
             maszynaId: wybranaMaszynaId, klientId: klient.id, klientNazwa: klient.nazwa,
             typMaszyny: maszyna.typMaszyny, model: maszyna.model, status: 'aktywne',
             nrZlecenia: zlecenieForm['nr-zlecenia'].value, opis: zlecenieForm['opis-usterki'].value,
-            motogodziny: Number(zlecenieForm.motogodziny.value) || maszyna.motogodziny,
-            motoHours: Number(zlecenieForm.motogodziny.value) || 0,
+            motogodziny: Number(maszyna.motogodziny) || 0,
+            motoHours: 0,
             createdDate: todayDate,
             createdOn: todayDate,
             startDate: todayDate,
@@ -5541,9 +5662,6 @@ async function dodajZlecenie(event) {
 
     try {
         const docRef = await addDoc(collection(db, "zlecenia"), dane);
-        if (dane.maszynaId && zlecenieForm.motogodziny.value) {
-            await updateDoc(doc(db, "maszyny", dane.maszynaId), { motogodziny: dane.motogodziny });
-        }
         await logActivityEvent({
             type: 'ORDER_CREATED',
             refId: docRef.id,
@@ -5661,6 +5779,8 @@ async function obslugaListyZlecen(event) {
             }
             const invInput = document.getElementById('wyfakturowane-godziny');
             if (invInput) invInput.value = String(getOrderInvoicedHours(zlecenie));
+            const motoInput = document.getElementById('moto-hours');
+            if (motoInput) motoInput.value = String(Number(zlecenie.motoHours ?? maszyna?.motogodziny ?? 0) || 0);
             czesciDoZlecenia = [];
             renderCzesciDoZlecenia();
             renderMagazynWModalu();
@@ -6268,6 +6388,9 @@ async function obslugaListyCzesci(event) {
                             refId: docId,
                             label: `Zmieniono datę wykonania z ${staraDataWykonania} na ${completionDate}`
                         });
+                    }
+                    if (zamykaneZlecenieData.maszynaId) {
+                        await updateDoc(doc(db, "maszyny", zamykaneZlecenieData.maszynaId), { motogodziny: Number(motoHours) });
                     }
                 }
                 alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
@@ -7341,15 +7464,18 @@ async function obslugaListyCzesci(event) {
             const endDate = plannedLeaveEndInput?.value || '';
             const startParsed = toDateSafe(startDate);
             const endParsed = toDateSafe(endDate);
+            const leaveDaysRaw = Number(plannedLeaveDaysInput?.value);
             if (!startParsed || !endParsed) { alert('Wybierz poprawny zakres dat.'); return; }
             if (startParsed > endParsed) { alert('Data końcowa nie może być wcześniejsza niż początkowa.'); return; }
+            if (plannedLeaveDaysInput?.value && (!Number.isFinite(leaveDaysRaw) || leaveDaysRaw <= 0)) { alert('Podaj poprawną liczbę dni urlopu (np. 0.5).'); return; }
             const payload = {
                 year: Number(selectedYear),
                 startDate,
                 endDate,
                 type: plannedLeaveTypeSelect?.value || 'Urlop planowany',
                 note: plannedLeaveNoteInput?.value || '',
-                countWorkingDays: Boolean(plannedLeaveWorkingDaysInput?.checked)
+                countWorkingDays: Boolean(plannedLeaveWorkingDaysInput?.checked),
+                leaveDays: plannedLeaveDaysInput?.value ? leaveDaysRaw : null
             };
             if (plannedLeaveEditId) {
                 await updateDoc(doc(db, 'plannedLeave', plannedLeaveEditId), {
@@ -7400,6 +7526,12 @@ async function obslugaListyCzesci(event) {
 
     // KALENDARZ (modal + klik w kalendarzu)
     if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
+    if (kalendarzForm) {
+        kalendarzForm.querySelectorAll('input[name="dayLeave"]').forEach((radio) => {
+            radio.addEventListener('change', syncDayLeaveAmountState);
+        });
+    }
+    syncDayLeaveAmountState();
     if (kalendarzForm && kalendarzForm['godziny-fakturowane']) {
         kalendarzForm['godziny-fakturowane'].addEventListener('input', () => {
             if (multiZlecenia.length === 0) {

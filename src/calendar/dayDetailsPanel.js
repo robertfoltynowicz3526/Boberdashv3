@@ -140,19 +140,6 @@ export const renderDayDetailsPanel = (container, model) => {
       </div>
     </div>
     <div class="calendar-day-panel__body">
-      <div class="calendar-day-panel__summary-section">
-        <div class="calendar-day-panel__section-header">
-          <h4>Podsumowanie dnia</h4>
-        </div>
-        <div class="calendar-day-panel__summary-tiles">
-          ${model.summary.tiles.map((tile) => `
-            <div class="calendar-day-panel__summary-tile">
-              <div class="calendar-day-panel__summary-label">${tile.label}</div>
-              <div class="calendar-day-panel__summary-value">${tile.value}</div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
       <div class="calendar-day-panel__form-host" data-panel-form-host></div>
     </div>
   `;
