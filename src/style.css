@@ -3996,3 +3996,164 @@ input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator { opacity:
 .notes-toolbar button { border:1px solid var(--line-color); background:var(--surface-color); color:var(--text-color); border-radius:8px; padding:4px 8px; cursor:pointer; }
 .notes-editor-content { width:100%; min-height:58vh; border:1px solid var(--line-color); border-radius:10px; padding:10px; overflow:auto; background:var(--surface-color); }
 .notes-editor-content:focus { outline:2px solid color-mix(in srgb, var(--color-accent) 45%, transparent); }
+
+/* ===== Etap 2: porządek wizualny i czytelność ===== */
+:root {
+  --ui-accent-main: var(--color-primary);
+  --ui-panel-bg: rgba(17, 28, 20, 0.9);
+  --ui-panel-bg-soft: rgba(255, 255, 255, 0.025);
+  --ui-panel-border: rgba(255, 255, 255, 0.09);
+  --ui-panel-border-strong: rgba(255, 255, 255, 0.16);
+}
+
+.sidebar-nav {
+  gap: 0.85rem;
+}
+
+.nav-group {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-group-label {
+  margin: 0 0 0.2rem;
+  padding: 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.tab-button {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.tab-button--accent {
+  border-color: rgba(54, 124, 43, 0.75);
+  background: linear-gradient(180deg, rgba(54, 124, 43, 0.4), rgba(30, 77, 35, 0.72));
+  box-shadow: 0 10px 24px -16px rgba(54, 124, 43, 0.9);
+}
+
+.tab-button.active {
+  background: rgba(252, 209, 22, 0.88);
+}
+
+.summary-container-subtle,
+.form-section,
+.search-section,
+.table-section,
+.card,
+#summary-container,
+#magazyn-summary,
+#annual-summary,
+.summary-card,
+.modal-content {
+  border-color: var(--ui-panel-border);
+}
+
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="month"],
+input[type="date"],
+input[type="email"],
+select,
+textarea {
+  background-color: rgba(8, 14, 10, 0.94);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.summary-stack {
+  gap: 20px;
+}
+
+.summary-card {
+  background: var(--ui-panel-bg);
+}
+
+.summary-card--primary {
+  border-color: rgba(54, 124, 43, 0.35);
+}
+
+#annual-summary {
+  display: grid;
+  gap: 14px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.year-section {
+  background: var(--ui-panel-bg-soft);
+  border: 1px solid var(--ui-panel-border);
+}
+
+.year-toggle .year-quick-sums {
+  gap: 10px 14px;
+}
+
+.notes-layout--airy .side {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.notes-layout--airy .form-group {
+  margin-bottom: 0;
+}
+
+.notes-actions--stacked {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+#zlecenie-form,
+#complete-zlecenie-form,
+#assign-zlecenie-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-shell h3 {
+  margin: 0.35rem 0 0.1rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--ui-panel-border);
+  font-size: 1rem;
+}
+
+.form-subsection-title {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.calendar-day-form {
+  gap: 14px;
+}
+
+.calendar-day-form__section {
+  padding: 14px;
+  border: 1px solid var(--ui-panel-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.calendar-day-form__section-header h4 {
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.calendar-day-form__fields {
+  row-gap: 0.65rem;
+}
+
+.day-status .ds-group {
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--ui-panel-border);
+  background: rgba(0, 0, 0, 0.16);
+}

@@ -25,15 +25,24 @@
             </div>
         </div>
         <nav class="sidebar-nav tabs-row">
-            <button type="button" class="tab-button" data-tab="pulpit">Pulpit</button>
-            <button type="button" class="tab-button" data-tab="kalendarz-tab">Kalendarz</button>
-            <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
-            <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
-            <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
-            <button type="button" class="tab-button" data-tab="dodaj-zlecenie">Dodaj Zlecenie</button>
-            <button type="button" class="tab-button" data-tab="notatnik">Notatnik</button>
-            <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
-            <button type="button" class="tab-button" data-tab="podsumowanie">Podsumowanie</button>
+            <div class="nav-group">
+                <p class="nav-group-label">Główne</p>
+                <button type="button" class="tab-button" data-tab="pulpit">Pulpit</button>
+                <button type="button" class="tab-button" data-tab="kalendarz-tab">Kalendarz</button>
+                <button type="button" class="tab-button tab-button--accent" data-tab="dodaj-zlecenie">+ Dodaj Zlecenie</button>
+            </div>
+            <div class="nav-group">
+                <p class="nav-group-label">Serwis</p>
+                <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
+                <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
+                <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
+            </div>
+            <div class="nav-group">
+                <p class="nav-group-label">Narzędzia</p>
+                <button type="button" class="tab-button" data-tab="notatnik">Notatnik</button>
+                <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
+                <button type="button" class="tab-button" data-tab="podsumowanie">Podsumowanie</button>
+            </div>
         </nav>
         <div class="sidebar-footer">
             <p class="sidebar-label">Motyw interfejsu</p>
@@ -90,7 +99,7 @@
                 <h2>Notatnik</h2>
                 <button type="button" id="notes-add-btn" class="btn-add">+ Nowa notatka</button>
             </div>
-            <div class="orders-grid notes-layout">
+            <div class="orders-grid notes-layout notes-layout--airy">
                 <div class="side">
                     <div class="form-group">
                         <label for="notes-quick-create">Szybka notatka</label>
@@ -113,7 +122,7 @@
                         <label for="notes-filter-order">Konkretne zlecenie</label>
                         <select id="notes-filter-order"><option value="">Wszystkie zlecenia</option></select>
                     </div>
-                    <div class="notes-actions" aria-label="Eksport notatek">
+                    <div class="notes-actions notes-actions--stacked" aria-label="Eksport notatek">
                         <button type="button" id="notes-export-selected" class="btn-secondary">Eksportuj .txt (wybrana)</button>
                         <button type="button" id="notes-export-filtered" class="btn-secondary">Eksportuj .txt (lista)</button>
                     </div>
@@ -311,7 +320,7 @@
         </div>
         <div id="podsumowanie" class="tab-content" data-section="podsumowanie">
             <div class="summary-stack">
-                <div class="summary-card" id="sum-roczne">
+                <div class="summary-card summary-card--primary" id="sum-roczne">
                     <div class="card-head">
                         <h3>Podsumowanie Roczne</h3>
                         <div class="export-menu">
@@ -326,7 +335,6 @@
                         </div>
                     </div>
                     <div class="summary-toolbar"><div class="summary-toolbar-left"><label for="summary-billing-mode">Wyfakturowane:</label><select id="summary-billing-mode"><option value="calendar">Zlecenia + ewidencja</option></select></div></div>
-                    <p class="summary-info">Zestawienie miesięcy z ewidencji czasu pracy, widoczne dla wszystkich dostępnych lat.</p>
                     <div id="annual-summary"></div>
                 </div>
                 <div class="summary-card" id="sum-urlop">
@@ -480,7 +488,7 @@
         </div>
     </div>
     <div id="complete-zlecenie-modal" class="modal">
-        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form" class="modal-body"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
+        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form" class="modal-body form-shell"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
             <h3>Rozliczenie</h3>
             <div class="form-group">
               <label for="complete-zlecenie-service-date">Data zakończenia/wykonania:</label>
@@ -500,7 +508,7 @@
               <label for="zakonczenie-notatka">Notatka z wykonanych prac (opcjonalnie):</label>
               <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
             </div>
-            <hr><h3>Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4>Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
+            <hr><h3 class="form-subsection-title">Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4 class="form-subsection-title">Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
     </div>
     <div id="stock-change-modal" class="modal">
         <div class="modal-content"><span class="close-button">&times;</span><h2 id="stock-modal-title">Zmień stan</h2><form id="stock-change-form" class="modal-body"><input type="hidden" id="stock-change-id"><p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p><p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p><div class="form-group"><label for="stock-change-qty">Ilość:</label><input type="number" step="1" id="stock-change-qty" required inputmode="numeric"></div><div class="modal-actions"><button type="submit">Zatwierdź Zmianę</button></div></form></div>
@@ -605,7 +613,7 @@
     <div id="assign-zlecenie-modal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span><h2>Przypisz zlecenie</h2>
-            <form id="assign-zlecenie-form" class="modal-body">
+            <form id="assign-zlecenie-form" class="modal-body form-shell">
                 <input type="hidden" id="assign-zlecenie-id">
                 <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
                 <p class="field-hint">Pełne zlecenie: wybierz klienta. Szybkie: bez klienta, podaj model maszyny.</p>
