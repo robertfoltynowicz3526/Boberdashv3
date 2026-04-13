@@ -3675,9 +3675,6 @@ function initializeApp() {
 
         const openYears = ensureOpenSummaryYears(years.map(y => y.year));
         annualSummaryContainer.innerHTML = `
-<div class="summary-explainer">
-  <p><strong>Jak czytać wskaźniki:</strong> Wyfakturowane = godziny z zamkniętych zleceń w miesiącu rozliczenia. Absorpcja = (wyfakturowane ÷ godziny pracy z ewidencji) × 100%.</p>
-</div>
 ${years.map(y => `
   <div class="year-section ${openYears.has(y.year) ? 'is-open' : ''}" data-year="${y.year}">
     <div class="year-header">
@@ -3703,7 +3700,7 @@ ${years.map(y => `
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane (zlecenia)</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja (z ewidencji)</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
