@@ -3378,6 +3378,50 @@ main,
 .planned-leave-item .actions{ display:flex; flex-wrap:wrap; gap:8px; }
 .planned-leave-item .actions button{ padding:4px 10px; border-radius:8px; }
 .btn-secondary{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); color:inherit; }
+.orders-flow-intro{
+  margin:0 0 12px;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;
+  background:rgba(122,162,255,.08);
+}
+.summary-explainer{
+  margin-bottom:12px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);
+  font-size:.9rem;
+  opacity:.92;
+}
+.calendar-day-form__section{
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+}
+.calendar-day-form{ display:grid; gap:10px; }
+.calendar-day-form .field-hint{ margin:0 0 8px; opacity:.8; }
+.app-toast{
+  position:fixed;
+  left:50%;
+  bottom:20px;
+  transform:translateX(-50%) translateY(12px);
+  background:rgba(16,185,129,.95);
+  color:#052e16;
+  border-radius:999px;
+  padding:8px 14px;
+  font-weight:700;
+  font-size:.86rem;
+  opacity:0;
+  pointer-events:none;
+  transition:all .2s ease;
+  z-index:2200;
+}
+.app-toast.is-visible{
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
 .adjustments-list{ list-style:none; padding:0; margin:0; display:grid; gap:8px; }
 .adjustments-list li{ display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--border-color, #e5e7eb); border-radius:10px; }
 

@@ -65,6 +65,19 @@ const deriveBillingMonthFromCompletionDate = (completionDate) => {
     return normalized ? normalized.slice(0, 7) : '';
 };
 
+const normalizeHalfDayValue = (value, { min = 0, fallback = 0 } = {}) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    const rounded = Math.round(num * 2) / 2;
+    return Math.max(min, rounded);
+};
+
+const formatDaysValue = (value) => {
+    const normalized = normalizeHalfDayValue(value, { min: 0, fallback: 0 });
+    if (normalized === 1) return '1 dzień';
+    return `${normalized.toFixed((normalized % 1) === 0 ? 0 : 1)} dni`;
+};
+
 const setDecorations = (decorations) => {
     window.__calendarDecorations = decorations;
     if (window.calendar) {
@@ -1206,6 +1219,25 @@ function initializeApp() {
         button._copyTimer = setTimeout(() => {
             button.textContent = previous;
         }, 1200);
+    };
+
+    const showToastMessage = (message = '') => {
+        const text = String(message || '').trim();
+        if (!text) return;
+        let toast = document.getElementById('app-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'app-toast';
+            toast.className = 'app-toast';
+            toast.setAttribute('aria-live', 'polite');
+            document.body.appendChild(toast);
+        }
+        toast.textContent = text;
+        toast.classList.add('is-visible');
+        clearTimeout(showToastMessage._timer);
+        showToastMessage._timer = setTimeout(() => {
+            toast.classList.remove('is-visible');
+        }, 1600);
     };
 
     const listDaysInRange = (start, end) => {
@@ -3642,7 +3674,11 @@ function initializeApp() {
         }
 
         const openYears = ensureOpenSummaryYears(years.map(y => y.year));
-        annualSummaryContainer.innerHTML = years.map(y => `
+        annualSummaryContainer.innerHTML = `
+<div class="summary-explainer">
+  <p><strong>Jak czytać wskaźniki:</strong> Wyfakturowane = godziny z zamkniętych zleceń w miesiącu rozliczenia. Absorpcja = (wyfakturowane ÷ godziny pracy z ewidencji) × 100%.</p>
+</div>
+${years.map(y => `
   <div class="year-section ${openYears.has(y.year) ? 'is-open' : ''}" data-year="${y.year}">
     <div class="year-header">
       <button type="button" class="year-toggle" data-year="${y.year}" aria-expanded="${openYears.has(y.year)}" aria-controls="year-content-${y.year}">
@@ -3656,8 +3692,8 @@ function initializeApp() {
             <span>Brutto: ${(Number(y.sum.gross)||0).toFixed(2)} zł</span>
             <span>Netto: ${(Number(y.sum.net)||0).toFixed(2)} zł</span>
             <span>Absorpcja: ${(Number(y.sum.absorpcja)||0).toFixed(1)}%</span>
-            <span>L4: ${y.sum.l4Days} dni</span>
-            <span>Urlop: ${y.sum.urlopDays} dni</span>
+            <span>L4: ${formatDaysValue(y.sum.l4Days)}</span>
+            <span>Urlop: ${formatDaysValue(y.sum.urlopDays)}</span>
           </span>
         </span>
       </button>
@@ -3667,7 +3703,7 @@ function initializeApp() {
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane (zlecenia)</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja (z ewidencji)</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -3680,7 +3716,7 @@ function initializeApp() {
               <td>${(Number(m.net)||0).toFixed(2)} zł</td>
               <td><span class="badge-value">${(Number(m.absorpcja)||0).toFixed(1)}%</span></td>
               <td>${m.l4Days}</td>
-              <td>${m.urlopDays}</td>
+              <td>${formatDaysValue(m.urlopDays)}</td>
             </tr>`).join('')}
         </tbody>
         <tfoot>
@@ -3693,13 +3729,13 @@ function initializeApp() {
             <td>${(Number(y.sum.net)||0).toFixed(2)} zł</td>
             <td><span class="badge-value">${(Number(y.sum.absorpcja)||0).toFixed(1)}%</span></td>
             <td>${y.sum.l4Days}</td>
-            <td>${y.sum.urlopDays}</td>
+            <td>${formatDaysValue(y.sum.urlopDays)}</td>
           </tr>
         </tfoot>
       </table>
     </div>
   </div>
-`).join('');
+`).join('')}`;
         if (annualSummaryExportBtn) {
             const latestYear = Math.max(...years.map(y => Number(y.year)).filter(Number.isFinite));
             annualSummaryExportBtn.dataset.exportYear = Number.isFinite(latestYear) ? String(latestYear) : '';
@@ -3774,8 +3810,8 @@ function initializeApp() {
     };
 
     const countDaysInRange = (startDate, endDate, workingOnly = false, explicitDays = null) => {
-        const explicit = Number(explicitDays);
-        if (Number.isFinite(explicit) && explicit > 0) return explicit;
+        const explicit = normalizeHalfDayValue(explicitDays, { min: 0, fallback: 0 });
+        if (explicit > 0) return explicit;
         const days = listDaysInclusive(startDate, endDate);
         if (!workingOnly) return days.length;
         return days.filter(day => !isWeekendDay(day)).length;
@@ -3794,7 +3830,7 @@ function initializeApp() {
             const label = formatujMiesiac(monthKey);
             const items = dates.map(day => {
                 const matched = usedDays.find(item => item.date === day);
-                const suffix = matched && Number(matched.amount) < 1 ? ` (${formatujLiczbe(matched.amount)} dnia)` : '';
+                const suffix = matched && Number(matched.amount) < 1 ? ` (${formatDaysValue(matched.amount)})` : '';
                 return `<li>${formatDateLabel(day)}${suffix}</li>`;
             }).join('');
             blocks.push(`
@@ -3834,7 +3870,9 @@ function initializeApp() {
             note: data.note || '',
             type: data.type || 'Urlop planowany',
             countWorkingDays: Boolean(data.countWorkingDays),
-            leaveDays: Number(data.leaveDays) > 0 ? Number(data.leaveDays) : null,
+            leaveDays: normalizeHalfDayValue(data.leaveDays, { min: 0, fallback: 0 }) > 0
+                ? normalizeHalfDayValue(data.leaveDays, { min: 0.5, fallback: 0.5 })
+                : null,
             createdAt: data.createdAt || null
         };
     };
@@ -3888,7 +3926,7 @@ function initializeApp() {
             const rangeLabel = `${entry.startDate || '—'} → ${entry.endDate || '—'}`;
             const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays);
             const metaBits = [
-                `${formatujLiczbe(count)} dni`,
+                formatDaysValue(count),
                 entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'
             ];
             if (entry.note) metaBits.push(entry.note);
@@ -4004,7 +4042,7 @@ function initializeApp() {
         vacationAdjustmentsDiv.innerHTML = adjustments.length
             ? `<ul class="adjustments-list">${adjustments.map(adj => `
                 <li data-id="${adj.id}">
-                    <span>${adj.date || 'brak daty'} — ${formatujLiczbe(adj.days)} dni ${adj.note ? `(${adj.note})` : ''}</span>
+                    <span>${adj.date || 'brak daty'} — ${formatDaysValue(adj.days)} ${adj.note ? `(${adj.note})` : ''}</span>
                     <button type="button" class="btn-remove adjustment-remove" data-id="${adj.id}">Usuń</button>
                 </li>`).join('')}</ul>`
             : '<p>Brak korekt urlopu.</p>';
@@ -4467,6 +4505,7 @@ async function obslugaListyKlientow(event) {
     const copied = await copyTextToClipboard(serial);
     if (copied) {
       showCopyFeedback(copySerialBtn, 'Skopiowano');
+      showToastMessage('Skopiowano numer seryjny');
     } else {
       alert('Nie udało się skopiować numeru seryjnego.');
     }
@@ -5212,6 +5251,7 @@ async function obslugaListyKlientow(event) {
     const copied = await copyTextToClipboard(serial);
     if (copied) {
       showCopyFeedback(copySerialBtn, 'Skopiowano');
+      showToastMessage('Skopiowano numer seryjny');
     } else {
       alert('Nie udało się skopiować numeru seryjnego.');
     }
@@ -5926,6 +5966,7 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
     if (opisInput) opisInput.value = zlecenie.opis || '';
 
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
+    editZlecenieForm['edit-moto-hours'].value = String(Number(zlecenie.motoHours ?? zlecenie.motogodziny ?? 0) || 0);
     editZlecenieForm['edit-typ-zlecenia'].value = zlecenie.typZlecenia || 'S';
     editZlecenieForm['edit-zakonczenie-wz'].value = zlecenie.zakonczenieNumerWZ || '';
     const editEndInput = editZlecenieForm['edit-completion-date'];
@@ -5945,6 +5986,7 @@ async function zapiszEdycjeZlecenia(event) {
     event.preventDefault();
     const zlecenieId = editZlecenieForm['edit-zlecenie-id'].value;
     const noweGodziny = Number(editZlecenieForm['edit-wyfakturowane-godziny'].value);
+    const noweMotoHours = Number(editZlecenieForm['edit-moto-hours']?.value ?? 0);
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
     const nowyNumerZlecenia = (document.getElementById('edit-zlecenie-nr-input')?.value || '').trim();
@@ -5959,6 +6001,7 @@ async function zapiszEdycjeZlecenia(event) {
         alert("Podaj poprawną liczbę godzin.");
         return;
     }
+    if (!Number.isFinite(noweMotoHours) || noweMotoHours < 0) { alert('Motogodziny muszą być liczbą większą lub równą 0.'); return; }
     if (!nowyNumerZlecenia) { alert('Numer zlecenia jest wymagany.'); return; }
     if (!nowyKlientId) { alert('Wybierz klienta.'); return; }
     if (!nowaMaszynaId) { alert('Wybierz maszynę.'); return; }
@@ -5973,6 +6016,7 @@ async function zapiszEdycjeZlecenia(event) {
         const staryTyp = zlecenieData.typZlecenia;
         const stareGodziny = zlecenieData.wyfakturowaneGodziny;
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
+        const stareMotoHours = Number(zlecenieData.motoHours ?? zlecenieData.motogodziny ?? 0) || 0;
         const staryNumerZlecenia = zlecenieData.nrZlecenia || '';
         const staryOpis = zlecenieData.opis || '';
         const staryKlientId = zlecenieData.klientId || '';
@@ -5993,6 +6037,7 @@ async function zapiszEdycjeZlecenia(event) {
             const nowyTekst = nowyNumerWz ? nowyNumerWz : 'brak';
             zmiany.push(`Numer WZ zmieniono z ${staryTekst} na ${nowyTekst}`);
         }
+        if (stareMotoHours !== noweMotoHours) zmiany.push(`Motogodziny: ${stareMotoHours} → ${noweMotoHours}`);
         if (staraCompletionDate !== noweCompletionDate) zmiany.push(`Data wykonania: ${staraCompletionDate || 'brak'} → ${noweCompletionDate || 'brak'}`);
         const nextBillingMonth = nowyBillingMonth;
         if (previousBillingMonth !== nextBillingMonth) zmiany.push(`Miesiąc rozliczenia: ${previousBillingMonth || 'brak'} → ${nextBillingMonth || 'brak'}`);
@@ -6014,12 +6059,15 @@ async function zapiszEdycjeZlecenia(event) {
             model: maszyna?.model || zlecenieData.model || null,
             opis: nowyOpis,
             wyfakturowaneGodziny: noweGodziny,
+            invoicedHours: noweGodziny,
+            motoHours: noweMotoHours,
             typZlecenia: nowyTyp,
             nrZlecenia: nowyNumerZlecenia,
             zakonczenieNumerWZ: nowyNumerWz || null,
             completionDate: noweCompletionDate || null,
             completedOn: noweCompletionDate || null,
             billingMonth: nextBillingMonth || null,
+            settlementMonth: nextBillingMonth || null,
             historia: nowaHistoria
         });
         hideModal(editZlecenieModal);
@@ -6152,7 +6200,7 @@ function updateAssignModeUI() {
     if (assignClientGroup) assignClientGroup.style.display = mode === 'quick' ? 'none' : '';
     if (assignMachineModelInput) {
         assignMachineModelInput.required = mode === 'quick';
-        assignMachineModelInput.placeholder = mode === 'quick' ? 'Wymagane w trybie szybkim' : 'Opcjonalnie';
+        assignMachineModelInput.placeholder = mode === 'quick' ? 'Wymagane (np. John Deere 6155M)' : 'Opcjonalnie (ułatwia identyfikację)';
     }
 }
 
@@ -7388,7 +7436,7 @@ async function obslugaListyCzesci(event) {
     if (vacationAdjustmentForm) {
         vacationAdjustmentForm.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const days = Number(vacationAdjustmentDaysInput?.value);
+            const days = normalizeHalfDayValue(vacationAdjustmentDaysInput?.value, { min: -9999, fallback: 0 });
             if (!Number.isFinite(days) || days === 0) { alert('Podaj liczbę dni (może być dodatnia lub ujemna).'); return; }
             await addAdjustment(selectedYear, {
                 date: vacationAdjustmentDateInput?.value || null,
@@ -7492,7 +7540,7 @@ async function obslugaListyCzesci(event) {
             const endDate = plannedLeaveEndInput?.value || '';
             const startParsed = toDateSafe(startDate);
             const endParsed = toDateSafe(endDate);
-            const leaveDaysRaw = Number(plannedLeaveDaysInput?.value);
+            const leaveDaysRaw = normalizeHalfDayValue(plannedLeaveDaysInput?.value, { min: 0, fallback: 0 });
             if (!startParsed || !endParsed) { alert('Wybierz poprawny zakres dat.'); return; }
             if (startParsed > endParsed) { alert('Data końcowa nie może być wcześniejsza niż początkowa.'); return; }
             if (plannedLeaveDaysInput?.value && (!Number.isFinite(leaveDaysRaw) || leaveDaysRaw <= 0)) { alert('Podaj poprawną liczbę dni urlopu (np. 0.5).'); return; }
