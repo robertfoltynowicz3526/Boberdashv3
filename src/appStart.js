@@ -917,6 +917,7 @@ function initializeApp() {
     const assignCancelBtn = document.getElementById('assign-cancel-btn');
     const assignMachineModelInput = document.getElementById('assign-machine-model-text');
     const assignFormError = document.getElementById('assign-form-error');
+    const assignTrybHint = document.getElementById('assign-tryb-hint');
     const klientForm = document.getElementById('klient-form');
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
@@ -5391,14 +5392,34 @@ function renderListInBatches(container, elements, emptyMessage) {
     requestAnimationFrame(renderChunk);
 }
 
-function createZlecenieListItem(zlecenie, bodyHtml, actionsHtml) {
+function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', metaHtml = '', actionsHtml = '', status = '' } = {}) {
     const li = document.createElement('li');
     li.dataset.id = zlecenie.id;
-    const span = document.createElement('span');
-    span.innerHTML = bodyHtml;
+    li.className = `order-list-item ${status ? `is-${status}` : ''}`;
+    const content = document.createElement('div');
+    content.className = 'order-list-item__content';
+    if (headerHtml) {
+        const header = document.createElement('div');
+        header.className = 'order-list-item__header';
+        header.innerHTML = headerHtml;
+        content.appendChild(header);
+    }
+    if (bodyHtml) {
+        const body = document.createElement('div');
+        body.className = 'order-list-item__body';
+        body.innerHTML = bodyHtml;
+        content.appendChild(body);
+    }
+    if (metaHtml) {
+        const meta = document.createElement('div');
+        meta.className = 'order-list-item__meta';
+        meta.innerHTML = metaHtml;
+        content.appendChild(meta);
+    }
     const actions = document.createElement('div');
+    actions.className = 'order-list-item__actions';
     actions.innerHTML = actionsHtml;
-    li.appendChild(span);
+    li.appendChild(content);
     li.appendChild(actions);
     return li;
 }
@@ -5444,24 +5465,37 @@ function wyswietlZlecenia() {
             const nazwa = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : quickLabel;
             const startLabel = normalizeDateOnly(zlecenie.startDate || zlecenie.startAt);
             const endLabel = normalizeDateOnly(zlecenie.completionDate || zlecenie.endAt || zlecenie.serviceDate);
-            const timelineHtml = (startLabel || endLabel)
-                ? `<br><small>Start: ${startLabel || '—'}${endLabel ? ` → Koniec: ${endLabel}` : ''}</small>`
-                : '';
+            const timelineHtml = (startLabel || endLabel) ? `Start: ${startLabel || '—'}${endLabel ? ` • Koniec: ${endLabel}` : ''}` : 'Start: —';
 
             if (zlecenie.status === 'aktywne' || zlecenie.status === 'nieprzypisane') {
                 const przycisk = zlecenie.status === 'nieprzypisane'
                     ? `<button type="button" class="assign-btn btn-edit" data-id="${zlecenie.id}">Przypisz</button>`
                     : `<button type="button" class="complete-btn" data-id="${zlecenie.id}">Zakończ</button>`;
-                const opisHtml = `<em>${zlecenie.opis || 'Brak opisu'}</em>`;
+                const statusLabel = zlecenie.status === 'nieprzypisane' ? 'Szybkie — nieprzypisane' : 'Aktywne';
+                const machineLabel = klient
+                    ? `${maszyna ? maszyna.typMaszyny : '—'} ${maszyna ? maszyna.model : ''}`.trim()
+                    : (quickMachineModel || 'Brak przypisanej maszyny');
                 aktywneElements.push(createZlecenieListItem(
                     zlecenie,
-                    `<strong>${nazwa}</strong><br>${opisHtml}${timelineHtml}`,
-                    `
+                    {
+                        status: 'active',
+                        headerHtml: `
+                            <strong>#${zlecenie.nrZlecenia || '—'}</strong>
+                            <span class="order-pill">${statusLabel}</span>
+                        `,
+                        bodyHtml: `
+                            <p><strong>Klient:</strong> ${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</p>
+                            <p><strong>Maszyna/model:</strong> ${machineLabel}</p>
+                            <p><strong>Opis:</strong> ${zlecenie.opis || 'Brak opisu'}</p>
+                        `,
+                        metaHtml: `<small>${timelineHtml}</small>`,
+                        actionsHtml: `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     ${przycisk}
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
+                    }
                 ));
             } else if (zlecenie.status === 'zakończone') {
                 const serviceDate = resolveServiceDate(zlecenie);
@@ -5474,23 +5508,27 @@ function wyswietlZlecenia() {
                 const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
                 const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
                 const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
-                const motoHtml = `<div class="job-foot"><span class="badge badge-done">Zakończone</span><span class="meta">Motogodziny: ${motoHoursVal.toFixed(1)} h</span></div>`;
                 ukonczoneElements.push(createZlecenieListItem(
                     zlecenie,
-                    `
-                    <strong>${nazwaMaszyny}</strong> (Nr: ${zlecenie.nrZlecenia})<br>
-                    <em>Wykonano (${serviceDate || 'b.d.'})</em><br>
-                    Fakturowano: <strong>${zlecenie.wyfakturowaneGodziny || 0}h</strong> | Typ: <strong>${zlecenie.typZlecenia || '?'}</strong>
-                    <br><small>Brutto: ${(amounts.grossCents / 100).toFixed(2)} zł | Netto: ${(amounts.netCents / 100).toFixed(2)} zł</small>
-                    ${uzyteCzesciHtml}${wzHtml}${notatkaHtml}${timelineHtml}
-                    ${motoHtml}
-                `,
-                    `
+                    {
+                        status: 'closed',
+                        headerHtml: `
+                            <strong>#${zlecenie.nrZlecenia || '—'}</strong>
+                            <span class="order-pill">Zakończone</span>
+                        `,
+                        bodyHtml: `
+                            <p><strong>Klient / maszyna:</strong> ${nazwaMaszyny}</p>
+                            <p><strong>Wykonano:</strong> ${serviceDate || 'b.d.'} • <strong>Typ:</strong> ${zlecenie.typZlecenia || '?'}</p>
+                            <p><strong>Fakturowano:</strong> ${zlecenie.wyfakturowaneGodziny || 0} h • <strong>Motogodziny:</strong> ${motoHoursVal.toFixed(1)} h</p>
+                        `,
+                        metaHtml: `<small>Brutto: ${(amounts.grossCents / 100).toFixed(2)} zł • Netto: ${(amounts.netCents / 100).toFixed(2)} zł</small>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}`,
+                        actionsHtml: `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
+                    }
                 ));
             }
         } catch (error) {
@@ -6112,12 +6150,16 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
         sumaFakturowanych += Number(powiazanie.fakturowane) || 0;
     }
 
-    titleEl.textContent = `Szczegóły Zlecenia #${zlecenie.nrZlecenia}`;
+    titleEl.textContent = `Szczegóły zlecenia #${zlecenie.nrZlecenia}`;
+    const machineDetails = maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : (zlecenie.machineModelText || '---');
+    const clientDetails = klient ? klient.nazwa : (zlecenie.status === 'nieprzypisane' ? 'Szybkie zlecenie (bez klienta)' : '---');
     infoDiv.innerHTML = `
-        <div class="details-group"><strong>Klient:</strong> <p>${klient ? klient.nazwa : '---'}</p></div>
-        <div class="details-group"><strong>Maszyna:</strong> <p>${maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : '---'}</p></div>
-        <div class="details-group"><strong>Data rozpoczęcia:</strong> <p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt || zlecenie.createdDate) || '—'}</p></div>
+        <div class="details-group"><strong>Numer:</strong> <p>#${zlecenie.nrZlecenia || '—'}</p></div>
         <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
+        <div class="details-group"><strong>Klient:</strong> <p>${clientDetails}</p></div>
+        <div class="details-group"><strong>Maszyna / model:</strong> <p>${machineDetails}</p></div>
+        <div class="details-group"><strong>Data rozpoczęcia:</strong> <p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt || zlecenie.createdDate) || '—'}</p></div>
+        <div class="details-group"><strong>Suma z kalendarza:</strong> <p>${formatujLiczbe(sumaFakturowanych)} h</p></div>
     `;
 
     if (zlecenie.status === 'zakończone') {
@@ -6195,6 +6237,11 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
 function updateAssignModeUI() {
     const mode = assignModeSelect?.value === 'quick' ? 'quick' : 'normal';
     if (assignClientGroup) assignClientGroup.style.display = mode === 'quick' ? 'none' : '';
+    if (assignTrybHint) {
+        assignTrybHint.textContent = mode === 'quick'
+            ? 'Tryb szybki: klient nie jest wymagany. Wpisz model maszyny i zapisz.'
+            : 'Tryb pełny: wybierz klienta. Model możesz dopisać pomocniczo.';
+    }
     if (assignMachineModelInput) {
         assignMachineModelInput.required = mode === 'quick';
         assignMachineModelInput.placeholder = mode === 'quick' ? 'Wymagane (np. John Deere 6155M)' : 'Opcjonalnie (ułatwia identyfikację)';

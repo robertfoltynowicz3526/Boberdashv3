@@ -220,7 +220,13 @@
                     </div>
                 </div>
                 <div class="main">
-                    <div class="table-section orders-active"><h3>Aktywne zlecenia</h3><div id="aktywne-zlecenia-lista"></div></div>
+                    <div class="table-section orders-active">
+                        <div class="orders-active-header">
+                            <h3>Aktywne zlecenia</h3>
+                            <p class="field-hint">Lista robocza: numer, klient, maszyna, status i szybkie akcje.</p>
+                        </div>
+                        <div id="aktywne-zlecenia-lista"></div>
+                    </div>
                     <div class="table-section orders-finished">
                         <h3 id="zakonczone-zlecenia-header" class="collapsible-header">
                             Zakończone zlecenia <span class="arrow">▼</span>
@@ -242,29 +248,28 @@
         </div>
         <div id="dodaj-zlecenie" class="tab-content">
             <h2>Dodaj nowe zlecenie</h2>
-            <p class="orders-flow-intro">Wybierz: <strong>pełne zlecenie</strong> (z klientem i maszyną) albo <strong>szybkie</strong> (bez klienta).</p>
+            <p class="orders-flow-intro"><strong>Pełne zlecenie</strong> = klient + maszyna. <strong>Szybkie zlecenie</strong> = bez klienta, do przypisania później.</p>
             <div class="form-section">
                 <form id="zlecenie-form">
                     <div class="form-grid form-grid-2">
                         <div class="form-group">
-                            <label for="zlecenie-klient-input">1. Tryb i klient:</label>
+                            <label for="zlecenie-klient-input">1. Wybór trybu i klienta</label>
                             <div class="combobox" data-combobox="order-client">
                                 <div class="combobox-input">
-                                    <input type="text" id="zlecenie-klient-input" autocomplete="off" placeholder="Klient lub „Szybkie zlecenie (bez klienta)”">
+                                    <input type="text" id="zlecenie-klient-input" autocomplete="off" placeholder="Wybierz klienta albo „Szybkie zlecenie (bez klienta)”">
                                     <button type="button" class="combobox-clear" aria-label="Wyczyść">×</button>
                                 </div>
                                 <input type="hidden" id="zlecenie-klient-id">
                                 <div id="zlecenie-klient-dropdown" class="combobox-dropdown" role="listbox"></div>
                             </div>
                         </div>
-                        <div class="form-group"><label for="zlecenie-maszyna-select">2. Maszyna (dla pełnego zlecenia):</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
+                        <div class="form-group"><label for="zlecenie-maszyna-select">2. Maszyna (tylko pełne zlecenie)</label><select id="zlecenie-maszyna-select" disabled><option value="">-- Najpierw wybierz klienta --</option></select></div>
                     </div>
-                    <div class="form-group"><label for="nr-zlecenia">3. Nr zlecenia / nazwa:</label><input type="text" id="nr-zlecenia" required></div>
+                    <div class="form-group"><label for="nr-zlecenia">3. Numer zlecenia / nazwa</label><input type="text" id="nr-zlecenia" required></div>
                     <div class="form-group"><label for="opis-usterki">Opis usterki:</label><textarea id="opis-usterki" rows="3"></textarea></div>
                     <button type="submit">Dodaj Zlecenie</button>
                 </form>
             </div>
-            <p class="orders-tip">Pełne: klient + maszyna. Szybkie: bez klienta, do późniejszego przypisania.</p>
         </div>
         <div id="magazyn" class="tab-content">
             <div id="magazyn-summary" class="summary-container-subtle"></div>
@@ -488,27 +493,26 @@
         </div>
     </div>
     <div id="complete-zlecenie-modal" class="modal">
-        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ Zlecenie</h2><form id="complete-zlecenie-form" class="modal-body form-shell"><input type="hidden" id="complete-zlecenie-id"><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
-            <h3>Rozliczenie</h3>
-            <div class="form-group">
-              <label for="complete-zlecenie-service-date">Data zakończenia/wykonania:</label>
+        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ zlecenie</h2><form id="complete-zlecenie-form" class="modal-body form-shell"><input type="hidden" id="complete-zlecenie-id"><p class="field-hint">To etap końcowy: uzupełnij wykonanie i rozliczenie.</p><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
+            <section class="order-form-section"><h3>Dane wykonania</h3><div class="form-group">
+              <label for="complete-zlecenie-service-date">Data zakończenia / wykonania</label>
               <input type="date" id="complete-zlecenie-service-date" required>
-            </div>
-            <div class="form-group">
-              <label for="complete-zlecenie-billing-month">Miesiąc rozliczenia:</label>
+            </div><div class="form-group">
+              <label for="zakonczenie-wz">Numer WZ (opcjonalnie)</label>
+              <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024">
+            </div></section>
+            <section class="order-form-section"><h3>Rozliczenie godzin</h3><div class="form-group">
+              <label for="complete-zlecenie-billing-month">Miesiąc rozliczenia</label>
               <input type="month" id="complete-zlecenie-billing-month" required>
             </div>
-            <div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny:</label><input type="number" step="0.1" id="wyfakturowane-godziny" required inputmode="decimal"></div>
-            <div class="form-group"><label for="moto-hours">Motogodziny:</label><input type="number" step="0.1" id="moto-hours" min="0" inputmode="decimal"></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia:</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div>
-            <div class="form-group">
-              <label for="zakonczenie-wz">Numer WZ (opcjonalnie):</label>
-              <input type="text" id="zakonczenie-wz" placeholder="Np. WZ/05/2024">
-            </div>
-            <div class="form-group">
-              <label for="zakonczenie-notatka">Notatka z wykonanych prac (opcjonalnie):</label>
+            <div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny</label><input type="number" step="0.1" id="wyfakturowane-godziny" required inputmode="decimal"></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div></section>
+            <section class="order-form-section"><h3>Motogodziny</h3><div class="form-group"><label for="moto-hours">Stan motogodzin</label><input type="number" step="0.1" id="moto-hours" min="0" inputmode="decimal"></div></section>
+            <section class="order-form-section"><h3>Części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4 class="form-subsection-title">Wybrane części do zdjęcia</h4><ul id="parts-to-remove-list"></ul></section>
+            <section class="order-form-section"><h3>Notatka końcowa / opis wykonanej pracy</h3><div class="form-group">
+              <label for="zakonczenie-notatka">Opis końcowy (opcjonalnie)</label>
               <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
-            </div>
-            <hr><h3 class="form-subsection-title">Wybierz części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4 class="form-subsection-title">Wybrane części do zdjęcia:</h4><ul id="parts-to-remove-list"></ul><hr><div class="modal-actions"><button type="submit" class="btn-add">Zakończ i Zdejmij ze Stanu</button></div></form></div>
+            </div></section>
+            <div class="modal-actions"><button type="submit" class="btn-add">Zakończ i zdejmij ze stanu</button></div></form></div>
     </div>
     <div id="stock-change-modal" class="modal">
         <div class="modal-content"><span class="close-button">&times;</span><h2 id="stock-modal-title">Zmień stan</h2><form id="stock-change-form" class="modal-body"><input type="hidden" id="stock-change-id"><p><strong>Produkt:</strong> <span id="stock-modal-name"></span></p><p><strong>Obecna ilość:</strong> <span id="stock-modal-current-qty"></span></p><div class="form-group"><label for="stock-change-qty">Ilość:</label><input type="number" step="1" id="stock-change-qty" required inputmode="numeric"></div><div class="modal-actions"><button type="submit">Zatwierdź Zmianę</button></div></form></div>
@@ -612,11 +616,11 @@
     </div>
     <div id="assign-zlecenie-modal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span><h2>Przypisz zlecenie</h2>
+            <span class="close-button">&times;</span><h2>Przypisz szybkie zlecenie</h2>
             <form id="assign-zlecenie-form" class="modal-body form-shell">
                 <input type="hidden" id="assign-zlecenie-id">
                 <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
-                <p class="field-hint">Pełne zlecenie: wybierz klienta. Szybkie: bez klienta, podaj model maszyny.</p>
+                <p id="assign-tryb-hint" class="field-hint">Pełne zlecenie: wybierz klienta. Szybkie: bez klienta, podaj model maszyny.</p>
                 <div class="form-group">
                     <label for="assign-tryb-select">Tryb przypisania</label>
                     <select id="assign-tryb-select">
@@ -824,15 +828,15 @@
     <div id="details-zlecenie-modal" class="modal">
         <div class="modal-content modal-content-large">
             <span class="close-button">&times;</span>
-            <h2 id="details-zlecenie-title">Szczegóły Zlecenia</h2>
+            <h2 id="details-zlecenie-title">Szczegóły zlecenia</h2>
             <div class="zlecenie-details-container">
-                <h3>Podstawowe Informacje</h3>
+                <h3>Podstawowe informacje</h3>
                 <div id="details-zlecenie-info"></div>
                 <hr>
                 <h3>Opis usterki</h3>
                 <div id="details-zlecenie-usterka"></div>
                 <hr>
-                <h3>Opis (szczegóły na zakończenie)</h3>
+                <h3>Opis końcowy</h3>
                 <div id="details-zlecenie-opis"></div>
                 <hr>
                 <h3>Notatki</h3>
@@ -855,8 +859,9 @@
         <div class="modal-content">
             <span class="close-button">&times;</span>
             <h2>Edytuj zlecenie</h2>
-            <form id="edit-zlecenie-form" class="modal-body">
+            <form id="edit-zlecenie-form" class="modal-body form-shell">
                 <input type="hidden" id="edit-zlecenie-id">
+                <p class="field-hint">Tryb korekty danych zlecenia (bez zamykania i rozliczania).</p>
                 <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
                 <p><strong>ID dokumentu:</strong> <code id="edit-zlecenie-doc-id"></code></p>
                 <div class="form-grid form-grid-2">
