@@ -121,6 +121,7 @@ function initializeApp() {
     const SUMMARY_OPEN_YEARS_STORAGE_KEY = 'summaryOpenYears';
     const VACATION_TAB_STORAGE_KEY = 'vacationTab';
     const BILLING_MONTH_MIGRATION_KEY = 'migrationBillingMonthFromCompletionDate.v1';
+    const ORDER_DEDUP_MIGRATION_KEY = 'ordersDedupByRootId.v1';
     const CALENDAR_VIEW_STORAGE_KEY = 'lastView';
     const CALENDAR_VIEW_STORAGE_LEGACY_KEY = 'lastCalendarView';
     const CALENDAR_DATE_STORAGE_KEY = 'lastFocusedDate';
@@ -5392,6 +5393,92 @@ function renderListInBatches(container, elements, emptyMessage) {
     requestAnimationFrame(renderChunk);
 }
 
+function resolveOrderIdentity(order = {}) {
+    const explicitRoot = String(order.rootOrderId || order.mainOrderId || '').trim();
+    if (explicitRoot) return explicitRoot;
+    const normalizedNumber = String(order.nrZlecenia || '').trim().toLowerCase();
+    if (normalizedNumber) return `nr:${normalizedNumber}`;
+    return String(order.id || '').trim();
+}
+
+function resolveOrderLastChangeTs(order = {}) {
+    const historyTs = Array.isArray(order.historia)
+        ? order.historia.reduce((latest, entry) => {
+            const ts = Date.parse(entry?.timestamp || '');
+            if (!Number.isFinite(ts)) return latest;
+            return ts > latest ? ts : latest;
+        }, 0)
+        : 0;
+    const candidates = [
+        order.updatedAt,
+        order.completionDate,
+        order.completedOn,
+        order.serviceDate,
+        order.dataUkonczenia,
+        order.completedAt,
+        order.createdOn,
+        order.createdDate,
+        order.createdAt
+    ]
+        .map((value) => Date.parse(value || ''))
+        .filter((value) => Number.isFinite(value));
+    return Math.max(historyTs, ...candidates, 0);
+}
+
+function mergeOrderHistory(group = []) {
+    const dedupe = new Map();
+    group.forEach((order) => {
+        const historyEntries = Array.isArray(order?.historia) ? order.historia : [];
+        historyEntries.forEach((entry) => {
+            const timestamp = entry?.timestamp || '';
+            const action = entry?.akcja || '';
+            const key = `${timestamp}|${action}`;
+            if (!dedupe.has(key)) dedupe.set(key, { timestamp, akcja: action });
+        });
+    });
+    return [...dedupe.values()].sort((a, b) => Date.parse(a.timestamp || '') - Date.parse(b.timestamp || ''));
+}
+
+function buildCanonicalOrders(orders = []) {
+    const groups = new Map();
+    (orders || []).forEach((order) => {
+        const key = resolveOrderIdentity(order);
+        if (!key) return;
+        const current = groups.get(key) || [];
+        current.push(order);
+        groups.set(key, current);
+    });
+
+    const canonical = [];
+    const duplicates = [];
+    groups.forEach((group, identity) => {
+        if (!group.length) return;
+        const sortedGroup = group.slice().sort((a, b) => {
+            const diff = resolveOrderLastChangeTs(b) - resolveOrderLastChangeTs(a);
+            if (diff !== 0) return diff;
+            const aPriority = a?.status === 'aktywne' ? 1 : 0;
+            const bPriority = b?.status === 'aktywne' ? 1 : 0;
+            return bPriority - aPriority;
+        });
+        const leader = sortedGroup[0];
+        const mergedHistory = mergeOrderHistory(sortedGroup);
+        canonical.push({
+            ...leader,
+            rootOrderId: leader?.rootOrderId || leader?.id || null,
+            historia: mergedHistory
+        });
+        if (sortedGroup.length > 1) {
+            duplicates.push({
+                identity,
+                leaderId: leader?.id || null,
+                duplicateIds: sortedGroup.slice(1).map((entry) => entry?.id).filter(Boolean)
+            });
+        }
+    });
+
+    return { canonical, duplicates };
+}
+
 function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', metaHtml = '', actionsHtml = '', status = '' } = {}) {
     const li = document.createElement('li');
     li.dataset.id = zlecenie.id;
@@ -5436,6 +5523,7 @@ function wyswietlZlecenia() {
     wszystkieZlecenia = [];
     const aktywneElements = [];
     const ukonczoneElements = [];
+    const renderedOrderIds = new Set();
 
     const przefiltrowaneZlecenia = _wszystkieZleceniaCache.filter(zlecenie => {
         if (ordersFilterMode === 'unbilled') {
@@ -5456,6 +5544,8 @@ function wyswietlZlecenia() {
 
     przefiltrowaneZlecenia.forEach(zlecenie => {
         try {
+            if (!zlecenie?.id || renderedOrderIds.has(zlecenie.id)) return;
+            renderedOrderIds.add(zlecenie.id);
             wszystkieZlecenia.push(zlecenie);
 
             const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
@@ -5486,13 +5576,14 @@ function wyswietlZlecenia() {
                         bodyHtml: `
                             <p><strong>Klient:</strong> ${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</p>
                             <p><strong>Maszyna/model:</strong> ${machineLabel}</p>
-                            <p><strong>Opis:</strong> ${zlecenie.opis || 'Brak opisu'}</p>
+                            <p><strong>Status roboczy:</strong> ${statusLabel}</p>
+                            <p><strong>Opis usterki:</strong> ${zlecenie.opis || 'Brak opisu'}</p>
                         `,
                         metaHtml: `<small>${timelineHtml}</small>`,
                         actionsHtml: `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
-                    ${przycisk}
+                    ${przycisk}                    
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
                     }
@@ -5556,11 +5647,13 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
     const normalizedOrders = Array.isArray(orders)
         ? orders.map(order => normalizeOrderForBilling(order))
         : [];
-    _wszystkieZleceniaCache = normalizedOrders;
-    wszystkieZlecenia = normalizedOrders;
-    runSettlementMonthMigrationOnce(normalizedOrders).catch((err) => console.error('[Migracja settlementMonth] Błąd:', err));
-    normalizedOrders.forEach((order) => {
-        const needsMigration = !order?.createdOn || (order.status === 'ukończone' && !order?.completedOn);
+    const { canonical: canonicalOrders, duplicates } = buildCanonicalOrders(normalizedOrders);
+    _wszystkieZleceniaCache = canonicalOrders;
+    wszystkieZlecenia = canonicalOrders;
+    runSettlementMonthMigrationOnce(canonicalOrders).catch((err) => console.error('[Migracja settlementMonth] Błąd:', err));
+    runOrderIdentityDedupMigrationOnce({ canonicalOrders, duplicates }).catch((err) => console.error('[Migracja deduplikacji zleceń] Błąd:', err));
+    canonicalOrders.forEach((order) => {
+        const needsMigration = !order?.createdOn || (order.status === 'zakończone' && !order?.completedOn);
         if (!needsMigration || !order?.id) return;
         const payload = {
             createdOn: order.createdOn || null,
@@ -5589,7 +5682,7 @@ const runSettlementMonthMigrationOnce = async (orders = []) => {
         if (!order?.id) return;
         const completionDate = normalizeDateOnly(order?.completionDate || order?.serviceDate || order?.dataUkonczenia || order?.completedAt || order?.completedOn);
         const explicitBillingMonth = normalizeMonthKey(order?.settlementMonth || order?.billingMonth);
-        const isClosed = order?.status === 'ukończone' || Boolean(completionDate);
+        const isClosed = order?.status === 'zakończone' || Boolean(completionDate);
         if (!isClosed || explicitBillingMonth || !completionDate) return;
         updates.push(
             updateDoc(doc(db, 'zlecenia', order.id), { settlementMonth: completionDate.slice(0, 7), billingMonth: completionDate.slice(0, 7) })
@@ -5603,6 +5696,48 @@ const runSettlementMonthMigrationOnce = async (orders = []) => {
 
     try {
         localStorage.setItem(BILLING_MONTH_MIGRATION_KEY, 'done');
+    } catch (_) { }
+};
+
+const runOrderIdentityDedupMigrationOnce = async ({ canonicalOrders = [], duplicates = [] } = {}) => {
+    try {
+        if (localStorage.getItem(ORDER_DEDUP_MIGRATION_KEY) === 'done') return;
+    } catch (_) { }
+
+    const updates = [];
+    (canonicalOrders || []).forEach((order) => {
+        if (!order?.id) return;
+        const expectedRoot = String(order.rootOrderId || order.id || '').trim();
+        if (!expectedRoot) return;
+        if (order.rootOrderId !== expectedRoot) {
+            updates.push(
+                updateDoc(doc(db, 'zlecenia', order.id), {
+                    rootOrderId: expectedRoot,
+                    duplicateOfOrderId: null,
+                    isDuplicate: false
+                }).catch((error) => console.warn('[Migracja rootOrderId] Nie udało się zaktualizować', order.id, error))
+            );
+        }
+    });
+
+    (duplicates || []).forEach((entry) => {
+        const leaderId = entry?.leaderId;
+        if (!leaderId) return;
+        (entry?.duplicateIds || []).forEach((duplicateId) => {
+            updates.push(
+                updateDoc(doc(db, 'zlecenia', duplicateId), {
+                    rootOrderId: leaderId,
+                    duplicateOfOrderId: leaderId,
+                    isDuplicate: true
+                }).catch((error) => console.warn('[Migracja duplikatu zlecenia] Nie udało się oznaczyć', duplicateId, error))
+            );
+        });
+    });
+
+    if (updates.length) await Promise.all(updates);
+
+    try {
+        localStorage.setItem(ORDER_DEDUP_MIGRATION_KEY, 'done');
     } catch (_) { }
 };
 
@@ -5765,6 +5900,7 @@ async function dodajZlecenie(event) {
 
     try {
         const docRef = await addDoc(collection(db, "zlecenia"), dane);
+        await updateDoc(docRef, { rootOrderId: docRef.id, duplicateOfOrderId: null, isDuplicate: false });
         await logActivityEvent({
             type: 'ORDER_CREATED',
             refId: docRef.id,
@@ -6239,8 +6375,8 @@ function updateAssignModeUI() {
     if (assignClientGroup) assignClientGroup.style.display = mode === 'quick' ? 'none' : '';
     if (assignTrybHint) {
         assignTrybHint.textContent = mode === 'quick'
-            ? 'Tryb szybki: klient nie jest wymagany. Wpisz model maszyny i zapisz.'
-            : 'Tryb pełny: wybierz klienta. Model możesz dopisać pomocniczo.';
+            ? 'Tryb szybki: bez klienta. Uzupełnij model maszyny.'
+            : 'Tryb pełny: przypisz klienta i maszynę dla istniejącego zlecenia.';
     }
     if (assignMachineModelInput) {
         assignMachineModelInput.required = mode === 'quick';
@@ -6485,6 +6621,7 @@ async function obslugaListyCzesci(event) {
                 if (zamykaneZlecenieData) {
                     const historiaPayload = {
                         orderId: docId,
+                        rootOrderId: zamykaneZlecenieData.rootOrderId || docId,
                         clientId: zamykaneZlecenieData.klientId || null,
                         machineId: zamykaneZlecenieData.maszynaId || null,
                         orderNo: zamykaneZlecenieData.nrZlecenia || '',
@@ -6493,7 +6630,8 @@ async function obslugaListyCzesci(event) {
                         closedAt: completionDate
                     };
                     try {
-                        await addDoc(collection(db, 'orders_history'), historiaPayload);
+                        const historyDocId = `${docId}_${completionDate}`;
+                        await setDoc(doc(db, 'orders_history', historyDocId), historiaPayload, { merge: true });
                     } catch (historyErr) {
                         console.warn('Nie udało się zapisać historii zlecenia:', historyErr);
                     }
@@ -7368,7 +7506,7 @@ async function obslugaListyCzesci(event) {
         exportZleceniaBtn.addEventListener('click', () => {
             const miesiac = getSelectedMonth();
             const dane = _wszystkieZleceniaCache
-                .filter(z => z.status === 'ukończone' && resolveServiceDate(z) && resolveServiceDate(z).startsWith(miesiac))
+                .filter(z => z.status === 'zakończone' && resolveServiceDate(z) && resolveServiceDate(z).startsWith(miesiac))
                 .map(({ id, createdAt, status, uzyteCzesci, historia, ...rest }) => ({
                     ...rest,
                     uzyte_czesci: uzyteCzesci ? uzyteCzesci.map(c => c.nazwa).join(', ') : ''
