@@ -248,7 +248,7 @@
         </div>
         <div id="dodaj-zlecenie" class="tab-content">
             <h2>Dodaj nowe zlecenie</h2>
-            <p class="orders-flow-intro"><strong>Pełne zlecenie</strong> = klient + maszyna. <strong>Szybkie zlecenie</strong> = bez klienta, do przypisania później.</p>
+            <p class="orders-flow-intro"><strong>Pełne zlecenie:</strong> klient + maszyna. <strong>Szybkie:</strong> bez klienta, przypiszesz później z listy aktywnych.</p>
             <div class="form-section">
                 <form id="zlecenie-form">
                     <div class="form-grid form-grid-2">
@@ -493,7 +493,7 @@
         </div>
     </div>
     <div id="complete-zlecenie-modal" class="modal">
-        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ zlecenie</h2><form id="complete-zlecenie-form" class="modal-body form-shell"><input type="hidden" id="complete-zlecenie-id"><p class="field-hint">To etap końcowy: uzupełnij wykonanie i rozliczenie.</p><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
+        <div class="modal-content"><span class="close-button">&times;</span><h2>Zakończ zlecenie</h2><form id="complete-zlecenie-form" class="modal-body form-shell"><input type="hidden" id="complete-zlecenie-id"><p class="field-hint"><strong>Finalne rozliczenie:</strong> uzupełnij wykonanie i zamknij zlecenie.</p><p><strong>Maszyna:</strong> <span id="modal-klient"></span></p><p><strong>Nr zlecenia:</strong> <span id="modal-nr-zlecenia"></span></p>
             <section class="order-form-section"><h3>Dane wykonania</h3><div class="form-group">
               <label for="complete-zlecenie-service-date">Data zakończenia / wykonania</label>
               <input type="date" id="complete-zlecenie-service-date" required>
@@ -616,11 +616,11 @@
     </div>
     <div id="assign-zlecenie-modal" class="modal">
         <div class="modal-content">
-            <span class="close-button">&times;</span><h2>Przypisz szybkie zlecenie</h2>
+            <span class="close-button">&times;</span><h2>Przypisz istniejące szybkie zlecenie</h2>
             <form id="assign-zlecenie-form" class="modal-body form-shell">
                 <input type="hidden" id="assign-zlecenie-id">
                 <p><strong>Opis zlecenia:</strong> <span id="assign-zlecenie-opis"></span></p>
-                <p id="assign-tryb-hint" class="field-hint">Pełne zlecenie: wybierz klienta. Szybkie: bez klienta, podaj model maszyny.</p>
+                <p id="assign-tryb-hint" class="field-hint">To jest akcja przypisania istniejącego zlecenia, bez tworzenia nowego rekordu.</p>
                 <div class="form-group">
                     <label for="assign-tryb-select">Tryb przypisania</label>
                     <select id="assign-tryb-select">
@@ -861,7 +861,7 @@
             <h2>Edytuj zlecenie</h2>
             <form id="edit-zlecenie-form" class="modal-body form-shell">
                 <input type="hidden" id="edit-zlecenie-id">
-                <p class="field-hint">Tryb korekty danych zlecenia (bez zamykania i rozliczania).</p>
+                <p class="field-hint"><strong>Tryb korekty danych:</strong> poprawiasz informacje, bez końcowego zamykania i rozliczania.</p>
                 <p><strong>Maszyna:</strong> <span id="edit-zlecenie-klient"></span></p>
                 <p><strong>ID dokumentu:</strong> <code id="edit-zlecenie-doc-id"></code></p>
                 <div class="form-grid form-grid-2">

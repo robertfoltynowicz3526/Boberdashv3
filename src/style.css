@@ -1577,6 +1577,8 @@ select {
 .order-list-item {
   align-items: flex-start !important;
   gap: 0.9rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
 }
 
 .order-list-item__content {
@@ -1600,6 +1602,7 @@ select {
 
 .order-list-item__body p {
   margin: 0;
+  line-height: 1.35;
 }
 
 .order-list-item__meta small {
@@ -1607,8 +1610,14 @@ select {
 }
 
 .order-list-item__actions {
+  display: flex;
+  gap: 0.45rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.order-list-item__actions button {
+  min-width: 88px;
 }
 
 .order-pill {
@@ -2546,7 +2555,7 @@ select {
 .zlecenie-details-container {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.95rem;
 }
 
 #details-zlecenie-historia {
@@ -3429,6 +3438,7 @@ main,
   border:1px solid rgba(255,255,255,.12);
   border-radius:10px;
   background:rgba(122,162,255,.08);
+  line-height:1.45;
 }
 .orders-active-header{
   display:flex;
@@ -4178,14 +4188,15 @@ textarea {
 .order-form-section {
   border: 1px solid var(--ui-panel-border);
   border-radius: 12px;
-  padding: 0.8rem 0.9rem;
+  padding: 0.9rem 1rem;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.75rem;
   background: rgba(255, 255, 255, 0.02);
 }
 
 .order-form-section h3 {
   margin: 0;
+  font-size: 1rem;
 }
 
 .form-shell h3 {
