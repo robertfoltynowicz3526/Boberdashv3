@@ -371,25 +371,22 @@ function initializeApp() {
     }
     function renderFH3M(host, y, m) {
         if (!host) return;
-        const months = lastMonthsInclusive(y, m, 4);
+        const months = lastMonthsInclusive(y, m, 3);
         const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
         const max = Math.max(...vals, 1);
         const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
-        const curr = vals[3];
-        const avg3 = (vals[0] + vals[1] + vals[2]) / 3;
-        const deltaPct = avg3 > 0 ? ((curr - avg3) / avg3) * 100 : 0;
+        const curr = vals[2];
+        const prev = vals[1];
+        const deltaPct = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
         host.innerHTML = `
     <div class="fh3m fh3m--trend">
-      <div class="row">
-        <div><strong>Wyfakturowane – ostatnie 3 mies.</strong></div>
-        <div class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</div>
-      </div>
       <div class="bars">
-        ${vals.map((v, i) => `<div class="bar ${i < 3 ? 'dim' : ''}" style="height:${(v / max) * 100}%;" title="${labels[i]}: ${v.toFixed(1)} h"></div>`).join('')}
+        ${vals.map((v, i) => `<div class="bar ${i < 2 ? 'dim' : ''}" style="height:${(v / max) * 100}%;" title="${labels[i]}: ${v.toFixed(1)} h"></div>`).join('')}
       </div>
       <div class="legend">
-        <span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span><span>${labels[3]}</span>
+        <span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span>
       </div>
+      <p class="trend-note">Zmiana vs poprzedni miesiąc: <span class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</span></p>
     </div>`;
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
@@ -1101,7 +1098,17 @@ function initializeApp() {
         if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.innerHTML = '<p class="loading-state">Ładowanie akcji...</p>';
         if (pulpitWeeklyContainer) pulpitWeeklyContainer.innerHTML = '<p class="loading-state">Ładowanie tygodnia...</p>';
         if (pulpitActivityList) pulpitActivityList.innerHTML = '<li class="loading-state">Ładowanie aktywności...</li>';
-        if (zakonczoneSummaryContainer) zakonczoneSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
+        if (zakonczoneSummaryContainer) {
+            zakonczoneSummaryContainer.innerHTML = `
+              <div class="orders-summary-loading" aria-live="polite" aria-busy="true">
+                <div class="metric-skeleton"></div>
+                <div class="metric-skeleton"></div>
+                <div class="metric-skeleton"></div>
+                <div class="metric-skeleton"></div>
+                <div class="metric-skeleton orders-summary-loading__chart"></div>
+              </div>
+            `;
+        }
         if (annualSummaryContainer) annualSummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         if (l4SummaryContainer) l4SummaryContainer.innerHTML = '<p class="loading-state">Ładowanie podsumowania...</p>';
         renderMagazynSummary();
@@ -3614,9 +3621,7 @@ function initializeApp() {
 
         zakonczoneSummaryContainer.classList.add('orders-summary');
 
-        Array.from(zakonczoneSummaryContainer.children)
-            .filter(child => child.classList.contains('metrics-grid') || child.classList.contains('chart'))
-            .forEach(el => el.remove());
+        zakonczoneSummaryContainer.innerHTML = '';
 
         const metricsGrid = document.createElement('div');
         metricsGrid.className = 'metrics-grid';
@@ -5608,16 +5613,32 @@ function wyswietlZlecenia() {
                             <span class="order-pill">Zakończone</span>
                         `,
                         bodyHtml: `
-                            <p><strong>Klient / maszyna:</strong> ${nazwaMaszyny}</p>
-                            <p><strong>Wykonano:</strong> ${serviceDate || 'b.d.'} • <strong>Typ:</strong> ${zlecenie.typZlecenia || '?'}</p>
-                            <p><strong>Fakturowano:</strong> ${zlecenie.wyfakturowaneGodziny || 0} h • <strong>Motogodziny:</strong> ${motoHoursVal.toFixed(1)} h</p>
+                            <div class="order-card-layout order-card-layout--closed">
+                                <div class="order-card-main">
+                                    <p><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
+                                    <p><span class="key">Maszyna</span><strong>${maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (quickMachineModel || 'Brak maszyny')}</strong></p>
+                                </div>
+                                <div class="order-card-stats">
+                                    <p><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
+                                    <p><span class="key">Typ</span><strong>${zlecenie.typZlecenia || '?'}</strong></p>
+                                    <p><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
+                                    <p><span class="key">Motogodziny</span><strong>${motoHoursVal.toFixed(1)} h</strong></p>
+                                    <p><span class="key">Brutto</span><strong>${(amounts.grossCents / 100).toFixed(2)} zł</strong></p>
+                                    <p><span class="key">Netto</span><strong>${(amounts.netCents / 100).toFixed(2)} zł</strong></p>
+                                </div>
+                            </div>
                         `,
-                        metaHtml: `<small>Brutto: ${(amounts.grossCents / 100).toFixed(2)} zł • Netto: ${(amounts.netCents / 100).toFixed(2)} zł</small>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}`,
+                        metaHtml: `<small>${uzyteCzesciHtml ? `Użyte części dostępne poniżej.` : ''}</small>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}`,
                         actionsHtml: `
-                    <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
-                    <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
-                    <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
+                    <button type="button" class="btn-secondary details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                    <button type="button" class="btn-secondary edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
+                    <div class="row-action">
+                      <button type="button" class="row-action-btn" data-order-action="menu" aria-label="Więcej akcji">⋯</button>
+                      <div class="row-action-menu" role="menu">
+                        <button type="button" class="delete-btn" data-id="${zlecenie.id}" data-order-action="delete">Usuń</button>
+                      </div>
+                    </div>
                 `
                     }
                 ));
@@ -5957,6 +5978,24 @@ async function obslugaListyZlecen(event) {
     const li = target.closest('li');
     const docId = target?.dataset.id || li?.dataset.id;
     if (!docId) return;
+    const closeOrderActionMenus = (except = null) => {
+        (ukonczoneZleceniaLista || document).querySelectorAll('.row-action').forEach(menu => {
+            if (menu !== except) menu.classList.remove('is-open');
+        });
+    };
+
+    const menuTrigger = target.closest('[data-order-action="menu"]');
+    if (menuTrigger) {
+        const menu = menuTrigger.closest('.row-action');
+        const isOpen = menu?.classList.toggle('is-open');
+        closeOrderActionMenus(isOpen ? menu : null);
+        return;
+    }
+
+    const menuAction = target.closest('[data-order-action]');
+    if (menuAction && menuAction.dataset.orderAction === 'delete') {
+        closeOrderActionMenus();
+    }
 
     if (target.classList.contains('delete-btn')) {
         if (confirm("Na pewno usunąć?")) { await deleteDoc(doc(db, "zlecenia", docId)); }
