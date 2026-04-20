@@ -718,6 +718,7 @@ function initializeApp() {
     };
     let unfinishedDrawerView = { mode: 'summary', days: [] };
     let ordersFilterMode = null;
+    let expandedActiveOrderIds = new Set();
     let unfinishedDrawer = null;
     let unfinishedButton = null;
     configureDayTotals({
@@ -5552,6 +5553,10 @@ function wyswietlZlecenia() {
         const tekst = `${nazwa} ${zlecenie.nrZlecenia} ${klient ? klient.nazwa : ''} ${maszyna ? maszyna.model : ''} ${maszyna ? maszyna.typMaszyny : ''} ${quickMachineModel}`.toLowerCase();
         return tekst.includes(frazaWyszukiwania);
     });
+    const filteredOrderIds = new Set(przefiltrowaneZlecenia.map((zlecenie) => zlecenie?.id).filter(Boolean));
+    expandedActiveOrderIds.forEach((orderId) => {
+        if (!filteredOrderIds.has(orderId)) expandedActiveOrderIds.delete(orderId);
+    });
 
     przefiltrowaneZlecenia.forEach(zlecenie => {
         try {
@@ -5576,27 +5581,43 @@ function wyswietlZlecenia() {
                 const machineLabel = klient
                     ? `${maszyna ? maszyna.typMaszyny : '—'} ${maszyna ? maszyna.model : ''}`.trim()
                     : (quickMachineModel || 'Brak przypisanej maszyny');
-                aktywneElements.push(createZlecenieListItem(
+                const isExpanded = expandedActiveOrderIds.has(zlecenie.id);
+                const activeListItem = createZlecenieListItem(
                     zlecenie,
                     {
                         status: 'active',
                         headerHtml: `
+                            <div class="order-active-summary" role="group" aria-label="Skrót aktywnego zlecenia">
+                                <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
+                                <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</strong></p>
+                                <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
+                                <p class="order-card-cell"><span class="key">Status</span><strong>${statusLabel}</strong></p>
+                                <button type="button"
+                                        class="order-expand-toggle"
+                                        data-order-action="toggle-expand"
+                                        data-id="${zlecenie.id}"
+                                        aria-expanded="${isExpanded ? 'true' : 'false'}"
+                                        aria-label="${isExpanded ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia'}">
+                                    <span>${isExpanded ? 'Zwiń' : 'Rozwiń'}</span>
+                                    <span class="order-expand-toggle__icon" aria-hidden="true">▾</span>
+                                </button>
+                            </div>
+                        `,
+                        bodyHtml: `
                             <div class="order-card-layout order-card-layout--active" role="group" aria-label="Dane aktywnego zlecenia">
                                 <div class="order-card-row order-card-row--active-top">
-                                    <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
-                                    <p class="order-card-cell"><span class="key">Status</span><strong>${statusLabel}</strong></p>
-                                    <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</strong></p>
                                     <p class="order-card-cell"><span class="key">Data startu</span><strong>${startLabel || '—'}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Status roboczy</span><strong>${statusLabel}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Najważniejsze dane</span><strong>${timelineHtml}</strong></p>
                                 </div>
                                 <div class="order-card-row order-card-row--active-middle">
                                     <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
-                                    <p class="order-card-cell"><span class="key">Status roboczy</span><strong>${statusLabel}</strong></p>
-                                    <p class="order-card-cell"><span class="key">Najważniejsze dane</span><strong>${timelineHtml}</strong></p>
+                                    <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</strong></p>
+                                    <p class="order-card-cell order-card-cell--identity"><span class="key">Numer zlecenia</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
                                 </div>
                                 <p class="order-card-note"><span class="key">Opis usterki</span><span>${zlecenie.opis || 'Brak opisu'}</span></p>
                             </div>
                         `,
-                        bodyHtml: '',
                         metaHtml: '',
                         actionsHtml: `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
@@ -5605,7 +5626,9 @@ function wyswietlZlecenia() {
                     <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
                     }
-                ));
+                );
+                activeListItem.classList.toggle('is-expanded', isExpanded);
+                aktywneElements.push(activeListItem);
             } else if (zlecenie.status === 'zakończone') {
                 const serviceDate = resolveServiceDate(zlecenie);
                 if (resolveOrderBillingMonth(zlecenie) !== selectedMonth) {
@@ -5994,6 +6017,21 @@ async function obslugaListyZlecen(event) {
     const li = target.closest('li');
     const docId = target?.dataset.id || li?.dataset.id;
     if (!docId) return;
+    const expandToggle = target.closest('[data-order-action="toggle-expand"]');
+    if (expandToggle && li?.classList.contains('is-active')) {
+        const shouldExpand = !expandedActiveOrderIds.has(docId);
+        if (shouldExpand) {
+            expandedActiveOrderIds.add(docId);
+        } else {
+            expandedActiveOrderIds.delete(docId);
+        }
+        li.classList.toggle('is-expanded', shouldExpand);
+        expandToggle.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+        expandToggle.setAttribute('aria-label', shouldExpand ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia');
+        const label = expandToggle.querySelector('span');
+        if (label) label.textContent = shouldExpand ? 'Zwiń' : 'Rozwiń';
+        return;
+    }
     const closeOrderActionMenus = (except = null) => {
         (ukonczoneZleceniaLista || document).querySelectorAll('.row-action').forEach(menu => {
             if (menu !== except) menu.classList.remove('is-open');
