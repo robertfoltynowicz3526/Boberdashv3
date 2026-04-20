@@ -2769,6 +2769,16 @@ select {
   flex: 1 1 200px;
 }
 
+#kalendarz-zlecenia-multi .multi-row select {
+  flex: 2 1 360px;
+  min-width: 260px;
+  letter-spacing: 0.01em;
+}
+
+#kalendarz-zlecenia-multi .multi-row input {
+  flex: 1 1 170px;
+}
+
 #kalendarz-zlecenia-multi .multi-row .multi-add {
   flex: 0 0 auto;
 }

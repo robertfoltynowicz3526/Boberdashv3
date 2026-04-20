@@ -2389,7 +2389,7 @@ function initializeApp() {
                 const option = document.createElement('option');
                 option.value = z.id;
                 option.textContent = label;
-                option.dataset.klientNazwa = z.klientNazwa || label;
+                option.dataset.klientNazwa = pobierzKlientaZlecenia(z) || z.klientNazwa || '';
                 kalendarzMultiSelect.appendChild(option);
             });
         zapewnijOpcjePowiazanych();
@@ -2439,11 +2439,12 @@ function initializeApp() {
         const istniejące = new Set(Array.from(kalendarzMultiSelect.options).map(opt => opt.value));
         multiZlecenia.forEach(pozycja => {
             if (!pozycja?.zlecenieId || istniejące.has(pozycja.zlecenieId)) return;
-            const label = pozycja.klientNazwa || pobierzNazwePowiazania(pozycja.zlecenieId);
+            const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId);
+            const label = pobierzNazweZlecenia(zlecenie) || pozycja.klientNazwa || pozycja.zlecenieId;
             const option = document.createElement('option');
             option.value = pozycja.zlecenieId;
             option.textContent = label || pozycja.zlecenieId;
-            option.dataset.klientNazwa = label || pozycja.zlecenieId;
+            option.dataset.klientNazwa = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || '';
             kalendarzMultiSelect.appendChild(option);
             istniejące.add(pozycja.zlecenieId);
         });
@@ -2514,10 +2515,11 @@ function initializeApp() {
             if (kalendarzMultiSelect) {
                 if (!Array.from(kalendarzMultiSelect.options).some(opt => opt.value === pozycja.zlecenieId)) {
                     const option = document.createElement('option');
-                    const label = pozycja.klientNazwa || pobierzNazwePowiazania(pozycja.zlecenieId);
+                    const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId);
+                    const label = pobierzNazweZlecenia(zlecenie) || pozycja.klientNazwa || pozycja.zlecenieId;
                     option.value = pozycja.zlecenieId;
                     option.textContent = label || pozycja.zlecenieId;
-                    option.dataset.klientNazwa = label || pozycja.zlecenieId;
+                    option.dataset.klientNazwa = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || '';
                     kalendarzMultiSelect.appendChild(option);
                 }
                 kalendarzMultiSelect.value = pozycja.zlecenieId;
@@ -3258,20 +3260,24 @@ function initializeApp() {
         return Number.isFinite(parsed) ? parsed : 0;
     }
 
-    function pobierzNazweZlecenia(zlecenie) {
+    function pobierzNumerEtykietaZlecenia(zlecenie) {
+        const numer = String(zlecenie?.nrZlecenia || zlecenie?.id || '').trim();
+        return numer ? `#${numer}` : '#—';
+    }
+
+    function pobierzKlientaZlecenia(zlecenie) {
         if (!zlecenie) return '';
         const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+        return zlecenie.klientNazwa || klient?.nazwa || '';
+    }
+
+    function pobierzNazweZlecenia(zlecenie) {
+        if (!zlecenie) return '';
         const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-        const klientLabel = zlecenie.klientNazwa || klient?.nazwa || '';
+        const klientLabel = pobierzKlientaZlecenia(zlecenie);
         const maszynaLabel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : '';
-        const nrZlecenia = zlecenie.nrZlecenia || zlecenie.id;
-        if (klientLabel && maszynaLabel) {
-            return `${klientLabel} — ${maszynaLabel}`;
-        }
-        if (klientLabel) {
-            return `${klientLabel} — ${nrZlecenia}`;
-        }
-        return nrZlecenia;
+        const numerLabel = pobierzNumerEtykietaZlecenia(zlecenie);
+        return [numerLabel, klientLabel, maszynaLabel].filter(Boolean).join(' — ');
     }
 
     function pobierzNazwePowiazania(zlecenieId) {
