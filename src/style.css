@@ -1562,27 +1562,28 @@ select {
   transform: translateY(-1px);
 }
 
-#aktywne-zlecenia-lista li span,
-#ukonczone-zlecenia-lista li span {
+#aktywne-zlecenia-lista > ul > li > span,
+#ukonczone-zlecenia-lista > ul > li > span {
   max-width: 60%;
   line-height: 1.5;
 }
 
-#aktywne-zlecenia-lista li div,
-#ukonczone-zlecenia-lista li div {
+#aktywne-zlecenia-lista > ul > li > div,
+#ukonczone-zlecenia-lista > ul > li > div {
   display: flex;
   gap: 0.4rem;
 }
 
 .order-list-item {
   align-items: flex-start !important;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 1.1rem;
   border-radius: 14px;
 }
 
 .order-list-item__content {
-  flex: 1;
+  flex: 1 1 640px;
   min-width: 0;
   display: grid;
   gap: 0.6rem;
@@ -1624,8 +1625,12 @@ select {
   grid-template-columns: minmax(220px, 1.15fr) minmax(220px, 1fr);
 }
 
+.order-card-row--top {
+  grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1.15fr) minmax(240px, 1fr);
+}
+
 .order-card-row--metrics {
-  grid-template-columns: repeat(4, minmax(110px, 1fr)) minmax(240px, 1.2fr);
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) minmax(260px, 1.3fr);
   align-items: stretch;
 }
 
@@ -1664,7 +1669,14 @@ select {
 
 .order-card-cell strong {
   display: block;
-  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.order-card-cell--identity strong {
+  white-space: nowrap;
 }
 
 .order-card-cell--client strong,
@@ -1690,7 +1702,16 @@ select {
   background: rgba(255, 255, 255, 0.015);
   border: 1px dashed rgba(255, 255, 255, 0.1);
   line-height: 1.45;
-  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.order-card-note span:last-child {
+  display: block;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .order-list-item__meta small {
@@ -1707,6 +1728,7 @@ select {
   gap: 0.45rem;
   justify-items: stretch;
   min-width: 170px;
+  flex: 0 0 200px;
 }
 
 .order-list-item__actions button {
@@ -1717,6 +1739,18 @@ select {
 .order-list-item.is-closed .order-list-item__actions {
   align-items: start;
   gap: 0.4rem;
+}
+
+@media (max-width: 1200px) {
+  .order-list-item.is-closed .order-list-item__actions {
+    flex-basis: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .order-list-item.is-closed .order-list-item__actions .row-action {
+    justify-self: end;
+  }
 }
 
 .order-list-item.is-closed .reopen-btn {
@@ -1753,6 +1787,7 @@ select {
     justify-self: end;
   }
 
+  .order-card-row--top,
   .order-card-row--primary,
   .order-card-row--metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
