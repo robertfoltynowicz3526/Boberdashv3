@@ -5600,10 +5600,12 @@ function wyswietlZlecenia() {
                 }
                 const amounts = computeOrderAmounts(zlecenie);
                 const nazwaMaszyny = klient ? `${klient.nazwa} - ${maszyna ? maszyna.typMaszyny : ''} ${maszyna ? maszyna.model : ''}` : 'Zlecenie usuniętej maszyny';
-                const uzyteCzesciHtml = zlecenie.uzyteCzesci?.length > 0 ? `<br><small>Użyto: ${zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ')}</small>` : '';
-                const wzHtml = zlecenie.zakonczenieNumerWZ ? `<br><small>WZ: ${zlecenie.zakonczenieNumerWZ}</small>` : '';
-                const notatkaHtml = zlecenie.zakonczenieNotatka ? `<br><small>📝 ${zlecenie.zakonczenieNotatka}</small>` : '';
+                const uzyteCzesciList = zlecenie.uzyteCzesci?.length > 0 ? zlecenie.uzyteCzesci.map(c => `${c.nazwa} (x${c.ilosc})`).join(', ') : '';
+                const wzLabel = zlecenie.zakonczenieNumerWZ || '';
+                const notatkaLabel = zlecenie.zakonczenieNotatka || '';
                 const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
+                const machineLabel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (quickMachineModel || 'Brak maszyny');
+                const orderDescription = notatkaLabel || zlecenie.opis || 'Brak opisu wykonanej pracy';
                 ukonczoneElements.push(createZlecenieListItem(
                     zlecenie,
                     {
@@ -5613,22 +5615,25 @@ function wyswietlZlecenia() {
                             <span class="order-pill">Zakończone</span>
                         `,
                         bodyHtml: `
-                            <div class="order-card-layout order-card-layout--closed">
-                                <div class="order-card-main">
-                                    <p><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
-                                    <p><span class="key">Maszyna</span><strong>${maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (quickMachineModel || 'Brak maszyny')}</strong></p>
+                            <div class="order-card-layout order-card-layout--closed" role="group" aria-label="Dane zakończonego zlecenia">
+                                <div class="order-card-row order-card-row--primary">
+                                    <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
+                                    <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
                                 </div>
-                                <div class="order-card-stats">
-                                    <p><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
-                                    <p><span class="key">Typ</span><strong>${zlecenie.typZlecenia || '?'}</strong></p>
-                                    <p><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
-                                    <p><span class="key">Motogodziny</span><strong>${motoHoursVal.toFixed(1)} h</strong></p>
-                                    <p><span class="key">Brutto</span><strong>${(amounts.grossCents / 100).toFixed(2)} zł</strong></p>
-                                    <p><span class="key">Netto</span><strong>${(amounts.netCents / 100).toFixed(2)} zł</strong></p>
+                                <div class="order-card-row order-card-row--metrics">
+                                    <p class="order-card-cell"><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Typ</span><strong>${zlecenie.typZlecenia || '?'}</strong></p>
+                                    <p class="order-card-cell order-card-cell--highlight"><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
+                                    <p class="order-card-cell"><span class="key">Motogodziny</span><strong>${motoHoursVal.toFixed(1)} h</strong></p>
+                                    <p class="order-card-cell order-card-cell--settlement"><span class="key">Rozliczenie (brutto / netto)</span><strong>${(amounts.grossCents / 100).toFixed(2)} zł / ${(amounts.netCents / 100).toFixed(2)} zł</strong></p>
                                 </div>
+                                <p class="order-card-note"><span class="key">Opis / notatka końcowa</span><span>${orderDescription}</span></p>
                             </div>
                         `,
-                        metaHtml: `<small>${uzyteCzesciHtml ? `Użyte części dostępne poniżej.` : ''}</small>${uzyteCzesciHtml}${wzHtml}${notatkaHtml}`,
+                        metaHtml: `
+                            ${uzyteCzesciList ? `<small><span class="key">Użyto części</span>${uzyteCzesciList}</small>` : ''}
+                            ${wzLabel ? `<small><span class="key">WZ</span>${wzLabel}</small>` : ''}
+                        `,
                         actionsHtml: `
                     <button type="button" class="btn-edit reopen-btn" data-id="${zlecenie.id}">Otwórz ponownie</button>
                     <button type="button" class="btn-secondary details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
