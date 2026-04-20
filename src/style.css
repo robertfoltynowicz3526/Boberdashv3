@@ -1606,6 +1606,37 @@ select {
   display: block;
 }
 
+.order-active-summary {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.3fr) minmax(260px, 1.5fr) minmax(130px, 0.7fr) auto;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.order-expand-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 46px;
+  min-width: 108px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-color);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.order-expand-toggle__icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.order-expand-toggle[aria-expanded="true"] .order-expand-toggle__icon {
+  transform: rotate(180deg);
+}
+
 .order-list-item__body {
   display: grid !important;
   gap: 0.55rem;
@@ -1804,6 +1835,35 @@ select {
   max-width: 100%;
 }
 
+.order-list-item.is-active .order-list-item__body {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.26s ease, opacity 0.2s ease;
+}
+
+.order-list-item.is-active.is-expanded .order-list-item__body {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.order-list-item.is-active .order-list-item__actions {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  padding-top: 0;
+  margin-top: 0;
+  transition: max-height 0.24s ease, opacity 0.2s ease;
+}
+
+.order-list-item.is-active.is-expanded .order-list-item__actions {
+  max-height: 170px;
+  opacity: 1;
+  pointer-events: auto;
+  padding-top: 0.2rem;
+}
+
 .order-card-layout--active {
   display: grid;
   gap: 0.7rem;
@@ -1890,6 +1950,14 @@ select {
   .order-card-note {
     grid-column: 1 / -1;
   }
+
+  .order-active-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .order-active-summary .order-expand-toggle {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -1917,6 +1985,19 @@ select {
 
   .order-card-row--metrics .order-card-cell--settlement {
     grid-column: 1 / -1;
+  }
+
+  .order-active-summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .order-active-summary .order-card-cell {
+    grid-column: span 3;
+  }
+
+  .order-active-summary .order-expand-toggle {
+    grid-column: span 6;
+    justify-content: flex-start;
   }
 }
 
