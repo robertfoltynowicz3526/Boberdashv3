@@ -5575,16 +5575,23 @@ function wyswietlZlecenia() {
                     {
                         status: 'active',
                         headerHtml: `
-                            <strong>#${zlecenie.nrZlecenia || '—'}</strong>
-                            <span class="order-pill">${statusLabel}</span>
+                            <div class="order-card-layout order-card-layout--active" role="group" aria-label="Dane aktywnego zlecenia">
+                                <div class="order-card-row order-card-row--active-top">
+                                    <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Status</span><strong>${statusLabel}</strong></p>
+                                    <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Data startu</span><strong>${startLabel || '—'}</strong></p>
+                                </div>
+                                <div class="order-card-row order-card-row--active-middle">
+                                    <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Status roboczy</span><strong>${statusLabel}</strong></p>
+                                    <p class="order-card-cell"><span class="key">Najważniejsze dane</span><strong>${timelineHtml}</strong></p>
+                                </div>
+                                <p class="order-card-note"><span class="key">Opis usterki</span><span>${zlecenie.opis || 'Brak opisu'}</span></p>
+                            </div>
                         `,
-                        bodyHtml: `
-                            <p><strong>Klient:</strong> ${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</p>
-                            <p><strong>Maszyna/model:</strong> ${machineLabel}</p>
-                            <p><strong>Status roboczy:</strong> ${statusLabel}</p>
-                            <p><strong>Opis usterki:</strong> ${zlecenie.opis || 'Brak opisu'}</p>
-                        `,
-                        metaHtml: `<small>${timelineHtml}</small>`,
+                        bodyHtml: '',
+                        metaHtml: '',
                         actionsHtml: `
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
