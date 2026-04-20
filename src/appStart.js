@@ -5610,13 +5610,11 @@ function wyswietlZlecenia() {
                     zlecenie,
                     {
                         status: 'closed',
-                        headerHtml: `
-                            <strong>#${zlecenie.nrZlecenia || '—'}</strong>
-                            <span class="order-pill">Zakończone</span>
-                        `,
+                        headerHtml: '',
                         bodyHtml: `
                             <div class="order-card-layout order-card-layout--closed" role="group" aria-label="Dane zakończonego zlecenia">
-                                <div class="order-card-row order-card-row--primary">
+                                <div class="order-card-row order-card-row--top">
+                                    <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'} • Zakończone</strong></p>
                                     <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
                                     <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
                                 </div>
