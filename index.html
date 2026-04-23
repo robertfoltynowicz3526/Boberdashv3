@@ -35,6 +35,7 @@
                 <p class="nav-group-label">Serwis</p>
                 <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
                 <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
+                <button type="button" class="tab-button" data-tab="statystyki-klientow">Statystyki klientów</button>
                 <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
             </div>
             <div class="nav-group">
@@ -181,6 +182,34 @@
                 <div id="clients-list" class="clients-list section-scroll scroll-y">
                     <div id="lista-klientow"></div>
                 </div>
+            </div>
+        </div>
+        <div id="statystyki-klientow" class="tab-content page-wide">
+            <h2>Statystyki klientów</h2>
+            <div class="base-toolbar stats-toolbar">
+                <div class="toolbar-fields">
+                    <div class="form-group">
+                        <label for="client-stats-search">Szukaj klienta</label>
+                        <input type="search" id="client-stats-search" placeholder="Nazwa klienta...">
+                    </div>
+                    <div class="form-group">
+                        <label for="client-stats-sort">Sortowanie rankingu</label>
+                        <select id="client-stats-sort">
+                            <option value="gross-desc">Brutto (malejąco)</option>
+                            <option value="net-desc">Netto (malejąco)</option>
+                            <option value="orders-desc">Liczba zleceń (malejąco)</option>
+                            <option value="billed-desc">Wyfakturowane godziny (malejąco)</option>
+                            <option value="drive-desc">Czas jazdy (malejąco)</option>
+                            <option value="name-asc">Nazwa klienta (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="client-stats-ranking" class="section-scroll scroll-y"></div>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="client-stats-details"></div>
             </div>
         </div>
         <div id="maszyny" class="tab-content page-wide">
@@ -737,7 +766,7 @@
                     <fieldset id="client-add-machine-fields" class="drawer-subform" hidden>
                         <legend>Pierwsza maszyna (opcjonalnie)</legend>
                         <div class="form-grid form-grid-2">
-                            <div class="form-group"><label for="client-machine-typ">Typ maszyny</label><input type="text" id="client-machine-typ" placeholder="Np. Ciągnik"></div>
+                            <div class="form-group"><label for="client-machine-typ">Typ maszyny</label><select id="client-machine-typ"><option value="">-- Wybierz typ --</option></select></div>
                             <div class="form-group"><label for="client-machine-model">Model</label><input type="text" id="client-machine-model" placeholder="Np. 6155M"></div>
                             <div class="form-group"><label for="client-machine-serial">Numer seryjny</label><input type="text" id="client-machine-serial" placeholder="Opcjonalnie"></div>
                             <div class="form-group"><label for="client-machine-rok">Rok produkcji</label><input type="number" id="client-machine-rok" inputmode="numeric" placeholder="Opcjonalnie"></div>

@@ -106,6 +106,7 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
+    const MACHINE_TYPE_OPTIONS = ['Traktor', 'Kombajn', 'Prasa', 'Sieczkarnia', 'Opryskiwacz', 'Inna'];
     const fhOf = (event) => {
         const evType = event?.extendedProps?.type || event?.extendedProps?.typ;
         const isLeave = typeof evType === 'string' && evType.startsWith('LEAVE');
@@ -926,6 +927,8 @@ function initializeApp() {
     const clientMachineSerialInput = document.getElementById('client-machine-serial');
     const clientMachineYearInput = document.getElementById('client-machine-rok');
     const clientMachineMthInput = document.getElementById('client-machine-mth');
+    const maszynaTypSelect = document.getElementById('maszyna-typ');
+    const editMaszynaTypSelect = document.getElementById('edit-maszyna-typ');
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
     const maszynaKlientInput = document.getElementById('maszyna-klient-input');
@@ -943,6 +946,10 @@ function initializeApp() {
     const completeModalForm = document.getElementById('complete-zlecenie-form');
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
+    const clientStatsSearchInput = document.getElementById('client-stats-search');
+    const clientStatsSortSelect = document.getElementById('client-stats-sort');
+    const clientStatsRanking = document.getElementById('client-stats-ranking');
+    const clientStatsDetails = document.getElementById('client-stats-details');
     const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
     const annualSummaryContainer = document.getElementById('annual-summary');
     const quarterlyBonusSummaryContainer = document.getElementById('quarterly-bonus-summary');
@@ -4482,11 +4489,42 @@ ${years.map(y => `
         }
     }
 
+    const normalizeMachineType = (value = '') => {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const found = MACHINE_TYPE_OPTIONS.find((option) => option.toLowerCase() === raw.toLowerCase());
+        return found || raw;
+    };
+
+    const populateMachineTypeSelect = (selectElement, { includePlaceholder = false } = {}) => {
+        if (!selectElement) return;
+        const currentValue = normalizeMachineType(selectElement.value);
+        const options = [];
+        if (includePlaceholder) {
+            options.push('<option value="">-- Wybierz typ --</option>');
+        }
+        MACHINE_TYPE_OPTIONS.forEach((option) => {
+            options.push(`<option value="${option}">${option}</option>`);
+        });
+        const shouldAppendCurrent = currentValue && !MACHINE_TYPE_OPTIONS.includes(currentValue);
+        if (shouldAppendCurrent) {
+            options.push(`<option value="${currentValue}">${currentValue}</option>`);
+        }
+        selectElement.innerHTML = options.join('');
+        selectElement.value = currentValue;
+    };
+
+    const initializeMachineTypeSelects = () => {
+        populateMachineTypeSelect(maszynaTypSelect, { includePlaceholder: true });
+        populateMachineTypeSelect(editMaszynaTypSelect);
+        populateMachineTypeSelect(clientMachineTypInput, { includePlaceholder: true });
+    };
+
     // --- KLIENCI ---
     async function dodajKlienta(event) {
         event.preventDefault();
         const shouldCreateMachine = Boolean(clientAddMachineToggle?.checked);
-        const machineType = (clientMachineTypInput?.value || '').trim();
+        const machineType = normalizeMachineType(clientMachineTypInput?.value || '');
         const machineModel = (clientMachineModelInput?.value || '').trim();
         if (shouldCreateMachine && (!machineType || !machineModel)) {
             alert('Aby dodać klienta z maszyną, uzupełnij przynajmniej typ i model maszyny.');
@@ -4676,6 +4714,7 @@ const applyClientsData = (clients = [], { render = true } = {}) => {
   if (render) {
     wyswietlMaszyny();
     wyswietlKlientow();
+    renderClientStatsView();
   }
 };
 
@@ -4693,6 +4732,7 @@ function nasluchujNaKlientow() {
 let clientDrawerOpen = false;
 let selectedClientId = null;
 let clientDrawerMode = 'view';
+let selectedClientStatsId = null;
 
 const renderClientView = (klient) => {
     if (!clientViewPanel) return;
@@ -5351,7 +5391,7 @@ async function obslugaListyKlientow(event) {
         const dane = {
             klientId: wybranyKlientId,
             klientNazwa: klient.nazwa || '(bez nazwy)',
-            typMaszyny: maszynaForm['maszyna-typ'].value,
+            typMaszyny: normalizeMachineType(maszynaForm['maszyna-typ'].value),
             model: maszynaForm['maszyna-model'].value,
             nrSeryjny: maszynaForm['maszyna-serial'].value || '---',
             rokProdukcji: Number(maszynaForm['maszyna-rok'].value) || null,
@@ -5496,6 +5536,7 @@ async function obslugaListyKlientow(event) {
         if (render) {
             wyswietlMaszyny();
             wyswietlKlientow();
+            renderClientStatsView();
         }
     };
 
@@ -5574,7 +5615,8 @@ function otworzModalEdycjiMaszyny(maszynaId) {
         name: klientNazwa,
         nip: klientNip
     });
-    editMaszynaForm['edit-maszyna-typ'].value = maszyna.typMaszyny;
+    populateMachineTypeSelect(editMaszynaTypSelect);
+    editMaszynaForm['edit-maszyna-typ'].value = normalizeMachineType(maszyna.typMaszyny);
     editMaszynaForm['edit-maszyna-model'].value = maszyna.model;
     editMaszynaForm['edit-maszyna-serial'].value = maszyna.nrSeryjny === '---' ? '' : maszyna.nrSeryjny;
     editMaszynaForm['edit-maszyna-rok'].value = maszyna.rokProdukcji || '';
@@ -5593,7 +5635,7 @@ async function zapiszEdycjeMaszyny(event) {
         return;
     }
     const nowyModel = editMaszynaForm['edit-maszyna-model'].value;
-    const nowyTyp = editMaszynaForm['edit-maszyna-typ'].value;
+    const nowyTyp = normalizeMachineType(editMaszynaForm['edit-maszyna-typ'].value);
     const wybranyKlientId = editMaszynaKlientIdInput?.value || '';
     if (!wybranyKlientId) {
         alert("Proszę wybrać klienta!");
@@ -5803,6 +5845,125 @@ function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', meta
     return li;
 }
 
+function buildClientStatsRows() {
+    const statsByClient = new Map();
+    (_wszystkieKlienciCache || []).forEach((klient) => {
+        if (!klient?.id) return;
+        statsByClient.set(klient.id, {
+            clientId: klient.id,
+            name: klient.nazwa || '—',
+            ordersCount: 0,
+            billedHours: 0,
+            driveHours: 0,
+            gross: 0,
+            net: 0,
+            orders: []
+        });
+    });
+    (_wszystkieZleceniaCache || []).forEach((zlecenie) => {
+        const clientId = zlecenie?.klientId;
+        if (!clientId || !statsByClient.has(clientId)) return;
+        const row = statsByClient.get(clientId);
+        const amounts = computeOrderAmounts(zlecenie);
+        const billedHours = Number(getOrderInvoicedHours(zlecenie)) || 0;
+        const driveHours = Number(zlecenie?.driveHours ?? zlecenie?.jazda ?? zlecenie?.czasJazdy ?? 0) || 0;
+        row.ordersCount += 1;
+        row.billedHours += billedHours;
+        row.driveHours += driveHours;
+        row.gross += amounts.grossCents / 100;
+        row.net += amounts.netCents / 100;
+        row.orders.push({
+            id: zlecenie.id,
+            nr: zlecenie.nrZlecenia || '—',
+            status: zlecenie.status || '—',
+            billedHours,
+            gross: amounts.grossCents / 100,
+            net: amounts.netCents / 100
+        });
+    });
+    return [...statsByClient.values()];
+}
+
+function renderClientStatsView() {
+    if (!clientStatsRanking || !clientStatsDetails) return;
+    const queryText = (clientStatsSearchInput?.value || '').trim().toLowerCase();
+    const sortMode = clientStatsSortSelect?.value || 'gross-desc';
+    let rows = buildClientStatsRows();
+    if (queryText) {
+        rows = rows.filter((row) => row.name.toLowerCase().includes(queryText));
+    }
+    const comparators = {
+        'gross-desc': (a, b) => b.gross - a.gross,
+        'net-desc': (a, b) => b.net - a.net,
+        'orders-desc': (a, b) => b.ordersCount - a.ordersCount,
+        'billed-desc': (a, b) => b.billedHours - a.billedHours,
+        'drive-desc': (a, b) => b.driveHours - a.driveHours,
+        'name-asc': (a, b) => a.name.localeCompare(b.name, 'pl')
+    };
+    rows.sort(comparators[sortMode] || comparators['gross-desc']);
+
+    if (!rows.length) {
+        clientStatsRanking.innerHTML = '<p class="loading-state">Brak klientów do wyświetlenia w statystykach.</p>';
+        clientStatsDetails.innerHTML = '<p class="loading-state">Wybierz klienta z rankingu, aby zobaczyć szczegóły.</p>';
+        selectedClientStatsId = null;
+        return;
+    }
+
+    if (!rows.some((row) => row.clientId === selectedClientStatsId)) {
+        selectedClientStatsId = rows[0].clientId;
+    }
+
+    clientStatsRanking.innerHTML = `
+        <table class="table machine-history-table client-stats-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Klient</th>
+                    <th>Liczba zleceń</th>
+                    <th>Wyfakturowane godziny</th>
+                    <th>Czas jazdy</th>
+                    <th>Brutto</th>
+                    <th>Netto</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map((row, index) => `
+                    <tr class="client-stats-row ${row.clientId === selectedClientStatsId ? 'is-active' : ''}" data-client-stats-id="${row.clientId}">
+                        <td>${index + 1}</td>
+                        <td><strong>${row.name}</strong></td>
+                        <td>${row.ordersCount}</td>
+                        <td>${row.billedHours.toFixed(1)} h</td>
+                        <td>${row.driveHours.toFixed(1)} h</td>
+                        <td>${row.gross.toFixed(2)} zł</td>
+                        <td>${row.net.toFixed(2)} zł</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    const selected = rows.find((row) => row.clientId === selectedClientStatsId) || rows[0];
+    clientStatsDetails.innerHTML = `
+        <div class="summary-container-subtle client-stats-details-panel">
+            <h3>${selected.name}</h3>
+            <div class="order-card-row order-card-row--metrics">
+                <p class="order-card-cell"><span class="key">Liczba zleceń</span><strong>${selected.ordersCount}</strong></p>
+                <p class="order-card-cell"><span class="key">Wyfakturowane</span><strong>${selected.billedHours.toFixed(1)} h</strong></p>
+                <p class="order-card-cell"><span class="key">Czas jazdy</span><strong>${selected.driveHours.toFixed(1)} h</strong></p>
+                <p class="order-card-cell"><span class="key">Brutto</span><strong>${selected.gross.toFixed(2)} zł</strong></p>
+                <p class="order-card-cell"><span class="key">Netto</span><strong>${selected.net.toFixed(2)} zł</strong></p>
+            </div>
+            <h4>Powiązane zlecenia</h4>
+            <ul class="client-stats-orders-list">
+                ${selected.orders.length
+                    ? selected.orders.slice(0, 12).map((order) => `<li>#${order.nr} • ${order.status} • ${order.billedHours.toFixed(1)} h • ${order.gross.toFixed(2)} zł / ${order.net.toFixed(2)} zł</li>`).join('')
+                    : '<li>Brak zleceń dla klienta.</li>'
+                }
+            </ul>
+        </div>
+    `;
+}
+
 function wyswietlZlecenia() {
     if (_wszystkieMaszynyCache.length === 0 && _wszystkieZleceniaCache.length > 0) {
         if (aktywneZleceniaLista) aktywneZleceniaLista.innerHTML = "<p>Ładowanie danych maszyn...</p>";
@@ -5875,15 +6036,9 @@ function wyswietlZlecenia() {
                                 <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak (szybkie zlecenie)'}</strong></p>
                                 <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
                                 <p class="order-card-cell"><span class="key">Status</span><strong>${statusLabel}</strong></p>
-                                <button type="button"
-                                        class="order-expand-toggle"
-                                        data-order-action="toggle-expand"
-                                        data-id="${zlecenie.id}"
-                                        aria-expanded="${isExpanded ? 'true' : 'false'}"
-                                        aria-label="${isExpanded ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia'}">
-                                    <span>${isExpanded ? 'Zwiń' : 'Rozwiń'}</span>
-                                    <span class="order-expand-toggle__icon" aria-hidden="true">▾</span>
-                                </button>
+                                <span class="order-expand-hint" aria-hidden="true">
+                                    <span class="order-expand-hint__icon" data-expanded="${isExpanded ? 'true' : 'false'}">▾</span>
+                                </span>
                             </div>
                         `,
                         bodyHtml: `
@@ -5938,15 +6093,9 @@ function wyswietlZlecenia() {
                                 <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
                                 <p class="order-card-cell"><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
                                 <p class="order-card-cell order-card-cell--highlight"><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
-                                <button type="button"
-                                        class="order-expand-toggle"
-                                        data-order-action="toggle-expand"
-                                        data-id="${zlecenie.id}"
-                                        aria-expanded="${isExpanded ? 'true' : 'false'}"
-                                        aria-label="${isExpanded ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia'}">
-                                    <span>${isExpanded ? 'Zwiń' : 'Rozwiń'}</span>
-                                    <span class="order-expand-toggle__icon" aria-hidden="true">▾</span>
-                                </button>
+                                <span class="order-expand-hint" aria-hidden="true">
+                                    <span class="order-expand-hint__icon" data-expanded="${isExpanded ? 'true' : 'false'}">▾</span>
+                                </span>
                             </div>
                         `,
                         bodyHtml: `
@@ -6023,6 +6172,7 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
     if (render) {
         invalidateMonthStatsCache();
         wyswietlZlecenia();
+        renderClientStatsView();
         odswiezPodsumowania();
         rebuildCalendarDecorations();
         updateUnfinishedSummary();
@@ -6319,12 +6469,8 @@ async function obslugaListyZlecen(event) {
         if (!orderLi) return;
         orderLi.classList.toggle('is-expanded', shouldExpand);
         orderLi.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
-        const toggleBtn = orderLi.querySelector('[data-order-action="toggle-expand"]');
-        if (!toggleBtn) return;
-        toggleBtn.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
-        toggleBtn.setAttribute('aria-label', shouldExpand ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia');
-        const label = toggleBtn.querySelector('span');
-        if (label) label.textContent = shouldExpand ? 'Zwiń' : 'Rozwiń';
+        const hintIcon = orderLi.querySelector('.order-expand-hint__icon');
+        if (hintIcon) hintIcon.dataset.expanded = shouldExpand ? 'true' : 'false';
     };
     const toggleOrderCard = () => {
         if (!li?.classList.contains('order-list-item')) return false;
@@ -6340,11 +6486,6 @@ async function obslugaListyZlecen(event) {
     };
     const clickedInteractiveControl = Boolean(target.closest('button, a, input, select, textarea, [contenteditable="true"]'));
     const clickedContent = target.closest('.order-list-item__content');
-    const expandToggle = target.closest('[data-order-action="toggle-expand"]');
-    if (expandToggle) {
-        toggleOrderCard();
-        return;
-    }
     if (clickedContent && !clickedInteractiveControl) {
         if (toggleOrderCard()) return;
     }
@@ -7855,6 +7996,8 @@ async function obslugaListyCzesci(event) {
         });
     }
 
+    initializeMachineTypeSelects();
+
    // --- PODPIĘCIE EVENTÓW ---
     if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.addEventListener('click', handleQuickActionClick);
     if (pulpitWeeklyContainer) pulpitWeeklyContainer.addEventListener('click', handleWeeklyMissingClick);
@@ -7874,6 +8017,16 @@ async function obslugaListyCzesci(event) {
         });
     }
     if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
+    if (clientStatsSearchInput) clientStatsSearchInput.addEventListener('input', renderClientStatsView);
+    if (clientStatsSortSelect) clientStatsSortSelect.addEventListener('change', renderClientStatsView);
+    if (clientStatsRanking) {
+        clientStatsRanking.addEventListener('click', (event) => {
+            const row = event.target.closest('[data-client-stats-id]');
+            if (!row) return;
+            selectedClientStatsId = row.dataset.clientStatsId || null;
+            renderClientStatsView();
+        });
+    }
 
     if (maszynaForm) maszynaForm.addEventListener('submit', dodajMaszyne);
     if (maszynaAddBtn) {
