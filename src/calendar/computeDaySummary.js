@@ -43,6 +43,7 @@ const readDayEntries = (dayDoc) => {
         zlecenieId: dayDoc.zlecenieId,
         klientNazwa: dayDoc.klientNazwa || null,
         fakturowane: parsePlNumber(dayDoc.fakturowane ?? 0),
+        jazda: parsePlNumber(dayDoc.jazda ?? dayDoc.drive ?? 0),
       },
     ];
   }
@@ -97,6 +98,7 @@ const sumEntries = (entries) => {
     }
 
     billed += parsePlNumber(entry?.fakturowane ?? 0);
+    drive += parsePlNumber(entry?.jazda ?? entry?.drive ?? 0);
   });
 
   return { work, drive, billed, over };
