@@ -4668,3 +4668,114 @@ textarea {
   border: 1px solid var(--ui-panel-border);
   background: rgba(0, 0, 0, 0.16);
 }
+
+.quarterly-bonus{
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+  overflow:hidden;
+}
+.quarterly-bonus__toggle{
+  width:100%;
+  border:none;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  text-align:left;
+}
+.quarterly-bonus__toggle-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:700;
+}
+.quarterly-bonus__summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 14px;
+  font-size:.84rem;
+  opacity:.9;
+  justify-content:flex-end;
+}
+.quarterly-bonus__content{
+  padding:0 14px 14px;
+  display:grid;
+  gap:12px;
+}
+.quarterly-bonus__top-metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+  gap:8px;
+}
+.quarterly-bonus__bonus-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(160px,1fr));
+  gap:8px;
+}
+.quarterly-bonus__mini-card{
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  padding:9px 10px;
+  background:rgba(255,255,255,.03);
+  display:grid;
+  gap:4px;
+}
+.quarterly-bonus__mini-card span{ font-size:.76rem; opacity:.75; }
+.quarterly-bonus__mini-card strong{ font-size:.95rem; }
+.quarterly-bonus__focus{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(200px,1fr));
+  gap:8px;
+}
+.quarterly-bonus__focus-box{
+  border:1px solid rgba(152,255,180,.35);
+  background:rgba(69,149,96,.16);
+  border-radius:10px;
+  padding:10px 12px;
+  display:grid;
+  gap:4px;
+}
+.quarterly-bonus__focus-box span{ font-size:.8rem; opacity:.85; }
+.quarterly-bonus__focus-box strong{ font-size:1rem; }
+.quarterly-bonus__history-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+.quarterly-bonus__history-head h4{ margin:0; }
+.quarterly-bonus__history-toggle{
+  border:1px solid rgba(255,255,255,.18);
+  background:transparent;
+  color:inherit;
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+  font-size:.82rem;
+}
+.tbl--light thead th{
+  background:rgba(16,51,30,.72);
+  padding:8px 10px;
+  font-size:.82rem;
+}
+.tbl--light tbody td{
+  padding:8px 10px;
+  font-size:.88rem;
+}
+@media (max-width:860px){
+  .quarterly-bonus__toggle{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .quarterly-bonus__summary{
+    justify-content:flex-start;
+  }
+  .quarterly-bonus__bonus-grid,
+  .quarterly-bonus__focus{
+    grid-template-columns:1fr;
+  }
+}
