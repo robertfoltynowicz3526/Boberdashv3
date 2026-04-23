@@ -3849,19 +3849,20 @@ function initializeApp() {
             : '0.00 h/dzień';
         quarterlyBonusSummaryContainer.innerHTML = `
             <section class="quarterly-bonus ${quarterlyBonusExpanded ? 'is-open' : ''}">
-                <button type="button" class="quarterly-bonus__toggle" aria-expanded="${quarterlyBonusExpanded}">
+                <button type="button" class="quarterly-bonus__toggle" aria-expanded="${quarterlyBonusExpanded}" aria-controls="quarterly-bonus-content">
                     <span class="quarterly-bonus__toggle-left">
                         <span class="quarterly-bonus__chevron" aria-hidden="true">${quarterlyBonusExpanded ? '▼' : '▶'}</span>
                         <span class="quarterly-bonus__title">Premia kwartalna</span>
                     </span>
                     <span class="quarterly-bonus__summary">
-                        <span><strong>Okres:</strong> ${current.period.label}</span>
-                        <span><strong>Próg:</strong> ${current.threshold ? current.threshold.name : 'poza progami'}</span>
-                        <span><strong>Premia brutto:</strong> ${current.grossBonus.toFixed(2)} zł</span>
-                        <span><strong>Do kolejnego progu:</strong> ${current.nextThreshold ? `${current.missingHours.toFixed(2)} h` : '0.00 h'}</span>
+                        <span class="quarterly-bonus__summary-chip"><em>Okres</em><strong>${current.period.label}</strong></span>
+                        <span class="quarterly-bonus__summary-chip"><em>Próg</em><strong>${current.threshold ? current.threshold.name : 'poza progami'}</strong></span>
+                        <span class="quarterly-bonus__summary-chip"><em>Premia brutto</em><strong>${current.grossBonus.toFixed(2)} zł</strong></span>
+                        <span class="quarterly-bonus__summary-chip"><em>Do kolejnego progu</em><strong>${current.nextThreshold ? `${current.missingHours.toFixed(2)} h` : '0.00 h'}</strong></span>
                     </span>
                 </button>
-                <div class="quarterly-bonus__content" ${quarterlyBonusExpanded ? '' : 'hidden'}>
+                ${quarterlyBonusExpanded ? `
+                <div class="quarterly-bonus__content" id="quarterly-bonus-content">
                     <div class="quarterly-bonus__top-metrics">
                         <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${current.totals.billed.toFixed(2)} h</div></div>
                         <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${current.totals.drive.toFixed(2)} h</div></div>
@@ -3905,6 +3906,7 @@ function initializeApp() {
                         </table>
                     </div>
                 </div>
+                ` : ''}
             </section>
         `;
     };
