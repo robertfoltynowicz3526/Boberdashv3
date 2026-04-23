@@ -731,6 +731,19 @@
                     <div class="form-group"><label for="klient-nip">NIP (opcjonalnie):</label><input type="text" id="klient-nip"></div>
                     <div class="form-group"><label for="klient-adres">Adres (opcjonalnie):</label><input type="text" id="klient-adres"></div>
                     <div class="form-group"><label for="klient-telefon">Telefon (opcjonalnie):</label><input type="text" id="klient-telefon" inputmode="tel"></div>
+                    <div class="form-group form-group-inline">
+                        <label class="inline-checkbox"><input type="checkbox" id="client-add-machine-toggle"> Dodaj klienta z maszyną</label>
+                    </div>
+                    <fieldset id="client-add-machine-fields" class="drawer-subform" hidden>
+                        <legend>Pierwsza maszyna (opcjonalnie)</legend>
+                        <div class="form-grid form-grid-2">
+                            <div class="form-group"><label for="client-machine-typ">Typ maszyny</label><input type="text" id="client-machine-typ" placeholder="Np. Ciągnik"></div>
+                            <div class="form-group"><label for="client-machine-model">Model</label><input type="text" id="client-machine-model" placeholder="Np. 6155M"></div>
+                            <div class="form-group"><label for="client-machine-serial">Numer seryjny</label><input type="text" id="client-machine-serial" placeholder="Opcjonalnie"></div>
+                            <div class="form-group"><label for="client-machine-rok">Rok produkcji</label><input type="number" id="client-machine-rok" inputmode="numeric" placeholder="Opcjonalnie"></div>
+                            <div class="form-group"><label for="client-machine-mth">Aktualne motogodziny</label><input type="number" step="0.1" id="client-machine-mth" inputmode="decimal" placeholder="0"></div>
+                        </div>
+                    </fieldset>
                     <div class="drawer-actions">
                         <button type="submit" class="btn-add">Dodaj klienta</button>
                     </div>
@@ -921,32 +934,53 @@
         <div class="modal-content modal-content-notes">
             <span class="close-button" id="notes-modal-close">&times;</span>
             <h2 id="notes-modal-title">Notatka</h2>
-            <div id="notes-editor-meta" class="notes-editor-meta" aria-live="polite">
-                <h3>Metryka</h3>
-                <p><span class="notes-editor-meta-label">Utworzono:</span> <span id="notes-editor-created">—</span></p>
-                <p><span class="notes-editor-meta-label">Ostatnia aktualizacja:</span> <span id="notes-editor-updated">—</span></p>
-            </div>
             <form id="notes-editor-form" class="modal-body">
                 <input type="hidden" id="notes-editor-id">
-                <div class="form-group"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title"></div>
-                <div class="form-group"><label>Powiąż ze zleceniem</label>
-                    <div class="notes-link-toggle">
-                        <label><input type="radio" name="notes-link-type" value="free" checked> Wolna</label>
-                        <label><input type="radio" name="notes-link-type" value="order"> Do zlecenia</label>
+                <div class="notes-editor-header">
+                    <div class="form-group notes-form-tight"><label for="notes-editor-title">Tytuł</label><input type="text" id="notes-editor-title" placeholder="Krótki tytuł (opcjonalnie)"></div>
+                    <div id="notes-editor-meta" class="notes-editor-meta" aria-live="polite">
+                        <h3>Metryka</h3>
+                        <p><span class="notes-editor-meta-label">Utworzono:</span> <span id="notes-editor-created">—</span></p>
+                        <p><span class="notes-editor-meta-label">Aktualizacja:</span> <span id="notes-editor-updated">—</span></p>
                     </div>
                 </div>
-                <div class="form-group" id="notes-editor-order-group" hidden>
-                    <label for="notes-editor-order">Zlecenie</label>
-                    <div class="combobox" data-combobox="notes-order">
-                        <div class="combobox-input">
-                            <input type="text" id="notes-editor-order-input" autocomplete="off" placeholder="Wyszukaj: klient, maszyna, numer">
-                            <button type="button" class="combobox-clear" id="notes-editor-order-clear" aria-label="Wyczyść">×</button>
+
+                <div class="notes-editor-sidegrid">
+                    <div class="form-group notes-form-tight">
+                        <label>Powiąż ze zleceniem</label>
+                        <div class="notes-link-toggle">
+                            <label><input type="radio" name="notes-link-type" value="free" checked> Wolna</label>
+                            <label><input type="radio" name="notes-link-type" value="order"> Do zlecenia</label>
                         </div>
-                        <input type="hidden" id="notes-editor-order">
-                        <div id="notes-editor-order-dropdown" class="combobox-dropdown" role="listbox"></div>
+                    </div>
+                    <div class="form-group notes-form-tight" id="notes-editor-order-group" hidden>
+                        <label for="notes-editor-order">Zlecenie</label>
+                        <div class="combobox" data-combobox="notes-order">
+                            <div class="combobox-input">
+                                <input type="text" id="notes-editor-order-input" autocomplete="off" placeholder="Wyszukaj: klient, maszyna, numer">
+                                <button type="button" class="combobox-clear" id="notes-editor-order-clear" aria-label="Wyczyść">×</button>
+                            </div>
+                            <input type="hidden" id="notes-editor-order">
+                            <div id="notes-editor-order-dropdown" class="combobox-dropdown" role="listbox"></div>
+                        </div>
+                    </div>
+                    <div class="form-group notes-form-tight">
+                        <label>Opcje</label>
+                        <div class="notes-link-toggle">
+                            <label><input type="checkbox" id="notes-editor-pinned"> Przypnij</label>
+                            <label for="notes-editor-color">Kolor</label>
+                            <select id="notes-editor-color">
+                                <option value="#ffffff">Biały</option>
+                                <option value="#fff8b8">Żółty</option>
+                                <option value="#d9fdd3">Zielony</option>
+                                <option value="#d7efff">Niebieski</option>
+                                <option value="#fce1ff">Różowy</option>
+                                <option value="#ffe8cc">Pomarańczowy</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group"><label for="notes-editor-content">Treść</label>
+                <div class="form-group notes-content-group"><label for="notes-editor-content">Treść</label>
                     <div class="notes-toolbar" id="notes-toolbar">
                         <button type="button" data-cmd="bold"><b>B</b></button>
                         <button type="button" data-cmd="italic"><i>I</i></button>
@@ -964,22 +998,7 @@
                     </div>
                     <div id="notes-editor-content" class="notes-editor-content" contenteditable="true"></div>
                 </div>
-                <div class="form-group">
-                    <label>Opcje</label>
-                    <div class="notes-link-toggle">
-                        <label><input type="checkbox" id="notes-editor-pinned"> Przypnij</label>
-                        <label for="notes-editor-color">Kolor</label>
-                        <select id="notes-editor-color">
-                            <option value="#ffffff">Biały</option>
-                            <option value="#fff8b8">Żółty</option>
-                            <option value="#d9fdd3">Zielony</option>
-                            <option value="#d7efff">Niebieski</option>
-                            <option value="#fce1ff">Różowy</option>
-                            <option value="#ffe8cc">Pomarańczowy</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-actions">
+                <div class="modal-actions modal-actions-sticky">
                     <button type="submit" class="btn-add">Zapisz</button>
                     <button type="button" id="notes-editor-cancel" class="btn-secondary">Anuluj</button>
                     <button type="button" id="notes-editor-delete" class="btn-danger">Usuń</button>
