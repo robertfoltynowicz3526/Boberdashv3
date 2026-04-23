@@ -937,6 +937,7 @@ function initializeApp() {
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
     const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
     const annualSummaryContainer = document.getElementById('annual-summary');
+    const quarterlyBonusSummaryContainer = document.getElementById('quarterly-bonus-summary');
     const l4SummaryContainer = document.getElementById('l4-summary');
     const summaryYearSelect = document.getElementById('summary-year-select');
     const annualSummaryExportBtn = document.getElementById('annual-summary-export');
@@ -1034,6 +1035,7 @@ function initializeApp() {
     const kalendarzMultiWrapper = document.getElementById('kalendarz-zlecenia-multi');
     const kalendarzMultiSelect = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-select') : null;
     const kalendarzMultiHoursInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-fh') : null;
+    const kalendarzMultiDriveInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-drive') : null;
     const kalendarzMultiAddButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-add') : null;
     const kalendarzMultiList = document.getElementById('kalendarz-zlecenia-list');
     const clientDrawer = document.getElementById('client-drawer');
@@ -1444,7 +1446,7 @@ function initializeApp() {
             orderId: entry.zlecenieId,
             clientName: resolveOrderClientName(entry.zlecenieId, entry.klientNazwa, orderIndex),
             work: parsePlNumber(entry?.work ?? 0),
-            drive: parsePlNumber(entry?.drive ?? 0),
+            drive: parsePlNumber(entry?.drive ?? entry?.jazda ?? 0),
             billed: parsePlNumber(entry?.fakturowane ?? 0),
             over: parsePlNumber(entry?.over ?? 0),
         }));
@@ -2400,6 +2402,7 @@ function initializeApp() {
         multiEdytowanyIndex = null;
         if (kalendarzMultiSelect) kalendarzMultiSelect.value = '';
         if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = '';
+        if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = '';
         if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj';
     }
 
@@ -2417,7 +2420,7 @@ function initializeApp() {
             ? multiZlecenia.map((pozycja, index) => {
                 const nazwa = pozycja.klientNazwa || pobierzNazwePowiazania(pozycja.zlecenieId);
                 return `<li data-index="${index}">
-                    <span>F: <strong>${formatujLiczbe(pozycja.fakturowane)}</strong> h — ${nazwa || pozycja.zlecenieId}</span>
+                    <span>F: <strong>${formatujLiczbe(pozycja.fakturowane)}</strong> h • J: <strong>${formatujLiczbe(pozycja.jazda)}</strong> h — ${nazwa || pozycja.zlecenieId}</span>
                     <div class="actions">
                         <button type="button" class="btn-edit multi-edit">Edytuj</button>
                         <button type="button" class="btn-remove multi-remove">Usuń</button>
@@ -2452,15 +2455,20 @@ function initializeApp() {
     }
 
     function dodajLubZapiszMultiZlecenie() {
-        if (!kalendarzMultiSelect || !kalendarzMultiHoursInput) return;
+        if (!kalendarzMultiSelect || !kalendarzMultiHoursInput || !kalendarzMultiDriveInput) return;
         const zlecenieId = kalendarzMultiSelect.value;
         const godziny = Number(kalendarzMultiHoursInput.value);
+        const czasJazdy = Number(kalendarzMultiDriveInput.value || 0);
         if (!zlecenieId) {
             alert('Wybierz zlecenie do powiązania.');
             return;
         }
         if (!Number.isFinite(godziny) || godziny <= 0) {
             alert('Podaj dodatnią liczbę godzin.');
+            return;
+        }
+        if (!Number.isFinite(czasJazdy) || czasJazdy < 0) {
+            alert('Podaj poprawny czas jazdy (0 lub więcej).');
             return;
         }
         const klientNazwa = (kalendarzMultiSelect.options[kalendarzMultiSelect.selectedIndex]?.dataset.klientNazwa)
@@ -2475,7 +2483,8 @@ function initializeApp() {
                 entryId: multiZlecenia[multiEdytowanyIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
-                fakturowane: Number(godziny) || 0
+                fakturowane: Number(godziny) || 0,
+                jazda: Number(czasJazdy) || 0
             };
         } else {
             const istnieje = multiZlecenia.some(poz => poz.zlecenieId === zlecenieId);
@@ -2487,7 +2496,8 @@ function initializeApp() {
                 entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
-                fakturowane: Number(godziny) || 0
+                fakturowane: Number(godziny) || 0,
+                jazda: Number(czasJazdy) || 0
             });
         }
         resetujFormularzMulti();
@@ -2526,6 +2536,7 @@ function initializeApp() {
                 kalendarzMultiSelect.value = pozycja.zlecenieId;
             }
             if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = Number(pozycja.fakturowane) || 0;
+            if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = Number(pozycja.jazda) || 0;
             if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Zapisz';
         }
     }
@@ -2538,7 +2549,8 @@ function initializeApp() {
             entryId: String(p.entryId || `${data}:${p.zlecenieId}:${index}`),
             zlecenieId: p.zlecenieId,
             klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
-            fakturowane: Number(p.fakturowane) || 0
+            fakturowane: Number(p.fakturowane) || 0,
+            jazda: Number(p.jazda) || 0
         }));
         const sumaFakturowane = powiazane.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         const wartoscZFormularza = Number(kalendarzForm['godziny-fakturowane'].value) || 0;
@@ -3295,7 +3307,8 @@ function initializeApp() {
                 entryId: String(p.entryId || p.id || `${dane?.date || dane?.id || 'unknown-day'}:${p.zlecenieId}:${index}`),
                 zlecenieId: p.zlecenieId,
                 klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
-                fakturowane: Number(p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia ?? p.fakturowane) || 0
+                fakturowane: Number(p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia ?? p.fakturowane) || 0,
+                jazda: Number(p.driveForOrderHours ?? p.czasJazdyDlaZlecenia ?? p.jazda) || 0
             }));
 
         if (!powiazane.length && dane?.zlecenieId) {
@@ -3303,7 +3316,8 @@ function initializeApp() {
                 entryId: String(dane?.entryId || dane?.id || `${dane?.date || dane?.zlecenieId || 'unknown-day'}:${dane.zlecenieId}:0`),
                 zlecenieId: dane.zlecenieId,
                 klientNazwa: dane.klientNazwa || pobierzNazwePowiazania(dane.zlecenieId),
-                fakturowane: Number(dane.invoicedForOrderHours ?? dane.fakturowaneDlaZlecenia ?? dane.fakturowane) || 0
+                fakturowane: Number(dane.invoicedForOrderHours ?? dane.fakturowaneDlaZlecenia ?? dane.fakturowane) || 0,
+                jazda: Number(dane.driveForOrderHours ?? dane.czasJazdyDlaZlecenia ?? dane.jazda) || 0
             });
         }
 
@@ -3663,6 +3677,176 @@ function initializeApp() {
     };
 
     const formatHours = (value) => `${(Number(value) || 0).toFixed(2)} h`;
+    const QUARTERLY_BONUS_THRESHOLDS = [
+        { name: 'I', min: 84, max: 108, rate: 2 },
+        { name: 'II', min: 109, max: 133, rate: 5 },
+        { name: 'III', min: 134, max: 168, rate: 7 }
+    ];
+    const PL_MONTHS = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
+
+    const monthKeyToParts = (monthKey = '') => {
+        const [yearStr, monthStr] = String(monthKey).split('-');
+        const year = Number(yearStr);
+        const month = Number(monthStr);
+        if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+        return { year, month };
+    };
+
+    const makeMonthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
+
+    const shiftMonth = (year, month, offset = 0) => {
+        const base = new Date(Date.UTC(year, month - 1 + offset, 1));
+        return { year: base.getUTCFullYear(), month: base.getUTCMonth() + 1 };
+    };
+
+    const resolveQuarterlyPeriodForMonth = (year, month) => {
+        if (month >= 2 && month <= 4) return { startYear: year, startMonth: 2 };
+        if (month >= 5 && month <= 7) return { startYear: year, startMonth: 5 };
+        if (month >= 8 && month <= 10) return { startYear: year, startMonth: 8 };
+        if (month >= 11) return { startYear: year, startMonth: 11 };
+        return { startYear: year - 1, startMonth: 11 };
+    };
+
+    const buildQuarterlyPeriod = ({ startYear, startMonth }) => {
+        const months = [0, 1, 2].map((offset) => {
+            const shifted = shiftMonth(startYear, startMonth, offset);
+            return {
+                ...shifted,
+                key: makeMonthKey(shifted.year, shifted.month),
+                label: `${PL_MONTHS[shifted.month - 1]} ${shifted.year}`
+            };
+        });
+        const end = months[2];
+        const endDate = new Date(end.year, end.month, 0);
+        return {
+            id: `${startYear}-${String(startMonth).padStart(2, '0')}`,
+            startYear,
+            startMonth,
+            months,
+            endDate,
+            label: `${PL_MONTHS[months[0].month - 1]} – ${PL_MONTHS[end.month - 1]} ${end.year}`
+        };
+    };
+
+    const resolveQuarterlyThreshold = (averageHours) => QUARTERLY_BONUS_THRESHOLDS.find((threshold) => averageHours >= threshold.min && averageHours <= threshold.max) || null;
+
+    const countBusinessDaysInclusive = (startDate, endDate) => {
+        if (!(startDate instanceof Date) || !(endDate instanceof Date) || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) return 0;
+        let count = 0;
+        const day = new Date(startDate);
+        while (day <= endDate) {
+            const weekDay = day.getDay();
+            if (weekDay !== 0 && weekDay !== 6) count += 1;
+            day.setDate(day.getDate() + 1);
+        }
+        return count;
+    };
+
+    const computeQuarterlyBonusModel = () => {
+        const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache).monthStats;
+        const driveByMonth = new Map();
+        (wszystkieWpisyKalendarza || []).forEach((entry) => {
+            const dayKey = normalizeDayKey(entry?.date || entry?.id, 'quarterly-bonus.drive');
+            if (!dayKey) return;
+            const monthKey = dayKey.slice(0, 7);
+            const manualDrive = Number(entry?.drive ?? entry?.jazda ?? 0) || 0;
+            const linkedDrive = normalizujPowiazaneZlecenia(entry || {}).powiazane
+                .reduce((acc, linked) => acc + (Number(linked?.jazda) || 0), 0);
+            const total = manualDrive + linkedDrive;
+            driveByMonth.set(monthKey, (driveByMonth.get(monthKey) || 0) + total);
+        });
+
+        const knownMonths = new Set([...invoiceByMonth.keys(), ...driveByMonth.keys()]);
+        const now = new Date();
+        knownMonths.add(makeMonthKey(now.getFullYear(), now.getMonth() + 1));
+        const sortedMonths = [...knownMonths]
+            .map(monthKeyToParts)
+            .filter(Boolean)
+            .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+        if (!sortedMonths.length) return null;
+
+        const startPeriod = resolveQuarterlyPeriodForMonth(sortedMonths[0].year, sortedMonths[0].month);
+        const endPeriod = resolveQuarterlyPeriodForMonth(sortedMonths[sortedMonths.length - 1].year, sortedMonths[sortedMonths.length - 1].month);
+        const periods = [];
+        let cursor = { ...startPeriod };
+        while ((cursor.startYear < endPeriod.startYear) || (cursor.startYear === endPeriod.startYear && cursor.startMonth <= endPeriod.startMonth)) {
+            periods.push(buildQuarterlyPeriod(cursor));
+            cursor = shiftMonth(cursor.startYear, cursor.startMonth, 3);
+        }
+
+        const summary = periods.map((period) => {
+            const months = period.months.map((item) => {
+                const invoice = invoiceByMonth.get(item.key);
+                const billed = Number(invoice?.invoicedHours) || 0;
+                const drive = Number(driveByMonth.get(item.key)) || 0;
+                return { ...item, billed, drive, total: billed + drive };
+            });
+            const totals = months.reduce((acc, item) => {
+                acc.billed += item.billed;
+                acc.drive += item.drive;
+                acc.total += item.total;
+                return acc;
+            }, { billed: 0, drive: 0, total: 0 });
+            const average = totals.total / 3;
+            const threshold = resolveQuarterlyThreshold(average);
+            const grossBonus = average * 3 * (threshold?.rate || 0);
+            const netBonus = grossBonus * 0.7;
+            const nextThreshold = QUARTERLY_BONUS_THRESHOLDS.find((item) => average < item.min) || null;
+            const missingHours = nextThreshold ? Math.max(0, (nextThreshold.min * 3) - totals.total) : 0;
+            return { period, months, totals, average, threshold, nextThreshold, missingHours, grossBonus, netBonus };
+        });
+
+        const currentPeriodMeta = resolveQuarterlyPeriodForMonth(now.getFullYear(), now.getMonth() + 1);
+        const currentPeriodId = `${currentPeriodMeta.startYear}-${String(currentPeriodMeta.startMonth).padStart(2, '0')}`;
+        const current = summary.find((item) => item.period.id === currentPeriodId) || null;
+        if (!current) return { current: null, history: summary.reverse() };
+
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const remainingBusinessDays = countBusinessDaysInclusive(tomorrow, current.period.endDate);
+        const neededPerDay = current.nextThreshold && remainingBusinessDays > 0
+            ? current.missingHours / remainingBusinessDays
+            : 0;
+
+        return {
+            current: { ...current, remainingBusinessDays, neededPerDay },
+            history: summary.filter((item) => item.period.id !== current.period.id).reverse()
+        };
+    };
+
+    const renderQuarterlyBonusSummary = () => {
+        if (!quarterlyBonusSummaryContainer) return;
+        const model = computeQuarterlyBonusModel();
+        if (!model || !model.current) {
+            quarterlyBonusSummaryContainer.innerHTML = '<p>Brak danych do wyliczenia premii kwartalnej.</p>';
+            return;
+        }
+        const current = model.current;
+        quarterlyBonusSummaryContainer.innerHTML = `
+            <p><strong>Aktualny okres:</strong> ${current.period.label}</p>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${current.totals.billed.toFixed(2)} h</div></div>
+                <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${current.totals.drive.toFixed(2)} h</div></div>
+                <div class="metric"><div class="label">Suma do premii</div><div class="value num">${current.totals.total.toFixed(2)} h</div></div>
+                <div class="metric"><div class="label">Średnia z 3 miesięcy</div><div class="value num">${current.average.toFixed(2)} h</div></div>
+            </div>
+            <p><strong>Próg:</strong> ${current.threshold ? `${current.threshold.name} (${current.threshold.min}–${current.threshold.max})` : 'poza progami'} | <strong>Stawka:</strong> ${(current.threshold?.rate || 0).toFixed(2)} zł | <strong>Premia brutto:</strong> ${current.grossBonus.toFixed(2)} zł | <strong>Premia po -30%:</strong> ${current.netBonus.toFixed(2)} zł</p>
+            <p><strong>Do kolejnego progu:</strong> ${current.nextThreshold ? `${current.missingHours.toFixed(2)} h (próg ${current.nextThreshold.name})` : 'Najwyższy próg osiągnięty'}</p>
+            <p><strong>Ile godzin dziennie potrzeba:</strong> ${current.nextThreshold ? `${current.neededPerDay.toFixed(2)} h/dzień (pozostałe dni robocze: ${current.remainingBusinessDays})` : '0.00 h/dzień'}</p>
+            <table class="tbl">
+                <thead><tr><th>Miesiąc</th><th>Wyfakturowane</th><th>Jazda</th><th>Suma</th></tr></thead>
+                <tbody>
+                    ${current.months.map((month) => `<tr><td>${month.label}</td><td>${month.billed.toFixed(2)} h</td><td>${month.drive.toFixed(2)} h</td><td>${month.total.toFixed(2)} h</td></tr>`).join('')}
+                </tbody>
+            </table>
+            <h4>Historia premii</h4>
+            <table class="tbl">
+                <thead><tr><th>Okres</th><th>Średnia</th><th>Próg</th><th>Stawka</th><th>Premia brutto</th><th>Premia po -30%</th></tr></thead>
+                <tbody>
+                    ${model.history.map((item) => `<tr><td>${item.period.label}</td><td>${item.average.toFixed(2)} h</td><td>${item.threshold ? item.threshold.name : '—'}</td><td>${(item.threshold?.rate || 0).toFixed(2)} zł</td><td>${item.grossBonus.toFixed(2)} zł</td><td>${item.netBonus.toFixed(2)} zł</td></tr>`).join('') || '<tr><td colspan="6">Brak zakończonych okresów.</td></tr>'}
+                </tbody>
+            </table>
+        `;
+    };
 
 
     const buildExportMenuMarkup = (year) => `
@@ -4065,6 +4249,7 @@ ${years.map(y => `
     async function renderPodsumowanie() {
         await ensureSelectedYearData();
         renderRocznePodsumowanie();
+        renderQuarterlyBonusSummary();
         renderL4Summary();
         await renderVacationSummary();
     }
