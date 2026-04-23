@@ -1018,6 +1018,8 @@ function initializeApp() {
     const itemOilContainerSelect = document.getElementById('item-oil-container');
     const itemProductTypeSelect = document.getElementById('item-product-type');
     const oilToolsDrawer = document.getElementById('oil-tools-drawer');
+    let quarterlyBonusExpanded = false;
+    let quarterlyBonusHistoryExpanded = false;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -3831,30 +3833,79 @@ function initializeApp() {
             quarterlyBonusSummaryContainer.innerHTML = '<p>Brak danych do wyliczenia premii kwartalnej.</p>';
             return;
         }
+        const historyPreviewLimit = 3;
+        const visibleHistory = quarterlyBonusHistoryExpanded
+            ? model.history
+            : model.history.slice(0, historyPreviewLimit);
+        const hasMoreHistory = model.history.length > historyPreviewLimit;
+        const periodRange = current.threshold
+            ? `${current.threshold.min}–${current.threshold.max}`
+            : 'poza progami';
+        const nextThresholdText = current.nextThreshold
+            ? `${current.missingHours.toFixed(2)} h do progu ${current.nextThreshold.name}`
+            : 'Najwyższy próg osiągnięty';
+        const neededPerDayText = current.nextThreshold
+            ? `${current.neededPerDay.toFixed(2)} h/dzień (pozostałe dni robocze: ${current.remainingBusinessDays})`
+            : '0.00 h/dzień';
         quarterlyBonusSummaryContainer.innerHTML = `
-            <p><strong>Aktualny okres:</strong> ${current.period.label}</p>
-            <div class="metrics-grid">
-                <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${current.totals.billed.toFixed(2)} h</div></div>
-                <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${current.totals.drive.toFixed(2)} h</div></div>
-                <div class="metric"><div class="label">Suma do premii</div><div class="value num">${current.totals.total.toFixed(2)} h</div></div>
-                <div class="metric"><div class="label">Średnia z 3 miesięcy</div><div class="value num">${current.average.toFixed(2)} h</div></div>
-            </div>
-            <p><strong>Próg:</strong> ${current.threshold ? `${current.threshold.name} (${current.threshold.min}–${current.threshold.max})` : 'poza progami'} | <strong>Stawka:</strong> ${(current.threshold?.rate || 0).toFixed(2)} zł | <strong>Premia brutto:</strong> ${current.grossBonus.toFixed(2)} zł | <strong>Premia po -30%:</strong> ${current.netBonus.toFixed(2)} zł</p>
-            <p><strong>Do kolejnego progu:</strong> ${current.nextThreshold ? `${current.missingHours.toFixed(2)} h (próg ${current.nextThreshold.name})` : 'Najwyższy próg osiągnięty'}</p>
-            <p><strong>Ile godzin dziennie potrzeba:</strong> ${current.nextThreshold ? `${current.neededPerDay.toFixed(2)} h/dzień (pozostałe dni robocze: ${current.remainingBusinessDays})` : '0.00 h/dzień'}</p>
-            <table class="tbl">
-                <thead><tr><th>Miesiąc</th><th>Wyfakturowane</th><th>Jazda</th><th>Suma</th></tr></thead>
-                <tbody>
-                    ${current.months.map((month) => `<tr><td>${month.label}</td><td>${month.billed.toFixed(2)} h</td><td>${month.drive.toFixed(2)} h</td><td>${month.total.toFixed(2)} h</td></tr>`).join('')}
-                </tbody>
-            </table>
-            <h4>Historia premii</h4>
-            <table class="tbl">
-                <thead><tr><th>Okres</th><th>Średnia</th><th>Próg</th><th>Stawka</th><th>Premia brutto</th><th>Premia po -30%</th></tr></thead>
-                <tbody>
-                    ${model.history.map((item) => `<tr><td>${item.period.label}</td><td>${item.average.toFixed(2)} h</td><td>${item.threshold ? item.threshold.name : '—'}</td><td>${(item.threshold?.rate || 0).toFixed(2)} zł</td><td>${item.grossBonus.toFixed(2)} zł</td><td>${item.netBonus.toFixed(2)} zł</td></tr>`).join('') || '<tr><td colspan="6">Brak zakończonych okresów.</td></tr>'}
-                </tbody>
-            </table>
+            <section class="quarterly-bonus ${quarterlyBonusExpanded ? 'is-open' : ''}">
+                <button type="button" class="quarterly-bonus__toggle" aria-expanded="${quarterlyBonusExpanded}">
+                    <span class="quarterly-bonus__toggle-left">
+                        <span class="quarterly-bonus__chevron" aria-hidden="true">${quarterlyBonusExpanded ? '▼' : '▶'}</span>
+                        <span class="quarterly-bonus__title">Premia kwartalna</span>
+                    </span>
+                    <span class="quarterly-bonus__summary">
+                        <span><strong>Okres:</strong> ${current.period.label}</span>
+                        <span><strong>Próg:</strong> ${current.threshold ? current.threshold.name : 'poza progami'}</span>
+                        <span><strong>Premia brutto:</strong> ${current.grossBonus.toFixed(2)} zł</span>
+                        <span><strong>Do kolejnego progu:</strong> ${current.nextThreshold ? `${current.missingHours.toFixed(2)} h` : '0.00 h'}</span>
+                    </span>
+                </button>
+                <div class="quarterly-bonus__content" ${quarterlyBonusExpanded ? '' : 'hidden'}>
+                    <div class="quarterly-bonus__top-metrics">
+                        <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${current.totals.billed.toFixed(2)} h</div></div>
+                        <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${current.totals.drive.toFixed(2)} h</div></div>
+                        <div class="metric"><div class="label">Suma do premii</div><div class="value num">${current.totals.total.toFixed(2)} h</div></div>
+                        <div class="metric"><div class="label">Średnia z 3 miesięcy</div><div class="value num">${current.average.toFixed(2)} h</div></div>
+                    </div>
+                    <div class="quarterly-bonus__bonus-grid">
+                        <div class="quarterly-bonus__mini-card"><span>Próg</span><strong>${current.threshold ? current.threshold.name : 'poza progami'} <small>${periodRange}</small></strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Stawka</span><strong>${(current.threshold?.rate || 0).toFixed(2)} zł</strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Premia brutto</span><strong>${current.grossBonus.toFixed(2)} zł</strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Premia po -30%</span><strong>${current.netBonus.toFixed(2)} zł</strong></div>
+                    </div>
+                    <div class="quarterly-bonus__focus">
+                        <div class="quarterly-bonus__focus-box">
+                            <span>Do kolejnego progu</span>
+                            <strong>${nextThresholdText}</strong>
+                        </div>
+                        <div class="quarterly-bonus__focus-box">
+                            <span>Ile godzin dziennie potrzeba</span>
+                            <strong>${neededPerDayText}</strong>
+                        </div>
+                    </div>
+                    <div class="quarterly-bonus__table-wrap">
+                        <table class="tbl tbl--light">
+                            <thead><tr><th>Miesiąc</th><th>Wyfakturowane</th><th>Jazda</th><th>Suma</th></tr></thead>
+                            <tbody>
+                                ${current.months.map((month) => `<tr><td>${month.label}</td><td>${month.billed.toFixed(2)} h</td><td>${month.drive.toFixed(2)} h</td><td>${month.total.toFixed(2)} h</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="quarterly-bonus__history-head">
+                        <h4>Historia premii</h4>
+                        ${hasMoreHistory ? `<button type="button" class="quarterly-bonus__history-toggle">${quarterlyBonusHistoryExpanded ? 'Pokaż mniej' : 'Pokaż więcej'}</button>` : ''}
+                    </div>
+                    <div class="quarterly-bonus__table-wrap">
+                        <table class="tbl tbl--light">
+                            <thead><tr><th>Okres</th><th>Średnia</th><th>Próg</th><th>Stawka</th><th>Premia brutto</th><th>Premia po -30%</th></tr></thead>
+                            <tbody>
+                                ${visibleHistory.map((item) => `<tr><td>${item.period.label}</td><td>${item.average.toFixed(2)} h</td><td>${item.threshold ? item.threshold.name : '—'}</td><td>${(item.threshold?.rate || 0).toFixed(2)} zł</td><td>${item.grossBonus.toFixed(2)} zł</td><td>${item.netBonus.toFixed(2)} zł</td></tr>`).join('') || '<tr><td colspan="6">Brak zakończonych okresów.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         `;
     };
 
@@ -7945,6 +7996,22 @@ async function obslugaListyCzesci(event) {
                 openSummaryYears.delete(year);
             }
             persistOpenYears([...openSummaryYears]);
+        });
+    }
+
+    if (quarterlyBonusSummaryContainer) {
+        quarterlyBonusSummaryContainer.addEventListener('click', (event) => {
+            const toggle = event.target.closest('.quarterly-bonus__toggle');
+            if (toggle) {
+                quarterlyBonusExpanded = !quarterlyBonusExpanded;
+                renderQuarterlyBonusSummary();
+                return;
+            }
+            const historyToggle = event.target.closest('.quarterly-bonus__history-toggle');
+            if (historyToggle) {
+                quarterlyBonusHistoryExpanded = !quarterlyBonusHistoryExpanded;
+                renderQuarterlyBonusSummary();
+            }
         });
     }
     document.addEventListener('click', (event) => {
