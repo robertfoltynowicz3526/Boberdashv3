@@ -3669,8 +3669,8 @@ function initializeApp() {
     const ensureOpenSummaryYears = (years = []) => {
         const available = new Set((years || []).map(Number).filter(Number.isFinite));
         const stored = readOpenYearsFromStorage().filter(year => available.has(year));
-        const next = stored.length ? stored : [currentYear].filter(year => available.has(year));
-        if (!next.length && years.length) next.push(Number(years[0]));
+        const shouldIgnoreStoredAllOpen = stored.length > 0 && stored.length === available.size;
+        const next = shouldIgnoreStoredAllOpen ? [] : stored;
         openSummaryYears = new Set(next);
         persistOpenYears([...openSummaryYears]);
         return openSummaryYears;
@@ -3697,6 +3697,11 @@ function initializeApp() {
     const shiftMonth = (year, month, offset = 0) => {
         const base = new Date(Date.UTC(year, month - 1 + offset, 1));
         return { year: base.getUTCFullYear(), month: base.getUTCMonth() + 1 };
+    };
+
+    const shiftQuarterlyPeriodStart = (startYear, startMonth, offset = 0) => {
+        const shifted = shiftMonth(startYear, startMonth, offset);
+        return { startYear: shifted.year, startMonth: shifted.month };
     };
 
     const resolveQuarterlyPeriodForMonth = (year, month) => {
@@ -3771,7 +3776,7 @@ function initializeApp() {
         let cursor = { ...startPeriod };
         while ((cursor.startYear < endPeriod.startYear) || (cursor.startYear === endPeriod.startYear && cursor.startMonth <= endPeriod.startMonth)) {
             periods.push(buildQuarterlyPeriod(cursor));
-            cursor = shiftMonth(cursor.startYear, cursor.startMonth, 3);
+            cursor = shiftQuarterlyPeriodStart(cursor.startYear, cursor.startMonth, 3);
         }
 
         const summary = periods.map((period) => {
@@ -3821,6 +3826,11 @@ function initializeApp() {
             return;
         }
         const current = model.current;
+        const hasAnyCurrentData = current.months.some((month) => month.billed > 0 || month.drive > 0);
+        if (!hasAnyCurrentData) {
+            quarterlyBonusSummaryContainer.innerHTML = '<p>Brak danych do wyliczenia premii kwartalnej.</p>';
+            return;
+        }
         quarterlyBonusSummaryContainer.innerHTML = `
             <p><strong>Aktualny okres:</strong> ${current.period.label}</p>
             <div class="metrics-grid">
