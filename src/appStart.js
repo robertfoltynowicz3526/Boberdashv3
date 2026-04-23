@@ -719,6 +719,7 @@ function initializeApp() {
     let unfinishedDrawerView = { mode: 'summary', days: [] };
     let ordersFilterMode = null;
     let expandedActiveOrderIds = new Set();
+    let expandedClosedOrderIds = new Set();
     let unfinishedDrawer = null;
     let unfinishedButton = null;
     configureDayTotals({
@@ -918,6 +919,13 @@ function initializeApp() {
     const assignFormError = document.getElementById('assign-form-error');
     const assignTrybHint = document.getElementById('assign-tryb-hint');
     const klientForm = document.getElementById('klient-form');
+    const clientAddMachineToggle = document.getElementById('client-add-machine-toggle');
+    const clientAddMachineFields = document.getElementById('client-add-machine-fields');
+    const clientMachineTypInput = document.getElementById('client-machine-typ');
+    const clientMachineModelInput = document.getElementById('client-machine-model');
+    const clientMachineSerialInput = document.getElementById('client-machine-serial');
+    const clientMachineYearInput = document.getElementById('client-machine-rok');
+    const clientMachineMthInput = document.getElementById('client-machine-mth');
     const klientAddBtn = document.getElementById('klient-add-btn');
     const listaKlientowDiv = document.getElementById('lista-klientow');
     const maszynaKlientInput = document.getElementById('maszyna-klient-input');
@@ -4477,6 +4485,13 @@ ${years.map(y => `
     // --- KLIENCI ---
     async function dodajKlienta(event) {
         event.preventDefault();
+        const shouldCreateMachine = Boolean(clientAddMachineToggle?.checked);
+        const machineType = (clientMachineTypInput?.value || '').trim();
+        const machineModel = (clientMachineModelInput?.value || '').trim();
+        if (shouldCreateMachine && (!machineType || !machineModel)) {
+            alert('Aby dodać klienta z maszyną, uzupełnij przynajmniej typ i model maszyny.');
+            return;
+        }
         const dane = {
             nazwa: klientForm['klient-nazwa'].value,
             nip: klientForm['klient-nip'].value || '---',
@@ -4485,8 +4500,21 @@ ${years.map(y => `
             createdAt: new Date()
         };
         try {
-            await addDoc(collection(db, "klienci"), dane);
+            const clientRef = await addDoc(collection(db, "klienci"), dane);
+            if (shouldCreateMachine) {
+                await addDoc(collection(db, "maszyny"), {
+                    klientId: clientRef.id,
+                    klientNazwa: dane.nazwa || '(bez nazwy)',
+                    typMaszyny: machineType,
+                    model: machineModel,
+                    nrSeryjny: (clientMachineSerialInput?.value || '').trim() || '---',
+                    rokProdukcji: Number(clientMachineYearInput?.value) || null,
+                    motogodziny: Number(clientMachineMthInput?.value) || 0,
+                    createdAt: new Date()
+                });
+            }
             klientForm.reset();
+            if (clientAddMachineFields) clientAddMachineFields.hidden = true;
             closeClientDrawer();
         }
         catch (e) { console.error("Błąd dodawania klienta: ", e); }
@@ -4713,6 +4741,8 @@ const openClientDrawer = (clientId = null, mode = 'view') => {
     if (mode === 'add') {
         selectedClientId = null;
         klientForm?.reset();
+        if (clientAddMachineToggle) clientAddMachineToggle.checked = false;
+        if (clientAddMachineFields) clientAddMachineFields.hidden = true;
     }
     if (mode === 'edit') {
         const klient = _wszystkieKlienciCache.find(k => k.id === selectedClientId);
@@ -4732,6 +4762,8 @@ const closeClientDrawer = () => {
     clientDrawerOpen = false;
     selectedClientId = null;
     clientDrawerMode = 'view';
+    if (clientAddMachineToggle) clientAddMachineToggle.checked = false;
+    if (clientAddMachineFields) clientAddMachineFields.hidden = true;
     closeDrawer(clientDrawer);
 };
 
@@ -5805,6 +5837,9 @@ function wyswietlZlecenia() {
     expandedActiveOrderIds.forEach((orderId) => {
         if (!filteredOrderIds.has(orderId)) expandedActiveOrderIds.delete(orderId);
     });
+    expandedClosedOrderIds.forEach((orderId) => {
+        if (!filteredOrderIds.has(orderId)) expandedClosedOrderIds.delete(orderId);
+    });
 
     przefiltrowaneZlecenia.forEach(zlecenie => {
         try {
@@ -5876,6 +5911,7 @@ function wyswietlZlecenia() {
                     }
                 );
                 activeListItem.classList.toggle('is-expanded', isExpanded);
+                activeListItem.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
                 aktywneElements.push(activeListItem);
             } else if (zlecenie.status === 'zakończone') {
                 const serviceDate = resolveServiceDate(zlecenie);
@@ -5890,22 +5926,33 @@ function wyswietlZlecenia() {
                 const motoHoursVal = Number.isFinite(Number(zlecenie.motoHours)) ? Number(zlecenie.motoHours) : 0;
                 const machineLabel = maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : (quickMachineModel || 'Brak maszyny');
                 const orderDescription = notatkaLabel || zlecenie.opis || 'Brak opisu wykonanej pracy';
-                ukonczoneElements.push(createZlecenieListItem(
+                const isExpanded = expandedClosedOrderIds.has(zlecenie.id);
+                const closedListItem = createZlecenieListItem(
                     zlecenie,
                     {
                         status: 'closed',
-                        headerHtml: '',
+                        headerHtml: `
+                            <div class="order-active-summary order-active-summary--closed" role="group" aria-label="Skrót zakończonego zlecenia">
+                                <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
+                                <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
+                                <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
+                                <p class="order-card-cell"><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
+                                <p class="order-card-cell order-card-cell--highlight"><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
+                                <button type="button"
+                                        class="order-expand-toggle"
+                                        data-order-action="toggle-expand"
+                                        data-id="${zlecenie.id}"
+                                        aria-expanded="${isExpanded ? 'true' : 'false'}"
+                                        aria-label="${isExpanded ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia'}">
+                                    <span>${isExpanded ? 'Zwiń' : 'Rozwiń'}</span>
+                                    <span class="order-expand-toggle__icon" aria-hidden="true">▾</span>
+                                </button>
+                            </div>
+                        `,
                         bodyHtml: `
                             <div class="order-card-layout order-card-layout--closed" role="group" aria-label="Dane zakończonego zlecenia">
-                                <div class="order-card-row order-card-row--top">
-                                    <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'} • Zakończone</strong></p>
-                                    <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
-                                    <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
-                                </div>
                                 <div class="order-card-row order-card-row--metrics">
-                                    <p class="order-card-cell"><span class="key">Wykonano</span><strong>${serviceDate || 'b.d.'}</strong></p>
                                     <p class="order-card-cell"><span class="key">Typ</span><strong>${zlecenie.typZlecenia || '?'}</strong></p>
-                                    <p class="order-card-cell order-card-cell--highlight"><span class="key">Wyfakturowane</span><strong>${zlecenie.wyfakturowaneGodziny || 0} h</strong></p>
                                     <p class="order-card-cell"><span class="key">Motogodziny</span><strong>${motoHoursVal.toFixed(1)} h</strong></p>
                                     <p class="order-card-cell order-card-cell--settlement"><span class="key">Rozliczenie (brutto / netto)</span><strong>${(amounts.grossCents / 100).toFixed(2)} zł / ${(amounts.netCents / 100).toFixed(2)} zł</strong></p>
                                 </div>
@@ -5928,7 +5975,10 @@ function wyswietlZlecenia() {
                     </div>
                 `
                     }
-                ));
+                );
+                closedListItem.classList.toggle('is-expanded', isExpanded);
+                closedListItem.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                ukonczoneElements.push(closedListItem);
             }
         } catch (error) {
             console.error('[wyswietlZlecenia] Pomijam rekord po błędzie', { orderId: zlecenie?.id, error });
@@ -6265,20 +6315,38 @@ async function obslugaListyZlecen(event) {
     const li = target.closest('li');
     const docId = target?.dataset.id || li?.dataset.id;
     if (!docId) return;
-    const expandToggle = target.closest('[data-order-action="toggle-expand"]');
-    if (expandToggle && li?.classList.contains('is-active')) {
-        const shouldExpand = !expandedActiveOrderIds.has(docId);
-        if (shouldExpand) {
-            expandedActiveOrderIds.add(docId);
-        } else {
-            expandedActiveOrderIds.delete(docId);
-        }
-        li.classList.toggle('is-expanded', shouldExpand);
-        expandToggle.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
-        expandToggle.setAttribute('aria-label', shouldExpand ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia');
-        const label = expandToggle.querySelector('span');
+    const updateExpandUi = (orderLi, shouldExpand) => {
+        if (!orderLi) return;
+        orderLi.classList.toggle('is-expanded', shouldExpand);
+        orderLi.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+        const toggleBtn = orderLi.querySelector('[data-order-action="toggle-expand"]');
+        if (!toggleBtn) return;
+        toggleBtn.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+        toggleBtn.setAttribute('aria-label', shouldExpand ? 'Zwiń kartę zlecenia' : 'Rozwiń kartę zlecenia');
+        const label = toggleBtn.querySelector('span');
         if (label) label.textContent = shouldExpand ? 'Zwiń' : 'Rozwiń';
+    };
+    const toggleOrderCard = () => {
+        if (!li?.classList.contains('order-list-item')) return false;
+        const isActive = li.classList.contains('is-active');
+        const isClosed = li.classList.contains('is-closed');
+        if (!isActive && !isClosed) return false;
+        const expandedSet = isActive ? expandedActiveOrderIds : expandedClosedOrderIds;
+        const shouldExpand = !expandedSet.has(docId);
+        if (shouldExpand) expandedSet.add(docId);
+        else expandedSet.delete(docId);
+        updateExpandUi(li, shouldExpand);
+        return true;
+    };
+    const clickedInteractiveControl = Boolean(target.closest('button, a, input, select, textarea, [contenteditable="true"]'));
+    const clickedContent = target.closest('.order-list-item__content');
+    const expandToggle = target.closest('[data-order-action="toggle-expand"]');
+    if (expandToggle) {
+        toggleOrderCard();
         return;
+    }
+    if (clickedContent && !clickedInteractiveControl) {
+        if (toggleOrderCard()) return;
     }
     const closeOrderActionMenus = (except = null) => {
         (ukonczoneZleceniaLista || document).querySelectorAll('.row-action').forEach(menu => {
@@ -6631,30 +6699,34 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
     const machineDetails = maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : (zlecenie.machineModelText || '---');
     const clientDetails = klient ? klient.nazwa : (zlecenie.status === 'nieprzypisane' ? 'Szybkie zlecenie (bez klienta)' : '---');
     infoDiv.innerHTML = `
-        <div class="details-group"><strong>Numer:</strong> <p>#${zlecenie.nrZlecenia || '—'}</p></div>
-        <div class="details-group"><strong>Status:</strong> <p>${zlecenie.status}</p></div>
-        <div class="details-group"><strong>Klient:</strong> <p>${clientDetails}</p></div>
-        <div class="details-group"><strong>Maszyna / model:</strong> <p>${machineDetails}</p></div>
-        <div class="details-group"><strong>Data rozpoczęcia:</strong> <p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt || zlecenie.createdDate) || '—'}</p></div>
-        <div class="details-group"><strong>Suma z kalendarza:</strong> <p>${formatujLiczbe(sumaFakturowanych)} h</p></div>
+        <div class="details-grid">
+            <div class="details-group"><strong>Numer</strong><p>#${zlecenie.nrZlecenia || '—'}</p></div>
+            <div class="details-group"><strong>Status</strong><p>${zlecenie.status}</p></div>
+            <div class="details-group"><strong>Klient</strong><p>${clientDetails}</p></div>
+            <div class="details-group"><strong>Maszyna / model</strong><p>${machineDetails}</p></div>
+            <div class="details-group"><strong>Data rozpoczęcia</strong><p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt || zlecenie.createdDate) || '—'}</p></div>
+            <div class="details-group"><strong>Wyfakturowane z ewidencji</strong><p>${formatujLiczbe(sumaFakturowanych)} h</p></div>
+        </div>
     `;
 
     if (zlecenie.status === 'zakończone') {
-         const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ:</strong> <p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
+         const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ</strong><p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
         infoDiv.innerHTML += `
-            <div class="details-group"><strong>Data zakończenia/wykonania:</strong> <p>${serviceDate || '—'}</p></div>
-            <div class="details-group"><strong>Miesiąc rozliczenia:</strong> <p>${resolveOrderSettlementMonth(zlecenie) || deriveBillingMonthFromCompletionDate(serviceDate) || '—'}</p></div>
-            <div class="details-group"><strong>Wyfakturowane:</strong> <p>${getOrderInvoicedHours(zlecenie)} h</p></div>
-            <div class="details-group"><strong>Brutto:</strong> <p>${getOrderGrossAmount(zlecenie).toFixed(2)} zł</p></div>
-            <div class="details-group"><strong>Netto:</strong> <p>${getOrderNetAmount(zlecenie).toFixed(2)} zł</p></div>
-            <div class="details-group"><strong>Motogodziny:</strong> <p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
-            <div class="details-group"><strong>Typ Zlecenia:</strong> <p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
-            <div class="details-group"><strong>Użyte Części:</strong> <p>${uzyteCzesciOpis}</p></div>
-            ${wzHtml}
+            <div class="details-grid details-grid--closed">
+                <div class="details-group"><strong>Data wykonania</strong><p>${serviceDate || '—'}</p></div>
+                <div class="details-group"><strong>Miesiąc rozliczenia</strong><p>${resolveOrderSettlementMonth(zlecenie) || deriveBillingMonthFromCompletionDate(serviceDate) || '—'}</p></div>
+                <div class="details-group"><strong>Wyfakturowane</strong><p>${getOrderInvoicedHours(zlecenie)} h</p></div>
+                <div class="details-group"><strong>Motogodziny</strong><p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
+                <div class="details-group"><strong>Brutto</strong><p>${getOrderGrossAmount(zlecenie).toFixed(2)} zł</p></div>
+                <div class="details-group"><strong>Netto</strong><p>${getOrderNetAmount(zlecenie).toFixed(2)} zł</p></div>
+                <div class="details-group"><strong>Typ zlecenia</strong><p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
+                <div class="details-group"><strong>Użyte części</strong><p>${uzyteCzesciOpis}</p></div>
+                ${wzHtml}
+            </div>
         `;
     }
 
-    usterkaDiv.innerHTML = `<p>${zlecenie.opis || '—'}</p>`;
+    usterkaDiv.innerHTML = `<div class="details-text-block"><p>${zlecenie.opis || '—'}</p></div>`;
 
     const historiaEntries = Array.isArray(zlecenie.historia) ? zlecenie.historia.slice() : [];
     historiaTitleEl.textContent = `Historia zlecenia (${historiaEntries.length})`;
@@ -6699,11 +6771,9 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
             </div>`;
     }
     if (kalendarzDiv) {
-        kalendarzDiv.innerHTML = kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>';
+        kalendarzDiv.innerHTML = `<div class="details-calendar-list">${kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>'}</div>`;
     }
-    opisDiv.innerHTML = `
-        ${zlecenie.zakonczenieNotatka ? `<p>${zlecenie.zakonczenieNotatka}</p>` : '<p>Brak opisu.</p>'}
-    `;
+    opisDiv.innerHTML = `<div class="details-text-block">${zlecenie.zakonczenieNotatka ? `<p>${zlecenie.zakonczenieNotatka}</p>` : '<p>Brak opisu.</p>'}</div>`;
     renderOrderNotes(zlecenie.id);
 
     if (!skipOpen) {
@@ -7790,6 +7860,14 @@ async function obslugaListyCzesci(event) {
     if (pulpitWeeklyContainer) pulpitWeeklyContainer.addEventListener('click', handleWeeklyMissingClick);
     if (pulpitActivityList) pulpitActivityList.addEventListener('click', handleActivityClick);
     if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
+    if (clientAddMachineToggle) {
+        clientAddMachineToggle.addEventListener('change', () => {
+            const enabled = clientAddMachineToggle.checked;
+            if (clientAddMachineFields) clientAddMachineFields.hidden = !enabled;
+            if (clientMachineTypInput) clientMachineTypInput.required = enabled;
+            if (clientMachineModelInput) clientMachineModelInput.required = enabled;
+        });
+    }
     if (klientAddBtn) {
         klientAddBtn.addEventListener('click', () => {
             openClientDrawer(null, 'add');
