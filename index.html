@@ -35,7 +35,6 @@
                 <p class="nav-group-label">Serwis</p>
                 <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
                 <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
-                <button type="button" class="tab-button" data-tab="statystyki-klientow">Statystyki klientów</button>
                 <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
             </div>
             <div class="nav-group">
@@ -176,7 +175,10 @@
                         <input type="search" id="klient-search-input" placeholder="Szukaj: nazwa, NIP, adres…">
                     </div>
                 </div>
-                <button type="button" id="klient-add-btn" class="btn-add">Dodaj klienta</button>
+                <div class="toolbar-actions">
+                    <button type="button" id="clients-stats-link-btn" class="btn-secondary">Przejdź do statystyk klientów</button>
+                    <button type="button" id="klient-add-btn" class="btn-add">Dodaj klienta</button>
+                </div>
             </div>
             <div class="table-section base-list-section">
                 <div id="clients-list" class="clients-list section-scroll scroll-y">

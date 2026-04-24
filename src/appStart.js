@@ -5851,6 +5851,25 @@ function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', meta
 function buildClientStatsRows() {
     const statsByClient = new Map();
     const machinesByClient = new Map();
+    const calendarDriveByOrder = new Map();
+    const calendarDriveByOrderMonth = new Map();
+
+    (wszystkieWpisyKalendarza || []).forEach((entry) => {
+        const dayKey = normalizeDayKey(entry?.date || entry?.id, 'client-stats.drive');
+        const monthKey = dayKey ? dayKey.slice(0, 7) : '';
+        const { powiazane } = normalizujPowiazaneZlecenia(entry || {});
+        powiazane.forEach((linked) => {
+            const orderId = linked?.zlecenieId;
+            if (!orderId) return;
+            const drive = Number(linked?.jazda) || 0;
+            if (!Number.isFinite(drive) || drive === 0) return;
+            calendarDriveByOrder.set(orderId, (calendarDriveByOrder.get(orderId) || 0) + drive);
+            if (!monthKey) return;
+            if (!calendarDriveByOrderMonth.has(orderId)) calendarDriveByOrderMonth.set(orderId, new Map());
+            const monthMap = calendarDriveByOrderMonth.get(orderId);
+            monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + drive);
+        });
+    });
 
     (_wszystkieMaszynyCache || []).forEach((maszyna) => {
         const clientId = maszyna?.klientId;
@@ -5882,7 +5901,7 @@ function buildClientStatsRows() {
         const row = statsByClient.get(clientId);
         const amounts = computeOrderAmounts(zlecenie);
         const billedHours = Number(getOrderInvoicedHours(zlecenie)) || 0;
-        const driveHours = Number(zlecenie?.driveHours ?? zlecenie?.jazda ?? zlecenie?.czasJazdy ?? 0) || 0;
+        const driveHours = Number(calendarDriveByOrder.get(zlecenie.id) || 0) || 0;
         const orderDate = normalizeDateOnly(
             zlecenie?.completionDate
             || zlecenie?.serviceDate
@@ -5915,10 +5934,18 @@ function buildClientStatsRows() {
             const monthRow = row.monthly.get(monthKey) || { month: monthKey, ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 };
             monthRow.ordersCount += 1;
             monthRow.billedHours += billedHours;
-            monthRow.driveHours += driveHours;
             monthRow.gross += amounts.grossCents / 100;
             monthRow.net += amounts.netCents / 100;
             row.monthly.set(monthKey, monthRow);
+        }
+
+        const driveByMonth = calendarDriveByOrderMonth.get(zlecenie.id);
+        if (driveByMonth) {
+            driveByMonth.forEach((driveValue, driveMonthKey) => {
+                const monthRow = row.monthly.get(driveMonthKey) || { month: driveMonthKey, ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 };
+                monthRow.driveHours += Number(driveValue) || 0;
+                row.monthly.set(driveMonthKey, monthRow);
+            });
         }
     });
 
@@ -5960,12 +5987,12 @@ function renderClientStatsView() {
             const scoped = scopedOrders.reduce((acc, order) => {
                 acc.ordersCount += 1;
                 acc.billedHours += order.billedHours;
-                acc.driveHours += order.driveHours;
                 acc.gross += order.gross;
                 acc.net += order.net;
                 return acc;
             }, { ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 });
             const scopedMonthly = row.monthly.filter((month) => isWithinRange(`${month.month}-01`));
+            scoped.driveHours = scopedMonthly.reduce((acc, month) => acc + (Number(month.driveHours) || 0), 0);
             return {
                 ...row,
                 ...scoped,
@@ -8202,6 +8229,13 @@ async function obslugaListyCzesci(event) {
             if (!row) return;
             selectedClientStatsId = row.dataset.clientStatsId || null;
             renderClientStatsView();
+        });
+    }
+
+    const clientsStatsLinkButton = document.getElementById('clients-stats-link-btn');
+    if (clientsStatsLinkButton) {
+        clientsStatsLinkButton.addEventListener('click', () => {
+            showTab('statystyki-klientow');
         });
     }
 

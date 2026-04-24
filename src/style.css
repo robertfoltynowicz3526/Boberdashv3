@@ -2376,6 +2376,18 @@ select {
   margin-left: auto;
 }
 
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions .btn-add {
+  margin-left: 0;
+}
+
 .base-list-section {
   width: 100%;
 }
