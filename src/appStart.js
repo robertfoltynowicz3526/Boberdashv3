@@ -1006,6 +1006,7 @@ function initializeApp() {
     const bulkInsertExampleBtn = document.getElementById('bulk-insert-example');
     const bulkValidCount = document.getElementById('bulk-valid-count');
     const magazynLowStockOnly = document.getElementById('magazyn-low-stock-only');
+    const magazynLowStockToggle = document.getElementById('magazyn-low-stock-toggle');
     const magazynClearFiltersBtn = document.getElementById('magazyn-clear-filters-btn');
     const oilConverterPresets = document.getElementById('oil-converter-presets');
 
@@ -7957,6 +7958,13 @@ async function obslugaListyCzesci(event) {
         });
     };
 
+    const syncLowStockToggleState = () => {
+        if (!magazynLowStockToggle || !magazynLowStockOnly) return;
+        const isActive = Boolean(magazynLowStockOnly.checked);
+        magazynLowStockToggle.classList.toggle('is-active', isActive);
+        magazynLowStockToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    };
+
     const sortMagazynItems = (items) => {
         const dir = magazynSort.dir === 'desc' ? -1 : 1;
         return [...items].sort((a, b) => {
@@ -8016,7 +8024,12 @@ async function obslugaListyCzesci(event) {
             const isLowStock = isWarehouseLowStock(produkt);
             return `<tr class="${isLowStock ? 'is-low-stock' : ''}" data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Indeks">${produkt.index}</td>
-                    <td data-label="Nazwa">${produkt.nazwa}${isLowStock ? ' <span class="low-stock-badge">Niski stan</span>' : ''}</td>
+                    <td data-label="Nazwa">
+                        <div class="warehouse-name-cell">
+                            <span class="warehouse-product-name">${produkt.nazwa}</span>
+                            ${isLowStock ? '<span class="low-stock-badge">Niski stan</span>' : ''}
+                        </div>
+                    </td>
                     <td data-label="Typ">${productType || 'INNE'}</td>
                     <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
                     <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
@@ -8083,18 +8096,13 @@ async function obslugaListyCzesci(event) {
     let magazynMenuState = { productId: null, trigger: null };
 
     const buildMagazynMenuItems = (produkt) => {
-        const items = [
-            { action: 'details', label: 'Szczegóły' },
-            { action: 'add', label: 'Dodaj' },
-            { action: 'remove', label: 'Zdejmij' }
+        return [
+            { action: 'edit', label: 'Edytuj' },
+            { action: 'add', label: 'Dodaj stan' },
+            { action: 'remove', label: 'Zdejmij stan' },
+            { action: 'history', label: 'Historia', disabled: true },
+            { action: 'delete', label: 'Usuń', variant: 'danger' }
         ];
-        if (produkt?.jestOlejem) {
-            items.push(
-                { action: 'add-oil', label: 'Dodaj olej' },
-                { action: 'remove-oil', label: 'Zdejmij olej' }
-            );
-        }
-        return items;
     };
 
     const ensureMagazynMenuPortal = () => {
@@ -8105,21 +8113,27 @@ async function obslugaListyCzesci(event) {
         menu.style.display = 'none';
         menu.addEventListener('click', (event) => {
             const btn = event.target.closest('button[data-action]');
-            if (!btn) return;
+            if (!btn || btn.disabled) return;
             const action = btn.dataset.action;
             const produkt = getProductById(magazynMenuState.productId);
             if (!produkt) return;
             closeMagazynRowMenu();
-            if (action === 'details') {
+            if (action === 'edit') {
                 openProductDetailsModal(produkt, 'add');
                 return;
             }
-            if (action === 'add' || action === 'add-oil') {
+            if (action === 'add') {
                 openProductDetailsModal(produkt, 'add');
                 return;
             }
-            if (action === 'remove' || action === 'remove-oil') {
+            if (action === 'remove') {
                 openProductDetailsModal(produkt, 'remove');
+                return;
+            }
+            if (action === 'delete') {
+                if (confirm(`Na pewno usunąć produkt „${produkt.nazwa || produkt.index || produkt.id}”?`)) {
+                    void deleteDoc(doc(db, "magazyn", produkt.id));
+                }
             }
         });
         document.body.appendChild(menu);
@@ -8162,7 +8176,7 @@ async function obslugaListyCzesci(event) {
         if (!trigger || !produkt) return;
         const menu = ensureMagazynMenuPortal();
         const items = buildMagazynMenuItems(produkt);
-        menu.innerHTML = items.map(item => `<button type="button" data-action="${item.action}">${item.label}</button>`).join('');
+        menu.innerHTML = items.map(item => `<button type="button" data-action="${item.action}" class="${item.variant === 'danger' ? 'row-action-item--danger' : ''}" ${item.disabled ? 'disabled' : ''}>${item.label}</button>`).join('');
         magazynMenuState = { productId: produkt.id, trigger };
         positionMagazynMenu(menu, trigger);
     };
@@ -8191,16 +8205,22 @@ async function obslugaListyCzesci(event) {
                 return;
             }
             closeRowActionMenus();
-            if (action === 'details') {
+            if (action === 'edit') {
                 openProductDetailsModal(produkt, 'add');
                 return;
             }
-            if (action === 'add' || action === 'add-oil') {
+            if (action === 'add') {
                 openProductDetailsModal(produkt, 'add');
                 return;
             }
-            if (action === 'remove' || action === 'remove-oil') {
+            if (action === 'remove') {
                 openProductDetailsModal(produkt, 'remove');
+                return;
+            }
+            if (action === 'delete') {
+                if (confirm(`Na pewno usunąć produkt „${produkt.nazwa || produkt.index || produkt.id}”?`)) {
+                    void deleteDoc(doc(db, "magazyn", produkt.id));
+                }
                 return;
             }
         }
@@ -8418,16 +8438,29 @@ async function obslugaListyCzesci(event) {
     if (magazynSearchInput) magazynSearchInput.addEventListener('input', renderMagazynTable);
     if (magazynFilterOilType) magazynFilterOilType.addEventListener('change', renderMagazynTable);
     if (magazynFilterContainer) magazynFilterContainer.addEventListener('change', renderMagazynTable);
-    if (magazynLowStockOnly) magazynLowStockOnly.addEventListener('change', renderMagazynTable);
+    if (magazynLowStockOnly) {
+        magazynLowStockOnly.addEventListener('change', () => {
+            syncLowStockToggleState();
+            renderMagazynTable();
+        });
+    }
+    if (magazynLowStockToggle && magazynLowStockOnly) {
+        magazynLowStockToggle.addEventListener('click', () => {
+            magazynLowStockOnly.checked = !magazynLowStockOnly.checked;
+            magazynLowStockOnly.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
     if (magazynClearFiltersBtn) {
         magazynClearFiltersBtn.addEventListener('click', () => {
             if (magazynSearchInput) magazynSearchInput.value = '';
             if (magazynFilterOilType) magazynFilterOilType.value = '';
             if (magazynFilterContainer) magazynFilterContainer.value = '';
             if (magazynLowStockOnly) magazynLowStockOnly.checked = false;
+            syncLowStockToggleState();
             renderMagazynTable();
         });
     }
+    syncLowStockToggleState();
     if (magazynTable) {
         magazynTable.addEventListener('click', (event) => {
             const btn = event.target.closest('.sort-btn');

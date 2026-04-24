@@ -322,25 +322,28 @@
             <h2>Magazyn</h2>
             <div class="warehouse-shell">
                 <div class="warehouse-toolbar">
-                    <div class="warehouse-search">
-                        <label for="magazyn-search-input">Wyszukaj</label>
-                        <input type="search" id="magazyn-search-input" placeholder="Index lub nazwa produktu...">
-                    </div>
-                    <div class="warehouse-filters">
-                        <div class="form-group">
-                            <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
-                            <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
+                    <div class="warehouse-toolbar-group warehouse-toolbar-group--filters">
+                        <div class="warehouse-search">
+                            <label for="magazyn-search-input">Wyszukaj</label>
+                            <input type="search" id="magazyn-search-input" placeholder="Index lub nazwa produktu...">
                         </div>
-                        <div class="form-group">
-                            <label for="magazyn-filter-container">Pojemnik</label>
-                            <select id="magazyn-filter-container"><option value="">Wszystkie</option></select>
+                        <div class="warehouse-filters">
+                            <div class="form-group">
+                                <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
+                                <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="magazyn-filter-container">Pojemnik</label>
+                                <select id="magazyn-filter-container"><option value="">Wszystkie</option></select>
+                            </div>
+                            <div class="warehouse-low-stock-filter">
+                                <input type="checkbox" id="magazyn-low-stock-only" class="sr-only-control">
+                                <button type="button" id="magazyn-low-stock-toggle" class="warehouse-filter-chip" aria-pressed="false">Niski stan</button>
+                            </div>
+                            <button type="button" id="magazyn-clear-filters-btn" class="btn-secondary warehouse-clear-btn">Wyczyść filtry</button>
                         </div>
                     </div>
-                    <div class="warehouse-filter-actions">
-                        <button type="button" id="magazyn-clear-filters-btn" class="btn-secondary">Wyczyść filtry</button>
-                        <label class="warehouse-low-stock-toggle"><input type="checkbox" id="magazyn-low-stock-only"> Niski stan</label>
-                    </div>
-                    <div class="warehouse-actions">
+                    <div class="warehouse-toolbar-group warehouse-toolbar-group--actions warehouse-actions">
                         <button type="button" id="magazyn-add-btn" class="btn-add">Dodaj produkt</button>
                         <button type="button" id="magazyn-bulk-btn" class="btn-secondary">Masowe dodawanie</button>
                         <button type="button" id="magazyn-oil-tools-btn" class="btn-secondary">Narzędzia oleju</button>
@@ -353,9 +356,9 @@
                             <table id="magazyn-table" class="responsive">
                                 <thead>
                                     <tr>
-                                        <th><button type="button" class="sort-btn" data-sort="index">Indeks</button></th>
-                                        <th><button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button></th>
-                                        <th><button type="button" class="sort-btn" data-sort="typ">Typ</button></th>
+                                        <th class="index-col"><button type="button" class="sort-btn" data-sort="index">Indeks</button></th>
+                                        <th class="name-col"><button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button></th>
+                                        <th class="type-col"><button type="button" class="sort-btn" data-sort="typ">Typ</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button></th>
                                         <th class="date-col"><button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button></th>
