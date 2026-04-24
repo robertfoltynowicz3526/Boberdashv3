@@ -3670,7 +3670,7 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 .warehouse-toolbar {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(320px, 2fr) auto;
+  grid-template-columns: minmax(280px, 1.6fr) minmax(320px, 1.8fr) auto;
   align-items: end;
   background: var(--bg-elevated);
   border-radius: 16px;
@@ -3700,6 +3700,30 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.warehouse-low-stock-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+#magazyn-table tbody tr.is-low-stock td {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.low-stock-badge {
+  display: inline-flex;
+  margin-left: 0.45rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.5);
 }
 
 .warehouse-table {
@@ -3770,6 +3794,10 @@ label{ font-size:.9rem; color:var(--ab-muted); }
   margin-top: 0.75rem;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+#bulk-insert-example {
+  margin-top: 0.45rem;
 }
 
 .sort-btn {
@@ -3866,6 +3894,18 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 
 .oil-fields.is-visible {
   display: grid;
+}
+
+.oil-fields-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.oil-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
 }
 
 @media (max-width:768px){
