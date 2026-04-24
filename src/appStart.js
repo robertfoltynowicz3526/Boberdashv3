@@ -5851,25 +5851,123 @@ function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', meta
 function buildClientStatsRows() {
     const statsByClient = new Map();
     const machinesByClient = new Map();
-    const calendarDriveByOrder = new Map();
-    const calendarDriveByOrderMonth = new Map();
+    const normalizeClientNameKey = (value) => String(value || '').trim().toLowerCase();
+    const getOrderNumberCandidates = (order = {}) => {
+        const candidates = [
+            order?.nrZlecenia,
+            order?.orderNo,
+            order?.numerZlecenia,
+            order?.zlecenieNumer,
+            order?.number
+        ]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean);
+        return [...new Set(candidates)];
+    };
+    const buildClientDriveAggregation = (entries = []) => {
+        const orderClientByOrderId = new Map();
+        const orderIdByNumber = new Map();
+        const uniqueClientIdByName = new Map();
+        const ambiguousClientNames = new Set();
+        const driveByClient = new Map();
+        const driveByClientMonth = new Map();
+        const driveByOrder = new Map();
 
-    (wszystkieWpisyKalendarza || []).forEach((entry) => {
-        const dayKey = normalizeDayKey(entry?.date || entry?.id, 'client-stats.drive');
-        const monthKey = dayKey ? dayKey.slice(0, 7) : '';
-        const { powiazane } = normalizujPowiazaneZlecenia(entry || {});
-        powiazane.forEach((linked) => {
-            const orderId = linked?.zlecenieId;
-            if (!orderId) return;
-            const drive = Number(linked?.jazda) || 0;
-            if (!Number.isFinite(drive) || drive === 0) return;
-            calendarDriveByOrder.set(orderId, (calendarDriveByOrder.get(orderId) || 0) + drive);
-            if (!monthKey) return;
-            if (!calendarDriveByOrderMonth.has(orderId)) calendarDriveByOrderMonth.set(orderId, new Map());
-            const monthMap = calendarDriveByOrderMonth.get(orderId);
-            monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + drive);
+        (_wszystkieZleceniaCache || []).forEach((order) => {
+            if (!order?.id) return;
+            const clientId = String(order?.klientId || '').trim();
+            if (clientId) orderClientByOrderId.set(String(order.id), clientId);
+            getOrderNumberCandidates(order).forEach((number) => {
+                if (!orderIdByNumber.has(number)) orderIdByNumber.set(number, String(order.id));
+            });
         });
-    });
+        (_wszystkieKlienciCache || []).forEach((client) => {
+            const clientId = String(client?.id || '').trim();
+            if (!clientId) return;
+            const nameKey = normalizeClientNameKey(client?.nazwa);
+            if (!nameKey) return;
+            if (uniqueClientIdByName.has(nameKey) && uniqueClientIdByName.get(nameKey) !== clientId) {
+                ambiguousClientNames.add(nameKey);
+                uniqueClientIdByName.delete(nameKey);
+                return;
+            }
+            if (!ambiguousClientNames.has(nameKey)) uniqueClientIdByName.set(nameKey, clientId);
+        });
+
+        const resolveClientIdForDrive = ({ linked, dayEntry }) => {
+            const directOrderIdRaw = linked?.zlecenieId ?? linked?.orderId ?? linked?.linkedOrderId ?? linked?.id ?? null;
+            const directOrderId = directOrderIdRaw ? String(directOrderIdRaw).trim() : '';
+            if (directOrderId && orderClientByOrderId.has(directOrderId)) {
+                return { clientId: orderClientByOrderId.get(directOrderId), orderId: directOrderId };
+            }
+
+            const orderNumberRaw = linked?.nrZlecenia ?? linked?.orderNo ?? linked?.numerZlecenia ?? linked?.zlecenieNumer ?? dayEntry?.nrZlecenia ?? dayEntry?.orderNo ?? null;
+            const orderNumber = orderNumberRaw ? String(orderNumberRaw).trim() : '';
+            if (orderNumber && orderIdByNumber.has(orderNumber)) {
+                const resolvedOrderId = orderIdByNumber.get(orderNumber);
+                const resolvedClientId = orderClientByOrderId.get(resolvedOrderId);
+                if (resolvedClientId) return { clientId: resolvedClientId, orderId: resolvedOrderId };
+            }
+
+            const directClientIdRaw = linked?.klientId ?? linked?.clientId ?? dayEntry?.klientId ?? dayEntry?.clientId ?? null;
+            const directClientId = directClientIdRaw ? String(directClientIdRaw).trim() : '';
+            if (directClientId && statsByClient.has(directClientId)) {
+                return { clientId: directClientId, orderId: '' };
+            }
+
+            const clientNameRaw = linked?.klientNazwa ?? linked?.clientName ?? dayEntry?.klientNazwa ?? dayEntry?.clientName ?? null;
+            const clientNameKey = normalizeClientNameKey(clientNameRaw);
+            if (clientNameKey && uniqueClientIdByName.has(clientNameKey)) {
+                return { clientId: uniqueClientIdByName.get(clientNameKey), orderId: '' };
+            }
+            return { clientId: '', orderId: '' };
+        };
+        const collectDriveLinks = (dayEntry = {}) => {
+            const normalizedLinks = normalizujPowiazaneZlecenia(dayEntry).powiazane || [];
+            const rawLinks = Array.isArray(dayEntry?.zleceniaPowiazane)
+                ? dayEntry.zleceniaPowiazane
+                : Array.isArray(dayEntry?.powiazane)
+                    ? dayEntry.powiazane
+                    : [];
+            const fallbackSingle = (!normalizedLinks.length && !rawLinks.length && (dayEntry?.zlecenieId || dayEntry?.orderId))
+                ? [{
+                    zlecenieId: dayEntry?.zlecenieId ?? dayEntry?.orderId ?? null,
+                    klientNazwa: dayEntry?.klientNazwa ?? dayEntry?.clientName ?? null,
+                    klientId: dayEntry?.klientId ?? dayEntry?.clientId ?? null,
+                    jazda: dayEntry?.driveForOrderHours ?? dayEntry?.czasJazdyDlaZlecenia ?? dayEntry?.jazda ?? dayEntry?.drive ?? 0
+                }]
+                : [];
+            return [...normalizedLinks, ...rawLinks, ...fallbackSingle].map((linked, index) => ({
+                linked,
+                key: String(linked?.entryId || linked?.id || `${dayEntry?.id || dayEntry?.date || 'day'}:${linked?.zlecenieId || linked?.orderId || 'order'}:${index}`),
+                drive: Number(linked?.driveForOrderHours ?? linked?.czasJazdyDlaZlecenia ?? linked?.drive ?? linked?.jazda ?? 0) || 0
+            }));
+        };
+
+        (entries || []).forEach((entry) => {
+            const dayKey = normalizeDayKey(entry?.date || entry?.id, 'client-stats.drive');
+            const monthKey = dayKey ? dayKey.slice(0, 7) : '';
+            const driveLinks = collectDriveLinks(entry);
+            const seen = new Set();
+            driveLinks.forEach(({ linked, key, drive }) => {
+                if (!key || seen.has(key)) return;
+                seen.add(key);
+                if (!Number.isFinite(drive) || drive === 0) return;
+                const { clientId, orderId } = resolveClientIdForDrive({ linked, dayEntry: entry });
+                if (!clientId) return;
+                driveByClient.set(clientId, (driveByClient.get(clientId) || 0) + drive);
+                if (monthKey) {
+                    if (!driveByClientMonth.has(clientId)) driveByClientMonth.set(clientId, new Map());
+                    const monthMap = driveByClientMonth.get(clientId);
+                    monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + drive);
+                }
+                if (orderId) {
+                    driveByOrder.set(orderId, (driveByOrder.get(orderId) || 0) + drive);
+                }
+            });
+        });
+        return { driveByClient, driveByClientMonth, driveByOrder };
+    };
 
     (_wszystkieMaszynyCache || []).forEach((maszyna) => {
         const clientId = maszyna?.klientId;
@@ -5894,6 +5992,7 @@ function buildClientStatsRows() {
             monthly: new Map()
         });
     });
+    const { driveByClient, driveByClientMonth, driveByOrder } = buildClientDriveAggregation(wszystkieWpisyKalendarza || []);
 
     (_wszystkieZleceniaCache || []).forEach((zlecenie) => {
         const clientId = zlecenie?.klientId;
@@ -5901,7 +6000,7 @@ function buildClientStatsRows() {
         const row = statsByClient.get(clientId);
         const amounts = computeOrderAmounts(zlecenie);
         const billedHours = Number(getOrderInvoicedHours(zlecenie)) || 0;
-        const driveHours = Number(calendarDriveByOrder.get(zlecenie.id) || 0) || 0;
+        const driveHours = Number(driveByOrder.get(zlecenie.id) || 0) || 0;
         const orderDate = normalizeDateOnly(
             zlecenie?.completionDate
             || zlecenie?.serviceDate
@@ -5915,7 +6014,6 @@ function buildClientStatsRows() {
 
         row.ordersCount += 1;
         row.billedHours += billedHours;
-        row.driveHours += driveHours;
         row.gross += amounts.grossCents / 100;
         row.net += amounts.netCents / 100;
         row.orders.push({
@@ -5938,15 +6036,16 @@ function buildClientStatsRows() {
             monthRow.net += amounts.netCents / 100;
             row.monthly.set(monthKey, monthRow);
         }
-
-        const driveByMonth = calendarDriveByOrderMonth.get(zlecenie.id);
-        if (driveByMonth) {
-            driveByMonth.forEach((driveValue, driveMonthKey) => {
-                const monthRow = row.monthly.get(driveMonthKey) || { month: driveMonthKey, ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 };
-                monthRow.driveHours += Number(driveValue) || 0;
-                row.monthly.set(driveMonthKey, monthRow);
-            });
-        }
+    });
+    statsByClient.forEach((row, clientId) => {
+        row.driveHours = Number(driveByClient.get(clientId) || 0) || 0;
+        const driveMonths = driveByClientMonth.get(clientId);
+        if (!driveMonths) return;
+        driveMonths.forEach((driveValue, driveMonthKey) => {
+            const monthRow = row.monthly.get(driveMonthKey) || { month: driveMonthKey, ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 };
+            monthRow.driveHours = Number(driveValue) || 0;
+            row.monthly.set(driveMonthKey, monthRow);
+        });
     });
 
     return [...statsByClient.values()].map((row) => ({
