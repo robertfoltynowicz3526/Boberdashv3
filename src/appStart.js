@@ -695,7 +695,8 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
-    const LOW_STOCK_THRESHOLD = 1;
+    const LOW_STOCK_UNITS_THRESHOLD = 1;
+    const LOW_STOCK_OIL_LITERS_THRESHOLD = 20;
     let stockStatus = 'loading';
     let hasLoadedStockOnce = false;
     let activeWarehouseProduct = null;
@@ -7573,6 +7574,19 @@ async function obslugaListyCzesci(event) {
         return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
+    const getWarehouseOilLiters = (produkt = {}) => {
+        if (!produkt?.jestOlejem) return 0;
+        const { pojemnosc } = parseOilMeta(produkt);
+        if (!pojemnosc) return 0;
+        return (Number(produkt.ilosc) || 0) * pojemnosc;
+    };
+
+    const isWarehouseLowStock = (produkt = {}) => {
+        if (!produkt) return false;
+        if (produkt.jestOlejem) return getWarehouseOilLiters(produkt) <= LOW_STOCK_OIL_LITERS_THRESHOLD;
+        return (Number(produkt.ilosc) || 0) <= LOW_STOCK_UNITS_THRESHOLD;
+    };
+
     const setOilFieldsVisibility = (visible) => {
         if (!itemOilFields) return;
         itemOilFields.classList.toggle('is-visible', visible);
@@ -7938,23 +7952,19 @@ async function obslugaListyCzesci(event) {
             const productType = resolveWarehouseType(item);
             const matchesProductType = !productTypeFilter || productType === productTypeFilter;
             const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            const matchesLowStock = !lowStockOnly || (Number(item.ilosc) || 0) <= LOW_STOCK_THRESHOLD;
+            const matchesLowStock = !lowStockOnly || isWarehouseLowStock(item);
             return matchesSearch && matchesProductType && matchesContainer && matchesLowStock;
         });
     };
 
     const sortMagazynItems = (items) => {
         const dir = magazynSort.dir === 'desc' ? -1 : 1;
-        const getLiters = (item) => {
-            const { pojemnosc } = parseOilMeta(item);
-            return pojemnosc ? (Number(item.ilosc) || 0) * pojemnosc : 0;
-        };
         return [...items].sort((a, b) => {
             switch (magazynSort.key) {
                 case 'ilosc':
                     return ((Number(a.ilosc) || 0) - (Number(b.ilosc) || 0)) * dir;
                 case 'litry':
-                    return (getLiters(a) - getLiters(b)) * dir;
+                    return (getWarehouseOilLiters(a) - getWarehouseOilLiters(b)) * dir;
                 case 'index':
                     return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
                 case 'typ':
@@ -7997,13 +8007,13 @@ async function obslugaListyCzesci(event) {
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
             const productType = resolveWarehouseType(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
-            const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
+            const litersValue = jestOlejem && pojemnosc ? getWarehouseOilLiters(produkt) : null;
             const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
             const iloscWLitrach = litersValue === null
                 ? '—'
                 : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
-            const isLowStock = (Number(produkt.ilosc) || 0) <= LOW_STOCK_THRESHOLD;
+            const isLowStock = isWarehouseLowStock(produkt);
             return `<tr class="${isLowStock ? 'is-low-stock' : ''}" data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Indeks">${produkt.index}</td>
                     <td data-label="Nazwa">${produkt.nazwa}${isLowStock ? ' <span class="low-stock-badge">Niski stan</span>' : ''}</td>
