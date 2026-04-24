@@ -4838,6 +4838,68 @@ textarea {
   gap: 1rem;
 }
 
+#complete-zlecenie-modal .modal-content {
+  width: min(760px, 92%);
+  max-height: 88vh;
+  margin: 3vh auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#complete-zlecenie-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  gap: 0.7rem;
+  padding-right: 0.25rem;
+}
+
+#complete-zlecenie-form > p {
+  margin: 0;
+}
+
+#complete-zlecenie-form {
+  gap: 0.7rem;
+}
+
+#complete-zlecenie-form .order-form-section {
+  padding: 0.72rem 0.85rem;
+  gap: 0.55rem;
+}
+
+#complete-zlecenie-form .order-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 0.75rem;
+}
+
+#complete-zlecenie-form .order-form-grid .form-group {
+  margin-bottom: 0;
+}
+
+#complete-zlecenie-form .order-form-section--parts {
+  background: rgba(255, 255, 255, 0.012);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+#complete-zlecenie-form #modal-magazyn-lista {
+  max-height: 150px;
+}
+
+#complete-zlecenie-form #parts-to-remove-list {
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+#complete-zlecenie-form #parts-to-remove-list li {
+  padding: 0.55rem 0.75rem;
+}
+
+#complete-zlecenie-form .modal-actions--compact {
+  margin-top: 0.2rem;
+}
+
 .order-form-section {
   border: 1px solid var(--ui-panel-border);
   border-radius: 12px;
@@ -4861,6 +4923,12 @@ textarea {
 
 .form-subsection-title {
   margin: 0.2rem 0 0.5rem;
+}
+
+@media (max-width: 720px) {
+  #complete-zlecenie-form .order-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .calendar-day-form {
