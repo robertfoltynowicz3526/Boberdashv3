@@ -324,13 +324,9 @@
                 <div class="warehouse-toolbar">
                     <div class="warehouse-search">
                         <label for="magazyn-search-input">Wyszukaj</label>
-                        <input type="search" id="magazyn-search-input" placeholder="Index, nazwa lub klient...">
+                        <input type="search" id="magazyn-search-input" placeholder="Index lub nazwa produktu...">
                     </div>
                     <div class="warehouse-filters">
-                        <div class="form-group">
-                            <label for="magazyn-filter-client">Klient</label>
-                            <select id="magazyn-filter-client"><option value="">Wszyscy</option></select>
-                        </div>
                         <div class="form-group">
                             <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
                             <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
@@ -341,6 +337,8 @@
                         </div>
                     </div>
                     <div class="warehouse-actions">
+                        <button type="button" id="magazyn-clear-filters-btn" class="btn-secondary">Wyczyść filtry</button>
+                        <label class="warehouse-low-stock-toggle"><input type="checkbox" id="magazyn-low-stock-only"> Niski stan</label>
                         <button type="button" id="magazyn-add-btn" class="btn-add">Dodaj produkt</button>
                         <button type="button" id="magazyn-bulk-btn" class="btn-secondary">Masowe dodawanie</button>
                         <button type="button" id="magazyn-oil-tools-btn" class="btn-secondary">Narzędzia oleju</button>
@@ -353,9 +351,9 @@
                             <table id="magazyn-table" class="responsive">
                                 <thead>
                                     <tr>
-                                        <th><button type="button" class="sort-btn" data-sort="index">Index</button></th>
+                                        <th><button type="button" class="sort-btn" data-sort="index">Indeks</button></th>
                                         <th><button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button></th>
-                                        <th><button type="button" class="sort-btn" data-sort="klient">Klient</button></th>
+                                        <th><button type="button" class="sort-btn" data-sort="typ">Typ</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button></th>
                                         <th class="num"><button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button></th>
                                         <th class="date-col"><button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button></th>
@@ -560,11 +558,11 @@
               </div>
               <div class="form-group"><label for="wyfakturowane-godziny">Wyfakturowane godziny</label><input type="number" step="0.1" id="wyfakturowane-godziny" required inputmode="decimal"></div><div class="form-group"><label for="typ-zlecenia">Typ zlecenia</label><select id="typ-zlecenia" required><option value="S">S - Wyjazdowe (45zł)</option><option value="W">W - Warsztat (35zł)</option><option value="G">G - Gwarancja (35zł)</option><option value="Z">Z - Zbrojenie (30zł)</option><option value="P">P - Poprawka (0zł)</option></select></div>
             </div></section>
-            <section class="order-form-section order-form-section--compact"><h3>Motogodziny</h3><div class="order-form-grid"><div class="form-group"><label for="moto-hours">Stan motogodzin</label><input type="number" step="0.1" id="moto-hours" min="0" inputmode="decimal"></div></div></section>
             <section class="order-form-section"><h3>Notatka końcowa / opis wykonanej pracy</h3><div class="form-group">
               <label for="zakonczenie-notatka">Opis końcowy (opcjonalnie)</label>
               <textarea id="zakonczenie-notatka" rows="3" placeholder="Co zostało zrobione, uwagi, rekomendacje..."></textarea>
             </div></section>
+            <section class="order-form-section order-form-section--compact"><h3>Motogodziny</h3><div class="order-form-grid"><div class="form-group"><label for="moto-hours">Stan motogodzin</label><input type="number" step="0.1" id="moto-hours" min="0" inputmode="decimal"></div></div></section>
             <section class="order-form-section order-form-section--parts"><h3>Części z magazynu</h3><div id="modal-magazyn-lista" class="modal-stock-list"></div><h4 class="form-subsection-title">Wybrane części do zdjęcia</h4><ul id="parts-to-remove-list"></ul></section>
             <div class="modal-actions modal-actions-sticky modal-actions--compact"><button type="submit" class="btn-add">Zakończ i zdejmij ze stanu</button></div></form></div>
     </div>
@@ -588,9 +586,8 @@
                 <form id="product-edit-form">
                     <input type="hidden" id="product-edit-id">
                     <div class="form-grid form-grid-2">
-                        <div class="form-group"><label for="product-edit-index">Index</label><input type="text" id="product-edit-index" required></div>
+                        <div class="form-group"><label for="product-edit-index">Indeks</label><input type="text" id="product-edit-index" required></div>
                         <div class="form-group"><label for="product-edit-name">Nazwa</label><input type="text" id="product-edit-name" required></div>
-                        <div class="form-group"><label for="product-edit-client">Klient</label><input type="text" id="product-edit-client" placeholder="Brak"></div>
                     </div>
                     <button type="submit">Zapisz dane</button>
                 </form>
@@ -616,19 +613,21 @@
             <span class="close-button">&times;</span>
             <h2>Dodaj produkt</h2>
             <form id="magazyn-form" class="modal-body">
-                <div class="form-group"><label for="item-index">Index</label><input type="text" id="item-index" required></div>
-                <div class="form-group"><label for="item-name">Nazwa</label><input type="text" id="item-name" required></div>
-                <div class="form-group">
-                    <label for="item-product-type">Typ produktu</label>
-                    <select id="item-product-type">
-                        <option value="">Brak</option>
-                        <option value="ZMYWACZ">Zmywacz</option>
-                    </select>
-                </div>
-                <div class="form-group"><label for="item-ilosc">Ilość (szt.)</label><input type="number" step="1" id="item-ilosc" value="0" inputmode="numeric"></div>
-                <div class="form-group"><label for="item-klient">Klient (opcjonalnie)</label><input type="text" id="item-klient"></div>
-                <div class="form-group">
-                    <label><input type="checkbox" id="item-is-oil"> Produkt olejowy</label>
+                <div class="form-grid form-grid-2">
+                    <div class="form-group"><label for="item-index">Indeks</label><input type="text" id="item-index" required><small class="field-hint">Indeks musi być unikalny.</small></div>
+                    <div class="form-group"><label for="item-name">Nazwa</label><input type="text" id="item-name" required></div>
+                    <div class="form-group">
+                        <label for="item-product-type">Typ produktu</label>
+                        <select id="item-product-type" required>
+                            <option value="">-- Wybierz --</option>
+                            <option value="OLEJ">Olej</option>
+                            <option value="FILTR">Filtr</option>
+                            <option value="CZESC">Część</option>
+                            <option value="CHEMIA">Chemia</option>
+                            <option value="INNE">Inne</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label for="item-ilosc">Ilość (szt.)</label><input type="number" step="1" id="item-ilosc" value="0" inputmode="numeric"><small class="field-hint">Stan podawaj w sztukach.</small></div>
                 </div>
                 <div class="form-grid form-grid-2 oil-fields" id="item-oil-fields">
                     <div class="form-group">
@@ -637,8 +636,9 @@
                     </div>
                     <div class="form-group">
                         <label for="item-oil-container">Pojemnik (L)</label>
-                        <select id="item-oil-container"><option value="">-- Wybierz --</option><option value="209">209</option><option value="55">55</option><option value="20">20</option></select>
+                        <select id="item-oil-container"><option value="">-- Wybierz --</option><option value="208">208</option><option value="55">55</option><option value="50">50</option><option value="20">20</option></select>
                     </div>
+                    <p class="field-hint oil-fields-hint">Dla oleju możesz przeliczać litry na sztuki w narzędziach oleju.</p>
                 </div>
                 <div class="modal-actions"><button type="submit">Dodaj produkt</button></div>
             </form>
@@ -650,16 +650,13 @@
             <h2>Masowe dodawanie</h2>
             <form id="bulk-add-form" class="modal-body">
                 <div class="form-group">
-                    <label for="bulk-klient">Klient (opcjonalnie)</label>
-                    <input type="text" id="bulk-klient" placeholder="Np. Firma XYZ">
-                </div>
-                <div class="form-group">
-                    <label for="bulk-items">Produkty</label>
-                    <textarea id="bulk-items" rows="6" placeholder="Index;Nazwa;Ilość" required></textarea>
-                    <small class="field-hint">Format: <strong>INDEX;NAZWA;ILOŚĆ</strong> (np. <em>FIL-123;Filtr powietrza;4</em>).</small>
+                    <label for="bulk-items">Produkty (format: INDEKS;NAZWA;ILOŚĆ)</label>
+                    <textarea id="bulk-items" rows="6" placeholder="INDEKS;NAZWA;ILOŚĆ" required></textarea>
+                    <small class="field-hint">Przykład: <em>OLEJ-HYGARD-20L;Olej HYGARD 20L;2</em><br><em>FIL-123;Filtr powietrza;4</em></small>
+                    <button type="button" id="bulk-insert-example" class="btn-secondary btn-small">Wklej przykład</button>
                 </div>
                 <div class="bulk-preview">
-                    <h4>Podgląd parsowania</h4>
+                    <h4>Podgląd parsowania <span id="bulk-valid-count"></span></h4>
                     <ul id="bulk-preview-list"></ul>
                     <div id="bulk-errors" class="bulk-errors"></div>
                 </div>
@@ -728,7 +725,7 @@
                             <input type="number" step="0.01" id="oil-converter-units" inputmode="decimal">
                         </div>
                     </div>
-                    <p class="drawer-hint">Wpis w jednym polu automatycznie przeliczy drugie.</p>
+                    <div class="oil-presets" id="oil-converter-presets"></div><p class="drawer-hint">Wpis w jednym polu automatycznie przeliczy drugie.</p>
                 </section>
                 <section class="drawer-tab-panel" data-drawer-panel="quick-add">
                     <div class="form-grid form-grid-2">
@@ -753,10 +750,6 @@
                                 <option value="L">L</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="oil-quick-client">Klient (opcjonalnie)</label>
-                        <input type="text" id="oil-quick-client" placeholder="Nazwa klienta">
                     </div>
                     <div class="drawer-actions">
                         <button type="button" id="oil-quick-submit" class="btn-add">Dodaj</button>

@@ -695,6 +695,7 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
+    const LOW_STOCK_THRESHOLD = 1;
     let stockStatus = 'loading';
     let hasLoadedStockOnce = false;
     let activeWarehouseProduct = null;
@@ -990,7 +991,6 @@ function initializeApp() {
     const magazynLista = document.getElementById('magazyn-lista');
     const magazynTable = document.getElementById('magazyn-table');
     const magazynSearchInput = document.getElementById('magazyn-search-input');
-    const magazynFilterClient = document.getElementById('magazyn-filter-client');
     const magazynFilterOilType = document.getElementById('magazyn-filter-oil-type');
     const magazynFilterContainer = document.getElementById('magazyn-filter-container');
     const magazynAddBtn = document.getElementById('magazyn-add-btn');
@@ -1002,6 +1002,11 @@ function initializeApp() {
     const bulkPreviewList = document.getElementById('bulk-preview-list');
     const bulkErrors = document.getElementById('bulk-errors');
     const bulkReport = document.getElementById('bulk-add-report');
+    const bulkInsertExampleBtn = document.getElementById('bulk-insert-example');
+    const bulkValidCount = document.getElementById('bulk-valid-count');
+    const magazynLowStockOnly = document.getElementById('magazyn-low-stock-only');
+    const magazynClearFiltersBtn = document.getElementById('magazyn-clear-filters-btn');
+    const oilConverterPresets = document.getElementById('oil-converter-presets');
 
     let orderClientCombobox = null;
     const ORDER_QUICK_OPTION = {
@@ -1016,7 +1021,6 @@ function initializeApp() {
     const productEditId = document.getElementById('product-edit-id');
     const productEditIndex = document.getElementById('product-edit-index');
     const productEditName = document.getElementById('product-edit-name');
-    const productEditClient = document.getElementById('product-edit-client');
     const productCurrentQty = document.getElementById('product-current-qty');
     const productCurrentLiters = document.getElementById('product-current-liters');
     const productLastChange = document.getElementById('product-last-change');
@@ -1047,7 +1051,6 @@ function initializeApp() {
     const oilQuickContainerSelect = document.getElementById('oil-quick-container');
     const oilQuickQuantityInput = document.getElementById('oil-quick-quantity');
     const oilQuickUnitSelect = document.getElementById('oil-quick-unit');
-    const oilQuickClientInput = document.getElementById('oil-quick-client');
     const oilQuickSubmitBtn = document.getElementById('oil-quick-submit');
     const themeSelect = document.getElementById('theme-select');
     const zakonczoneZleceniaHeader = document.getElementById('zakonczone-zlecenia-header');
@@ -7553,17 +7556,15 @@ async function obslugaListyCzesci(event) {
 
     const resolveWarehouseType = (produkt = {}) => {
         if (!produkt) return '';
-        if (produkt.jestOlejem) {
-            const { typOleju } = parseOilMeta(produkt);
-            return typOleju || '';
-        }
-        if (produkt.typProdukt) return produkt.typProdukt;
+        if (produkt.jestOlejem) return 'OLEJ';
+        const type = String(produkt.typProdukt || '').toUpperCase();
+        if (['OLEJ', 'FILTR', 'CZESC', 'CHEMIA', 'INNE'].includes(type)) return type;
         const index = String(produkt.index || '').toUpperCase();
         const name = String(produkt.nazwa || '').toUpperCase();
-        if (index.includes(PRODUCT_TYPE_ZMYWACZ) || name.includes('ZMYWACZ')) {
-            return PRODUCT_TYPE_ZMYWACZ;
-        }
-        return '';
+        if (index.includes('FIL') || name.includes('FILTR')) return 'FILTR';
+        if (index.includes('OLEJ') || name.includes('OLEJ')) return 'OLEJ';
+        if (index.includes('CHEM') || name.includes('CHEM')) return 'CHEMIA';
+        return 'INNE';
     };
 
     const formatWarehouseDate = (value) => {
@@ -7575,6 +7576,8 @@ async function obslugaListyCzesci(event) {
     const setOilFieldsVisibility = (visible) => {
         if (!itemOilFields) return;
         itemOilFields.classList.toggle('is-visible', visible);
+        if (itemOilTypeSelect) itemOilTypeSelect.required = visible;
+        if (itemOilContainerSelect) itemOilContainerSelect.required = visible;
     };
 
     const resetProductAddForm = () => {
@@ -7623,7 +7626,6 @@ async function obslugaListyCzesci(event) {
         if (!magazynForm) return;
         const index = magazynForm['item-index'].value.trim();
         const nazwa = magazynForm['item-name'].value.trim();
-        const klient = magazynForm['item-klient'].value.trim();
         const ilosc = Number(magazynForm['item-ilosc'].value || 0);
         const isOil = Boolean(itemIsOilCheckbox?.checked);
         const pojemnosc = Number(itemOilContainerSelect?.value || '');
@@ -7644,7 +7646,7 @@ async function obslugaListyCzesci(event) {
             index,
             nazwa,
             ilosc: Number(ilosc),
-            klient: klient || '---',
+            klient: '---',
             createdAt: new Date(),
             updatedAt: new Date(),
             jestOlejem: isOil,
@@ -7706,13 +7708,14 @@ async function obslugaListyCzesci(event) {
             </li>
         `).join('') || '<li>Brak danych do podglądu.</li>';
         const errors = parsed.filter(item => !item.valid);
-        bulkErrors.textContent = errors.length ? `Błędy: ${errors.length}. Popraw dane przed zapisem.` : '';
+        const validCount = parsed.filter(item => item.valid).length;
+        if (bulkValidCount) bulkValidCount.textContent = `• do dodania: ${validCount}`;
+        bulkErrors.textContent = errors.length ? `Błędne wiersze: ${errors.map(item => item.index).join(', ')}.` : '';
         if (bulkReport) bulkReport.textContent = '';
     };
 
     async function dodajMasowo(event) {
         event.preventDefault();
-        const klient = (bulkAddForm?.['bulk-klient']?.value || '').trim() || '---';
         const itemsText = bulkItemsInput?.value || '';
         if (!itemsText.trim()) return;
         const parsed = parseBulkItems(itemsText);
@@ -7735,7 +7738,7 @@ async function obslugaListyCzesci(event) {
                     index: item.data.index,
                     nazwa: item.data.nazwa,
                     ilosc: item.data.ilosc,
-                    klient,
+                    klient: '---',
                     jestOlejem: false,
                     createdAt: new Date(),
                     updatedAt: new Date()
@@ -7761,13 +7764,13 @@ async function obslugaListyCzesci(event) {
     }
 
     const OIL_TYPE_DEFAULTS = ['HYGARD', 'PLUS50', 'COOLGARD', 'EXTGARD'];
-    const OIL_CONTAINER_DEFAULTS = [20, 55, 209];
+    const OIL_CONTAINER_DEFAULTS = [20, 50, 55, 208];
 
-    const buildOilProductData = ({ typ, pojemnosc, klient, ilosc }) => ({
+    const buildOilProductData = ({ typ, pojemnosc, ilosc }) => ({
         index: `OLEJ-${typ}-${pojemnosc}L`,
         nazwa: `Olej ${typ} ${pojemnosc}L`,
         ilosc,
-        klient: klient || '---',
+        klient: '---',
         jestOlejem: true,
         typOleju: typ,
         pojemnosc,
@@ -7827,6 +7830,14 @@ async function obslugaListyCzesci(event) {
         }
     };
 
+    const renderOilConverterPresets = () => {
+        if (!oilConverterPresets) return;
+        const presets = [20, 50, 55, 208];
+        oilConverterPresets.innerHTML = presets
+            .map((value) => `<button type="button" class="btn-secondary btn-small" data-oil-preset="${value}">${value} L</button>`)
+            .join('');
+    };
+
     const setOilToolsTab = (tabId) => {
         oilToolsTabs?.forEach(btn => {
             btn.classList.toggle('is-active', btn.dataset.drawerTab === tabId);
@@ -7864,11 +7875,10 @@ async function obslugaListyCzesci(event) {
         });
     };
 
-    const findOilProduct = ({ typ, pojemnosc, klient }) => {
+    const findOilProduct = ({ typ, pojemnosc }) => {
         return wszystkieProdukty.find((produkt) => {
             const meta = parseOilMeta(produkt);
-            const clientMatch = klient ? normalizeClientName(produkt.klient) === normalizeClientName(klient) : true;
-            return meta.typOleju === typ && Number(meta.pojemnosc) === Number(pojemnosc) && clientMatch;
+            return meta.typOleju === typ && Number(meta.pojemnosc) === Number(pojemnosc);
         });
     };
 
@@ -7878,14 +7888,13 @@ async function obslugaListyCzesci(event) {
         const pojemnosc = Number(oilQuickContainerSelect.value);
         const unit = oilQuickUnitSelect.value;
         const rawQty = Number(oilQuickQuantityInput.value);
-        const klient = oilQuickClientInput?.value.trim();
         if (!typ || !Number.isFinite(pojemnosc) || pojemnosc <= 0) { alert("Uzupełnij typ i pojemność."); return; }
         if (!Number.isFinite(rawQty) || rawQty <= 0) { alert("Podaj poprawną ilość."); return; }
         const qtyInUnits = unit === 'L' ? rawQty / pojemnosc : rawQty;
         const normalizedQty = Number(qtyInUnits.toFixed(2));
         if (!Number.isFinite(normalizedQty) || normalizedQty <= 0) { alert("Ilość po przeliczeniu jest nieprawidłowa."); return; }
 
-        const existing = findOilProduct({ typ, pojemnosc, klient });
+        const existing = findOilProduct({ typ, pojemnosc });
         try {
             if (existing) {
                 await adjustWarehouseStock({ docId: existing.id, changeQty: normalizedQty, operation: 'add' });
@@ -7893,7 +7902,6 @@ async function obslugaListyCzesci(event) {
                 const docRef = await addDoc(collection(db, "magazyn"), buildOilProductData({
                     typ,
                     pojemnosc,
-                    klient,
                     ilosc: normalizedQty
                 }));
                 await logActivityEvent({
@@ -7903,7 +7911,6 @@ async function obslugaListyCzesci(event) {
                 });
             }
             if (oilQuickQuantityInput) oilQuickQuantityInput.value = '';
-            if (oilQuickClientInput) oilQuickClientInput.value = '';
         } catch (e) {
             console.error("Błąd szybkiego dodawania oleju: ", e);
             alert(`Wystąpił błąd: ${e.message || e}`);
@@ -7922,18 +7929,17 @@ async function obslugaListyCzesci(event) {
 
     const applyMagazynFilters = (items) => {
         const search = (magazynSearchInput?.value || '').trim().toLowerCase();
-        const clientFilter = magazynFilterClient?.value || '';
         const productTypeFilter = magazynFilterOilType?.value || '';
         const containerFilter = magazynFilterContainer?.value || '';
+        const lowStockOnly = Boolean(magazynLowStockOnly?.checked);
         return (items || []).filter(item => {
-            const clientName = normalizeClientName(item.klient);
-            const matchesSearch = !search || [item.index, item.nazwa, clientName].some(val => String(val || '').toLowerCase().includes(search));
+            const matchesSearch = !search || [item.index, item.nazwa].some(val => String(val || '').toLowerCase().includes(search));
             const { pojemnosc } = parseOilMeta(item);
             const productType = resolveWarehouseType(item);
-            const matchesClient = !clientFilter || clientName === clientFilter;
             const matchesProductType = !productTypeFilter || productType === productTypeFilter;
             const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            return matchesSearch && matchesClient && matchesProductType && matchesContainer;
+            const matchesLowStock = !lowStockOnly || (Number(item.ilosc) || 0) <= LOW_STOCK_THRESHOLD;
+            return matchesSearch && matchesProductType && matchesContainer && matchesLowStock;
         });
     };
 
@@ -7949,10 +7955,10 @@ async function obslugaListyCzesci(event) {
                     return ((Number(a.ilosc) || 0) - (Number(b.ilosc) || 0)) * dir;
                 case 'litry':
                     return (getLiters(a) - getLiters(b)) * dir;
-                case 'klient':
-                    return normalizeClientName(a.klient).localeCompare(normalizeClientName(b.klient), 'pl') * dir;
                 case 'index':
                     return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
+                case 'typ':
+                    return resolveWarehouseType(a).localeCompare(resolveWarehouseType(b), 'pl') * dir;
                 case 'updatedAt': {
                     const aDate = toDateSafe(a.updatedAt || a.createdAt);
                     const bDate = toDateSafe(b.updatedAt || b.createdAt);
@@ -7996,12 +8002,12 @@ async function obslugaListyCzesci(event) {
             const iloscWLitrach = litersValue === null
                 ? '—'
                 : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
-            const klientDisplay = normalizeClientName(produkt.klient);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
-            return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
-                    <td data-label="Index">${produkt.index}</td>
-                    <td data-label="Nazwa">${produkt.nazwa}</td>
-                    <td data-label="Klient">${klientDisplay}</td>
+            const isLowStock = (Number(produkt.ilosc) || 0) <= LOW_STOCK_THRESHOLD;
+            return `<tr class="${isLowStock ? 'is-low-stock' : ''}" data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
+                    <td data-label="Indeks">${produkt.index}</td>
+                    <td data-label="Nazwa">${produkt.nazwa}${isLowStock ? ' <span class="low-stock-badge">Niski stan</span>' : ''}</td>
+                    <td data-label="Typ">${productType || 'INNE'}</td>
                     <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
                     <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
                     <td data-label="Ostatnia zmiana" class="date-col">${lastChange}</td>
@@ -8017,27 +8023,21 @@ async function obslugaListyCzesci(event) {
     };
 
     const refreshMagazynFilters = () => {
-        if (!magazynFilterClient || !magazynFilterOilType || !magazynFilterContainer) return;
-        const prevClient = magazynFilterClient.value;
+        if (!magazynFilterOilType || !magazynFilterContainer) return;
         const prevOilType = magazynFilterOilType.value;
         const prevContainer = magazynFilterContainer.value;
-        const clients = new Set();
         const productTypes = new Set();
         const containers = new Set();
         wszystkieProdukty.forEach(item => {
-            clients.add(normalizeClientName(item.klient));
             const { pojemnosc } = parseOilMeta(item);
             const productType = resolveWarehouseType(item);
             if (productType) productTypes.add(productType);
             if (pojemnosc) containers.add(String(pojemnosc));
         });
-        const clientOptions = [''].concat([...clients].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pl')));
-        magazynFilterClient.innerHTML = clientOptions.map(val => `<option value="${val}">${val || 'Wszyscy'}</option>`).join('');
         const typeOptions = [''].concat([...productTypes].filter(Boolean).sort());
         magazynFilterOilType.innerHTML = typeOptions.map(val => `<option value="${val}">${val || 'Wszystkie'}</option>`).join('');
         const containerOptions = [''].concat([...containers].filter(Boolean).sort((a, b) => Number(a) - Number(b)));
         magazynFilterContainer.innerHTML = containerOptions.map(val => `<option value="${val}">${val ? `${val} L` : 'Wszystkie'}</option>`).join('');
-        if (clientOptions.includes(prevClient)) magazynFilterClient.value = prevClient;
         if (typeOptions.includes(prevOilType)) magazynFilterOilType.value = prevOilType;
         if (containerOptions.includes(prevContainer)) magazynFilterContainer.value = prevContainer;
         syncOilToolOptions();
@@ -8053,7 +8053,6 @@ async function obslugaListyCzesci(event) {
         if (productEditId) productEditId.value = produkt.id;
         if (productEditIndex) productEditIndex.value = produkt.index || '';
         if (productEditName) productEditName.value = produkt.nazwa || '';
-        if (productEditClient) productEditClient.value = normalizeClientName(produkt.klient) === 'Brak' ? '' : produkt.klient;
         if (productCurrentQty) productCurrentQty.textContent = iloscFormatowana;
         if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : `${litersValue.toFixed(2)} L`;
         if (productLastChange) productLastChange.textContent = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
@@ -8211,7 +8210,6 @@ async function obslugaListyCzesci(event) {
         const docId = productEditId.value;
         const index = productEditIndex?.value.trim();
         const nazwa = productEditName?.value.trim();
-        const klient = productEditClient?.value.trim();
         if (!index || !nazwa) { alert('Index i nazwa są wymagane.'); return; }
         const duplicate = wszystkieProdukty.find(p => p.id !== docId && (p.index || '').toLowerCase() === index.toLowerCase());
         if (duplicate) { alert('Index musi być unikalny.'); return; }
@@ -8219,7 +8217,6 @@ async function obslugaListyCzesci(event) {
             await updateDoc(doc(db, "magazyn", docId), {
                 index,
                 nazwa,
-                klient: klient || '---',
                 updatedAt: new Date()
             });
         } catch (e) {
@@ -8401,11 +8398,26 @@ async function obslugaListyCzesci(event) {
     if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
     if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
     if (bulkItemsInput) bulkItemsInput.addEventListener('input', renderBulkPreview);
+    if (bulkInsertExampleBtn && bulkItemsInput) {
+        bulkInsertExampleBtn.addEventListener('click', () => {
+            bulkItemsInput.value = 'OLEJ-HYGARD-20L;Olej HYGARD 20L;2\nFIL-123;Filtr powietrza;4';
+            renderBulkPreview();
+        });
+    }
     if (magazynLista) magazynLista.addEventListener('click', handleMagazynRowClick);
     if (magazynSearchInput) magazynSearchInput.addEventListener('input', renderMagazynTable);
-    if (magazynFilterClient) magazynFilterClient.addEventListener('change', renderMagazynTable);
     if (magazynFilterOilType) magazynFilterOilType.addEventListener('change', renderMagazynTable);
     if (magazynFilterContainer) magazynFilterContainer.addEventListener('change', renderMagazynTable);
+    if (magazynLowStockOnly) magazynLowStockOnly.addEventListener('change', renderMagazynTable);
+    if (magazynClearFiltersBtn) {
+        magazynClearFiltersBtn.addEventListener('click', () => {
+            if (magazynSearchInput) magazynSearchInput.value = '';
+            if (magazynFilterOilType) magazynFilterOilType.value = '';
+            if (magazynFilterContainer) magazynFilterContainer.value = '';
+            if (magazynLowStockOnly) magazynLowStockOnly.checked = false;
+            renderMagazynTable();
+        });
+    }
     if (magazynTable) {
         magazynTable.addEventListener('click', (event) => {
             const btn = event.target.closest('.sort-btn');
@@ -8435,11 +8447,9 @@ async function obslugaListyCzesci(event) {
     if (itemProductTypeSelect) {
         itemProductTypeSelect.addEventListener('change', () => {
             if (!magazynForm) return;
-            if (itemProductTypeSelect.value !== PRODUCT_TYPE_ZMYWACZ) return;
-            const indexInput = magazynForm['item-index'];
-            const nameInput = magazynForm['item-name'];
-            if (indexInput && !indexInput.value) indexInput.value = PRODUCT_TYPE_ZMYWACZ;
-            if (nameInput && !nameInput.value) nameInput.value = 'Zmywacz';
+            const isOilType = itemProductTypeSelect.value === 'OLEJ';
+            if (itemIsOilCheckbox) itemIsOilCheckbox.checked = isOilType;
+            setOilFieldsVisibility(isOilType);
         });
     }
     if (productDetailsCloseButton && productDetailsModal) {
@@ -8679,6 +8689,16 @@ async function obslugaListyCzesci(event) {
         });
     }
     if (oilQuickSubmitBtn) oilQuickSubmitBtn.addEventListener('click', handleOilQuickAdd);
+    renderOilConverterPresets();
+    if (oilConverterPresets && oilConverterContainer) {
+        oilConverterPresets.addEventListener('click', (event) => {
+            const btn = event.target.closest('[data-oil-preset]');
+            if (!btn) return;
+            oilConverterContainer.value = String(btn.dataset.oilPreset || '');
+            if (oilConverterLitersInput?.value) updateOilConverter(oilConverterLitersInput);
+            if (oilConverterUnitsInput?.value) updateOilConverter(oilConverterUnitsInput);
+        });
+    }
 
     // KALENDARZ (modal + klik w kalendarzu)
     if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
