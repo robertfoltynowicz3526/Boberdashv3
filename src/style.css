@@ -1620,6 +1620,37 @@ select {
   align-items: stretch;
 }
 
+.order-closed-compact-summary {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.8fr) minmax(170px, 1.2fr) minmax(180px, 1.3fr) minmax(110px, 0.8fr) minmax(120px, 0.8fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.order-closed-compact-summary .order-card-cell {
+  padding: 0.36rem 0.48rem;
+  border-radius: 8px;
+}
+
+.order-closed-compact-summary .key {
+  margin-bottom: 0.1rem;
+  font-size: 0.64rem;
+}
+
+.order-closed-compact-summary .order-card-cell strong {
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.order-list-item.is-closed {
+  padding: 0.52rem 0.62rem;
+  gap: 0.32rem;
+}
+
+.order-list-item.is-closed .order-list-item__header {
+  gap: 0.35rem;
+}
+
 .order-expand-hint {
   display: inline-flex;
   align-items: center;
@@ -1985,11 +2016,13 @@ select {
     grid-column: 1 / -1;
   }
 
-  .order-active-summary {
+  .order-active-summary,
+  .order-closed-compact-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .order-active-summary .order-expand-hint {
+  .order-active-summary .order-expand-hint,
+  .order-closed-compact-summary .order-expand-hint {
     grid-column: 1 / -1;
     justify-content: flex-end;
   }
@@ -2022,15 +2055,18 @@ select {
     grid-column: 1 / -1;
   }
 
-  .order-active-summary {
+  .order-active-summary,
+  .order-closed-compact-summary {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .order-active-summary .order-card-cell {
+  .order-active-summary .order-card-cell,
+  .order-closed-compact-summary .order-card-cell {
     grid-column: span 3;
   }
 
-  .order-active-summary .order-expand-hint {
+  .order-active-summary .order-expand-hint,
+  .order-closed-compact-summary .order-expand-hint {
     grid-column: span 6;
     justify-content: flex-end;
   }
@@ -3957,9 +3993,49 @@ main,
 .client-stats-row.is-active{
   background:rgba(255,222,0,.12);
 }
+.client-link-btn{
+  border:0;
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  padding:0;
+  text-align:left;
+  cursor:pointer;
+}
+.client-stats-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+  gap:10px;
+}
+.client-top-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));
+  gap:10px;
+}
+.client-top-card{
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  background:rgba(255,255,255,.03);
+  padding:10px 12px;
+}
+.client-top-card h4{
+  margin:0 0 8px;
+  font-size:.9rem;
+}
+.client-top-card ol{
+  margin:0;
+  padding-left:1rem;
+  display:grid;
+  gap:4px;
+}
 .client-stats-details-panel{
   display:grid;
   gap:.8rem;
+}
+.client-stats-machines{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
 }
 .client-stats-orders-list{
   margin:0;

@@ -948,6 +948,9 @@ function initializeApp() {
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
     const clientStatsSearchInput = document.getElementById('client-stats-search');
     const clientStatsSortSelect = document.getElementById('client-stats-sort');
+    const clientStatsRangeSelect = document.getElementById('client-stats-range');
+    const clientStatsSummary = document.getElementById('client-stats-summary');
+    const clientStatsTop = document.getElementById('client-stats-top');
     const clientStatsRanking = document.getElementById('client-stats-ranking');
     const clientStatsDetails = document.getElementById('client-stats-details');
     const ordersSummaryControls = document.querySelector('#zakonczone-zlecenia-content .summary-controls');
@@ -5847,6 +5850,16 @@ function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', meta
 
 function buildClientStatsRows() {
     const statsByClient = new Map();
+    const machinesByClient = new Map();
+
+    (_wszystkieMaszynyCache || []).forEach((maszyna) => {
+        const clientId = maszyna?.klientId;
+        if (!clientId) return;
+        if (!machinesByClient.has(clientId)) machinesByClient.set(clientId, new Set());
+        const label = `${maszyna?.typMaszyny || ''} ${maszyna?.model || ''}`.trim() || `Maszyna ${maszyna?.id || ''}`.trim();
+        machinesByClient.get(clientId).add(label);
+    });
+
     (_wszystkieKlienciCache || []).forEach((klient) => {
         if (!klient?.id) return;
         statsByClient.set(klient.id, {
@@ -5857,9 +5870,12 @@ function buildClientStatsRows() {
             driveHours: 0,
             gross: 0,
             net: 0,
-            orders: []
+            orders: [],
+            machines: [...(machinesByClient.get(klient.id) || new Set())],
+            monthly: new Map()
         });
     });
+
     (_wszystkieZleceniaCache || []).forEach((zlecenie) => {
         const clientId = zlecenie?.klientId;
         if (!clientId || !statsByClient.has(clientId)) return;
@@ -5867,6 +5883,17 @@ function buildClientStatsRows() {
         const amounts = computeOrderAmounts(zlecenie);
         const billedHours = Number(getOrderInvoicedHours(zlecenie)) || 0;
         const driveHours = Number(zlecenie?.driveHours ?? zlecenie?.jazda ?? zlecenie?.czasJazdy ?? 0) || 0;
+        const orderDate = normalizeDateOnly(
+            zlecenie?.completionDate
+            || zlecenie?.serviceDate
+            || zlecenie?.dataUkonczenia
+            || zlecenie?.completedOn
+            || zlecenie?.createdDate
+            || zlecenie?.createdOn
+            || zlecenie?.createdAt
+        );
+        const monthKey = orderDate ? orderDate.slice(0, 7) : null;
+
         row.ordersCount += 1;
         row.billedHours += billedHours;
         row.driveHours += driveHours;
@@ -5876,22 +5903,82 @@ function buildClientStatsRows() {
             id: zlecenie.id,
             nr: zlecenie.nrZlecenia || '—',
             status: zlecenie.status || '—',
+            date: orderDate,
+            machine: `${zlecenie?.typMaszyny || ''} ${zlecenie?.model || ''}`.trim() || (zlecenie?.machineModelText || '—'),
             billedHours,
+            driveHours,
             gross: amounts.grossCents / 100,
             net: amounts.netCents / 100
         });
+
+        if (monthKey) {
+            const monthRow = row.monthly.get(monthKey) || { month: monthKey, ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 };
+            monthRow.ordersCount += 1;
+            monthRow.billedHours += billedHours;
+            monthRow.driveHours += driveHours;
+            monthRow.gross += amounts.grossCents / 100;
+            monthRow.net += amounts.netCents / 100;
+            row.monthly.set(monthKey, monthRow);
+        }
     });
-    return [...statsByClient.values()];
+
+    return [...statsByClient.values()].map((row) => ({
+        ...row,
+        orders: row.orders.sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))),
+        monthly: [...row.monthly.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)))
+    }));
 }
 
 function renderClientStatsView() {
-    if (!clientStatsRanking || !clientStatsDetails) return;
+    if (!clientStatsRanking || !clientStatsDetails || !clientStatsSummary || !clientStatsTop) return;
     const queryText = (clientStatsSearchInput?.value || '').trim().toLowerCase();
     const sortMode = clientStatsSortSelect?.value || 'gross-desc';
+    const rangeMode = clientStatsRangeSelect?.value || 'all';
     let rows = buildClientStatsRows();
+
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentYear = now.getFullYear();
+    const rolling3m = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const isWithinRange = (dateText = '') => {
+        if (rangeMode === 'all') return true;
+        if (!dateText) return false;
+        const monthKey = String(dateText).slice(0, 7);
+        if (rangeMode === 'month') return monthKey === currentMonth;
+        const year = Number(String(dateText).slice(0, 4));
+        if (rangeMode === 'year') return year === currentYear;
+        if (rangeMode === '3m') {
+            const parsed = Date.parse(`${monthKey}-01T00:00:00Z`);
+            return Number.isFinite(parsed) && parsed >= rolling3m.getTime();
+        }
+        return true;
+    };
+
+    rows = rows
+        .map((row) => {
+            const scopedOrders = row.orders.filter((order) => isWithinRange(order.date));
+            const scoped = scopedOrders.reduce((acc, order) => {
+                acc.ordersCount += 1;
+                acc.billedHours += order.billedHours;
+                acc.driveHours += order.driveHours;
+                acc.gross += order.gross;
+                acc.net += order.net;
+                return acc;
+            }, { ordersCount: 0, billedHours: 0, driveHours: 0, gross: 0, net: 0 });
+            const scopedMonthly = row.monthly.filter((month) => isWithinRange(`${month.month}-01`));
+            return {
+                ...row,
+                ...scoped,
+                orders: scopedOrders,
+                monthly: scopedMonthly
+            };
+        })
+        .filter((row) => row.ordersCount > 0 || rangeMode === 'all');
+
     if (queryText) {
         rows = rows.filter((row) => row.name.toLowerCase().includes(queryText));
     }
+
     const comparators = {
         'gross-desc': (a, b) => b.gross - a.gross,
         'net-desc': (a, b) => b.net - a.net,
@@ -5903,6 +5990,8 @@ function renderClientStatsView() {
     rows.sort(comparators[sortMode] || comparators['gross-desc']);
 
     if (!rows.length) {
+        clientStatsSummary.innerHTML = '<p class="loading-state">Brak danych w wybranym zakresie czasu.</p>';
+        clientStatsTop.innerHTML = '';
         clientStatsRanking.innerHTML = '<p class="loading-state">Brak klientów do wyświetlenia w statystykach.</p>';
         clientStatsDetails.innerHTML = '<p class="loading-state">Wybierz klienta z rankingu, aby zobaczyć szczegóły.</p>';
         selectedClientStatsId = null;
@@ -5912,6 +6001,48 @@ function renderClientStatsView() {
     if (!rows.some((row) => row.clientId === selectedClientStatsId)) {
         selectedClientStatsId = rows[0].clientId;
     }
+
+    const summary = rows.reduce((acc, row) => {
+        acc.clients += 1;
+        acc.orders += row.ordersCount;
+        acc.billed += row.billedHours;
+        acc.drive += row.driveHours;
+        acc.gross += row.gross;
+        acc.net += row.net;
+        return acc;
+    }, { clients: 0, orders: 0, billed: 0, drive: 0, gross: 0, net: 0 });
+
+    clientStatsSummary.innerHTML = `
+        <div class="client-stats-summary-grid">
+            <div class="metric"><div class="label">Liczba klientów</div><div class="value num">${summary.clients}</div></div>
+            <div class="metric"><div class="label">Liczba zleceń</div><div class="value num">${summary.orders}</div></div>
+            <div class="metric"><div class="label">Łączne wyfakturowane</div><div class="value num">${summary.billed.toFixed(1)} h</div></div>
+            <div class="metric"><div class="label">Łączny czas jazdy</div><div class="value num">${summary.drive.toFixed(1)} h</div></div>
+            <div class="metric"><div class="label">Łączne brutto</div><div class="value num">${summary.gross.toFixed(2)} zł</div></div>
+            <div class="metric"><div class="label">Łączne netto</div><div class="value num">${summary.net.toFixed(2)} zł</div></div>
+        </div>
+    `;
+
+    const topList = (label, sorter) => {
+        const entries = [...rows].sort(sorter).slice(0, 5);
+        return `
+            <div class="client-top-card">
+                <h4>${label}</h4>
+                <ol>
+                    ${entries.map((row) => `<li><button type="button" class="client-link-btn" data-client-stats-id="${row.clientId}">${row.name}</button></li>`).join('') || '<li>Brak danych</li>'}
+                </ol>
+            </div>
+        `;
+    };
+
+    clientStatsTop.innerHTML = `
+        <div class="client-top-grid">
+            ${topList('Top 5 po brutto', (a, b) => b.gross - a.gross)}
+            ${topList('Top 5 po wyfakturowanych', (a, b) => b.billedHours - a.billedHours)}
+            ${topList('Top 5 po liczbie zleceń', (a, b) => b.ordersCount - a.ordersCount)}
+            ${topList('Top 5 po czasie jazdy', (a, b) => b.driveHours - a.driveHours)}
+        </div>
+    `;
 
     clientStatsRanking.innerHTML = `
         <table class="table machine-history-table client-stats-table">
@@ -5930,7 +6061,7 @@ function renderClientStatsView() {
                 ${rows.map((row, index) => `
                     <tr class="client-stats-row ${row.clientId === selectedClientStatsId ? 'is-active' : ''}" data-client-stats-id="${row.clientId}">
                         <td>${index + 1}</td>
-                        <td><strong>${row.name}</strong></td>
+                        <td><button type="button" class="client-link-btn" data-client-stats-id="${row.clientId}"><strong>${row.name}</strong></button></td>
                         <td>${row.ordersCount}</td>
                         <td>${row.billedHours.toFixed(1)} h</td>
                         <td>${row.driveHours.toFixed(1)} h</td>
@@ -5943,6 +6074,10 @@ function renderClientStatsView() {
     `;
 
     const selected = rows.find((row) => row.clientId === selectedClientStatsId) || rows[0];
+    const avgOrderValue = selected.ordersCount ? (selected.gross / selected.ordersCount) : 0;
+    const avgHoursPerOrder = selected.ordersCount ? (selected.billedHours / selected.ordersCount) : 0;
+    const driveRatio = selected.billedHours > 0 ? (selected.driveHours / selected.billedHours) : null;
+
     clientStatsDetails.innerHTML = `
         <div class="summary-container-subtle client-stats-details-panel">
             <h3>${selected.name}</h3>
@@ -5952,14 +6087,55 @@ function renderClientStatsView() {
                 <p class="order-card-cell"><span class="key">Czas jazdy</span><strong>${selected.driveHours.toFixed(1)} h</strong></p>
                 <p class="order-card-cell"><span class="key">Brutto</span><strong>${selected.gross.toFixed(2)} zł</strong></p>
                 <p class="order-card-cell"><span class="key">Netto</span><strong>${selected.net.toFixed(2)} zł</strong></p>
+                <p class="order-card-cell"><span class="key">Średnia wartość zlecenia</span><strong>${avgOrderValue.toFixed(2)} zł</strong></p>
+                <p class="order-card-cell"><span class="key">Śr. godzin / zlecenie</span><strong>${avgHoursPerOrder.toFixed(2)} h</strong></p>
+                <p class="order-card-cell"><span class="key">Stosunek jazdy / wyfakturowanych</span><strong>${driveRatio === null ? '—' : `${(driveRatio * 100).toFixed(1)}%`}</strong></p>
             </div>
-            <h4>Powiązane zlecenia</h4>
-            <ul class="client-stats-orders-list">
-                ${selected.orders.length
-                    ? selected.orders.slice(0, 12).map((order) => `<li>#${order.nr} • ${order.status} • ${order.billedHours.toFixed(1)} h • ${order.gross.toFixed(2)} zł / ${order.net.toFixed(2)} zł</li>`).join('')
-                    : '<li>Brak zleceń dla klienta.</li>'
-                }
-            </ul>
+            <h4>Maszyny klienta</h4>
+            <div class="client-stats-machines">
+                ${selected.machines.length ? selected.machines.map((machine) => `<span class="order-pill">${machine}</span>`).join('') : '<span class="client-meta">Brak maszyn</span>'}
+            </div>
+            <h4>Ostatnie zlecenia</h4>
+            <table class="table machine-history-table client-stats-table client-stats-table--orders">
+                <thead>
+                    <tr><th>Numer</th><th>Data</th><th>Maszyna</th><th>Wyfakturowane</th><th>Brutto / Netto</th></tr>
+                </thead>
+                <tbody>
+                    ${selected.orders.length
+                        ? selected.orders.slice(0, 12).map((order) => `
+                            <tr>
+                                <td>#${order.nr}</td>
+                                <td>${order.date || '—'}</td>
+                                <td>${order.machine || '—'}</td>
+                                <td>${order.billedHours.toFixed(1)} h</td>
+                                <td>${order.gross.toFixed(2)} zł / ${order.net.toFixed(2)} zł</td>
+                            </tr>
+                        `).join('')
+                        : '<tr><td colspan="5">Brak zleceń dla klienta.</td></tr>'
+                    }
+                </tbody>
+            </table>
+            <h4>Trend miesięczny</h4>
+            <table class="table machine-history-table client-stats-table client-stats-table--trend">
+                <thead>
+                    <tr><th>Miesiąc</th><th>Liczba zleceń</th><th>Wyfakturowane</th><th>Jazda</th><th>Brutto</th><th>Netto</th></tr>
+                </thead>
+                <tbody>
+                    ${selected.monthly.length
+                        ? selected.monthly.map((month) => `
+                            <tr>
+                                <td>${month.month}</td>
+                                <td>${month.ordersCount}</td>
+                                <td>${month.billedHours.toFixed(1)} h</td>
+                                <td>${month.driveHours.toFixed(1)} h</td>
+                                <td>${month.gross.toFixed(2)} zł</td>
+                                <td>${month.net.toFixed(2)} zł</td>
+                            </tr>
+                        `).join('')
+                        : '<tr><td colspan="6">Brak danych miesięcznych dla tego klienta.</td></tr>'
+                    }
+                </tbody>
+            </table>
         </div>
     `;
 }
@@ -6087,7 +6263,7 @@ function wyswietlZlecenia() {
                     {
                         status: 'closed',
                         headerHtml: `
-                            <div class="order-active-summary order-active-summary--closed" role="group" aria-label="Skrót zakończonego zlecenia">
+                            <div class="order-closed-compact-summary" role="group" aria-label="Skrót zakończonego zlecenia">
                                 <p class="order-card-cell order-card-cell--identity"><span class="key">Zlecenie</span><strong>#${zlecenie.nrZlecenia || '—'}</strong></p>
                                 <p class="order-card-cell order-card-cell--client"><span class="key">Klient</span><strong>${klient ? klient.nazwa : 'Brak klienta'}</strong></p>
                                 <p class="order-card-cell order-card-cell--machine"><span class="key">Maszyna / model</span><strong>${machineLabel}</strong></p>
@@ -8019,6 +8195,7 @@ async function obslugaListyCzesci(event) {
     if (listaKlientowDiv) listaKlientowDiv.addEventListener('click', obslugaListyKlientow);
     if (clientStatsSearchInput) clientStatsSearchInput.addEventListener('input', renderClientStatsView);
     if (clientStatsSortSelect) clientStatsSortSelect.addEventListener('change', renderClientStatsView);
+    if (clientStatsRangeSelect) clientStatsRangeSelect.addEventListener('change', renderClientStatsView);
     if (clientStatsRanking) {
         clientStatsRanking.addEventListener('click', (event) => {
             const row = event.target.closest('[data-client-stats-id]');

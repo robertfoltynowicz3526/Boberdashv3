@@ -203,7 +203,22 @@
                             <option value="name-asc">Nazwa klienta (A-Z)</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label for="client-stats-range">Zakres czasu</label>
+                        <select id="client-stats-range">
+                            <option value="all">Cały okres</option>
+                            <option value="year">Ten rok</option>
+                            <option value="3m">Ostatnie 3 miesiące</option>
+                            <option value="month">Ten miesiąc</option>
+                        </select>
+                    </div>
                 </div>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="client-stats-summary"></div>
+            </div>
+            <div class="table-section base-list-section">
+                <div id="client-stats-top"></div>
             </div>
             <div class="table-section base-list-section">
                 <div id="client-stats-ranking" class="section-scroll scroll-y"></div>
