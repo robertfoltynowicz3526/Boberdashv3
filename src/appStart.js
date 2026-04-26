@@ -696,7 +696,13 @@ function initializeApp() {
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
     const LOW_STOCK_UNITS_THRESHOLD = 1;
-    const LOW_STOCK_OIL_LITERS_THRESHOLD = 20;
+    const LOW_STOCK_OIL_LITERS_DEFAULT_THRESHOLD = 5;
+    const LOW_STOCK_OIL_LITERS_BY_CONTAINER = {
+        20: 5,
+        50: 10,
+        55: 10,
+        208: 25
+    };
     let stockStatus = 'loading';
     let hasLoadedStockOnce = false;
     let activeWarehouseProduct = null;
@@ -7582,9 +7588,16 @@ async function obslugaListyCzesci(event) {
         return (Number(produkt.ilosc) || 0) * pojemnosc;
     };
 
+    const getWarehouseOilLowStockThreshold = (produkt = {}) => {
+        if (!produkt?.jestOlejem) return 0;
+        const { pojemnosc } = parseOilMeta(produkt);
+        if (!Number.isFinite(pojemnosc)) return LOW_STOCK_OIL_LITERS_DEFAULT_THRESHOLD;
+        return LOW_STOCK_OIL_LITERS_BY_CONTAINER[pojemnosc] ?? LOW_STOCK_OIL_LITERS_DEFAULT_THRESHOLD;
+    };
+
     const isWarehouseLowStock = (produkt = {}) => {
         if (!produkt) return false;
-        if (produkt.jestOlejem) return getWarehouseOilLiters(produkt) <= LOW_STOCK_OIL_LITERS_THRESHOLD;
+        if (produkt.jestOlejem) return getWarehouseOilLiters(produkt) <= getWarehouseOilLowStockThreshold(produkt);
         return (Number(produkt.ilosc) || 0) <= LOW_STOCK_UNITS_THRESHOLD;
     };
 
