@@ -1,5 +1,6 @@
 // ZASADA NA PRZYSZŁOŚĆ: DATA → AGREGACJA → RENDER, bez skrótów.
 import { clearAppLockSession, createLockScreen, getAppLockConfig, isAppUnlocked, unlockWithPassword } from './appLock.js';
+import { startApp } from './appStart.js';
 
 const ensureDomReady = () => new Promise((resolve) => {
   if (document.readyState === 'loading') {
@@ -10,7 +11,6 @@ const ensureDomReady = () => new Promise((resolve) => {
 });
 
 const startUnlockedApp = async () => {
-  const { startApp } = await import('./appStart.js');
   await startApp();
 };
 
