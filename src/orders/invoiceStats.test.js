@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildInvoiceStatsByMonth, normalizeOrderForBilling, computeOrderAmounts } from './invoiceStats.js';
+import { buildInvoiceStatsByMonth, normalizeOrderForBilling, computeOrderAmounts, getOrderInvoicedHours } from './invoiceStats.js';
 
 test('aggregates invoiced, gross and net from closed orders by settlementMonth', () => {
   const orders = [
@@ -44,4 +44,20 @@ test('falls back to invoicedHours * order rate when gross/net are missing', () =
   assert.equal(amounts.grossCents, 45000);
   assert.equal(amounts.netCents, 31500);
   assert.equal(amounts.source, 'derived:hours*rate');
+});
+
+test('prefers wyfakturowaneGodziny over invoicedHours when values differ', () => {
+  const order = normalizeOrderForBilling({
+    id: 'mismatch',
+    status: 'zakończone',
+    settlementMonth: '2026-02',
+    wyfakturowaneGodziny: 2,
+    invoicedHours: 1.8,
+    typZlecenia: 'S'
+  });
+  const amounts = computeOrderAmounts(order);
+  assert.equal(getOrderInvoicedHours(order), 2);
+  assert.equal(order.invoicedHours, 2);
+  assert.equal(order.wyfakturowaneGodziny, 2);
+  assert.equal(amounts.grossCents, 9000);
 });

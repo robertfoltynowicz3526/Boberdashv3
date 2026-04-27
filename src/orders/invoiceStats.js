@@ -20,6 +20,15 @@ export const parseAmount = (value) => {
   return Number.isFinite(num) ? num : 0;
 };
 
+const resolveCanonicalInvoicedHours = (order = {}) => {
+  const hasWyfakturowane = order?.wyfakturowaneGodziny != null && String(order.wyfakturowaneGodziny).trim() !== '';
+  const hasInvoiced = order?.invoicedHours != null && String(order.invoicedHours).trim() !== '';
+
+  if (hasWyfakturowane) return parseHours(order.wyfakturowaneGodziny);
+  if (hasInvoiced) return parseHours(order.invoicedHours);
+  return 0;
+};
+
 const RATE_BY_ORDER_TYPE = {
   S: 45,
   W: 35,
@@ -170,7 +179,16 @@ export const resolveOrderBillingMonth = (order = {}, entryDate = null) => {
 
 export const isOrderClosed = (order = {}) => normalizeOrderStatus(order?.status) === 'zakończone';
 
-export const getOrderInvoicedHours = (order = {}) => parseHours(order?.invoicedHours ?? order?.wyfakturowaneGodziny ?? order?.wyfakturowane ?? 0);
+export const getOrderInvoicedHours = (order = {}) => {
+  const canonicalHours = resolveCanonicalInvoicedHours(order);
+  const hasCanonical = canonicalHours !== 0
+    || (order?.wyfakturowaneGodziny != null && String(order.wyfakturowaneGodziny).trim() !== '')
+    || (order?.invoicedHours != null && String(order.invoicedHours).trim() !== '');
+  if (hasCanonical) return canonicalHours;
+  const hasLegacyWyf = order?.wyfakturowane != null && String(order.wyfakturowane).trim() !== '';
+  if (hasLegacyWyf) return parseHours(order.wyfakturowane);
+  return 0;
+};
 export const getOrderGrossAmount = (order = {}) => computeOrderAmounts(order).grossCents / 100;
 export const getOrderNetAmount = (order = {}) => computeOrderAmounts(order).netCents / 100;
 
@@ -178,6 +196,7 @@ export const normalizeOrderForBilling = (order = {}) => {
   const createdOn = resolveOrderCreatedOn(order);
   const completionDate = resolveOrderCompletedOn(order);
   const settlementMonth = resolveOrderSettlementMonth(order);
+  const canonicalInvoicedHours = resolveCanonicalInvoicedHours(order);
   return {
     ...order,
     status: normalizeOrderStatus(order?.status),
@@ -187,8 +206,8 @@ export const normalizeOrderForBilling = (order = {}) => {
     completedOn: completionDate || null,
     settlementMonth: settlementMonth || null,
     billingMonth: settlementMonth || null,
-    invoicedHours: order?.invoicedHours ?? order?.wyfakturowaneGodziny ?? null,
-    wyfakturowaneGodziny: order?.invoicedHours ?? order?.wyfakturowaneGodziny ?? null,
+    invoicedHours: canonicalInvoicedHours,
+    wyfakturowaneGodziny: canonicalInvoicedHours,
     grossAmount: order?.grossAmount ?? order?.kwotaBrutto ?? order?.brutto ?? order?.gross ?? order?.valueGross ?? null,
     netAmount: order?.netAmount ?? order?.kwotaNetto ?? order?.netto ?? order?.net ?? order?.valueNet ?? null
   };
