@@ -36,8 +36,9 @@ import {
 import {
     renderAgroEffectRowsHtml,
     renderAgroEffectTotalsHtml,
-    renderOvertimeMonthlyHtml,
-    renderOvertimeListHtml
+    renderOvertimeMonthlyCardsHtml,
+    renderOvertimeYearSummaryHtml,
+    renderOvertimeClientTotalsHtml
 } from './finance/financeRender.js';
 import {
     buildInvoiceStatsByMonth,
@@ -1092,6 +1093,9 @@ function initializeApp() {
     let financeAgroRowsByMonth = {};
     let financeOvertimeEntries = [];
     let financeOvertimeEditId = null;
+    let financeAgroExpandedMonths = new Set();
+    let financeOvertimeExpandedMonths = new Set();
+    let financeOvertimeFormMonth = null;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -4489,8 +4493,6 @@ ${years.map(y => `
         obliczIPokazPodsumowanieFinansowe();
     }
 
-    const formatMoney = (value) => `${(Number(value) || 0).toFixed(2)} zł`;
-
     const renderFinanceLockScreen = (errorMsg = '') => {
         if (!financeView) return;
         financeView.innerHTML = `
@@ -4515,6 +4517,10 @@ ${years.map(y => `
         if (!financeView) return;
         const years = getFinanceYearOptions(2026);
         const { rows, totals } = getFinanceAgroAggregation();
+        const normalizedExpanded = new Set(rows.filter((row) => financeAgroExpandedMonths.has(row.monthKey)).map((row) => row.monthKey));
+        if (normalizedExpanded.size !== financeAgroExpandedMonths.size) {
+            financeAgroExpandedMonths = normalizedExpanded;
+        }
         financeView.innerHTML = `
             <section class="summary-container-subtle finance-panel">
                 <div class="finance-topbar">
@@ -4528,9 +4534,8 @@ ${years.map(y => `
                     <label for="finance-year">Rok:</label>
                     <select id="finance-year">${years.map((year) => `<option value="${year}" ${year === financeYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
                 </div>
-                <p class="field-hint">Podstawa brutto jest wyliczeniem orientacyjnym dla UoP, bez PPK.</p>
                 ${renderAgroEffectTotalsHtml(totals)}
-                ${renderAgroEffectRowsHtml(rows)}
+                ${renderAgroEffectRowsHtml(rows, financeAgroExpandedMonths)}
             </section>
         `;
     };
@@ -4539,6 +4544,13 @@ ${years.map(y => `
         if (!financeView) return;
         const years = getFinanceYearOptions(2026);
         const yearly = aggregateOvertimeYear(financeOvertimeEntries, financeOvertimeYear);
+        const existingMonthKeys = new Set(yearly.monthly.map((row) => row.monthKey));
+        financeOvertimeExpandedMonths = new Set([...financeOvertimeExpandedMonths].filter((key) => existingMonthKeys.has(key)));
+        if (financeOvertimeFormMonth && !existingMonthKeys.has(financeOvertimeFormMonth)) {
+            financeOvertimeFormMonth = null;
+            financeOvertimeEditId = null;
+        }
+        const activeEditingEntry = financeOvertimeEntries.find((entry) => entry.id === financeOvertimeEditId) || null;
         financeView.innerHTML = `
             <section class="summary-container-subtle finance-panel">
                 <div class="finance-topbar">
@@ -4552,19 +4564,19 @@ ${years.map(y => `
                     <label for="finance-overtime-year">Rok:</label>
                     <select id="finance-overtime-year">${years.map((year) => `<option value="${year}" ${year === financeOvertimeYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
                 </div>
-                <form id="finance-overtime-form" class="finance-overtime-form">
-                    <input type="date" id="finance-overtime-date" required>
-                    <input type="text" id="finance-overtime-client" placeholder="Klient" required>
-                    <input type="number" id="finance-overtime-net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" required>
-                    <input type="text" id="finance-overtime-note" placeholder="Opis / notatka (opcjonalnie)">
-                    <button type="submit">${financeOvertimeEditId ? 'Zapisz' : 'Dodaj'}</button>
-                    ${financeOvertimeEditId ? '<button type="button" class="btn-secondary" id="finance-overtime-cancel">Anuluj</button>' : ''}
-                </form>
-                <div class="finance-summary-grid">
-                    <div class="metric"><div class="label">Suma roczna netto</div><div class="value num">${formatMoney(yearly.totalNet)}</div></div>
-                </div>
-                ${renderOvertimeMonthlyHtml(yearly.monthly)}
-                ${renderOvertimeListHtml(yearly.entries)}
+                ${renderOvertimeYearSummaryHtml({
+                    totalNet: yearly.totalNet,
+                    totalEntries: yearly.totalEntries,
+                    bestMonth: yearly.bestMonth,
+                    bestClient: yearly.clientsRanking[0] || null
+                })}
+                ${renderOvertimeMonthlyCardsHtml({
+                    monthly: yearly.monthly,
+                    expandedMonths: financeOvertimeExpandedMonths,
+                    activeFormMonth: financeOvertimeFormMonth,
+                    editingEntry: activeEditingEntry
+                })}
+                ${renderOvertimeClientTotalsHtml(yearly.clientsRanking)}
             </section>
         `;
     };
@@ -9012,15 +9024,16 @@ async function obslugaListyCzesci(event) {
                 return;
             }
 
-            const overtimeForm = event.target.closest('#finance-overtime-form');
+            const overtimeForm = event.target.closest('[data-overtime-form-month]');
             if (!overtimeForm) return;
             event.preventDefault();
-            const date = overtimeForm.querySelector('#finance-overtime-date')?.value || '';
-            const client = overtimeForm.querySelector('#finance-overtime-client')?.value?.trim() || '';
-            const netAmount = Number(overtimeForm.querySelector('#finance-overtime-net')?.value) || 0;
-            const note = overtimeForm.querySelector('#finance-overtime-note')?.value?.trim() || '';
-            if (!date || !client || netAmount <= 0) {
-                alert('Uzupełnij datę, klienta i poprawną kwotę netto.');
+            const monthKey = overtimeForm.dataset.overtimeFormMonth || '';
+            const client = overtimeForm.querySelector('[data-overtime-field="client"]')?.value?.trim() || '';
+            const netAmount = Number(overtimeForm.querySelector('[data-overtime-field="net"]')?.value) || 0;
+            const note = overtimeForm.querySelector('[data-overtime-field="note"]')?.value?.trim() || '';
+            const date = `${monthKey}-01`;
+            if (!monthKey || !client || netAmount <= 0) {
+                alert('Uzupełnij klienta i poprawną kwotę netto.');
                 return;
             }
             const payload = { date, client, netAmount, note };
@@ -9030,6 +9043,7 @@ async function obslugaListyCzesci(event) {
             } else {
                 await addOvertimeEntry(db, payload);
             }
+            financeOvertimeFormMonth = null;
             financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
             renderFinanceView();
         });
@@ -9041,6 +9055,8 @@ async function obslugaListyCzesci(event) {
                 if (financeInnerTab === 'overtime') {
                     financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
                 }
+                financeOvertimeFormMonth = null;
+                financeOvertimeEditId = null;
                 renderFinanceView();
                 return;
             }
@@ -9048,13 +9064,47 @@ async function obslugaListyCzesci(event) {
             if (event.target.closest('#finance-lock-btn')) {
                 financeUnlocked = false;
                 financeOvertimeEditId = null;
+                financeOvertimeFormMonth = null;
                 setFinanceUnlockedInSession(false);
                 renderFinanceView();
                 return;
             }
 
-            if (event.target.closest('#finance-overtime-cancel')) {
+            const cancelFormBtn = event.target.closest('[data-overtime-cancel-form]');
+            if (cancelFormBtn) {
                 financeOvertimeEditId = null;
+                financeOvertimeFormMonth = null;
+                renderFinanceView();
+                return;
+            }
+
+            const agroToggleBtn = event.target.closest('[data-agro-toggle]');
+            if (agroToggleBtn) {
+                const monthKey = agroToggleBtn.dataset.agroToggle;
+                if (financeAgroExpandedMonths.has(monthKey)) financeAgroExpandedMonths.delete(monthKey);
+                else financeAgroExpandedMonths.add(monthKey);
+                renderFinanceView();
+                return;
+            }
+
+            const overtimeToggleBtn = event.target.closest('[data-overtime-toggle]');
+            if (overtimeToggleBtn) {
+                const monthKey = overtimeToggleBtn.dataset.overtimeToggle;
+                if (financeOvertimeExpandedMonths.has(monthKey)) financeOvertimeExpandedMonths.delete(monthKey);
+                else financeOvertimeExpandedMonths.add(monthKey);
+                renderFinanceView();
+                return;
+            }
+
+            const openOvertimeFormBtn = event.target.closest('[data-overtime-open-form]');
+            if (openOvertimeFormBtn) {
+                const monthKey = openOvertimeFormBtn.dataset.overtimeOpenForm;
+                financeOvertimeFormMonth = monthKey || null;
+                financeOvertimeExpandedMonths.add(monthKey);
+                const editingEntry = financeOvertimeEntries.find((entry) => entry.id === financeOvertimeEditId);
+                if (editingEntry && !String(editingEntry.date || '').startsWith(monthKey || '')) {
+                    financeOvertimeEditId = null;
+                }
                 renderFinanceView();
                 return;
             }
@@ -9067,19 +9117,14 @@ async function obslugaListyCzesci(event) {
                 if (!confirm('Usunąć wpis?')) return;
                 await deleteOvertimeEntry(db, entry.id);
                 financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                if (financeOvertimeEditId === entry.id) financeOvertimeEditId = null;
                 renderFinanceView();
                 return;
             }
             financeOvertimeEditId = entry.id;
+            financeOvertimeFormMonth = String(entry.date || '').slice(0, 7);
+            financeOvertimeExpandedMonths.add(financeOvertimeFormMonth);
             renderFinanceView();
-            const dateInput = financeView.querySelector('#finance-overtime-date');
-            const clientInput = financeView.querySelector('#finance-overtime-client');
-            const netInput = financeView.querySelector('#finance-overtime-net');
-            const noteInput = financeView.querySelector('#finance-overtime-note');
-            if (dateInput) dateInput.value = entry.date || '';
-            if (clientInput) clientInput.value = entry.client || '';
-            if (netInput) netInput.value = String(entry.netAmount || '');
-            if (noteInput) noteInput.value = entry.note || '';
         });
 
         financeView.addEventListener('change', async (event) => {
@@ -9087,6 +9132,7 @@ async function obslugaListyCzesci(event) {
             if (yearSelect) {
                 financeYear = Number(yearSelect.value) || 2026;
                 financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
+                financeAgroExpandedMonths = new Set();
                 renderFinanceView();
                 return;
             }
@@ -9094,6 +9140,9 @@ async function obslugaListyCzesci(event) {
             if (overtimeYearSelect) {
                 financeOvertimeYear = Number(overtimeYearSelect.value) || 2026;
                 financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                financeOvertimeFormMonth = null;
+                financeOvertimeEditId = null;
+                financeOvertimeExpandedMonths = new Set();
                 renderFinanceView();
                 return;
             }
