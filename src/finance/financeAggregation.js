@@ -89,18 +89,31 @@ export const aggregateOvertimeYear = (entries = [], year) => {
   const monthly = Array.from({ length: 12 }, (_, idx) => {
     const month = idx + 1;
     const key = `${y}-${String(month).padStart(2, '0')}`;
-    const totalNet = round2(filtered
-      .filter((entry) => String(entry.date || '').startsWith(key))
-      .reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0));
+    const monthEntries = filtered.filter((entry) => String(entry.date || '').startsWith(key));
+    const totalNet = round2(monthEntries.reduce((sum, entry) => sum + (Number(entry.netAmount) || 0), 0));
     return {
       month,
+      monthKey: key,
       label: MONTH_NAMES_PL[idx],
-      totalNet
+      totalNet,
+      count: monthEntries.length,
+      entries: monthEntries
     };
   });
 
   const totalNet = round2(monthly.reduce((sum, row) => sum + row.totalNet, 0));
-  return { entries: filtered, monthly, totalNet };
+  const totalEntries = filtered.length;
+  const bestMonth = monthly.reduce((best, row) => (row.totalNet > (best?.totalNet || 0) ? row : best), null);
+  const clientTotals = filtered.reduce((acc, entry) => {
+    const client = String(entry.client || '').trim() || 'Nieznany klient';
+    acc[client] = round2((acc[client] || 0) + (Number(entry.netAmount) || 0));
+    return acc;
+  }, {});
+  const clientsRanking = Object.entries(clientTotals)
+    .map(([client, totalNetByClient]) => ({ client, totalNet: totalNetByClient }))
+    .sort((a, b) => b.totalNet - a.totalNet);
+
+  return { entries: filtered, monthly, totalNet, totalEntries, bestMonth, clientsRanking };
 };
 
 export const getFinanceYearOptions = (minYear = 2026) => {
