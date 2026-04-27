@@ -4141,34 +4141,191 @@ main,
   flex-wrap:wrap;
 }
 .summary-toolbar-right{ margin-left:auto; }
-.vacation-block{ display:grid; gap:12px; }
 .vacation-allowance-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .vacation-allowance-row input{ max-width:120px; }
-.vacation-stats p{ margin:0; }
-.vacation-adjustment-form .form-inline{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
-.vacation-adjustment-form input, .vacation-adjustment-form button, .vacation-adjustment-form label{ flex:1 1 auto; min-width:120px; }
-.vacation-adjustment-form label{ flex-basis:100px; min-width:80px; }
-.vacation-adjustment-form button{ flex:0 0 auto; width:fit-content; }
-.vacation-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 8px; }
-.vacation-tab{ border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06); color:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; font-size:.9rem; transition:all .2s ease; }
+.vacation-stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(155px,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.vacation-stat-chip{
+  display:grid;
+  grid-template-columns:auto auto;
+  align-items:end;
+  gap:2px 6px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:10px;
+  background:rgba(255,255,255,.04);
+}
+.vacation-stat-chip .label{
+  grid-column:1 / -1;
+  font-size:.74rem;
+  opacity:.75;
+}
+.vacation-stat-chip strong{ font-size:1.05rem; line-height:1; }
+.vacation-stat-chip .unit{ font-size:.75rem; opacity:.8; }
+.vacation-stat-chip--remaining{
+  border-color:rgba(255,222,0,.4);
+  background:rgba(255,222,0,.1);
+}
+.vacation-tabs{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:10px 0 4px;
+}
+.vacation-tab{ border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06); color:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; font-size:.88rem; transition:all .2s ease; }
 .vacation-tab.is-active{ background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.5); font-weight:600; }
-.vacation-tab-panels{ display:grid; gap:16px; }
+.vacation-tab-panels{ display:grid; gap:10px; }
 .vacation-tab-panel{ display:none; }
 .vacation-tab-panel.is-active{ display:block; }
 .vacation-used-list{ display:grid; gap:12px; }
 .vacation-used-list .month-group{ padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
 .vacation-used-list .month-group h5{ margin:0 0 8px; text-transform:capitalize; }
 .vacation-used-list ul{ margin:0; padding-left:18px; display:grid; gap:4px; }
-.planned-leave-form .form-inline{ display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
-.planned-leave-form input, .planned-leave-form select, .planned-leave-form button, .planned-leave-form label{ flex:1 1 auto; min-width:120px; }
-.planned-leave-form label{ flex-basis:80px; }
-.planned-leave-form .planned-leave-working{ flex:1 1 220px; display:flex; align-items:center; gap:6px; }
-.planned-leave-summary{ font-weight:600; margin-top:8px; }
-.planned-leave-list{ display:grid; gap:12px; }
-.planned-leave-item{ padding:12px; border-radius:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); display:grid; gap:8px; }
-.planned-leave-item .meta{ display:flex; flex-wrap:wrap; gap:12px; font-size:.9rem; opacity:.8; }
-.planned-leave-item .actions{ display:flex; flex-wrap:wrap; gap:8px; }
-.planned-leave-item .actions button{ padding:4px 10px; border-radius:8px; }
+.vacation-panel-card{
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:12px;
+  background:rgba(255,255,255,.03);
+  padding:12px;
+  display:grid;
+  gap:10px;
+}
+.vacation-panel-card h4{ margin:0; }
+.planned-leave-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.field-group{
+  display:grid;
+  gap:4px;
+}
+.field-group label{ font-size:.82rem; opacity:.82; }
+.field-group--full{ grid-column:1 / -1; }
+.planned-leave-form input,
+.planned-leave-form select,
+.vacation-adjustment-form input{
+  height:38px;
+  border-radius:10px;
+}
+.planned-leave-working{
+  grid-column:3 / 4;
+  justify-self:end;
+  align-self:end;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  font-size:.84rem;
+  padding-bottom:8px;
+}
+.planned-leave-working input{
+  width:14px;
+  height:14px;
+  margin:0;
+}
+.field-group--toggle span{ line-height:1.2; }
+.planned-leave-actions{
+  grid-column:1 / -1;
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+}
+.planned-leave-actions button{
+  width:auto;
+  min-width:110px;
+  height:38px;
+  border-radius:10px;
+}
+.planned-leave-summary{ font-weight:600; margin:2px 0 0; font-size:.9rem; }
+.planned-leave-list{ display:grid; gap:8px; }
+.planned-leave-item{
+  padding:10px 12px;
+  border-radius:10px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  display:grid;
+  gap:6px;
+}
+.planned-leave-item__head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+}
+.planned-leave-item__type{
+  font-size:.75rem;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;
+  padding:2px 8px;
+  opacity:.9;
+}
+.planned-leave-item__meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  font-size:.83rem;
+  opacity:.82;
+}
+.planned-leave-item__note{
+  margin:0;
+  font-size:.84rem;
+  opacity:.88;
+}
+.planned-leave-item .actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  justify-content:flex-end;
+}
+.planned-leave-item .actions button{
+  padding:4px 10px;
+  border-radius:8px;
+  font-size:.8rem;
+}
+.vacation-panel-card--adjustments{ margin-top:12px; }
+.vacation-adjustment-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr 1.4fr auto;
+  gap:10px;
+  align-items:end;
+}
+.vacation-adjustment-actions{
+  display:flex;
+  justify-content:flex-end;
+}
+.vacation-adjustment-actions button{
+  height:38px;
+  border-radius:10px;
+  min-width:130px;
+}
+.empty-state{
+  margin:0;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px dashed rgba(255,255,255,.16);
+  background:rgba(255,255,255,.02);
+  opacity:.75;
+  font-size:.9rem;
+}
+@media (max-width: 860px){
+  .planned-leave-grid,
+  .vacation-adjustment-grid{
+    grid-template-columns:1fr;
+  }
+  .planned-leave-working{
+    grid-column:1;
+    justify-self:start;
+    padding-bottom:0;
+  }
+  .planned-leave-actions,
+  .vacation-adjustment-actions{
+    justify-content:flex-start;
+  }
+}
 .btn-secondary{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); color:inherit; }
 .orders-flow-intro{
   margin:0 0 12px;
@@ -4281,7 +4438,12 @@ main,
   transform:translateX(-50%) translateY(0);
 }
 .adjustments-list{ list-style:none; padding:0; margin:0; display:grid; gap:8px; }
-.adjustments-list li{ display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--border-color, #e5e7eb); border-radius:10px; }
+.adjustments-list li{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; padding:9px 10px; border:1px solid rgba(255,255,255,.12); border-radius:10px; background:rgba(255,255,255,.03); }
+.adjustment-content{ display:grid; gap:2px; }
+.adjustment-date{ font-size:.84rem; opacity:.92; }
+.adjustment-days{ font-weight:600; font-size:.87rem; }
+.adjustment-note{ font-size:.82rem; opacity:.78; }
+.adjustment-remove{ font-size:.78rem; padding:4px 8px; border-radius:8px; align-self:flex-end; }
 
 .year-heading{ margin:0 0 8px; }
 .summary-table .total-row td{ font-weight:700; }

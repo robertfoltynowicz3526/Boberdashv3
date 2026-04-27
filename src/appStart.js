@@ -992,6 +992,7 @@ function initializeApp() {
     const plannedLeaveCancelBtn = document.getElementById('planned-leave-cancel');
     const plannedLeaveList = document.getElementById('planned-leave-list');
     const plannedLeaveTotalSpan = document.getElementById('planned-leave-total');
+    const plannedLeaveTotalPanelSpan = document.getElementById('planned-leave-total-panel');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
@@ -4202,25 +4203,31 @@ ${years.map(y => `
     const renderPlannedLeaveList = () => {
         if (!plannedLeaveList || !plannedLeaveTotalSpan) return;
         if (!plannedLeaveEntries.length) {
-            plannedLeaveList.innerHTML = '<p>Brak zaplanowanych urlopów w wybranym roku.</p>';
+            plannedLeaveList.innerHTML = '<p class="empty-state">Brak zaplanowanych urlopów w wybranym roku.</p>';
             plannedLeaveTotalSpan.textContent = '0';
+            if (plannedLeaveTotalPanelSpan) plannedLeaveTotalPanelSpan.textContent = '0';
             refreshPlannedLeaveDecorations();
             return;
         }
         const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays), 0);
-        plannedLeaveTotalSpan.textContent = formatujLiczbe(totalDays);
+        const formattedTotal = formatujLiczbe(totalDays);
+        plannedLeaveTotalSpan.textContent = formattedTotal;
+        if (plannedLeaveTotalPanelSpan) plannedLeaveTotalPanelSpan.textContent = formattedTotal;
         plannedLeaveList.innerHTML = plannedLeaveEntries.map(entry => {
-            const rangeLabel = `${entry.startDate || '—'} → ${entry.endDate || '—'}`;
             const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays);
-            const metaBits = [
-                formatDaysValue(count),
-                entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'
-            ];
-            if (entry.note) metaBits.push(entry.note);
+            const rangeLabel = `${formatDateLabel(entry.startDate)} → ${formatDateLabel(entry.endDate)}`;
+            const noteText = entry.note || 'Brak notatki';
             return `
                 <div class="planned-leave-item" data-id="${entry.id}">
-                    <div><strong>${rangeLabel}</strong></div>
-                    <div class="meta">${metaBits.map(bit => `<span>${bit}</span>`).join('')}</div>
+                    <div class="planned-leave-item__head">
+                        <strong>${rangeLabel}</strong>
+                        <span class="planned-leave-item__type">${entry.type || '—'}</span>
+                    </div>
+                    <div class="planned-leave-item__meta">
+                        <span><b>Dni:</b> ${formatDaysValue(count)}</span>
+                        <span><b>Zliczanie:</b> ${entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'}</span>
+                    </div>
+                    <p class="planned-leave-item__note">${noteText}</p>
                     <div class="actions">
                         <button type="button" class="btn-secondary" data-action="edit" data-id="${entry.id}">Edytuj</button>
                         <button type="button" class="btn-remove" data-action="delete" data-id="${entry.id}">Usuń</button>
@@ -4329,10 +4336,14 @@ ${years.map(y => `
         vacationAdjustmentsDiv.innerHTML = adjustments.length
             ? `<ul class="adjustments-list">${adjustments.map(adj => `
                 <li data-id="${adj.id}">
-                    <span>${adj.date || 'brak daty'} — ${formatDaysValue(adj.days)} ${adj.note ? `(${adj.note})` : ''}</span>
+                    <div class="adjustment-content">
+                        <span class="adjustment-date">${formatDateLabel(adj.date, 'Brak daty')}</span>
+                        <span class="adjustment-days">${formatDaysValue(adj.days)}</span>
+                        <span class="adjustment-note">${adj.note || 'Bez notatki'}</span>
+                    </div>
                     <button type="button" class="btn-remove adjustment-remove" data-id="${adj.id}">Usuń</button>
                 </li>`).join('')}</ul>`
-            : '<p>Brak korekt urlopu.</p>';
+            : '<p class="empty-state">Brak korekt urlopu.</p>';
 
         renderUsedLeaveList();
         await refreshPlannedLeaveEntries();
