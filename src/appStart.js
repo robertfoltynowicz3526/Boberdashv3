@@ -17,6 +17,29 @@ import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthSta
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
 import {
+    getFinanceMonthsForYear,
+    aggregateAgroEffectYear,
+    aggregateOvertimeYear,
+    getFinanceYearOptions
+} from './finance/financeAggregation.js';
+import {
+    isFinanceUnlockedInSession,
+    setFinanceUnlockedInSession,
+    verifyFinancePassword,
+    loadAgroEffectYear,
+    saveAgroEffectMonth,
+    listOvertimeEntriesForYear,
+    addOvertimeEntry,
+    updateOvertimeEntry,
+    deleteOvertimeEntry
+} from './finance/financeData.js';
+import {
+    renderAgroEffectRowsHtml,
+    renderAgroEffectTotalsHtml,
+    renderOvertimeMonthlyHtml,
+    renderOvertimeListHtml
+} from './finance/financeRender.js';
+import {
     buildInvoiceStatsByMonth,
     normalizeMonthKey,
     normalizeOrderForBilling,
@@ -718,7 +741,7 @@ function initializeApp() {
     let lastLeaveByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
-    let vacationSectionCollapsed = false;
+    let vacationSectionCollapsed = true;
     let l4SectionCollapsed = true;
     let unfinishedDrawerOpen = false;
     let unfinishedSummary = {
@@ -997,13 +1020,13 @@ function initializeApp() {
     const plannedLeaveEndInput = document.getElementById('planned-leave-end');
     const plannedLeaveTypeSelect = document.getElementById('planned-leave-type');
     const plannedLeaveNoteInput = document.getElementById('planned-leave-note');
-    const plannedLeaveWorkingDaysInput = document.getElementById('planned-leave-working-days');
     const plannedLeaveDaysInput = document.getElementById('planned-leave-days');
     const plannedLeaveSubmitBtn = document.getElementById('planned-leave-submit');
     const plannedLeaveCancelBtn = document.getElementById('planned-leave-cancel');
     const plannedLeaveList = document.getElementById('planned-leave-list');
     const plannedLeaveTotalSpan = document.getElementById('planned-leave-total');
     const plannedLeaveTotalPanelSpan = document.getElementById('planned-leave-total-panel');
+    const financeView = document.getElementById('finance-view');
     const modalMagazynLista = document.getElementById('modal-magazyn-lista');
     const partsToRemoveList = document.getElementById('parts-to-remove-list');
     const magazynForm = document.getElementById('magazyn-form');
@@ -1062,6 +1085,13 @@ function initializeApp() {
     const oilToolsDrawer = document.getElementById('oil-tools-drawer');
     let quarterlyBonusExpanded = false;
     let quarterlyBonusHistoryExpanded = false;
+    let financeUnlocked = isFinanceUnlockedInSession();
+    let financeInnerTab = 'agro';
+    let financeYear = 2026;
+    let financeOvertimeYear = 2026;
+    let financeAgroRowsByMonth = {};
+    let financeOvertimeEntries = [];
+    let financeOvertimeEditId = null;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -1719,6 +1749,9 @@ function initializeApp() {
     const handleTabActivation = (tabName) => {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
+        }
+        if (tabName === 'finanse') {
+            void initFinanceModule();
         }
         if (tabName === 'kalendarz-tab') {
             syncCalendarShellHeight();
@@ -4041,7 +4074,7 @@ ${years.map(y => `
     }
 
     const getPlannedLeaveTotal = (entries = []) => {
-        return (entries || []).reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays), 0);
+        return (entries || []).reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.leaveDays), 0);
     };
 
     const calcVacationRemaining = (allowance, usedFromCalendar, plannedDays, adjustmentsSum) => {
@@ -4129,11 +4162,10 @@ ${years.map(y => `
         return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    const countDaysInRange = (startDate, endDate, workingOnly = false, explicitDays = null) => {
+    const countDaysInRange = (startDate, endDate, explicitDays = null) => {
         const explicit = normalizeHalfDayValue(explicitDays, { min: 0, fallback: 0 });
         if (explicit > 0) return explicit;
         const days = listDaysInclusive(startDate, endDate);
-        if (!workingOnly) return days.length;
         return days.filter(day => !isWeekendDay(day)).length;
     };
 
@@ -4189,7 +4221,6 @@ ${years.map(y => `
             endDate: endDate || startDate || '',
             note: data.note || '',
             type: data.type || 'Urlop planowany',
-            countWorkingDays: Boolean(data.countWorkingDays),
             leaveDays: normalizeHalfDayValue(data.leaveDays, { min: 0, fallback: 0 }) > 0
                 ? normalizeHalfDayValue(data.leaveDays, { min: 0.5, fallback: 0.5 })
                 : null,
@@ -4214,7 +4245,6 @@ ${years.map(y => `
         if (plannedLeaveEndInput) plannedLeaveEndInput.value = entry.endDate || '';
         if (plannedLeaveTypeSelect) plannedLeaveTypeSelect.value = entry.type || 'Urlop planowany';
         if (plannedLeaveNoteInput) plannedLeaveNoteInput.value = entry.note || '';
-        if (plannedLeaveWorkingDaysInput) plannedLeaveWorkingDaysInput.checked = Boolean(entry.countWorkingDays);
         if (plannedLeaveDaysInput) plannedLeaveDaysInput.value = entry.leaveDays ? String(entry.leaveDays) : '';
     };
 
@@ -4246,7 +4276,7 @@ ${years.map(y => `
         plannedLeaveTotalSpan.textContent = formattedTotal;
         if (plannedLeaveTotalPanelSpan) plannedLeaveTotalPanelSpan.textContent = formattedTotal;
         plannedLeaveList.innerHTML = plannedLeaveEntries.map(entry => {
-            const count = countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays);
+            const count = countDaysInRange(entry.startDate, entry.endDate, entry.leaveDays);
             const rangeLabel = `${formatDateLabel(entry.startDate)} → ${formatDateLabel(entry.endDate)}`;
             const noteText = entry.note || 'Brak notatki';
             return `
@@ -4257,7 +4287,7 @@ ${years.map(y => `
                     </div>
                     <div class="planned-leave-item__meta">
                         <span><b>${formatDaysValue(count)}</b> dni</span>
-                        <span>${entry.countWorkingDays ? 'liczono dni robocze' : 'liczono wszystkie dni'}</span>
+                        <span>liczono dni robocze</span>
                     </div>
                     <p class="planned-leave-item__note">Notatka: ${noteText}</p>
                     <div class="actions">
@@ -4458,6 +4488,124 @@ ${years.map(y => `
         }
         obliczIPokazPodsumowanieFinansowe();
     }
+
+    const formatMoney = (value) => `${(Number(value) || 0).toFixed(2)} zł`;
+
+    const renderFinanceLockScreen = (errorMsg = '') => {
+        if (!financeView) return;
+        financeView.innerHTML = `
+            <section class="summary-container-subtle finance-lock">
+                <h3>Finanse</h3>
+                <p>Ta sekcja jest dodatkowo zabezpieczona.</p>
+                <form id="finance-unlock-form" class="finance-lock-form">
+                    <input type="password" id="finance-password" placeholder="Hasło" autocomplete="current-password" required>
+                    <button type="submit">Odblokuj</button>
+                </form>
+                <p id="finance-unlock-error" class="form-error">${errorMsg || ''}</p>
+            </section>
+        `;
+    };
+
+    const getFinanceAgroAggregation = () => {
+        const months = getFinanceMonthsForYear(financeYear, 2026, 1);
+        return aggregateAgroEffectYear(months, financeAgroRowsByMonth);
+    };
+
+    const renderFinanceAgroTab = () => {
+        if (!financeView) return;
+        const years = getFinanceYearOptions(2026);
+        const { rows, totals } = getFinanceAgroAggregation();
+        financeView.innerHTML = `
+            <section class="summary-container-subtle finance-panel">
+                <div class="finance-topbar">
+                    <div class="finance-tabs" id="finance-inner-tabs">
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
+                    </div>
+                    <button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button>
+                </div>
+                <div class="finance-toolbar">
+                    <label for="finance-year">Rok:</label>
+                    <select id="finance-year">${years.map((year) => `<option value="${year}" ${year === financeYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
+                </div>
+                <p class="field-hint">Podstawa brutto jest wyliczeniem orientacyjnym dla UoP, bez PPK.</p>
+                ${renderAgroEffectTotalsHtml(totals)}
+                ${renderAgroEffectRowsHtml(rows)}
+            </section>
+        `;
+    };
+
+    const renderFinanceOvertimeTab = () => {
+        if (!financeView) return;
+        const years = getFinanceYearOptions(2026);
+        const yearly = aggregateOvertimeYear(financeOvertimeEntries, financeOvertimeYear);
+        financeView.innerHTML = `
+            <section class="summary-container-subtle finance-panel">
+                <div class="finance-topbar">
+                    <div class="finance-tabs" id="finance-inner-tabs">
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
+                    </div>
+                    <button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button>
+                </div>
+                <div class="finance-toolbar">
+                    <label for="finance-overtime-year">Rok:</label>
+                    <select id="finance-overtime-year">${years.map((year) => `<option value="${year}" ${year === financeOvertimeYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
+                </div>
+                <form id="finance-overtime-form" class="finance-overtime-form">
+                    <input type="date" id="finance-overtime-date" required>
+                    <input type="text" id="finance-overtime-client" placeholder="Klient" required>
+                    <input type="number" id="finance-overtime-net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" required>
+                    <input type="text" id="finance-overtime-note" placeholder="Opis / notatka (opcjonalnie)">
+                    <button type="submit">${financeOvertimeEditId ? 'Zapisz' : 'Dodaj'}</button>
+                    ${financeOvertimeEditId ? '<button type="button" class="btn-secondary" id="finance-overtime-cancel">Anuluj</button>' : ''}
+                </form>
+                <div class="finance-summary-grid">
+                    <div class="metric"><div class="label">Suma roczna netto</div><div class="value num">${formatMoney(yearly.totalNet)}</div></div>
+                </div>
+                ${renderOvertimeMonthlyHtml(yearly.monthly)}
+                ${renderOvertimeListHtml(yearly.entries)}
+            </section>
+        `;
+    };
+
+    const renderFinanceView = () => {
+        if (!financeUnlocked) {
+            renderFinanceLockScreen('');
+            return;
+        }
+        if (financeInnerTab === 'overtime') {
+            renderFinanceOvertimeTab();
+            return;
+        }
+        renderFinanceAgroTab();
+    };
+
+    const loadFinanceData = async () => {
+        financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
+        financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+    };
+
+    const initFinanceModule = async () => {
+        if (!financeView) return;
+        financeYear = Number.isFinite(financeYear) ? financeYear : 2026;
+        financeOvertimeYear = Number.isFinite(financeOvertimeYear) ? financeOvertimeYear : 2026;
+        try {
+            await loadFinanceData();
+        } catch (error) {
+            console.error('[finance] load failed', error);
+        }
+        renderFinanceView();
+    };
+
+    const saveAgroField = async (monthKey, field, rawValue) => {
+        if (!monthKey || (field !== 'baseNet' && field !== 'bonusNet')) return;
+        const current = financeAgroRowsByMonth[monthKey] || { baseNet: 0, bonusNet: 0 };
+        const next = { ...current, [field]: Number(rawValue) || 0 };
+        financeAgroRowsByMonth = { ...financeAgroRowsByMonth, [monthKey]: next };
+        await saveAgroEffectMonth(db, financeYear, monthKey, next);
+        renderFinanceView();
+    };
 
     function eksportujDoCSV(dane, nazwaPliku) {
         if (dane.length === 0) { alert("Brak danych do wyeksportowania."); return; }
@@ -8816,7 +8964,6 @@ async function obslugaListyCzesci(event) {
                 endDate,
                 type: plannedLeaveTypeSelect?.value || 'Urlop planowany',
                 note: plannedLeaveNoteInput?.value || '',
-                countWorkingDays: Boolean(plannedLeaveWorkingDaysInput?.checked),
                 leaveDays: plannedLeaveDaysInput?.value ? leaveDaysRaw : null
             };
             if (plannedLeaveEditId) {
@@ -8845,6 +8992,114 @@ async function obslugaListyCzesci(event) {
                 await deleteDoc(doc(db, 'plannedLeave', entry.id));
                 await refreshPlannedLeaveEntries();
             }
+        });
+    }
+
+    if (financeView) {
+        financeView.addEventListener('submit', async (event) => {
+            const unlockForm = event.target.closest('#finance-unlock-form');
+            if (unlockForm) {
+                event.preventDefault();
+                const passwordInput = unlockForm.querySelector('#finance-password');
+                const password = passwordInput?.value || '';
+                if (!verifyFinancePassword(password)) {
+                    renderFinanceLockScreen('Nieprawidłowe hasło.');
+                    return;
+                }
+                financeUnlocked = true;
+                setFinanceUnlockedInSession(true);
+                renderFinanceView();
+                return;
+            }
+
+            const overtimeForm = event.target.closest('#finance-overtime-form');
+            if (!overtimeForm) return;
+            event.preventDefault();
+            const date = overtimeForm.querySelector('#finance-overtime-date')?.value || '';
+            const client = overtimeForm.querySelector('#finance-overtime-client')?.value?.trim() || '';
+            const netAmount = Number(overtimeForm.querySelector('#finance-overtime-net')?.value) || 0;
+            const note = overtimeForm.querySelector('#finance-overtime-note')?.value?.trim() || '';
+            if (!date || !client || netAmount <= 0) {
+                alert('Uzupełnij datę, klienta i poprawną kwotę netto.');
+                return;
+            }
+            const payload = { date, client, netAmount, note };
+            if (financeOvertimeEditId) {
+                await updateOvertimeEntry(db, financeOvertimeEditId, payload);
+                financeOvertimeEditId = null;
+            } else {
+                await addOvertimeEntry(db, payload);
+            }
+            financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+            renderFinanceView();
+        });
+
+        financeView.addEventListener('click', async (event) => {
+            const tabBtn = event.target.closest('[data-finance-tab]');
+            if (tabBtn) {
+                financeInnerTab = tabBtn.dataset.financeTab === 'overtime' ? 'overtime' : 'agro';
+                if (financeInnerTab === 'overtime') {
+                    financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                }
+                renderFinanceView();
+                return;
+            }
+
+            if (event.target.closest('#finance-lock-btn')) {
+                financeUnlocked = false;
+                financeOvertimeEditId = null;
+                setFinanceUnlockedInSession(false);
+                renderFinanceView();
+                return;
+            }
+
+            if (event.target.closest('#finance-overtime-cancel')) {
+                financeOvertimeEditId = null;
+                renderFinanceView();
+                return;
+            }
+
+            const actionBtn = event.target.closest('[data-overtime-action]');
+            if (!actionBtn) return;
+            const entry = financeOvertimeEntries.find((item) => item.id === actionBtn.dataset.id);
+            if (!entry) return;
+            if (actionBtn.dataset.overtimeAction === 'delete') {
+                if (!confirm('Usunąć wpis?')) return;
+                await deleteOvertimeEntry(db, entry.id);
+                financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                renderFinanceView();
+                return;
+            }
+            financeOvertimeEditId = entry.id;
+            renderFinanceView();
+            const dateInput = financeView.querySelector('#finance-overtime-date');
+            const clientInput = financeView.querySelector('#finance-overtime-client');
+            const netInput = financeView.querySelector('#finance-overtime-net');
+            const noteInput = financeView.querySelector('#finance-overtime-note');
+            if (dateInput) dateInput.value = entry.date || '';
+            if (clientInput) clientInput.value = entry.client || '';
+            if (netInput) netInput.value = String(entry.netAmount || '');
+            if (noteInput) noteInput.value = entry.note || '';
+        });
+
+        financeView.addEventListener('change', async (event) => {
+            const yearSelect = event.target.closest('#finance-year');
+            if (yearSelect) {
+                financeYear = Number(yearSelect.value) || 2026;
+                financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
+                renderFinanceView();
+                return;
+            }
+            const overtimeYearSelect = event.target.closest('#finance-overtime-year');
+            if (overtimeYearSelect) {
+                financeOvertimeYear = Number(overtimeYearSelect.value) || 2026;
+                financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                renderFinanceView();
+                return;
+            }
+            const agroInput = event.target.closest('[data-agro-input]');
+            if (!agroInput) return;
+            await saveAgroField(agroInput.dataset.month, agroInput.dataset.agroInput, agroInput.value);
         });
     }
 

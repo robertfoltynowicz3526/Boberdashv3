@@ -42,6 +42,7 @@
                 <button type="button" class="tab-button" data-tab="notatnik">Notatnik</button>
                 <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
                 <button type="button" class="tab-button" data-tab="podsumowanie">Podsumowanie</button>
+                <button type="button" class="tab-button" data-tab="finanse">Finanse</button>
             </div>
         </nav>
         <div class="sidebar-footer">
@@ -392,7 +393,7 @@
                     <div id="annual-summary"></div>
                 </div>
                 <div class="summary-card" id="sum-urlop">
-                    <div class="card-head card-head--collapsible" id="vacation-section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="vacation-section-content">
+                    <div class="card-head card-head--collapsible" id="vacation-section-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="vacation-section-content">
                         <div class="collapsible-title-wrap">
                             <span class="section-chevron" id="vacation-section-chevron" aria-hidden="true">▼</span>
                             <h3>Urlop – plan i wykorzystanie</h3>
@@ -408,7 +409,7 @@
                             <select id="vacation-year" data-no-collapse="true"></select>
                         </div>
                     </div>
-                    <div id="vacation-section-content">
+                    <div id="vacation-section-content" hidden>
                     <div class="vacation-allowance">
                         <label for="vacation-allowance-input">Pula urlopu (dni) na rok</label>
                         <div class="vacation-allowance-row">
@@ -474,10 +475,6 @@
                                             <label for="planned-leave-days">Liczba dni (opcjonalnie)</label>
                                             <input type="number" id="planned-leave-days" min="0.5" step="0.5" inputmode="decimal" placeholder="np. 0.5">
                                         </div>
-                                        <label class="planned-leave-working field-group--toggle">
-                                            <input type="checkbox" id="planned-leave-working-days">
-                                            <span>Licz tylko dni robocze</span>
-                                        </label>
                                         <div class="planned-leave-actions">
                                             <button type="button" id="planned-leave-cancel" class="btn-secondary">Anuluj</button>
                                             <button type="submit" id="planned-leave-submit">Dodaj plan</button>
@@ -536,6 +533,12 @@
                     <div id="quarterly-bonus-summary"></div>
                 </div>
             </div>
+        </div>
+        <div id="finanse" class="tab-content page-wide" data-section="finanse">
+            <div class="pulpit-header">
+                <h2>Finanse</h2>
+            </div>
+            <div id="finance-view" class="finance-view"></div>
         </div>
         </main>
 

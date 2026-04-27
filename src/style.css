@@ -5506,3 +5506,17 @@ textarea {
     grid-template-columns:1fr;
   }
 }
+
+.finance-view{display:grid;gap:12px;}
+.finance-lock{max-width:520px;}
+.finance-lock-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.finance-lock-form input{min-width:220px;}
+.finance-panel{display:grid;gap:12px;}
+.finance-topbar{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;}
+.finance-tabs{display:flex;gap:8px;flex-wrap:wrap;}
+.finance-tabs .is-active{border-color:var(--accent);color:var(--accent);}
+.finance-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.finance-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;}
+.finance-table-wrap{overflow:auto;}
+.finance-table .finance-input{width:100%;min-width:120px;}
+.finance-overtime-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:end;}
