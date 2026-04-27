@@ -1988,7 +1988,6 @@ function initializeApp() {
         firstTabButton.click(); // Otwórz pierwszą zakładkę
     }
     inicjujMotywJohnDeere();
-    inicjujZwijanie();
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
 
     odswiezSelectKlientaDoZlecenia();
@@ -4357,7 +4356,12 @@ ${years.map(y => `
         if (!vacationAllowanceInput || !vacationUsedSpan || !vacationRemainingSpan || !vacationAdjustmentsDiv) return;
         const allowance = await getVacationAllowance(selectedYear);
         vacationAllowanceInput.value = allowance;
-        const plannedTotal = await refreshPlannedLeaveEntries();
+        let plannedTotal = 0;
+        try {
+            plannedTotal = await refreshPlannedLeaveEntries();
+        } catch (error) {
+            console.error('[vacation] refresh planned leave failed', error);
+        }
 
         const adjustments = await listVacationAdjustments(selectedYear);
         const adjustmentsSum = adjustments.reduce((acc, adj) => acc + (Number(adj.days) || 0), 0);
@@ -4366,7 +4370,7 @@ ${years.map(y => `
         const remaining = calcVacationRemaining(allowance, usedFromCalendar, plannedTotal, adjustmentsSum);
 
         vacationUsedSpan.textContent = formatujLiczbe(usedFromCalendar);
-        vacationAdjustmentsTotalSpan.textContent = formatujLiczbe(adjustmentsSum);
+        if (vacationAdjustmentsTotalSpan) vacationAdjustmentsTotalSpan.textContent = formatujLiczbe(adjustmentsSum);
         vacationRemainingSpan.textContent = formatujLiczbe(remaining);
         setVacationCollapsedSummary({
             remaining,
@@ -4392,10 +4396,10 @@ ${years.map(y => `
 
     async function renderPodsumowanie() {
         await ensureSelectedYearData();
-        renderRocznePodsumowanie();
-        renderQuarterlyBonusSummary();
-        renderL4Summary();
-        await renderVacationSummary();
+        try { renderRocznePodsumowanie(); } catch (error) { console.error('[summary] annual render failed', error); }
+        try { renderQuarterlyBonusSummary(); } catch (error) { console.error('[summary] quarterly render failed', error); }
+        try { renderL4Summary(); } catch (error) { console.error('[summary] L4 render failed', error); }
+        try { await renderVacationSummary(); } catch (error) { console.error('[summary] vacation render failed', error); }
     }
 
     async function applySelectedYear(nextYear) {
@@ -9199,6 +9203,7 @@ async function obslugaListyCzesci(event) {
     };
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
+    inicjujZwijanie();
     moveOrdersSearchBetweenSections();
     bindCalendarToolbar();
     bindDayPanelEvents();
