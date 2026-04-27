@@ -23,33 +23,30 @@ export const renderAgroEffectRowsHtml = (rows = [], expandedMonths = new Set()) 
         const isExpanded = expandedMonths.has(row.monthKey);
         return `
           <article class="finance-month-card ${isExpanded ? 'is-expanded' : ''}">
-            <header class="finance-month-card__header">
-              <div>
-                <h4>${row.label}</h4>
-                <p class="muted-text">Wpisujesz tylko wartości netto. Reszta liczy się automatycznie.</p>
-              </div>
-              <button type="button" class="btn-ghost finance-chevron" data-agro-toggle="${row.monthKey}" aria-expanded="${isExpanded}">
-                ${isExpanded ? '▼' : '▶'}
-              </button>
-            </header>
-            <div class="finance-month-card__main">
-              <label class="finance-field">
+            <header class="finance-month-card__header finance-month-card__header--agro">
+              <h4>${row.label}</h4>
+              <label class="finance-field finance-field--inline">
                 <span>Podstawa netto</span>
                 <input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-input="baseNet" data-month="${row.monthKey}" value="${row.baseNet || ''}" placeholder="0">
               </label>
-              <label class="finance-field">
+              <label class="finance-field finance-field--inline">
                 <span>Premia netto</span>
                 <input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-input="bonusNet" data-month="${row.monthKey}" value="${row.bonusNet || ''}" placeholder="0">
               </label>
-              <div class="finance-result"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
-              <div class="finance-result"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
-            </div>
+              <div class="finance-result finance-result--inline"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
+              <div class="finance-result finance-result--inline"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
+              <button type="button" class="btn-ghost finance-chevron" data-agro-toggle="${row.monthKey}" aria-expanded="${isExpanded}" aria-label="Pokaż szczegóły miesiąca ${row.label}">
+                ${isExpanded ? '▼' : '▶'}
+              </button>
+            </header>
             ${isExpanded ? `
-              <div class="finance-month-card__details">
-                <div class="finance-result"><span>Podstawa brutto (orient.)</span><strong>${money(row.baseGross)}</strong></div>
-                <div class="finance-result"><span>Premia brutto</span><strong>${money(row.bonusGross)}</strong></div>
-                <div class="finance-result"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
-                <div class="finance-result"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
+              <div class="finance-month-card__body">
+                <div class="finance-month-card__details">
+                  <div class="finance-result"><span>Podstawa brutto (orient.)</span><strong>${money(row.baseGross)}</strong></div>
+                  <div class="finance-result"><span>Premia brutto</span><strong>${money(row.bonusGross)}</strong></div>
+                  <div class="finance-result"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
+                  <div class="finance-result"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
+                </div>
                 <p class="field-hint">Podstawa brutto orientacyjnie dla UoP bez PPK.</p>
               </div>
             ` : ''}
@@ -96,34 +93,37 @@ export const renderOvertimeMonthlyCardsHtml = ({ monthly = [], expandedMonths = 
         const isEditingInside = showForm && editingEntry && String(editingEntry.date || '').startsWith(row.monthKey);
         return `
           <article class="finance-month-card ${row.count > 0 ? 'has-data' : ''} ${isExpanded ? 'is-expanded' : ''}">
-            <header class="finance-month-card__header">
-              <div>
-                <h4>${row.label}</h4>
-                <p class="muted-text">Suma: ${money(row.totalNet)} • Wpisy: ${row.count}</p>
-              </div>
+            <header class="finance-month-card__header finance-month-card__header--overtime">
+              <h4>${row.label}</h4>
+              <p class="finance-month-card__meta">Suma: <strong>${money(row.totalNet)}</strong></p>
+              <p class="finance-month-card__meta">Wpisy: <strong>${row.count}</strong></p>
               <div class="finance-month-card__actions">
                 <button type="button" data-overtime-open-form="${row.monthKey}">Dodaj wpis</button>
-                <button type="button" class="btn-ghost finance-chevron" data-overtime-toggle="${row.monthKey}" aria-expanded="${isExpanded}">
+                <button type="button" class="btn-ghost finance-chevron" data-overtime-toggle="${row.monthKey}" aria-expanded="${isExpanded}" aria-label="Pokaż wpisy miesiąca ${row.label}">
                   ${isExpanded ? '▼' : '▶'}
                 </button>
               </div>
             </header>
-            ${showForm ? `
-              <form class="finance-overtime-form" data-overtime-form-month="${row.monthKey}">
-                <input type="text" data-overtime-field="client" placeholder="Klient" value="${escapeHtml(isEditingInside ? editingEntry.client : '')}" required>
-                <input type="number" data-overtime-field="net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" value="${isEditingInside ? (editingEntry.netAmount || '') : ''}" required>
-                <input type="text" data-overtime-field="note" placeholder="Opis / notatka (opcjonalnie)" value="${escapeHtml(isEditingInside ? editingEntry.note : '')}">
-                <div class="finance-form-actions">
-                  <button type="submit">${isEditingInside ? 'Zapisz' : 'Dodaj'}</button>
-                  <button type="button" class="btn-secondary" data-overtime-cancel-form="${row.monthKey}">Anuluj</button>
-                </div>
-              </form>
-            ` : ''}
-            ${isExpanded ? `
-              <div class="finance-month-card__details">
-                ${row.entries.length
-                  ? `<ul class="finance-entry-list">${row.entries.map((entry) => renderOvertimeEntryItem(entry)).join('')}</ul>`
-                  : '<p class="empty-state">Brak wpisów w tym miesiącu.</p>'}
+            ${(showForm || isExpanded) ? `
+              <div class="finance-month-card__body">
+                ${showForm ? `
+                  <form class="finance-overtime-form" data-overtime-form-month="${row.monthKey}">
+                    <input type="text" data-overtime-field="client" placeholder="Klient" value="${escapeHtml(isEditingInside ? editingEntry.client : '')}" required>
+                    <input type="number" data-overtime-field="net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" value="${isEditingInside ? (editingEntry.netAmount || '') : ''}" required>
+                    <input type="text" data-overtime-field="note" placeholder="Opis / notatka (opcjonalnie)" value="${escapeHtml(isEditingInside ? editingEntry.note : '')}">
+                    <div class="finance-form-actions">
+                      <button type="submit">${isEditingInside ? 'Zapisz' : 'Dodaj'}</button>
+                      <button type="button" class="btn-secondary" data-overtime-cancel-form="${row.monthKey}">Anuluj</button>
+                    </div>
+                  </form>
+                ` : ''}
+                ${isExpanded ? `
+                  <div class="finance-month-card__details">
+                    ${row.entries.length
+                      ? `<ul class="finance-entry-list">${row.entries.map((entry) => renderOvertimeEntryItem(entry)).join('')}</ul>`
+                      : '<p class="empty-state">Brak wpisów w tym miesiącu.</p>'}
+                  </div>
+                ` : ''}
               </div>
             ` : ''}
           </article>
