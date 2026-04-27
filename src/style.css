@@ -5517,26 +5517,20 @@ textarea {
 .finance-tabs .is-active{border-color:var(--accent);color:var(--accent);}
 .finance-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .finance-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;}
-.finance-cards-list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;}
-.finance-month-card{display:grid;grid-template-columns:minmax(0,1fr);gap:0;border:1px solid var(--color-border);border-radius:12px;padding:12px;background:rgba(255,255,255,.02);min-height:0;height:auto;}
-.finance-month-card.has-data{border-color:rgba(244, 202, 56, .45);}
-.finance-month-card__header{display:grid;grid-template-columns:minmax(150px,1.1fr) repeat(4,minmax(130px,1fr)) auto;gap:10px;align-items:end;}
-.finance-month-card__header h4{margin:0;align-self:center;}
-.finance-month-card__header--overtime{grid-template-columns:minmax(150px,1.25fr) minmax(120px,.9fr) minmax(100px,.7fr) auto;align-items:center;}
-.finance-month-card__meta{margin:0;font-size:.88rem;color:var(--color-muted-text);}
-.finance-month-card__meta strong{color:var(--color-text);}
-.finance-month-card__actions{display:flex;gap:8px;align-items:center;justify-self:end;}
-.finance-chevron{min-width:42px;padding:6px 8px;}
-.finance-month-card__body{display:grid;gap:10px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--color-border);min-height:0;}
-.finance-field{display:grid;gap:4px;min-width:0;}
-.finance-field span{font-size:.82rem;color:var(--color-muted-text);}
-.finance-field--inline .finance-input{min-height:36px;}
-.finance-input{width:100%;min-height:38px;}
-.finance-result{display:grid;gap:4px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px;background:rgba(255,255,255,.01);min-width:0;}
-.finance-result--inline{height:100%;align-content:center;}
-.finance-result span{font-size:.8rem;color:var(--color-muted-text);}
-.finance-result strong{font-size:1rem;}
-.finance-month-card__details{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;min-height:0;}
+.finance-table-wrap{width:100%;overflow-x:hidden;border:1px solid var(--color-border);border-radius:12px;background:rgba(255,255,255,.015);}
+.finance-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+.finance-table th,
+.finance-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:middle;text-align:left;word-break:break-word;}
+.finance-table thead th{font-size:.82rem;text-transform:uppercase;letter-spacing:.03em;color:var(--color-muted-text);background:rgba(255,255,255,.02);}
+.finance-table tbody tr:last-child td{border-bottom:none;}
+.finance-table td strong{font-size:.96rem;}
+.finance-table tr.is-editing td{background:rgba(252,209,22,.08);}
+.finance-actions-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.finance-inline-note{display:block;font-size:.75rem;color:var(--color-muted-text);}
+.finance-input{width:100%;min-height:36px;}
+.finance-details-row td{background:rgba(255,255,255,.025);}
+.finance-month-details{display:grid;gap:10px;}
+.finance-history-box{display:grid;gap:8px;}
 .finance-overtime-form{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr)) auto;gap:8px;align-items:end;}
 .finance-form-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .finance-entry-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;}
@@ -5548,15 +5542,18 @@ textarea {
 .finance-client-totals{list-style:none;margin:0;padding:0;display:grid;gap:6px;}
 .finance-client-totals li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--color-border);padding:4px 0;}
 @media (max-width:1100px){
-  .finance-month-card__header{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;}
-  .finance-month-card__header--overtime{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .finance-month-card__actions{justify-self:start;}
   .finance-overtime-form{grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:700px){
-  .finance-month-card__header,
-  .finance-month-card__header--overtime,
-  .finance-month-card__details,
+  .finance-table thead{display:none;}
+  .finance-table,
+  .finance-table tbody,
+  .finance-table tr,
+  .finance-table td{display:block;width:100%;}
+  .finance-table tr{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+  .finance-table td{border-bottom:none;padding:4px 12px;}
+  .finance-table td::before{content:attr(data-label);display:block;font-size:.72rem;color:var(--color-muted-text);text-transform:uppercase;letter-spacing:.03em;}
+  .finance-details-row td::before{display:none;}
   .finance-overtime-form{grid-template-columns:1fr;}
   .finance-entry-item{flex-direction:column;}
   .finance-entry-item__side{justify-items:start;text-align:left;}
