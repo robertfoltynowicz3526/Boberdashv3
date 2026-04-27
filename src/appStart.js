@@ -1093,7 +1093,8 @@ function initializeApp() {
     let financeAgroRowsByMonth = {};
     let financeOvertimeEntries = [];
     let financeOvertimeEditId = null;
-    let financeAgroExpandedMonths = new Set();
+    let financeAgroEditingMonth = null;
+    let financeAgroDraft = null;
     let financeOvertimeExpandedMonths = new Set();
     let financeOvertimeFormMonth = null;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
@@ -4517,9 +4518,9 @@ ${years.map(y => `
         if (!financeView) return;
         const years = getFinanceYearOptions(2026);
         const { rows, totals } = getFinanceAgroAggregation();
-        const normalizedExpanded = new Set(rows.filter((row) => financeAgroExpandedMonths.has(row.monthKey)).map((row) => row.monthKey));
-        if (normalizedExpanded.size !== financeAgroExpandedMonths.size) {
-            financeAgroExpandedMonths = normalizedExpanded;
+        if (financeAgroEditingMonth && !rows.some((row) => row.monthKey === financeAgroEditingMonth)) {
+            financeAgroEditingMonth = null;
+            financeAgroDraft = null;
         }
         financeView.innerHTML = `
             <section class="summary-container-subtle finance-panel">
@@ -4535,7 +4536,7 @@ ${years.map(y => `
                     <select id="finance-year">${years.map((year) => `<option value="${year}" ${year === financeYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
                 </div>
                 ${renderAgroEffectTotalsHtml(totals)}
-                ${renderAgroEffectRowsHtml(rows, financeAgroExpandedMonths)}
+                ${renderAgroEffectRowsHtml(rows, financeAgroEditingMonth, financeAgroDraft)}
             </section>
         `;
     };
@@ -4610,10 +4611,14 @@ ${years.map(y => `
         renderFinanceView();
     };
 
-    const saveAgroField = async (monthKey, field, rawValue) => {
-        if (!monthKey || (field !== 'baseNet' && field !== 'bonusNet')) return;
+    const saveAgroMonth = async (monthKey, values = {}) => {
+        if (!monthKey) return;
         const current = financeAgroRowsByMonth[monthKey] || { baseNet: 0, bonusNet: 0 };
-        const next = { ...current, [field]: Number(rawValue) || 0 };
+        const next = {
+            ...current,
+            baseNet: Math.max(0, Number(values.baseNet) || 0),
+            bonusNet: Math.max(0, Number(values.bonusNet) || 0)
+        };
         financeAgroRowsByMonth = { ...financeAgroRowsByMonth, [monthKey]: next };
         await saveAgroEffectMonth(db, financeYear, monthKey, next);
         renderFinanceView();
@@ -9055,6 +9060,8 @@ async function obslugaListyCzesci(event) {
                 if (financeInnerTab === 'overtime') {
                     financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
                 }
+                financeAgroEditingMonth = null;
+                financeAgroDraft = null;
                 financeOvertimeFormMonth = null;
                 financeOvertimeEditId = null;
                 renderFinanceView();
@@ -9063,6 +9070,8 @@ async function obslugaListyCzesci(event) {
 
             if (event.target.closest('#finance-lock-btn')) {
                 financeUnlocked = false;
+                financeAgroEditingMonth = null;
+                financeAgroDraft = null;
                 financeOvertimeEditId = null;
                 financeOvertimeFormMonth = null;
                 setFinanceUnlockedInSession(false);
@@ -9078,12 +9087,40 @@ async function obslugaListyCzesci(event) {
                 return;
             }
 
-            const agroToggleBtn = event.target.closest('[data-agro-toggle]');
-            if (agroToggleBtn) {
-                const monthKey = agroToggleBtn.dataset.agroToggle;
-                if (financeAgroExpandedMonths.has(monthKey)) financeAgroExpandedMonths.delete(monthKey);
-                else financeAgroExpandedMonths.add(monthKey);
+            const agroEditBtn = event.target.closest('[data-agro-edit]');
+            if (agroEditBtn) {
+                const monthKey = agroEditBtn.dataset.agroEdit;
+                const current = financeAgroRowsByMonth[monthKey] || { baseNet: 0, bonusNet: 0 };
+                financeAgroEditingMonth = monthKey;
+                financeAgroDraft = {
+                    baseNet: current.baseNet ?? 0,
+                    bonusNet: current.bonusNet ?? 0
+                };
                 renderFinanceView();
+                return;
+            }
+
+            if (event.target.closest('[data-agro-cancel]')) {
+                financeAgroEditingMonth = null;
+                financeAgroDraft = null;
+                renderFinanceView();
+                return;
+            }
+
+            const agroSaveBtn = event.target.closest('[data-agro-save]');
+            if (agroSaveBtn) {
+                const monthKey = agroSaveBtn.dataset.agroSave;
+                if (!monthKey || monthKey !== financeAgroEditingMonth) return;
+                const rowEl = agroSaveBtn.closest('tr');
+                const baseNetInput = rowEl?.querySelector('[data-agro-draft-input="baseNet"]');
+                const bonusNetInput = rowEl?.querySelector('[data-agro-draft-input="bonusNet"]');
+                const values = {
+                    baseNet: baseNetInput?.value ?? financeAgroDraft?.baseNet,
+                    bonusNet: bonusNetInput?.value ?? financeAgroDraft?.bonusNet
+                };
+                await saveAgroMonth(monthKey, values);
+                financeAgroEditingMonth = null;
+                financeAgroDraft = null;
                 return;
             }
 
@@ -9100,7 +9137,6 @@ async function obslugaListyCzesci(event) {
             if (openOvertimeFormBtn) {
                 const monthKey = openOvertimeFormBtn.dataset.overtimeOpenForm;
                 financeOvertimeFormMonth = monthKey || null;
-                financeOvertimeExpandedMonths.add(monthKey);
                 const editingEntry = financeOvertimeEntries.find((entry) => entry.id === financeOvertimeEditId);
                 if (editingEntry && !String(editingEntry.date || '').startsWith(monthKey || '')) {
                     financeOvertimeEditId = null;
@@ -9123,7 +9159,7 @@ async function obslugaListyCzesci(event) {
             }
             financeOvertimeEditId = entry.id;
             financeOvertimeFormMonth = String(entry.date || '').slice(0, 7);
-            financeOvertimeExpandedMonths.add(financeOvertimeFormMonth);
+            if (financeOvertimeFormMonth) financeOvertimeExpandedMonths.add(financeOvertimeFormMonth);
             renderFinanceView();
         });
 
@@ -9132,7 +9168,8 @@ async function obslugaListyCzesci(event) {
             if (yearSelect) {
                 financeYear = Number(yearSelect.value) || 2026;
                 financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
-                financeAgroExpandedMonths = new Set();
+                financeAgroEditingMonth = null;
+                financeAgroDraft = null;
                 renderFinanceView();
                 return;
             }
@@ -9146,9 +9183,14 @@ async function obslugaListyCzesci(event) {
                 renderFinanceView();
                 return;
             }
-            const agroInput = event.target.closest('[data-agro-input]');
-            if (!agroInput) return;
-            await saveAgroField(agroInput.dataset.month, agroInput.dataset.agroInput, agroInput.value);
+            const agroDraftInput = event.target.closest('[data-agro-draft-input]');
+            if (!agroDraftInput || !financeAgroEditingMonth) return;
+            const field = agroDraftInput.dataset.agroDraftInput;
+            if (field !== 'baseNet' && field !== 'bonusNet') return;
+            financeAgroDraft = {
+                ...(financeAgroDraft || {}),
+                [field]: agroDraftInput.value
+            };
         });
     }
 

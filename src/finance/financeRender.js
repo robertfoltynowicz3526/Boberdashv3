@@ -12,47 +12,58 @@ const escapeHtml = (value) => String(value || '')
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#39;');
 
-export const renderAgroEffectRowsHtml = (rows = [], expandedMonths = new Set()) => {
+export const renderAgroEffectRowsHtml = (rows = [], editingMonth = null, editingDraft = null) => {
   if (!rows.length) {
     return '<p class="empty-state">Brak miesięcy do wyświetlenia.</p>';
   }
 
   return `
-    <div class="finance-cards-list">
-      ${rows.map((row) => {
-        const isExpanded = expandedMonths.has(row.monthKey);
-        return `
-          <article class="finance-month-card ${isExpanded ? 'is-expanded' : ''}">
-            <header class="finance-month-card__header finance-month-card__header--agro">
-              <h4>${row.label}</h4>
-              <label class="finance-field finance-field--inline">
-                <span>Podstawa netto</span>
-                <input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-input="baseNet" data-month="${row.monthKey}" value="${row.baseNet || ''}" placeholder="0">
-              </label>
-              <label class="finance-field finance-field--inline">
-                <span>Premia netto</span>
-                <input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-input="bonusNet" data-month="${row.monthKey}" value="${row.bonusNet || ''}" placeholder="0">
-              </label>
-              <div class="finance-result finance-result--inline"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
-              <div class="finance-result finance-result--inline"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
-              <button type="button" class="btn-ghost finance-chevron" data-agro-toggle="${row.monthKey}" aria-expanded="${isExpanded}" aria-label="Pokaż szczegóły miesiąca ${row.label}">
-                ${isExpanded ? '▼' : '▶'}
-              </button>
-            </header>
-            ${isExpanded ? `
-              <div class="finance-month-card__body">
-                <div class="finance-month-card__details">
-                  <div class="finance-result"><span>Podstawa brutto (orient.)</span><strong>${money(row.baseGross)}</strong></div>
-                  <div class="finance-result"><span>Premia brutto</span><strong>${money(row.bonusGross)}</strong></div>
-                  <div class="finance-result"><span>Razem netto</span><strong>${money(row.totalNet)}</strong></div>
-                  <div class="finance-result"><span>Razem brutto</span><strong>${money(row.totalGross)}</strong></div>
-                </div>
-                <p class="field-hint">Podstawa brutto orientacyjnie dla UoP bez PPK.</p>
-              </div>
-            ` : ''}
-          </article>
-        `;
-      }).join('')}
+    <div class="finance-table-wrap">
+      <table class="finance-table finance-table--agro">
+        <thead>
+          <tr>
+            <th>Miesiąc</th>
+            <th>Podstawa netto</th>
+            <th>Premia netto</th>
+            <th>Razem netto</th>
+            <th>Razem brutto</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => {
+            const isEditing = editingMonth === row.monthKey;
+            const baseValue = isEditing ? (editingDraft?.baseNet ?? row.baseNet ?? '') : row.baseNet;
+            const bonusValue = isEditing ? (editingDraft?.bonusNet ?? row.bonusNet ?? '') : row.bonusNet;
+            return `
+              <tr class="${isEditing ? 'is-editing' : ''}">
+                <td data-label="Miesiąc">${row.label}</td>
+                <td data-label="Podstawa netto">
+                  ${isEditing
+                    ? `<input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-draft-input="baseNet" value="${Number(baseValue) || baseValue === 0 ? baseValue : ''}" placeholder="0">`
+                    : `<strong>${money(row.baseNet)}</strong>`}
+                </td>
+                <td data-label="Premia netto">
+                  ${isEditing
+                    ? `<input type="number" step="0.01" min="0" inputmode="decimal" class="finance-input" data-agro-draft-input="bonusNet" value="${Number(bonusValue) || bonusValue === 0 ? bonusValue : ''}" placeholder="0">`
+                    : `<strong>${money(row.bonusNet)}</strong>`}
+                </td>
+                <td data-label="Razem netto"><strong>${money(row.totalNet)}</strong></td>
+                <td data-label="Razem brutto"><strong>${money(row.totalGross)}</strong></td>
+                <td data-label="Akcje">
+                  <div class="finance-actions-inline">
+                    ${isEditing
+                      ? `<button type="button" data-agro-save="${row.monthKey}">Zapisz</button>
+                         <button type="button" class="btn-secondary" data-agro-cancel>Anuluj</button>
+                         <small class="finance-inline-note">Brutto: podstawa ${money(row.baseGross)} • premia ${money(row.bonusGross)}</small>`
+                      : `<button type="button" class="btn-ghost" data-agro-edit="${row.monthKey}">Edytuj</button>`}
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
     </div>
   `;
 };
@@ -72,7 +83,7 @@ const renderOvertimeEntryItem = (entry) => `
   <li class="finance-entry-item" data-overtime-row="${entry.id}">
     <div class="finance-entry-item__main">
       <p class="finance-entry-item__client">${escapeHtml(entry.client || '—')}</p>
-      <p class="finance-entry-item__meta">${escapeHtml(entry.note || 'Brak notatki')}</p>
+      <p class="finance-entry-item__meta">${escapeHtml(entry.note || 'Brak opisu')}</p>
     </div>
     <div class="finance-entry-item__side">
       <strong>${money(entry.netAmount)}</strong>
@@ -86,49 +97,61 @@ const renderOvertimeEntryItem = (entry) => `
 
 export const renderOvertimeMonthlyCardsHtml = ({ monthly = [], expandedMonths = new Set(), activeFormMonth = null, editingEntry = null }) => {
   return `
-    <div class="finance-cards-list">
-      ${monthly.map((row) => {
-        const isExpanded = expandedMonths.has(row.monthKey);
-        const showForm = activeFormMonth === row.monthKey;
-        const isEditingInside = showForm && editingEntry && String(editingEntry.date || '').startsWith(row.monthKey);
-        return `
-          <article class="finance-month-card ${row.count > 0 ? 'has-data' : ''} ${isExpanded ? 'is-expanded' : ''}">
-            <header class="finance-month-card__header finance-month-card__header--overtime">
-              <h4>${row.label}</h4>
-              <p class="finance-month-card__meta">Suma: <strong>${money(row.totalNet)}</strong></p>
-              <p class="finance-month-card__meta">Wpisy: <strong>${row.count}</strong></p>
-              <div class="finance-month-card__actions">
-                <button type="button" data-overtime-open-form="${row.monthKey}">Dodaj wpis</button>
-                <button type="button" class="btn-ghost finance-chevron" data-overtime-toggle="${row.monthKey}" aria-expanded="${isExpanded}" aria-label="Pokaż wpisy miesiąca ${row.label}">
-                  ${isExpanded ? '▼' : '▶'}
-                </button>
-              </div>
-            </header>
-            ${(showForm || isExpanded) ? `
-              <div class="finance-month-card__body">
-                ${showForm ? `
-                  <form class="finance-overtime-form" data-overtime-form-month="${row.monthKey}">
-                    <input type="text" data-overtime-field="client" placeholder="Klient" value="${escapeHtml(isEditingInside ? editingEntry.client : '')}" required>
-                    <input type="number" data-overtime-field="net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" value="${isEditingInside ? (editingEntry.netAmount || '') : ''}" required>
-                    <input type="text" data-overtime-field="note" placeholder="Opis / notatka (opcjonalnie)" value="${escapeHtml(isEditingInside ? editingEntry.note : '')}">
-                    <div class="finance-form-actions">
-                      <button type="submit">${isEditingInside ? 'Zapisz' : 'Dodaj'}</button>
-                      <button type="button" class="btn-secondary" data-overtime-cancel-form="${row.monthKey}">Anuluj</button>
-                    </div>
-                  </form>
-                ` : ''}
-                ${isExpanded ? `
-                  <div class="finance-month-card__details">
-                    ${row.entries.length
-                      ? `<ul class="finance-entry-list">${row.entries.map((entry) => renderOvertimeEntryItem(entry)).join('')}</ul>`
-                      : '<p class="empty-state">Brak wpisów w tym miesiącu.</p>'}
+    <div class="finance-table-wrap">
+      <table class="finance-table finance-table--overtime">
+        <thead>
+          <tr>
+            <th>Miesiąc</th>
+            <th>Suma netto</th>
+            <th>Liczba wpisów</th>
+            <th>Akcje</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${monthly.map((row) => {
+            const showHistory = expandedMonths.has(row.monthKey);
+            const showForm = activeFormMonth === row.monthKey;
+            const isEditingInside = showForm && editingEntry && String(editingEntry.date || '').startsWith(row.monthKey);
+            return `
+              <tr>
+                <td data-label="Miesiąc">${row.label}</td>
+                <td data-label="Suma netto"><strong>${money(row.totalNet)}</strong></td>
+                <td data-label="Liczba wpisów">${row.count}</td>
+                <td data-label="Akcje">
+                  <div class="finance-actions-inline">
+                    <button type="button" data-overtime-open-form="${row.monthKey}">${isEditingInside ? 'Edytujesz wpis' : 'Dodaj wpis'}</button>
+                    <button type="button" class="btn-ghost" data-overtime-toggle="${row.monthKey}">${showHistory ? 'Ukryj' : 'Historia'}</button>
                   </div>
-                ` : ''}
-              </div>
-            ` : ''}
-          </article>
-        `;
-      }).join('')}
+                </td>
+              </tr>
+              ${(showForm || showHistory)
+                ? `<tr class="finance-details-row"><td colspan="4">
+                    <div class="finance-month-details">
+                      ${showForm ? `
+                        <form class="finance-overtime-form" data-overtime-form-month="${row.monthKey}">
+                          <input type="text" data-overtime-field="client" placeholder="Klient" value="${escapeHtml(isEditingInside ? editingEntry.client : '')}" required>
+                          <input type="number" data-overtime-field="net" step="0.01" min="0" inputmode="decimal" placeholder="Kwota netto" value="${isEditingInside ? (editingEntry.netAmount || '') : ''}" required>
+                          <input type="text" data-overtime-field="note" placeholder="Opis" value="${escapeHtml(isEditingInside ? editingEntry.note : '')}">
+                          <div class="finance-form-actions">
+                            <button type="submit">${isEditingInside ? 'Zapisz' : 'Dodaj'}</button>
+                            <button type="button" class="btn-secondary" data-overtime-cancel-form="${row.monthKey}">Anuluj</button>
+                          </div>
+                        </form>
+                      ` : ''}
+                      ${showHistory ? `
+                        <div class="finance-history-box">
+                          ${row.entries.length
+                            ? `<ul class="finance-entry-list">${row.entries.map((entry) => renderOvertimeEntryItem(entry)).join('')}</ul>`
+                            : '<p class="empty-state">Brak wpisów w tym miesiącu.</p>'}
+                        </div>
+                      ` : ''}
+                    </div>
+                  </td></tr>`
+                : ''}
+            `;
+          }).join('')}
+        </tbody>
+      </table>
     </div>
   `;
 };
