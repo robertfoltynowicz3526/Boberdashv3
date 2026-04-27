@@ -718,6 +718,8 @@ function initializeApp() {
     let lastLeaveByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
+    let vacationSectionCollapsed = false;
+    let l4SectionCollapsed = true;
     let unfinishedDrawerOpen = false;
     let unfinishedSummary = {
         daysWithoutSummary: [],
@@ -965,15 +967,24 @@ function initializeApp() {
     const annualSummaryContainer = document.getElementById('annual-summary');
     const quarterlyBonusSummaryContainer = document.getElementById('quarterly-bonus-summary');
     const l4SummaryContainer = document.getElementById('l4-summary');
+    const l4SectionToggle = document.getElementById('l4-section-toggle');
+    const l4SectionContent = document.getElementById('l4-section-content');
+    const l4SectionCounter = document.getElementById('l4-section-counter');
     const summaryYearSelect = document.getElementById('summary-year-select');
     const annualSummaryExportBtn = document.getElementById('annual-summary-export');
     const summaryBillingModeSelect = document.getElementById('summary-billing-mode');
     const vacationYearSelect = document.getElementById('vacation-year');
+    const vacationSectionToggle = document.getElementById('vacation-section-toggle');
+    const vacationSectionContent = document.getElementById('vacation-section-content');
     const vacationAllowanceInput = document.getElementById('vacation-allowance-input');
     const vacationAllowanceSaveBtn = document.getElementById('vacation-allowance-save');
     const vacationUsedSpan = document.getElementById('vacation-used');
     const vacationRemainingSpan = document.getElementById('vacation-remaining');
     const vacationAdjustmentsTotalSpan = document.getElementById('vacation-adjustments-total');
+    const vacationCollapsedRemainingSpan = document.getElementById('vacation-collapsed-remaining');
+    const vacationCollapsedUsedSpan = document.getElementById('vacation-collapsed-used');
+    const vacationCollapsedPlannedSpan = document.getElementById('vacation-collapsed-planned');
+    const vacationCollapsedAdjustmentsSpan = document.getElementById('vacation-collapsed-adjustments');
     const vacationTabs = document.getElementById('vacation-tabs');
     const vacationUsedList = document.getElementById('vacation-used-list');
     const vacationAdjustmentForm = document.getElementById('vacation-adjustment-form');
@@ -4030,8 +4041,27 @@ ${years.map(y => `
         }
     }
 
-    const calcVacationRemaining = (allowance, usedFromCalendar, adjustmentsSum) => {
-        return (Number(allowance) || 0) - (Number(usedFromCalendar) || 0) + (Number(adjustmentsSum) || 0);
+    const getPlannedLeaveTotal = (entries = []) => {
+        return (entries || []).reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays), 0);
+    };
+
+    const calcVacationRemaining = (allowance, usedFromCalendar, plannedDays, adjustmentsSum) => {
+        return (Number(allowance) || 0) - (Number(usedFromCalendar) || 0) - (Number(plannedDays) || 0) + (Number(adjustmentsSum) || 0);
+    };
+
+    const setVacationCollapsedSummary = ({ remaining = 0, used = 0, planned = 0, adjustments = 0 } = {}) => {
+        if (vacationCollapsedRemainingSpan) vacationCollapsedRemainingSpan.textContent = formatujLiczbe(remaining);
+        if (vacationCollapsedUsedSpan) vacationCollapsedUsedSpan.textContent = formatujLiczbe(used);
+        if (vacationCollapsedPlannedSpan) vacationCollapsedPlannedSpan.textContent = formatujLiczbe(planned);
+        if (vacationCollapsedAdjustmentsSpan) vacationCollapsedAdjustmentsSpan.textContent = formatujLiczbe(adjustments);
+    };
+
+    const setSummarySectionCollapsed = ({ cardId, toggleEl, contentEl, collapsed = false }) => {
+        const card = cardId ? document.getElementById(cardId) : null;
+        if (!toggleEl || !contentEl || !card) return;
+        card.classList.toggle('is-collapsed', Boolean(collapsed));
+        toggleEl.setAttribute('aria-expanded', String(!collapsed));
+        contentEl.hidden = Boolean(collapsed);
     };
 
     function updateYearSelectOptions(selectEl, years, selectedValue) {
@@ -4052,9 +4082,12 @@ ${years.map(y => `
         const yearData = selectedYearSummary;
         if (!yearData || !yearData.months.length) {
             l4SummaryContainer.innerHTML = '<p>Brak danych dla wybranego roku.</p>';
+            if (l4SectionCounter) l4SectionCounter.textContent = '0 wpisów';
             return;
         }
         const total = yearData.sum.l4Days;
+        const monthsWithL4 = yearData.months.filter(m => Number(m.l4Days) > 0).length;
+        if (l4SectionCounter) l4SectionCounter.textContent = `${monthsWithL4} mies. / ${formatDaysValue(total)} dni`;
         const rows = yearData.months.map(m => `<tr><td>${m.label}</td><td class="num">${m.l4Days}</td></tr>`).join('');
         l4SummaryContainer.innerHTML = `
             <table class="tbl">
@@ -4207,9 +4240,9 @@ ${years.map(y => `
             plannedLeaveTotalSpan.textContent = '0';
             if (plannedLeaveTotalPanelSpan) plannedLeaveTotalPanelSpan.textContent = '0';
             refreshPlannedLeaveDecorations();
-            return;
+            return 0;
         }
-        const totalDays = plannedLeaveEntries.reduce((acc, entry) => acc + countDaysInRange(entry.startDate, entry.endDate, entry.countWorkingDays, entry.leaveDays), 0);
+        const totalDays = getPlannedLeaveTotal(plannedLeaveEntries);
         const formattedTotal = formatujLiczbe(totalDays);
         plannedLeaveTotalSpan.textContent = formattedTotal;
         if (plannedLeaveTotalPanelSpan) plannedLeaveTotalPanelSpan.textContent = formattedTotal;
@@ -4224,10 +4257,10 @@ ${years.map(y => `
                         <span class="planned-leave-item__type">${entry.type || '—'}</span>
                     </div>
                     <div class="planned-leave-item__meta">
-                        <span><b>Dni:</b> ${formatDaysValue(count)}</span>
-                        <span><b>Zliczanie:</b> ${entry.countWorkingDays ? 'dni robocze' : 'wszystkie dni'}</span>
+                        <span><b>${formatDaysValue(count)}</b> dni</span>
+                        <span>${entry.countWorkingDays ? 'liczono dni robocze' : 'liczono wszystkie dni'}</span>
                     </div>
-                    <p class="planned-leave-item__note">${noteText}</p>
+                    <p class="planned-leave-item__note">Notatka: ${noteText}</p>
                     <div class="actions">
                         <button type="button" class="btn-secondary" data-action="edit" data-id="${entry.id}">Edytuj</button>
                         <button type="button" class="btn-remove" data-action="delete" data-id="${entry.id}">Usuń</button>
@@ -4236,12 +4269,14 @@ ${years.map(y => `
             `;
         }).join('');
         refreshPlannedLeaveDecorations();
+        return totalDays;
     };
 
     async function refreshPlannedLeaveEntries() {
         plannedLeaveEntries = await listPlannedLeave(selectedYear);
-        renderPlannedLeaveList();
+        const total = renderPlannedLeaveList();
         updateUnfinishedSummary();
+        return Number(total) || 0;
     }
 
     async function getVacationAllowance(year) {
@@ -4322,16 +4357,23 @@ ${years.map(y => `
         if (!vacationAllowanceInput || !vacationUsedSpan || !vacationRemainingSpan || !vacationAdjustmentsDiv) return;
         const allowance = await getVacationAllowance(selectedYear);
         vacationAllowanceInput.value = allowance;
+        const plannedTotal = await refreshPlannedLeaveEntries();
 
         const adjustments = await listVacationAdjustments(selectedYear);
         const adjustmentsSum = adjustments.reduce((acc, adj) => acc + (Number(adj.days) || 0), 0);
         const yearTotals = getSelectedYearTotals();
         const usedFromCalendar = Number(yearTotals?.urlopDaysUsed) || 0;
-        const remaining = calcVacationRemaining(allowance, usedFromCalendar, adjustmentsSum);
+        const remaining = calcVacationRemaining(allowance, usedFromCalendar, plannedTotal, adjustmentsSum);
 
         vacationUsedSpan.textContent = formatujLiczbe(usedFromCalendar);
         vacationAdjustmentsTotalSpan.textContent = formatujLiczbe(adjustmentsSum);
         vacationRemainingSpan.textContent = formatujLiczbe(remaining);
+        setVacationCollapsedSummary({
+            remaining,
+            used: usedFromCalendar,
+            planned: plannedTotal,
+            adjustments: adjustmentsSum
+        });
 
         vacationAdjustmentsDiv.innerHTML = adjustments.length
             ? `<ul class="adjustments-list">${adjustments.map(adj => `
@@ -4346,7 +4388,6 @@ ${years.map(y => `
             : '<p class="empty-state">Brak korekt urlopu.</p>';
 
         renderUsedLeaveList();
-        await refreshPlannedLeaveEntries();
     }
 
     async function renderPodsumowanie() {
@@ -4488,6 +4529,70 @@ ${years.map(y => `
      const isCollapsed = ukonczoneZleceniaLista.classList.toggle('collapsed');
       zakonczoneZleceniaHeader.dataset.collapsed = isCollapsed ? 'true' : 'false'; 
     }, { passive: true });
+  }
+
+  const shouldSkipCollapseToggle = (target) => Boolean(
+    target?.closest?.('select, option, input, textarea, button, a, [data-no-collapse="true"]')
+  );
+
+  if (vacationSectionToggle && vacationSectionContent) {
+    setSummarySectionCollapsed({
+      cardId: 'sum-urlop',
+      toggleEl: vacationSectionToggle,
+      contentEl: vacationSectionContent,
+      collapsed: vacationSectionCollapsed
+    });
+    vacationSectionToggle.addEventListener('click', (event) => {
+      if (shouldSkipCollapseToggle(event.target)) return;
+      vacationSectionCollapsed = !vacationSectionCollapsed;
+      setSummarySectionCollapsed({
+        cardId: 'sum-urlop',
+        toggleEl: vacationSectionToggle,
+        contentEl: vacationSectionContent,
+        collapsed: vacationSectionCollapsed
+      });
+    });
+    vacationSectionToggle.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      vacationSectionCollapsed = !vacationSectionCollapsed;
+      setSummarySectionCollapsed({
+        cardId: 'sum-urlop',
+        toggleEl: vacationSectionToggle,
+        contentEl: vacationSectionContent,
+        collapsed: vacationSectionCollapsed
+      });
+    });
+  }
+
+  if (l4SectionToggle && l4SectionContent) {
+    setSummarySectionCollapsed({
+      cardId: 'sum-l4',
+      toggleEl: l4SectionToggle,
+      contentEl: l4SectionContent,
+      collapsed: l4SectionCollapsed
+    });
+    l4SectionToggle.addEventListener('click', (event) => {
+      if (shouldSkipCollapseToggle(event.target)) return;
+      l4SectionCollapsed = !l4SectionCollapsed;
+      setSummarySectionCollapsed({
+        cardId: 'sum-l4',
+        toggleEl: l4SectionToggle,
+        contentEl: l4SectionContent,
+        collapsed: l4SectionCollapsed
+      });
+    });
+    l4SectionToggle.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      l4SectionCollapsed = !l4SectionCollapsed;
+      setSummarySectionCollapsed({
+        cardId: 'sum-l4',
+        toggleEl: l4SectionToggle,
+        contentEl: l4SectionContent,
+        collapsed: l4SectionCollapsed
+      });
+    });
   }
 
 }

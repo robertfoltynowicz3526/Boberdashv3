@@ -392,13 +392,23 @@
                     <div id="annual-summary"></div>
                 </div>
                 <div class="summary-card" id="sum-urlop">
-                    <div class="card-head">
-                        <h3>Urlop – plan i wykorzystanie</h3>
+                    <div class="card-head card-head--collapsible" id="vacation-section-toggle" role="button" tabindex="0" aria-expanded="true" aria-controls="vacation-section-content">
+                        <div class="collapsible-title-wrap">
+                            <span class="section-chevron" id="vacation-section-chevron" aria-hidden="true">▼</span>
+                            <h3>Urlop – plan i wykorzystanie</h3>
+                            <div class="vacation-collapsed-summary" id="vacation-collapsed-summary">
+                                <span>Pozostało: <strong id="vacation-collapsed-remaining">0</strong></span>
+                                <span>Wykorzystany: <strong id="vacation-collapsed-used">0</strong></span>
+                                <span>Zaplanowany: <strong id="vacation-collapsed-planned">0</strong></span>
+                                <span>Korekty: <strong id="vacation-collapsed-adjustments">0</strong></span>
+                            </div>
+                        </div>
                         <div class="summary-controls">
                             <label for="vacation-year">Rok:</label>
-                            <select id="vacation-year"></select>
+                            <select id="vacation-year" data-no-collapse="true"></select>
                         </div>
                     </div>
+                    <div id="vacation-section-content">
                     <div class="vacation-allowance">
                         <label for="vacation-allowance-input">Pula urlopu (dni) na rok</label>
                         <div class="vacation-allowance-row">
@@ -460,7 +470,7 @@
                                             <label for="planned-leave-note">Notatka</label>
                                             <input type="text" id="planned-leave-note" placeholder="Opcjonalna notatka">
                                         </div>
-                                        <div class="field-group">
+                                        <div class="field-group planned-leave-days-field">
                                             <label for="planned-leave-days">Liczba dni (opcjonalnie)</label>
                                             <input type="number" id="planned-leave-days" min="0.5" step="0.5" inputmode="decimal" placeholder="np. 0.5">
                                         </div>
@@ -502,18 +512,25 @@
                         </form>
                     </div>
                     <div id="vacation-adjustments" class="vacation-adjustments"></div>
+                    </div>
                 </div>
                 <div class="summary-card" id="sum-l4">
-                    <div class="card-head">
-                        <h3>L4 – zestawienie</h3>
+                    <div class="card-head card-head--collapsible" id="l4-section-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="l4-section-content">
+                        <div class="collapsible-title-wrap">
+                            <span class="section-chevron" id="l4-section-chevron" aria-hidden="true">▼</span>
+                            <h3>L4 – zestawienie</h3>
+                            <span class="section-counter" id="l4-section-counter">0 wpisów</span>
+                        </div>
                         <div class="summary-toolbar">
                             <div class="summary-toolbar-left">
                                 <label for="summary-year-select">Rok:</label>
-                                <select id="summary-year-select"></select>
+                                <select id="summary-year-select" data-no-collapse="true"></select>
                             </div>
                         </div>
                     </div>
-                    <div id="l4-summary"></div>
+                    <div id="l4-section-content" hidden>
+                        <div id="l4-summary"></div>
+                    </div>
                 </div>
                 <div class="summary-card" id="sum-premia-kwartalna">
                     <div id="quarterly-bonus-summary"></div>
