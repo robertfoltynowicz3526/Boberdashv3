@@ -1,3 +1,5 @@
+import { readEntryDriveHours } from '../calendar/driveHoursAggregation.js';
+
 const toMonthKey = (value) => {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
@@ -22,7 +24,7 @@ export const aggregateMonthStats = (entries = [], monthKey, options = {}) => {
       acc.fakturowanePlanowane += Number(entry.fakturowane || entry.billed || 0);
     }
     acc.nadgodziny += Number(entry.nadgodziny || 0);
-    acc.jazda += Number(entry.jazda || 0);
+    acc.jazda += readEntryDriveHours(entry);
     return acc;
   }, { praca: 0, fakturowanePlanowane: 0, fakturowaneRozliczone: 0, nadgodziny: 0, jazda: 0 });
   return totals;

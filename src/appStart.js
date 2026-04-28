@@ -7,6 +7,7 @@ import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
+import { aggregateMonthlyDriveHours, getMonthlyDriveHoursFromCalendar } from './calendar/driveHoursAggregation.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
 import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from './reporting/reportingRender.js';
@@ -3492,12 +3493,11 @@ function initializeApp() {
 
     function monthStats(monthDays = []) {
         const uniqByDate = new Map();
-        let work = 0, drive = 0, l4Days = 0, urlopDays = 0;
+        let work = 0, l4Days = 0, urlopDays = 0;
 
         (monthDays || []).forEach(day => {
             const normalized = normalizeDayRecord(day.id || day.date, day);
             work += Number(normalized.work) || 0;
-            drive += Number(normalized.drive) || 0;
 
             const key = normalized.date;
             if (!key) return;
@@ -3512,7 +3512,7 @@ function initializeApp() {
             urlopDays += Number(v.urlop) || 0;
         }
 
-        return { work, drive, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
+        return { work, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
     }
 
     async function obliczPodsumowaniaMiesieczne(wpisy) {
@@ -3544,9 +3544,11 @@ function initializeApp() {
                 const stats = monthStats(months[month]);
                 const miesiacKey = `${year}-${String(month).padStart(2, '0')}`;
                 const invoiceMonth = invoiceByMonth.get(miesiacKey) || { invoicedHours: 0, grossAmount: 0, netAmount: 0 };
+                const monthlyDriveHours = getMonthlyDriveHoursFromCalendar(months[month], miesiacKey);
                 const baseGross = Number(invoiceMonth.grossAmount) || 0;
                 const baseNet = Number(invoiceMonth.netAmount) || 0;
                 stats.billed = Number(invoiceMonth.invoicedHours) || 0;
+                stats.drive = monthlyDriveHours;
                 stats.gross = baseGross;
                 stats.net = baseNet;
                 stats.absorpcja = obliczAbsorpcjaDoBazy(stats.billed, ABSORPTION_MONTHLY_BASE_HOURS);
@@ -3829,17 +3831,7 @@ function initializeApp() {
 
     const computeQuarterlyBonusModel = () => {
         const invoiceByMonth = buildInvoiceStatsByMonth(_wszystkieZleceniaCache).monthStats;
-        const driveByMonth = new Map();
-        (wszystkieWpisyKalendarza || []).forEach((entry) => {
-            const dayKey = normalizeDayKey(entry?.date || entry?.id, 'quarterly-bonus.drive');
-            if (!dayKey) return;
-            const monthKey = dayKey.slice(0, 7);
-            const manualDrive = Number(entry?.drive ?? entry?.jazda ?? 0) || 0;
-            const linkedDrive = normalizujPowiazaneZlecenia(entry || {}).powiazane
-                .reduce((acc, linked) => acc + (Number(linked?.jazda) || 0), 0);
-            const total = manualDrive + linkedDrive;
-            driveByMonth.set(monthKey, (driveByMonth.get(monthKey) || 0) + total);
-        });
+        const driveByMonth = aggregateMonthlyDriveHours(wszystkieWpisyKalendarza || []);
 
         const knownMonths = new Set([...invoiceByMonth.keys(), ...driveByMonth.keys()]);
         const now = new Date();
@@ -6127,17 +6119,20 @@ function createZlecenieListItem(zlecenie, { headerHtml = '', bodyHtml = '', meta
     if (bodyHtml) {
         const body = document.createElement('div');
         body.className = 'order-list-item__body';
+        body.dataset.expandSection = 'body';
         body.innerHTML = bodyHtml;
         content.appendChild(body);
     }
     if (metaHtml) {
         const meta = document.createElement('div');
         meta.className = 'order-list-item__meta';
+        meta.dataset.expandSection = 'meta';
         meta.innerHTML = metaHtml;
         content.appendChild(meta);
     }
     const actions = document.createElement('div');
     actions.className = 'order-list-item__actions';
+    actions.dataset.expandSection = 'actions';
     actions.innerHTML = actionsHtml;
     li.appendChild(content);
     li.appendChild(actions);
@@ -6665,6 +6660,9 @@ function wyswietlZlecenia() {
                 );
                 activeListItem.classList.toggle('is-expanded', isExpanded);
                 activeListItem.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                activeListItem.querySelectorAll('[data-expand-section]').forEach((section) => {
+                    section.hidden = !isExpanded;
+                });
                 aktywneElements.push(activeListItem);
             } else if (zlecenie.status === 'zakończone') {
                 const serviceDate = resolveServiceDate(zlecenie);
@@ -6725,6 +6723,9 @@ function wyswietlZlecenia() {
                 );
                 closedListItem.classList.toggle('is-expanded', isExpanded);
                 closedListItem.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                closedListItem.querySelectorAll('[data-expand-section]').forEach((section) => {
+                    section.hidden = !isExpanded;
+                });
                 ukonczoneElements.push(closedListItem);
             }
         } catch (error) {
@@ -7069,6 +7070,9 @@ async function obslugaListyZlecen(event) {
         orderLi.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
         const hintIcon = orderLi.querySelector('.order-expand-hint__icon');
         if (hintIcon) hintIcon.dataset.expanded = shouldExpand ? 'true' : 'false';
+        orderLi.querySelectorAll('[data-expand-section]').forEach((section) => {
+            section.hidden = !shouldExpand;
+        });
     };
     const toggleOrderCard = () => {
         if (!li?.classList.contains('order-list-item')) return false;

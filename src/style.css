@@ -1595,8 +1595,7 @@ select {
 .order-list-item__content {
   flex: 1 1 640px;
   min-width: 0;
-  display: grid;
-  gap: 0.6rem;
+  display: block;
   width: 100%;
   max-width: 100%;
 }
@@ -1607,6 +1606,7 @@ select {
   flex-wrap: wrap;
   gap: 0.6rem;
   min-width: 0;
+  margin: 0;
 }
 
 .order-list-item.is-active .order-list-item__header {
@@ -1671,8 +1671,9 @@ select {
 }
 
 .order-list-item__body {
-  display: grid !important;
+  display: grid;
   gap: 0.55rem;
+  margin-top: 0.6rem;
 }
 
 .order-list-item__body p {
@@ -1869,62 +1870,35 @@ select {
 }
 
 .order-list-item.is-active .order-list-item__body {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: max-height 0.26s ease, opacity 0.2s ease;
-}
-
-.order-list-item.is-active.is-expanded .order-list-item__body {
-  max-height: 500px;
-  opacity: 1;
+  display: none;
 }
 
 .order-list-item.is-active .order-list-item__actions {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  padding-top: 0;
-  margin-top: 0;
-  transition: max-height 0.24s ease, opacity 0.2s ease;
+  display: none;
 }
 
 .order-list-item.is-active.is-expanded .order-list-item__actions {
-  max-height: 170px;
-  opacity: 1;
-  pointer-events: auto;
+  display: flex;
   padding-top: 0.2rem;
 }
 
 .order-list-item.is-closed .order-list-item__body,
 .order-list-item.is-closed .order-list-item__meta,
 .order-list-item.is-closed .order-list-item__actions {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  padding-top: 0;
-  margin-top: 0;
-  transition: max-height 0.24s ease, opacity 0.2s ease;
+  display: none;
 }
 
 .order-list-item.is-closed.is-expanded .order-list-item__body {
-  max-height: 520px;
-  opacity: 1;
-  pointer-events: auto;
+  display: grid;
 }
 
 .order-list-item.is-closed.is-expanded .order-list-item__meta {
-  max-height: 80px;
-  opacity: 1;
-  pointer-events: auto;
+  display: block;
+  margin-top: 0.2rem;
 }
 
 .order-list-item.is-closed.is-expanded .order-list-item__actions {
-  max-height: 170px;
-  opacity: 1;
-  pointer-events: auto;
+  display: flex;
   padding-top: 0.2rem;
   margin-top: 0.2rem;
 }
