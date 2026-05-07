@@ -70,14 +70,64 @@ export const renderAgroEffectRowsHtml = (rows = [], editingMonth = null, editing
 
 export const renderAgroEffectTotalsHtml = (totals) => {
   return `
-    <div class="finance-summary-grid">
+    <div class="finance-summary-grid finance-summary-grid--agro-main">
       <div class="metric"><div class="label">Razem netto</div><div class="value num">${money(totals.totalNet)}</div></div>
       <div class="metric"><div class="label">Razem brutto</div><div class="value num">${money(totals.totalGross)}</div></div>
-      <div class="metric"><div class="label">Podstawy netto / brutto</div><div class="value num">${money(totals.baseNet)} / ${money(totals.baseGross)}</div></div>
-      <div class="metric"><div class="label">Premie netto / brutto</div><div class="value num">${money(totals.bonusNet)} / ${money(totals.bonusGross)}</div></div>
+    </div>
+    <div class="finance-subtle-row">
+      <span><strong>Podstawa:</strong> ${money(totals.baseNet)} / ${money(totals.baseGross)}</span>
+      <span><strong>Premia:</strong> ${money(totals.bonusNet)} / ${money(totals.bonusGross)}</span>
     </div>
   `;
 };
+
+const hours = (value) => `${String(Number(value) || 0).replace('.', ',')} h`;
+
+export const renderShrubberySummaryHtml = ({ totals = {}, hourlyRate = 0, rateMissing = false }) => `
+  <div class="finance-summary-grid">
+    <div class="metric"><div class="label">Suma godzin</div><div class="value num">${hours(totals.hours)}</div></div>
+    <div class="metric"><div class="label">Suma przychodu</div><div class="value num">${money(totals.revenue)}</div></div>
+    <div class="metric"><div class="label">Suma kosztów</div><div class="value num">${money(totals.costs)}</div></div>
+    <div class="metric"><div class="label">Suma wyniku</div><div class="value num">${money(totals.result)}</div></div>
+  </div>
+  <div class="finance-subtle-row">
+    <span><strong>Stawka godzinowa:</strong> ${money(hourlyRate)}</span>
+    ${rateMissing ? '<span>Ustaw stawkę, aby liczyć przychód.</span>' : ''}
+  </div>
+`;
+
+export const renderShrubberyRowsHtml = ({ rows = [], editingMonth = null, draftHours = '', expandedCostsMonth = null, costDraft = {} }) => `
+  <div class="finance-table-wrap">
+    <table class="finance-table">
+      <thead><tr><th>Miesiąc</th><th>Godziny</th><th>Przychód</th><th>Koszty</th><th>Wynik</th><th>Akcje</th></tr></thead>
+      <tbody>
+      ${rows.map((row) => {
+        const editing = editingMonth === row.monthKey;
+        const expanded = expandedCostsMonth === row.monthKey;
+        return `<tr class="${row.isZero ? 'finance-row-muted' : ''}">
+          <td data-label="Miesiąc">${row.label}</td>
+          <td data-label="Godziny">${editing ? `<input type="number" step="0.1" min="0" class="finance-input" data-shrubbery-hours value="${draftHours}">` : `<strong>${hours(row.hours)}</strong>`}</td>
+          <td data-label="Przychód"><strong>${money(row.revenue)}</strong></td>
+          <td data-label="Koszty"><strong>${money(row.costsTotal)}</strong></td>
+          <td data-label="Wynik"><strong>${money(row.result)}</strong></td>
+          <td data-label="Akcje"><div class="finance-actions-inline">
+            ${editing ? `<button type="button" data-shrubbery-save="${row.monthKey}">Zapisz</button><button type="button" class="btn-secondary" data-shrubbery-cancel>Anuluj</button>` : `<button type="button" class="btn-ghost finance-btn-subtle" data-shrubbery-edit="${row.monthKey}">Edytuj</button>`}
+            <button type="button" class="btn-ghost finance-btn-subtle" data-shrubbery-costs="${row.monthKey}">${expanded ? 'Ukryj koszty' : 'Koszty'}</button>
+          </div></td>
+        </tr>
+        ${expanded ? `<tr class="finance-details-row"><td colspan="6"><div class="finance-month-details">
+          <div class="finance-overtime-form">
+            <input type="text" data-shrubbery-cost-name placeholder="Nazwa kosztu" value="${escapeHtml(costDraft.name || '')}">
+            <input type="number" step="0.01" min="0" data-shrubbery-cost-amount placeholder="Kwota" value="${costDraft.amount || ''}">
+            <button type="button" data-shrubbery-cost-add="${row.monthKey}">Dodaj koszt</button>
+          </div>
+          ${row.costs.length ? `<ul class="finance-entry-list">${row.costs.map((cost) => `<li class="finance-entry-item"><div class="finance-entry-item__main"><p class="finance-entry-item__client">${escapeHtml(cost.name || '—')}</p></div><div class="finance-entry-item__side"><strong>${money(cost.amount)}</strong><div class="finance-entry-item__actions"><button type="button" class="btn-secondary" data-shrubbery-cost-edit="${row.monthKey}:${cost.id}">Edytuj</button><button type="button" class="btn-remove" data-shrubbery-cost-delete="${row.monthKey}:${cost.id}">Usuń</button></div></div></li>`).join('')}</ul>` : '<p class="empty-state">Brak kosztów w tym miesiącu.</p>'}
+        </div></td></tr>` : ''}`;
+      }).join('')}
+      </tbody>
+    </table>
+  </div>
+`;
 
 const renderOvertimeEntryItem = (entry) => `
   <li class="finance-entry-item" data-overtime-row="${entry.id}">

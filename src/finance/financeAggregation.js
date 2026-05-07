@@ -122,3 +122,23 @@ export const getFinanceYearOptions = (minYear = 2026) => {
   for (let year = currentYear; year >= minYear; year -= 1) years.push(year);
   return years;
 };
+
+export const aggregateShrubberyYear = ({ months = [], data = {}, hourlyRate = 0 }) => {
+  const rate = round2(hourlyRate);
+  const rows = months.map(({ monthKey, label }) => {
+    const src = data[monthKey] || {};
+    const hours = round2(src.hours);
+    const revenue = round2(hours * rate);
+    const costs = Array.isArray(src.costs) ? src.costs : [];
+    const costsTotal = round2(costs.reduce((sum, row) => sum + (Number(row?.amount) || 0), 0));
+    const result = round2(revenue - costsTotal);
+    return { monthKey, label, hours, revenue, costs, costsTotal, result, isZero: hours <= 0 && costsTotal <= 0 };
+  });
+  const totals = rows.reduce((acc, row) => ({
+    hours: round2(acc.hours + row.hours),
+    revenue: round2(acc.revenue + row.revenue),
+    costs: round2(acc.costs + row.costsTotal),
+    result: round2(acc.result + row.result)
+  }), { hours: 0, revenue: 0, costs: 0, result: 0 });
+  return { rows, totals, hourlyRate: rate };
+};

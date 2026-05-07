@@ -100,3 +100,33 @@ export const updateOvertimeEntry = async (db, id, payload) => {
 export const deleteOvertimeEntry = async (db, id) => {
   await deleteDoc(doc(db, 'finance_overtime_entries', id));
 };
+
+export const getShrubberyDocRef = (db, year) => doc(db, 'finance_shrubbery', String(year));
+
+export const loadShrubberyYear = async (db, year) => {
+  const snap = await getDoc(getShrubberyDocRef(db, year));
+  if (!snap.exists()) return { hourlyRate: 0, months: {} };
+  const data = snap.data() || {};
+  const months = Object.entries(data.months || {}).reduce((acc, [monthKey, row]) => {
+    const costs = Array.isArray(row?.costs) ? row.costs.map((cost) => ({
+      id: String(cost?.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
+      name: String(cost?.name || ''),
+      amount: toNumber(cost?.amount)
+    })) : [];
+    acc[monthKey] = {
+      hours: toNumber(row?.hours),
+      costs
+    };
+    return acc;
+  }, {});
+  return { hourlyRate: toNumber(data.hourlyRate), months };
+};
+
+export const saveShrubberyYear = async (db, year, payload = {}) => {
+  await setDoc(getShrubberyDocRef(db, year), {
+    year: Number(year),
+    hourlyRate: toNumber(payload?.hourlyRate),
+    months: payload?.months || {},
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+};
