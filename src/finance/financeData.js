@@ -105,9 +105,14 @@ export const getShrubberyDocRef = (db, year) => doc(db, 'finance_shrubbery', Str
 
 export const loadShrubberyYear = async (db, year) => {
   const snap = await getDoc(getShrubberyDocRef(db, year));
-  if (!snap.exists()) return { hourlyRate: 0, months: {} };
+  if (!snap.exists()) return { hourlyRate: 80, months: {} };
   const data = snap.data() || {};
   const months = Object.entries(data.months || {}).reduce((acc, [monthKey, row]) => {
+    const workEntries = Array.isArray(row?.workEntries) ? row.workEntries.map((entry) => ({
+      id: String(entry?.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
+      date: String(entry?.date || ''),
+      hours: toNumber(entry?.hours)
+    })) : [];
     const costs = Array.isArray(row?.costs) ? row.costs.map((cost) => ({
       id: String(cost?.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
       name: String(cost?.name || ''),
@@ -115,18 +120,35 @@ export const loadShrubberyYear = async (db, year) => {
     })) : [];
     acc[monthKey] = {
       hours: toNumber(row?.hours),
+      workEntries,
       costs
     };
     return acc;
   }, {});
-  return { hourlyRate: toNumber(data.hourlyRate), months };
+  return { hourlyRate: 80, months };
 };
 
 export const saveShrubberyYear = async (db, year, payload = {}) => {
+  const normalizedMonths = Object.entries(payload?.months || {}).reduce((acc, [monthKey, row]) => {
+    acc[monthKey] = {
+      hours: toNumber(row?.hours),
+      workEntries: Array.isArray(row?.workEntries) ? row.workEntries.map((entry) => ({
+        id: String(entry?.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
+        date: String(entry?.date || ''),
+        hours: toNumber(entry?.hours)
+      })) : [],
+      costs: Array.isArray(row?.costs) ? row.costs.map((cost) => ({
+        id: String(cost?.id || `${Date.now()}_${Math.random().toString(16).slice(2)}`),
+        name: String(cost?.name || ''),
+        amount: toNumber(cost?.amount)
+      })) : []
+    };
+    return acc;
+  }, {});
   await setDoc(getShrubberyDocRef(db, year), {
     year: Number(year),
-    hourlyRate: toNumber(payload?.hourlyRate),
-    months: payload?.months || {},
+    hourlyRate: 80,
+    months: normalizedMonths,
     updatedAt: serverTimestamp()
   }, { merge: true });
 };

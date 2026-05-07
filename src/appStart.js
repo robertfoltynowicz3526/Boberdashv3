@@ -1104,11 +1104,13 @@ function initializeApp() {
     let financeOvertimeExpandedMonths = new Set();
     let financeOvertimeFormMonth = null;
     let financeShrubberyYear = 2026;
-    let financeShrubberyData = { hourlyRate: 0, months: {} };
-    let financeShrubberyEditingMonth = null;
-    let financeShrubberyHoursDraft = '';
+    let financeShrubberyData = { hourlyRate: 80, months: {} };
+    let financeShrubberyExpandedWorkMonth = null;
     let financeShrubberyExpandedCostsMonth = null;
     let financeShrubberyCostDraft = { name: '', amount: '' };
+    let financeShrubberyWorkDraft = { date: '', hours: '' };
+    let financeShrubberyEditingWorkEntryId = null;
+    let financeShrubberyEditingCostId = null;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -4601,17 +4603,16 @@ ${years.map(y => `
         if (financeInnerTab === 'shrubbery') {
             const years = getFinanceYearOptions(2026);
             const months = getFinanceMonthsForYear(financeShrubberyYear, 2026, 1);
-            const yearly = aggregateShrubberyYear({ months, data: financeShrubberyData.months, hourlyRate: financeShrubberyData.hourlyRate });
+            const yearly = aggregateShrubberyYear({ months, data: financeShrubberyData.months, hourlyRate: 80 });
             financeView.innerHTML = `<section class="summary-container-subtle finance-panel">
                 <div class="finance-topbar"><div class="finance-tabs" id="finance-inner-tabs">
                     <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
                     <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
                     <button type="button" class="btn-ghost ${financeInnerTab === 'shrubbery' ? 'is-active' : ''}" data-finance-tab="shrubbery">Szkółka krzewów</button>
                 </div><button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button></div>
-                <div class="finance-toolbar"><label for="finance-shrubbery-year">Rok:</label><select id="finance-shrubbery-year">${years.map((year) => `<option value="${year}" ${year === financeShrubberyYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
-                <label for="finance-shrubbery-rate">Stawka godzinowa:</label><input id="finance-shrubbery-rate" type="number" step="0.01" min="0" class="finance-input finance-rate-input" value="${financeShrubberyData.hourlyRate || ''}" placeholder="0"></div>
-                ${renderShrubberySummaryHtml({ totals: yearly.totals, hourlyRate: yearly.hourlyRate, rateMissing: yearly.hourlyRate <= 0 })}
-                ${renderShrubberyRowsHtml({ rows: yearly.rows, editingMonth: financeShrubberyEditingMonth, draftHours: financeShrubberyHoursDraft, expandedCostsMonth: financeShrubberyExpandedCostsMonth, costDraft: financeShrubberyCostDraft })}
+                <div class="finance-toolbar"><label for="finance-shrubbery-year">Rok:</label><select id="finance-shrubbery-year">${years.map((year) => `<option value="${year}" ${year === financeShrubberyYear ? 'selected' : ''}>${year}</option>`).join('')}</select></div>
+                ${renderShrubberySummaryHtml({ totals: yearly.totals, hourlyRate: yearly.hourlyRate, rateMissing: false })}
+                ${renderShrubberyRowsHtml({ rows: yearly.rows, expandedWorkMonth: financeShrubberyExpandedWorkMonth, expandedCostsMonth: financeShrubberyExpandedCostsMonth, costDraft: financeShrubberyCostDraft, workDraft: financeShrubberyWorkDraft, editingWorkEntry: financeShrubberyEditingWorkEntryId, editingCostId: financeShrubberyEditingCostId })}
             </section>`;
             return;
         }
@@ -9185,25 +9186,12 @@ async function obslugaListyCzesci(event) {
                 return;
             }
 
-            const shrubberyEditBtn = event.target.closest('[data-shrubbery-edit]');
-            if (shrubberyEditBtn) {
-                financeShrubberyEditingMonth = shrubberyEditBtn.dataset.shrubberyEdit;
-                financeShrubberyHoursDraft = String(financeShrubberyData.months?.[financeShrubberyEditingMonth]?.hours ?? '');
-                renderFinanceView();
-                return;
-            }
-            if (event.target.closest('[data-shrubbery-cancel]')) {
-                financeShrubberyEditingMonth = null;
-                financeShrubberyHoursDraft = '';
-                renderFinanceView();
-                return;
-            }
-            const shrubberySaveBtn = event.target.closest('[data-shrubbery-save]');
-            if (shrubberySaveBtn) {
-                const monthKey = shrubberySaveBtn.dataset.shrubberySave;
-                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { costs: [] }), hours: Math.max(0, Number(financeShrubberyHoursDraft) || 0) };
-                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
-                financeShrubberyEditingMonth = null;
+            const shrubberyWorkBtn = event.target.closest('[data-shrubbery-work]');
+            if (shrubberyWorkBtn) {
+                const monthKey = shrubberyWorkBtn.dataset.shrubberyWork;
+                financeShrubberyExpandedWorkMonth = financeShrubberyExpandedWorkMonth === monthKey ? null : monthKey;
+                financeShrubberyWorkDraft = { date: `${monthKey}-01`, hours: '' };
+                financeShrubberyEditingWorkEntryId = null;
                 renderFinanceView();
                 return;
             }
@@ -9212,6 +9200,27 @@ async function obslugaListyCzesci(event) {
                 const monthKey = shrubberyCostsBtn.dataset.shrubberyCosts;
                 financeShrubberyExpandedCostsMonth = financeShrubberyExpandedCostsMonth === monthKey ? null : monthKey;
                 financeShrubberyCostDraft = { name: '', amount: '' };
+                financeShrubberyEditingCostId = null;
+                renderFinanceView();
+                return;
+            }
+            const shrubberyWorkAddBtn = event.target.closest('[data-shrubbery-work-add]');
+            if (shrubberyWorkAddBtn) {
+                const monthKey = shrubberyWorkAddBtn.dataset.shrubberyWorkAdd;
+                const date = String(financeShrubberyWorkDraft.date || '');
+                const workHours = Math.max(0, Number(financeShrubberyWorkDraft.hours) || 0);
+                if (!monthKey || !date.startsWith(monthKey) || workHours <= 0) return;
+                const entries = [...(financeShrubberyData.months?.[monthKey]?.workEntries || [])];
+                if (financeShrubberyEditingWorkEntryId) {
+                    const idx = entries.findIndex((item) => item.id === financeShrubberyEditingWorkEntryId);
+                    if (idx >= 0) entries[idx] = { ...entries[idx], date, hours: workHours };
+                } else {
+                    entries.push({ id: `${Date.now()}`, date, hours: workHours });
+                }
+                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { hours: 0, costs: [] }), workEntries: entries };
+                financeShrubberyWorkDraft = { date: `${monthKey}-01`, hours: '' };
+                financeShrubberyEditingWorkEntryId = null;
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
                 renderFinanceView();
                 return;
             }
@@ -9221,9 +9230,25 @@ async function obslugaListyCzesci(event) {
                 const name = (financeShrubberyCostDraft.name || '').trim();
                 const amount = Math.max(0, Number(financeShrubberyCostDraft.amount) || 0);
                 if (!name || amount <= 0) return;
-                const costs = [...(financeShrubberyData.months?.[monthKey]?.costs || []), { id: `${Date.now()}`, name, amount }];
+                const costs = [...(financeShrubberyData.months?.[monthKey]?.costs || [])];
+                if (financeShrubberyEditingCostId) {
+                    const idx = costs.findIndex((item) => item.id === financeShrubberyEditingCostId);
+                    if (idx >= 0) costs[idx] = { ...costs[idx], name, amount };
+                } else {
+                    costs.push({ id: `${Date.now()}`, name, amount });
+                }
                 financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { hours: 0 }), costs };
                 financeShrubberyCostDraft = { name: '', amount: '' };
+                financeShrubberyEditingCostId = null;
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
+                renderFinanceView();
+                return;
+            }
+            const shrubberyWorkDeleteBtn = event.target.closest('[data-shrubbery-work-delete]');
+            if (shrubberyWorkDeleteBtn) {
+                const [monthKey, id] = String(shrubberyWorkDeleteBtn.dataset.shrubberyWorkDelete || '').split(':');
+                const workEntries = (financeShrubberyData.months?.[monthKey]?.workEntries || []).filter((item) => item.id !== id);
+                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { costs: [] }), workEntries };
                 await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
                 renderFinanceView();
                 return;
@@ -9241,7 +9266,22 @@ async function obslugaListyCzesci(event) {
             if (shrubberyCostEditBtn) {
                 const [monthKey, id] = String(shrubberyCostEditBtn.dataset.shrubberyCostEdit || '').split(':');
                 const existing = (financeShrubberyData.months?.[monthKey]?.costs || []).find((item) => item.id === id);
-                if (existing) financeShrubberyCostDraft = { name: existing.name, amount: existing.amount };
+                if (existing) {
+                    financeShrubberyCostDraft = { name: existing.name, amount: existing.amount };
+                    financeShrubberyEditingCostId = id;
+                }
+                renderFinanceView();
+                return;
+            }
+            const shrubberyWorkEditBtn = event.target.closest('[data-shrubbery-work-edit]');
+            if (shrubberyWorkEditBtn) {
+                const [monthKey, id] = String(shrubberyWorkEditBtn.dataset.shrubberyWorkEdit || '').split(':');
+                const existing = (financeShrubberyData.months?.[monthKey]?.workEntries || []).find((item) => item.id === id);
+                if (existing) {
+                    financeShrubberyWorkDraft = { date: existing.date, hours: existing.hours };
+                    financeShrubberyEditingWorkEntryId = id;
+                    financeShrubberyExpandedWorkMonth = monthKey;
+                }
                 renderFinanceView();
                 return;
             }
@@ -9291,17 +9331,15 @@ async function obslugaListyCzesci(event) {
                 renderFinanceView();
                 return;
             }
-            const shrubberyRateInput = event.target.closest('#finance-shrubbery-rate');
-            if (shrubberyRateInput) {
-                financeShrubberyData.hourlyRate = Math.max(0, Number(shrubberyRateInput.value) || 0);
-                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
-                renderFinanceView();
+            const agroDraftInput = event.target.closest('[data-agro-draft-input]');
+            const shrubberyWorkDateInput = event.target.closest('[data-shrubbery-work-date]');
+            if (shrubberyWorkDateInput) {
+                financeShrubberyWorkDraft = { ...financeShrubberyWorkDraft, date: shrubberyWorkDateInput.value };
                 return;
             }
-            const agroDraftInput = event.target.closest('[data-agro-draft-input]');
-            const shrubberyHoursInput = event.target.closest('[data-shrubbery-hours]');
-            if (shrubberyHoursInput) {
-                financeShrubberyHoursDraft = shrubberyHoursInput.value;
+            const shrubberyWorkHoursInput = event.target.closest('[data-shrubbery-work-hours]');
+            if (shrubberyWorkHoursInput) {
+                financeShrubberyWorkDraft = { ...financeShrubberyWorkDraft, hours: shrubberyWorkHoursInput.value };
                 return;
             }
             const shrubberyCostNameInput = event.target.closest('[data-shrubbery-cost-name]');
