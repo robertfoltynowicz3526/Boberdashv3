@@ -124,15 +124,21 @@ export const getFinanceYearOptions = (minYear = 2026) => {
 };
 
 export const aggregateShrubberyYear = ({ months = [], data = {}, hourlyRate = 0 }) => {
-  const rate = round2(hourlyRate);
+  const rate = 80;
   const rows = months.map(({ monthKey, label }) => {
     const src = data[monthKey] || {};
-    const hours = round2(src.hours);
+    const workEntries = Array.isArray(src.workEntries) ? src.workEntries : [];
+    const workHours = round2(workEntries.reduce((sum, entry) => sum + (Number(entry?.hours) || 0), 0));
+    const legacyHours = workEntries.length ? 0 : round2(src.hours);
+    const hours = round2(workHours + legacyHours);
     const revenue = round2(hours * rate);
     const costs = Array.isArray(src.costs) ? src.costs : [];
     const costsTotal = round2(costs.reduce((sum, row) => sum + (Number(row?.amount) || 0), 0));
     const result = round2(revenue - costsTotal);
-    return { monthKey, label, hours, revenue, costs, costsTotal, result, isZero: hours <= 0 && costsTotal <= 0 };
+    return {
+      monthKey, label, hours, revenue, costs, costsTotal, result, isZero: hours <= 0 && costsTotal <= 0,
+      workEntries, legacyHours
+    };
   });
   const totals = rows.reduce((acc, row) => ({
     hours: round2(acc.hours + row.hours),
