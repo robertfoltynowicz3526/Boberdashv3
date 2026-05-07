@@ -21,7 +21,8 @@ import {
     getFinanceMonthsForYear,
     aggregateAgroEffectYear,
     aggregateOvertimeYear,
-    getFinanceYearOptions
+    getFinanceYearOptions,
+    aggregateShrubberyYear
 } from './finance/financeAggregation.js';
 import {
     isFinanceUnlockedInSession,
@@ -32,14 +33,18 @@ import {
     listOvertimeEntriesForYear,
     addOvertimeEntry,
     updateOvertimeEntry,
-    deleteOvertimeEntry
+    deleteOvertimeEntry,
+    loadShrubberyYear,
+    saveShrubberyYear
 } from './finance/financeData.js';
 import {
     renderAgroEffectRowsHtml,
     renderAgroEffectTotalsHtml,
     renderOvertimeMonthlyCardsHtml,
     renderOvertimeYearSummaryHtml,
-    renderOvertimeClientTotalsHtml
+    renderOvertimeClientTotalsHtml,
+    renderShrubberySummaryHtml,
+    renderShrubberyRowsHtml
 } from './finance/financeRender.js';
 import {
     buildInvoiceStatsByMonth,
@@ -1098,6 +1103,12 @@ function initializeApp() {
     let financeAgroDraft = null;
     let financeOvertimeExpandedMonths = new Set();
     let financeOvertimeFormMonth = null;
+    let financeShrubberyYear = 2026;
+    let financeShrubberyData = { hourlyRate: 0, months: {} };
+    let financeShrubberyEditingMonth = null;
+    let financeShrubberyHoursDraft = '';
+    let financeShrubberyExpandedCostsMonth = null;
+    let financeShrubberyCostDraft = { name: '', amount: '' };
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -2772,6 +2783,8 @@ function initializeApp() {
             updateUnfinishedSummary();
             selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
+            const now = new Date();
+            obliczSumeGodzinZKalendarza(new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 1));
         }
     };
 
@@ -4490,11 +4503,11 @@ ${years.map(y => `
         if (!financeView) return;
         financeView.innerHTML = `
             <section class="summary-container-subtle finance-lock">
-                <h3>Finanse</h3>
-                <p>Ta sekcja jest dodatkowo zabezpieczona.</p>
+                <h3>Dostęp do sekcji Finanse</h3>
+                <p>Ta sekcja jest zabezpieczona dodatkowym hasłem.</p>
                 <form id="finance-unlock-form" class="finance-lock-form">
-                    <input type="password" id="finance-password" placeholder="Hasło" autocomplete="current-password" required>
-                    <button type="submit">Odblokuj</button>
+                    <input type="password" id="finance-password" placeholder="Hasło do finansów" autocomplete="current-password" required>
+                    <button type="submit">Odblokuj finanse</button>
                 </form>
                 <p id="finance-unlock-error" class="form-error">${errorMsg || ''}</p>
             </section>
@@ -4520,6 +4533,7 @@ ${years.map(y => `
                     <div class="finance-tabs" id="finance-inner-tabs">
                         <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
                         <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'shrubbery' ? 'is-active' : ''}" data-finance-tab="shrubbery">Szkółka krzewów</button>
                     </div>
                     <button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button>
                 </div>
@@ -4550,6 +4564,7 @@ ${years.map(y => `
                     <div class="finance-tabs" id="finance-inner-tabs">
                         <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
                         <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
+                        <button type="button" class="btn-ghost ${financeInnerTab === 'shrubbery' ? 'is-active' : ''}" data-finance-tab="shrubbery">Szkółka krzewów</button>
                     </div>
                     <button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button>
                 </div>
@@ -4583,12 +4598,30 @@ ${years.map(y => `
             renderFinanceOvertimeTab();
             return;
         }
+        if (financeInnerTab === 'shrubbery') {
+            const years = getFinanceYearOptions(2026);
+            const months = getFinanceMonthsForYear(financeShrubberyYear, 2026, 1);
+            const yearly = aggregateShrubberyYear({ months, data: financeShrubberyData.months, hourlyRate: financeShrubberyData.hourlyRate });
+            financeView.innerHTML = `<section class="summary-container-subtle finance-panel">
+                <div class="finance-topbar"><div class="finance-tabs" id="finance-inner-tabs">
+                    <button type="button" class="btn-ghost ${financeInnerTab === 'agro' ? 'is-active' : ''}" data-finance-tab="agro">Agro-Efekt</button>
+                    <button type="button" class="btn-ghost ${financeInnerTab === 'overtime' ? 'is-active' : ''}" data-finance-tab="overtime">Praca po godzinach</button>
+                    <button type="button" class="btn-ghost ${financeInnerTab === 'shrubbery' ? 'is-active' : ''}" data-finance-tab="shrubbery">Szkółka krzewów</button>
+                </div><button type="button" class="btn-secondary" id="finance-lock-btn">Zablokuj finanse</button></div>
+                <div class="finance-toolbar"><label for="finance-shrubbery-year">Rok:</label><select id="finance-shrubbery-year">${years.map((year) => `<option value="${year}" ${year === financeShrubberyYear ? 'selected' : ''}>${year}</option>`).join('')}</select>
+                <label for="finance-shrubbery-rate">Stawka godzinowa:</label><input id="finance-shrubbery-rate" type="number" step="0.01" min="0" class="finance-input finance-rate-input" value="${financeShrubberyData.hourlyRate || ''}" placeholder="0"></div>
+                ${renderShrubberySummaryHtml({ totals: yearly.totals, hourlyRate: yearly.hourlyRate, rateMissing: yearly.hourlyRate <= 0 })}
+                ${renderShrubberyRowsHtml({ rows: yearly.rows, editingMonth: financeShrubberyEditingMonth, draftHours: financeShrubberyHoursDraft, expandedCostsMonth: financeShrubberyExpandedCostsMonth, costDraft: financeShrubberyCostDraft })}
+            </section>`;
+            return;
+        }
         renderFinanceAgroTab();
     };
 
     const loadFinanceData = async () => {
         financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
         financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+        financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
     };
 
     const initFinanceModule = async () => {
@@ -9060,9 +9093,12 @@ async function obslugaListyCzesci(event) {
         financeView.addEventListener('click', async (event) => {
             const tabBtn = event.target.closest('[data-finance-tab]');
             if (tabBtn) {
-                financeInnerTab = tabBtn.dataset.financeTab === 'overtime' ? 'overtime' : 'agro';
+                financeInnerTab = ['agro', 'overtime', 'shrubbery'].includes(tabBtn.dataset.financeTab) ? tabBtn.dataset.financeTab : 'agro';
                 if (financeInnerTab === 'overtime') {
                     financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                }
+                if (financeInnerTab === 'shrubbery') {
+                    financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
                 }
                 financeAgroEditingMonth = null;
                 financeAgroDraft = null;
@@ -9149,6 +9185,67 @@ async function obslugaListyCzesci(event) {
                 return;
             }
 
+            const shrubberyEditBtn = event.target.closest('[data-shrubbery-edit]');
+            if (shrubberyEditBtn) {
+                financeShrubberyEditingMonth = shrubberyEditBtn.dataset.shrubberyEdit;
+                financeShrubberyHoursDraft = String(financeShrubberyData.months?.[financeShrubberyEditingMonth]?.hours ?? '');
+                renderFinanceView();
+                return;
+            }
+            if (event.target.closest('[data-shrubbery-cancel]')) {
+                financeShrubberyEditingMonth = null;
+                financeShrubberyHoursDraft = '';
+                renderFinanceView();
+                return;
+            }
+            const shrubberySaveBtn = event.target.closest('[data-shrubbery-save]');
+            if (shrubberySaveBtn) {
+                const monthKey = shrubberySaveBtn.dataset.shrubberySave;
+                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { costs: [] }), hours: Math.max(0, Number(financeShrubberyHoursDraft) || 0) };
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
+                financeShrubberyEditingMonth = null;
+                renderFinanceView();
+                return;
+            }
+            const shrubberyCostsBtn = event.target.closest('[data-shrubbery-costs]');
+            if (shrubberyCostsBtn) {
+                const monthKey = shrubberyCostsBtn.dataset.shrubberyCosts;
+                financeShrubberyExpandedCostsMonth = financeShrubberyExpandedCostsMonth === monthKey ? null : monthKey;
+                financeShrubberyCostDraft = { name: '', amount: '' };
+                renderFinanceView();
+                return;
+            }
+            const shrubberyCostAddBtn = event.target.closest('[data-shrubbery-cost-add]');
+            if (shrubberyCostAddBtn) {
+                const monthKey = shrubberyCostAddBtn.dataset.shrubberyCostAdd;
+                const name = (financeShrubberyCostDraft.name || '').trim();
+                const amount = Math.max(0, Number(financeShrubberyCostDraft.amount) || 0);
+                if (!name || amount <= 0) return;
+                const costs = [...(financeShrubberyData.months?.[monthKey]?.costs || []), { id: `${Date.now()}`, name, amount }];
+                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { hours: 0 }), costs };
+                financeShrubberyCostDraft = { name: '', amount: '' };
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
+                renderFinanceView();
+                return;
+            }
+            const shrubberyCostDeleteBtn = event.target.closest('[data-shrubbery-cost-delete]');
+            if (shrubberyCostDeleteBtn) {
+                const [monthKey, id] = String(shrubberyCostDeleteBtn.dataset.shrubberyCostDelete || '').split(':');
+                const costs = (financeShrubberyData.months?.[monthKey]?.costs || []).filter((item) => item.id !== id);
+                financeShrubberyData.months[monthKey] = { ...(financeShrubberyData.months[monthKey] || { hours: 0 }), costs };
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
+                renderFinanceView();
+                return;
+            }
+            const shrubberyCostEditBtn = event.target.closest('[data-shrubbery-cost-edit]');
+            if (shrubberyCostEditBtn) {
+                const [monthKey, id] = String(shrubberyCostEditBtn.dataset.shrubberyCostEdit || '').split(':');
+                const existing = (financeShrubberyData.months?.[monthKey]?.costs || []).find((item) => item.id === id);
+                if (existing) financeShrubberyCostDraft = { name: existing.name, amount: existing.amount };
+                renderFinanceView();
+                return;
+            }
+
             const actionBtn = event.target.closest('[data-overtime-action]');
             if (!actionBtn) return;
             const entry = financeOvertimeEntries.find((item) => item.id === actionBtn.dataset.id);
@@ -9187,7 +9284,36 @@ async function obslugaListyCzesci(event) {
                 renderFinanceView();
                 return;
             }
+            const shrubberyYearSelect = event.target.closest('#finance-shrubbery-year');
+            if (shrubberyYearSelect) {
+                financeShrubberyYear = Number(shrubberyYearSelect.value) || 2026;
+                financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
+                renderFinanceView();
+                return;
+            }
+            const shrubberyRateInput = event.target.closest('#finance-shrubbery-rate');
+            if (shrubberyRateInput) {
+                financeShrubberyData.hourlyRate = Math.max(0, Number(shrubberyRateInput.value) || 0);
+                await saveShrubberyYear(db, financeShrubberyYear, financeShrubberyData);
+                renderFinanceView();
+                return;
+            }
             const agroDraftInput = event.target.closest('[data-agro-draft-input]');
+            const shrubberyHoursInput = event.target.closest('[data-shrubbery-hours]');
+            if (shrubberyHoursInput) {
+                financeShrubberyHoursDraft = shrubberyHoursInput.value;
+                return;
+            }
+            const shrubberyCostNameInput = event.target.closest('[data-shrubbery-cost-name]');
+            if (shrubberyCostNameInput) {
+                financeShrubberyCostDraft = { ...financeShrubberyCostDraft, name: shrubberyCostNameInput.value };
+                return;
+            }
+            const shrubberyCostAmountInput = event.target.closest('[data-shrubbery-cost-amount]');
+            if (shrubberyCostAmountInput) {
+                financeShrubberyCostDraft = { ...financeShrubberyCostDraft, amount: shrubberyCostAmountInput.value };
+                return;
+            }
             if (!agroDraftInput || !financeAgroEditingMonth) return;
             const field = agroDraftInput.dataset.agroDraftInput;
             if (field !== 'baseNet' && field !== 'bonusNet') return;
