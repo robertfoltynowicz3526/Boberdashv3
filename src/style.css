@@ -5538,3 +5538,23 @@ textarea {
   .finance-entry-item__side{justify-items:start;text-align:left;}
   .finance-entry-item__actions{justify-content:flex-start;}
 }
+/* Shrubbery compact rows/forms */
+.finance-history-box--compact{gap:6px;}
+.finance-details-row td{padding:8px 10px;}
+.finance-overtime-form--shrubbery{grid-template-columns:170px 120px auto;gap:6px;align-items:center;}
+.finance-overtime-form--shrubbery-costs{grid-template-columns:minmax(180px,1fr) 120px auto;gap:6px;align-items:center;}
+.finance-overtime-form--shrubbery input,
+.finance-overtime-form--shrubbery-costs input{min-height:30px;padding:4px 8px;font-size:.88rem;}
+.finance-btn-compact{padding:4px 10px;font-size:.83rem;line-height:1.2;min-height:30px;width:auto;}
+.finance-entry-list--compact{gap:4px;}
+.finance-entry-item--compact{display:grid;grid-template-columns:120px 90px 120px auto;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:.88rem;}
+.finance-entry-item--cost{grid-template-columns:minmax(160px,1fr) 120px auto;}
+.finance-entry-item--compact .finance-entry-item__actions--compact{gap:4px;justify-content:flex-end;}
+.finance-entry-item--compact strong{font-size:.9rem;}
+@media (max-width:700px){
+  .finance-overtime-form--shrubbery,
+  .finance-overtime-form--shrubbery-costs{grid-template-columns:1fr 1fr auto;}
+  .finance-entry-item--compact,
+  .finance-entry-item--cost{grid-template-columns:1fr;align-items:start;}
+  .finance-entry-item--compact .finance-entry-item__actions--compact{justify-content:flex-start;}
+}
