@@ -637,6 +637,9 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
+    let magazynMode = 'products';
+    let isCompletingOrder = false;
+    let isBulkAdding = false;
     let stockStatus = 'loading';
     let hasLoadedStockOnce = false;
     let activeWarehouseProduct = null;
@@ -905,6 +908,12 @@ function initializeApp() {
     const bulkPreviewList = document.getElementById('bulk-preview-list');
     const bulkErrors = document.getElementById('bulk-errors');
     const bulkReport = document.getElementById('bulk-add-report');
+    const bulkExistingMode = document.getElementById('bulk-existing-mode');
+    const bulkSubmitBtn = document.getElementById('bulk-submit-btn');
+    const bulkItemsLabel = document.getElementById('bulk-items-label');
+    const magazynModeTabs = document.getElementById('magazyn-mode-tabs');
+    const magazynTableTitle = document.getElementById('magazyn-table-title');
+    const completeSubmitBtn = document.getElementById('complete-zlecenie-submit');
 
     let orderClientCombobox = null;
     const ORDER_QUICK_OPTION = {
@@ -920,6 +929,9 @@ function initializeApp() {
     const productEditIndex = document.getElementById('product-edit-index');
     const productEditName = document.getElementById('product-edit-name');
     const productEditClient = document.getElementById('product-edit-client');
+    const productEditPartType = document.getElementById('product-edit-part-type');
+    const productEditFits = document.getElementById('product-edit-fits');
+    const productEditNote = document.getElementById('product-edit-note');
     const productCurrentQty = document.getElementById('product-current-qty');
     const productCurrentLiters = document.getElementById('product-current-liters');
     const productLastChange = document.getElementById('product-last-change');
@@ -938,6 +950,13 @@ function initializeApp() {
     const itemOilTypeSelect = document.getElementById('item-oil-type');
     const itemOilContainerSelect = document.getElementById('item-oil-container');
     const itemProductTypeSelect = document.getElementById('item-product-type');
+    const itemProductTypeGroup = document.getElementById('item-product-type-group');
+    const itemClientGroup = document.getElementById('item-client-group');
+    const itemPartTypeSelect = document.getElementById('item-part-type');
+    const itemPartTypeGroup = document.getElementById('item-part-type-group');
+    const itemFitsGroup = document.getElementById('item-fits-group');
+    const itemNoteGroup = document.getElementById('item-note-group');
+    const productAddTitle = document.getElementById('product-add-title');
     const oilToolsDrawer = document.getElementById('oil-tools-drawer');
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
@@ -2261,9 +2280,9 @@ function initializeApp() {
         zapewnijOpcjePowiazanych();
         const itemsHtml = multiZlecenia.length
             ? multiZlecenia.map((pozycja, index) => {
-                const nazwa = pozycja.klientNazwa || pobierzNazwePowiazania(pozycja.zlecenieId);
-                return `<li data-index="${index}">
-                    <span>F: <strong>${formatujLiczbe(pozycja.fakturowane)}</strong> h — ${nazwa || pozycja.zlecenieId}</span>
+                const compact = pobierzKompaktPowiazania(pozycja.zlecenieId, pozycja);
+                return `<li data-index="${index}" class="calendar-order-compact">
+                    <span><strong>${compact.label}</strong><br><small>F: ${formatujLiczbe(compact.fakt)} h • J: ${formatujLiczbe(compact.drive)} h</small></span>
                     <div class="actions">
                         <button type="button" class="btn-edit multi-edit">Edytuj</button>
                         <button type="button" class="btn-remove multi-remove">Usuń</button>
@@ -2310,6 +2329,7 @@ function initializeApp() {
         }
         const klientNazwa = (kalendarzMultiSelect.options[kalendarzMultiSelect.selectedIndex]?.dataset.klientNazwa)
             || pobierzNazwePowiazania(zlecenieId);
+        const compactMeta = pobierzKompaktPowiazania(zlecenieId, { klientNazwa, fakturowane: godziny });
         if (multiEdytowanyIndex !== null) {
             const istnieje = multiZlecenia.some((poz, idx) => idx !== multiEdytowanyIndex && poz.zlecenieId === zlecenieId);
             if (istnieje) {
@@ -2319,6 +2339,8 @@ function initializeApp() {
             multiZlecenia[multiEdytowanyIndex] = {
                 zlecenieId,
                 klientNazwa,
+                nrZlecenia: compactMeta.nr,
+                maszynaLabel: compactMeta.maszynaLabel,
                 fakturowane: Number(godziny) || 0
             };
         } else {
@@ -2330,6 +2352,8 @@ function initializeApp() {
             multiZlecenia.push({
                 zlecenieId,
                 klientNazwa,
+                nrZlecenia: compactMeta.nr,
+                maszynaLabel: compactMeta.maszynaLabel,
                 fakturowane: Number(godziny) || 0
             });
         }
@@ -2379,6 +2403,8 @@ function initializeApp() {
         const powiazane = multiZlecenia.map(p => ({
             zlecenieId: p.zlecenieId,
             klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
+            nrZlecenia: p.nrZlecenia || pobierzKompaktPowiazania(p.zlecenieId, p).nr,
+            maszynaLabel: p.maszynaLabel || pobierzKompaktPowiazania(p.zlecenieId, p).maszynaLabel,
             fakturowane: Number(p.fakturowane) || 0
         }));
         const sumaFakturowane = powiazane.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
@@ -2943,6 +2969,19 @@ function initializeApp() {
         return nrZlecenia;
     }
 
+
+    function pobierzKompaktPowiazania(zlecenieId, entry = {}) {
+        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId) || {};
+        const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
+        const nr = zlecenie.nrZlecenia || entry.nrZlecenia || '?';
+        const klientLabel = entry.klientNazwa || zlecenie.klientNazwa || klient?.nazwa || 'Klient: brak';
+        const maszynaLabel = entry.maszynaLabel || (maszyna ? `${maszyna.typMaszyny || ''} ${maszyna.model || ''}`.trim() : '') || 'Maszyna: brak';
+        const fakt = Number(entry.fakturowane) || 0;
+        const drive = Number(kalendarzForm?.['czas-jazdy']?.value || entry.jazda || entry.drive || 0) || 0;
+        return { nr, klientLabel, maszynaLabel, fakt, drive, label: `#${nr} • ${klientLabel} • ${maszynaLabel}` };
+    }
+
     function pobierzNazwePowiazania(zlecenieId) {
         if (!zlecenieId) return '';
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
@@ -2956,6 +2995,8 @@ function initializeApp() {
             .map(p => ({
                 zlecenieId: p.zlecenieId,
                 klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
+                nrZlecenia: p.nrZlecenia || pobierzKompaktPowiazania(p.zlecenieId, p).nr,
+                maszynaLabel: p.maszynaLabel || pobierzKompaktPowiazania(p.zlecenieId, p).maszynaLabel,
                 fakturowane: Number(p.fakturowane) || 0
             }));
 
@@ -5586,6 +5627,10 @@ async function obslugaListyCzesci(event) {
     async function obslugaZakonczeniaZlecenia(event) {
         if (!completeModalForm || !completeModal) return;
         event.preventDefault();
+        if (isCompletingOrder) return;
+        isCompletingOrder = true;
+        if (completeSubmitBtn) { completeSubmitBtn.disabled = true; completeSubmitBtn.textContent = 'Zamykam...'; }
+        const resetCompleteState = () => { isCompletingOrder = false; if (completeSubmitBtn) { completeSubmitBtn.disabled = false; completeSubmitBtn.textContent = 'Zakończ i Zdejmij ze Stanu'; } };
         const docId = document.getElementById('complete-zlecenie-id').value;
         const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
         const zakonczenieWzInput = document.getElementById('zakonczenie-wz');
@@ -5597,12 +5642,14 @@ async function obslugaListyCzesci(event) {
         const normalizedServiceDate = normalizeDayKey(serviceDateRaw, 'serviceDate');
         if (serviceDateRaw && !normalizedServiceDate) {
             alert('Wybierz poprawną datę wykonania.');
+            resetCompleteState();
             return;
         }
         const serviceDateKey = normalizedServiceDate || formatDateForStorage(new Date());
         const motoHoursRaw = Number(document.getElementById('moto-hours')?.value);
         if (Number.isNaN(motoHoursRaw) || motoHoursRaw < 0) {
             alert('Motogodziny muszą być liczbą większą lub równą 0.');
+            resetCompleteState();
             return;
         }
         const motoHours = Number.isFinite(motoHoursRaw) ? motoHoursRaw : 0;
@@ -5612,15 +5659,18 @@ async function obslugaListyCzesci(event) {
             const zlecenieStartSnap = await getDoc(zlecenieRef);
             if (!zlecenieStartSnap.exists()) {
                 alert("Nie znaleziono zlecenia do zakończenia.");
+                resetCompleteState();
                 return;
             }
             const startAtDate = toDateSafe(zlecenieStartSnap.data().startAt);
             if (!walidujPrzedzialCzasu(startAtDate, manualEndAt, { allowEndBeforeStart: true })) {
+                resetCompleteState();
                 return;
             }
         } catch (error) {
             console.error("Błąd walidacji czasu zakończenia:", error);
             alert("Nie udało się zweryfikować czasu zakończenia. Spróbuj ponownie.");
+            resetCompleteState();
             return;
         }
 
@@ -5674,9 +5724,12 @@ async function obslugaListyCzesci(event) {
                         nowaIlosc = Number(nowaIlosc.toFixed(2));
                     }
                     if (nowaIlosc < 0) throw `Za mało produktu ${czesc.nazwa} na stanie!`;
-                    t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc });
+                    const historiaRuchow = Array.isArray(produktMagazynData.historiaRuchow) ? produktMagazynData.historiaRuchow : [];
+                    t.update(doc(db, "magazyn", czesc.id), { ilosc: nowaIlosc, updatedAt: new Date(), historiaRuchow: [...historiaRuchow.slice(-49), { data: new Date().toISOString(), typ: 'użyto w zleceniu', ilosc: czesc.ilosc, stanPrzed: aktualnaIlosc, stanPo: nowaIlosc, powod: dane.nrZlecenia || docId }] });
                 }
             });
+            hideModal(completeModal);
+            completeModalForm.reset();
             if (zamykaneZlecenieData) {
                 const historiaPayload = {
                     orderId: docId,
@@ -5706,11 +5759,12 @@ async function obslugaListyCzesci(event) {
                 }
             }
             alert("Zlecenie zakończone, stan magazynowy zaktualizowany!");
-            hideModal(completeModal);
-            completeModalForm.reset();
         } catch (error) {
             console.error("BŁĄD TRANSAKCJI: ", error);
             alert(`Wystąpił błąd: ${error.message || error}`);
+        } finally {
+            isCompletingOrder = false;
+            if (completeSubmitBtn) { completeSubmitBtn.disabled = false; completeSubmitBtn.textContent = 'Zakończ i Zdejmij ze Stanu'; }
         }
     }
 
@@ -5720,6 +5774,11 @@ async function obslugaListyCzesci(event) {
         if (!trimmed || trimmed === '---') return 'Brak';
         return trimmed;
     };
+
+    const isPartItem = (item = {}) => item.rodzaj === 'part' || item.typMagazynu === 'czesc';
+    const activeWarehouseItems = () => wszystkieProdukty.filter(item => magazynMode === 'parts' ? isPartItem(item) : !isPartItem(item));
+    const PART_TYPES = ['Filtr oleju','Filtr paliwa','Filtr powietrza','Filtr hydrauliczny','Pasek','Czujnik','Uszczelka','Łożysko','Część elektryczna','Część hydrauliczna','Inne'];
+    const getWarehouseQtyLabel = (item = {}) => isPartItem(item) ? 'szt.' : 'szt';
 
 
     const parseOilMeta = (produkt = {}) => {
@@ -5779,6 +5838,13 @@ async function obslugaListyCzesci(event) {
         if (itemIsOilCheckbox) itemIsOilCheckbox.checked = false;
         if (itemProductTypeSelect) itemProductTypeSelect.value = '';
         setOilFieldsVisibility(false);
+        const isParts = magazynMode === 'parts';
+        if (productAddTitle) productAddTitle.textContent = isParts ? 'Dodaj część' : 'Dodaj produkt';
+        itemProductTypeGroup?.classList.toggle('is-hidden', isParts);
+        itemClientGroup?.classList.toggle('is-hidden', isParts);
+        itemPartTypeGroup?.classList.toggle('is-hidden', !isParts);
+        itemFitsGroup?.classList.toggle('is-hidden', !isParts);
+        itemNoteGroup?.classList.toggle('is-hidden', !isParts);
     };
 
     const ensureDefaultStockItems = async (items = []) => {
@@ -5825,14 +5891,18 @@ async function obslugaListyCzesci(event) {
         const pojemnosc = Number(itemOilContainerSelect?.value || '');
         const typOleju = itemOilTypeSelect?.value || '';
         const typProdukt = itemProductTypeSelect?.value || '';
+        const isPart = magazynMode === 'parts';
+        const typCzesci = itemPartTypeSelect?.value || '';
+        const pasujeDo = magazynForm['item-fits']?.value.trim() || '';
+        const notatka = magazynForm['item-note']?.value.trim() || '';
 
         if (!index || !nazwa) { alert("Index i nazwa są wymagane."); return; }
         if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === index.toLowerCase())) {
             alert("Index musi być unikalny."); return;
         }
         if (!Number.isFinite(ilosc) || ilosc < 0) { alert("Podaj poprawną ilość (>= 0)."); return; }
-        if (!isOil && !Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
-        if (isOil && (!typOleju || !Number.isFinite(pojemnosc) || pojemnosc <= 0)) {
+        if ((!isOil || isPart) && !Number.isInteger(ilosc)) { alert("Ilość musi być liczbą całkowitą."); return; }
+        if (!isPart && isOil && (!typOleju || !Number.isFinite(pojemnosc) || pojemnosc <= 0)) {
             alert("Uzupełnij typ oleju i pojemnik."); return;
         }
 
@@ -5840,13 +5910,18 @@ async function obslugaListyCzesci(event) {
             index,
             nazwa,
             ilosc: Number(ilosc),
-            klient: klient || '---',
+            klient: isPart ? '---' : (klient || '---'),
+            rodzaj: isPart ? 'part' : 'product',
+            typMagazynu: isPart ? 'czesc' : 'produkt',
+            typCzesci: isPart ? (typCzesci || null) : null,
+            pasujeDo: isPart ? pasujeDo : null,
+            notatka: isPart ? notatka : null,
             createdAt: new Date(),
             updatedAt: new Date(),
-            jestOlejem: isOil,
-            typOleju: isOil ? typOleju : null,
-            pojemnosc: isOil ? pojemnosc : null,
-            typProdukt: isOil ? typOleju : (typProdukt || null)
+            jestOlejem: isPart ? false : isOil,
+            typOleju: (!isPart && isOil) ? typOleju : null,
+            pojemnosc: (!isPart && isOil) ? pojemnosc : null,
+            typProdukt: (!isPart && isOil) ? typOleju : (!isPart ? (typProdukt || null) : null)
         };
         try {
             const docRef = await addDoc(collection(db, "magazyn"), dane);
@@ -5862,98 +5937,66 @@ async function obslugaListyCzesci(event) {
         }
     }
 
-    const parseBulkItems = (text) => {
+    const parseBulkItems = (text, { existingMode = 'increase' } = {}) => {
         const lines = (text || '').split('\n').map(line => line.trim()).filter(Boolean);
         const seen = new Set();
+        const scopeItems = activeWarehouseItems();
         return lines.map((line, idx) => {
             const parts = line.split(';').map(p => p.trim());
-            if (parts.length < 3) {
-                return { line, index: idx + 1, valid: false, error: 'Nieprawidłowy format (brak pól).' };
-            }
+            if (parts.length !== 3) return { line, index: idx + 1, valid: false, error: 'zły format' };
             const [index, nazwa, ilosc] = parts;
-            const parsedIlosc = Number(ilosc);
-            if (!index) return { line, index: idx + 1, valid: false, error: 'Brak indexu.' };
-            if (!nazwa) return { line, index: idx + 1, valid: false, error: 'Brak nazwy.' };
-            const normalizedIndex = index.toLowerCase();
-            if (seen.has(normalizedIndex)) {
-                return { line, index: idx + 1, valid: false, error: 'Duplikat indexu w liście.' };
-            }
-            seen.add(normalizedIndex);
-            if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === normalizedIndex)) {
-                return { line, index: idx + 1, valid: false, error: 'Index już istnieje.' };
-            }
-            if (!Number.isFinite(parsedIlosc) || parsedIlosc < 0) {
-                return { line, index: idx + 1, valid: false, error: 'Nieprawidłowa ilość.' };
-            }
-            if (!Number.isInteger(parsedIlosc)) {
-                return { line, index: idx + 1, valid: false, error: 'Ilość musi być liczbą całkowitą.' };
-            }
-            return { line, index: idx + 1, valid: true, data: { index, nazwa, ilosc: parsedIlosc } };
+            const qty = Number(String(ilosc).replace(',', '.'));
+            if (!index) return { line, index: idx + 1, valid: false, error: 'brak indeksu' };
+            if (!nazwa) return { line, index: idx + 1, valid: false, error: 'brak nazwy' };
+            if (!Number.isFinite(qty) || qty < 0 || !Number.isInteger(qty)) return { line, index: idx + 1, valid: false, error: 'błędna ilość' };
+            const key = index.toLowerCase();
+            if (seen.has(key)) return { line, index: idx + 1, valid: false, error: 'duplikat indeksu w liście' };
+            seen.add(key);
+            const existing = scopeItems.find(p => (p.index || '').toLowerCase() === key);
+            const action = existing ? (existingMode === 'increase' ? 'update' : 'skip') : 'add';
+            return { line, index: idx + 1, valid: true, existing, action, data: { index, nazwa, ilosc: qty } };
         });
     };
 
     const renderBulkPreview = () => {
         if (!bulkItemsInput || !bulkPreviewList || !bulkErrors) return;
-        const parsed = parseBulkItems(bulkItemsInput.value);
-        bulkPreviewList.innerHTML = parsed.map(item => `
-            <li>
-                <span>${item.index}. ${item.data ? `${item.data.index} • ${item.data.nazwa}` : item.line}</span>
-                <span class="${item.valid ? 'status-ok' : 'status-error'}">${item.valid ? 'OK' : item.error}</span>
-            </li>
-        `).join('') || '<li>Brak danych do podglądu.</li>';
-        const errors = parsed.filter(item => !item.valid);
-        bulkErrors.textContent = errors.length ? `Błędy: ${errors.length}. Popraw dane przed zapisem.` : '';
+        const mode = bulkExistingMode?.value || 'increase';
+        const parsed = parseBulkItems(bulkItemsInput.value, { existingMode: mode });
+        const ok = parsed.filter(i => i.valid).length;
+        const errors = parsed.filter(i => !i.valid);
+        const existing = parsed.filter(i => i.valid && i.existing).length;
+        const toAdd = parsed.filter(i => i.valid && i.action === 'add').length;
+        const toUpdate = parsed.filter(i => i.valid && i.action === 'update').length;
+        bulkPreviewList.innerHTML = parsed.map(item => `<li><span>${item.index}. ${item.data ? `${item.data.index} • ${item.data.nazwa} • ${item.data.ilosc}` : item.line}</span><span class="${item.valid ? 'status-ok' : 'status-error'}">${item.valid ? (item.action === 'update' ? 'Aktualizacja' : item.action === 'skip' ? 'Pominięcie' : 'Nowe') : item.error}</span></li>`).join('') || '<li>Brak danych do podglądu.</li>';
+        bulkErrors.innerHTML = `<strong>Podsumowanie:</strong> poprawne ${ok}, błędy ${errors.length}, istniejące ${existing}, nowe ${toAdd}, aktualizacje ${toUpdate}.${errors.length ? `<div>${errors.map(e => `${e.index}: ${e.error}`).join(' • ')}</div>` : ''}`;
         if (bulkReport) bulkReport.textContent = '';
     };
 
     async function dodajMasowo(event) {
         event.preventDefault();
+        if (isBulkAdding) return;
         const klient = (bulkAddForm?.['bulk-klient']?.value || '').trim() || '---';
-        const itemsText = bulkItemsInput?.value || '';
-        if (!itemsText.trim()) return;
-        const parsed = parseBulkItems(itemsText);
+        const mode = bulkExistingMode?.value || 'increase';
+        const parsed = parseBulkItems(bulkItemsInput?.value || '', { existingMode: mode });
         const validItems = parsed.filter(item => item.valid && item.data);
-        const invalidItems = parsed.filter(item => !item.valid);
-        if (!validItems.length) {
-            alert("Nie znaleziono poprawnych rekordów do dodania.");
-            return;
-        }
-        let dodaneCount = 0;
-        const skipped = [];
+        if (!validItems.length) { alert('Nie znaleziono poprawnych rekordów do dodania.'); return; }
+        isBulkAdding = true;
+        if (bulkSubmitBtn) { bulkSubmitBtn.disabled = true; bulkSubmitBtn.textContent = 'Dodaję pozycje...'; }
+        let added = 0, updated = 0, skipped = 0;
         try {
             for (const item of validItems) {
-                const existing = wszystkieProdukty.find(p => (p.index || '').toLowerCase() === item.data.index.toLowerCase());
-                if (existing) {
-                    skipped.push(`${item.data.index}: duplikat indexu`);
-                    continue;
+                if (item.action === 'skip') { skipped++; continue; }
+                if (item.action === 'update' && item.existing) {
+                    await adjustWarehouseStock({ docId: item.existing.id, changeQty: item.data.ilosc, operation: 'add', silent: true }); updated++; continue;
                 }
-                await addDoc(collection(db, "magazyn"), {
-                    index: item.data.index,
-                    nazwa: item.data.nazwa,
-                    ilosc: item.data.ilosc,
-                    klient,
-                    jestOlejem: false,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                });
-                dodaneCount++;
+                await addDoc(collection(db, 'magazyn'), { index: item.data.index, nazwa: item.data.nazwa, ilosc: item.data.ilosc, klient: magazynMode === 'parts' ? '---' : klient, rodzaj: magazynMode === 'parts' ? 'part' : 'product', typMagazynu: magazynMode === 'parts' ? 'czesc' : 'produkt', typCzesci: magazynMode === 'parts' ? null : null, pasujeDo: '', notatka: '', jestOlejem: false, createdAt: new Date(), updatedAt: new Date() });
+                added++;
             }
-            const invalidReasons = invalidItems.map(item => `${item.index}: ${item.error}`);
-            const skippedCount = invalidItems.length + skipped.length;
-            if (bulkReport) {
-                bulkReport.innerHTML = `
-                    <strong>Raport:</strong> dodano ${dodaneCount}, pominięto ${skippedCount}.
-                    ${skippedCount ? `<div>Powody: ${[...invalidReasons, ...skipped].join(' • ')}</div>` : ''}
-                `;
-            }
-            bulkAddForm?.reset();
-            if (bulkPreviewList) bulkPreviewList.innerHTML = '';
-            if (bulkErrors) bulkErrors.textContent = '';
-            if (bulkAddModal) hideModal(bulkAddModal);
-        } catch (error) {
-            console.error("Błąd masowego dodawania:", error);
-            alert("Wystąpił błąd.");
-        }
+            skipped += parsed.filter(i => !i.valid).length;
+            if (bulkReport) bulkReport.textContent = `Zakończono: dodano ${added}, zaktualizowano ${updated}, pominięto ${skipped}, błędy: ${parsed.filter(i => !i.valid).length}.`;
+            bulkAddForm?.reset(); renderBulkPreview();
+        } catch (error) { console.error('Błąd masowego dodawania:', error); alert('Wystąpił błąd.'); }
+        finally { isBulkAdding = false; if (bulkSubmitBtn) { bulkSubmitBtn.disabled = false; bulkSubmitBtn.textContent = 'Dodaj pozycje'; } }
     }
 
     const OIL_TYPE_DEFAULTS = ['HYGARD', 'PLUS50', 'COOLGARD', 'EXTGARD'];
@@ -6032,7 +6075,7 @@ async function obslugaListyCzesci(event) {
         });
     };
 
-    const adjustWarehouseStock = async ({ docId, changeQty, operation }) => {
+    const adjustWarehouseStock = async ({ docId, changeQty, operation, correction = null, silent = false }) => {
         if (!docId) return;
         const docRef = doc(db, "magazyn", docId);
         const produkt = getProductById(docId);
@@ -6046,18 +6089,21 @@ async function obslugaListyCzesci(event) {
             if (!isOil && !Number.isInteger(changeQty)) {
                 throw "Dla tego produktu można podawać tylko liczby całkowite.";
             }
-            let newQty = operation === 'add' ? currentQty + changeQty : currentQty - changeQty;
+            let newQty = correction !== null ? Number(correction) : (operation === 'add' ? currentQty + changeQty : currentQty - changeQty);
             if (isOil) {
                 newQty = Number(newQty.toFixed(2));
             }
             if (newQty < 0) { throw "Nie można zdjąć więcej niż jest na stanie!"; }
-            t.update(docRef, { ilosc: newQty, updatedAt: new Date() });
+            const history = Array.isArray(produktData.historiaRuchow) ? produktData.historiaRuchow : [];
+            t.update(docRef, { ilosc: newQty, updatedAt: new Date(), historiaRuchow: [...history.slice(-49), { data: new Date().toISOString(), typ: correction !== null ? 'korekta' : (operation === 'add' ? 'dodano' : 'zdjęto'), ilosc: changeQty, stanPrzed: currentQty, stanPo: newQty }] });
         });
-        await logActivityEvent({
-            type: 'STOCK_CHANGE',
-            refId: docId,
-            label: `Zmiana stanu: ${produktLabel} (${operation === 'add' ? '+' : '-'}${changeQty} szt.)`
-        });
+        if (!silent) {
+            await logActivityEvent({
+                type: 'STOCK_CHANGE',
+                refId: docId,
+                label: `Zmiana stanu: ${produktLabel} (${operation === 'add' ? '+' : '-'}${changeQty} szt.)`
+            });
+        }
     };
 
     const findOilProduct = ({ typ, pojemnosc, klient }) => {
@@ -6123,13 +6169,14 @@ async function obslugaListyCzesci(event) {
         const containerFilter = magazynFilterContainer?.value || '';
         return (items || []).filter(item => {
             const clientName = normalizeClientName(item.klient);
-            const matchesSearch = !search || [item.index, item.nazwa, clientName].some(val => String(val || '').toLowerCase().includes(search));
+            const matchesSearch = !search || [item.index, item.nazwa, clientName, item.typCzesci, item.pasujeDo].some(val => String(val || '').toLowerCase().includes(search));
             const { pojemnosc } = parseOilMeta(item);
             const productType = resolveWarehouseType(item);
             const matchesClient = !clientFilter || clientName === clientFilter;
             const matchesProductType = !productTypeFilter || productType === productTypeFilter;
             const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            return matchesSearch && matchesClient && matchesProductType && matchesContainer;
+            const matchesMode = magazynMode === 'parts' ? isPartItem(item) : !isPartItem(item);
+            return matchesMode && matchesSearch && matchesClient && matchesProductType && matchesContainer;
         });
     };
 
@@ -6147,6 +6194,8 @@ async function obslugaListyCzesci(event) {
                     return (getLiters(a) - getLiters(b)) * dir;
                 case 'klient':
                     return normalizeClientName(a.klient).localeCompare(normalizeClientName(b.klient), 'pl') * dir;
+                case 'typ':
+                    return (a.typCzesci || resolveWarehouseType(a) || '').localeCompare(b.typCzesci || resolveWarehouseType(b) || '', 'pl') * dir;
                 case 'index':
                     return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
                 case 'updatedAt': {
@@ -6176,6 +6225,9 @@ async function obslugaListyCzesci(event) {
             return;
         }
         const filtered = sortMagazynItems(applyMagazynFilters(wszystkieProdukty));
+        if (magazynTableTitle) magazynTableTitle.textContent = magazynMode === 'parts' ? 'Magazyn części' : 'Stan magazynowy';
+        document.getElementById('magazyn-col-client')?.classList.toggle('is-hidden', magazynMode === 'parts');
+        document.getElementById('magazyn-col-liters')?.classList.toggle('is-hidden', magazynMode === 'parts');
         const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Brak pozycji w magazynie.</td></tr>';
         if (!filtered.length) {
             magazynLista.innerHTML = emptyRowHtml;
@@ -6186,6 +6238,7 @@ async function obslugaListyCzesci(event) {
             const jestOlejem = Boolean(produkt.jestOlejem);
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
             const productType = resolveWarehouseType(produkt);
+            const isPart = isPartItem(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? (Number(produkt.ilosc) * pojemnosc) : null;
             const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
@@ -6197,9 +6250,10 @@ async function obslugaListyCzesci(event) {
             return `<tr data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-client="${klientDisplay}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Index">${produkt.index}</td>
                     <td data-label="Nazwa">${produkt.nazwa}</td>
-                    <td data-label="Klient">${klientDisplay}</td>
+                    ${isPart ? '' : `<td data-label="Klient">${klientDisplay}</td>`}
+                    <td data-label="Typ">${isPart ? (produkt.typCzesci || '—') : (productType || '—')}</td>
                     <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
-                    <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
+                    ${isPart ? '' : `<td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>`}
                     <td data-label="Ostatnia zmiana" class="date-col">${lastChange}</td>
                     <td data-label="Akcje" class="actions-col">
                         <div class="row-action">
@@ -6219,12 +6273,13 @@ async function obslugaListyCzesci(event) {
         const prevContainer = magazynFilterContainer.value;
         const clients = new Set();
         const productTypes = new Set();
+        const scoped = activeWarehouseItems();
         const containers = new Set();
-        wszystkieProdukty.forEach(item => {
+        scoped.forEach(item => {
             clients.add(normalizeClientName(item.klient));
             const { pojemnosc } = parseOilMeta(item);
             const productType = resolveWarehouseType(item);
-            if (productType) productTypes.add(productType);
+            if (magazynMode === 'parts') { if (item.typCzesci) productTypes.add(item.typCzesci); } else if (productType) productTypes.add(productType);
             if (pojemnosc) containers.add(String(pojemnosc));
         });
         const clientOptions = [''].concat([...clients].filter(Boolean).sort((a, b) => a.localeCompare(b, 'pl')));
@@ -6250,6 +6305,11 @@ async function obslugaListyCzesci(event) {
         if (productEditIndex) productEditIndex.value = produkt.index || '';
         if (productEditName) productEditName.value = produkt.nazwa || '';
         if (productEditClient) productEditClient.value = normalizeClientName(produkt.klient) === 'Brak' ? '' : produkt.klient;
+        const isPart = isPartItem(produkt);
+        productDetailsModal.querySelectorAll('.product-part-field').forEach(el => el.classList.toggle('is-hidden', !isPart));
+        if (productEditPartType) productEditPartType.value = produkt.typCzesci || '';
+        if (productEditFits) productEditFits.value = produkt.pasujeDo || '';
+        if (productEditNote) productEditNote.value = produkt.notatka || '';
         if (productCurrentQty) productCurrentQty.textContent = iloscFormatowana;
         if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : `${litersValue.toFixed(2)} L`;
         if (productLastChange) productLastChange.textContent = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
@@ -6271,9 +6331,11 @@ async function obslugaListyCzesci(event) {
 
     const buildMagazynMenuItems = (produkt) => {
         const items = [
-            { action: 'details', label: 'Szczegóły' },
-            { action: 'add', label: 'Dodaj' },
-            { action: 'remove', label: 'Zdejmij' }
+            { action: 'details', label: 'Edytuj' },
+            { action: 'add', label: 'Dodaj stan' },
+            { action: 'remove', label: 'Zdejmij stan' },
+            { action: 'history', label: 'Historia' },
+            { action: 'delete', label: 'Usuń' }
         ];
         if (produkt?.jestOlejem) {
             items.push(
@@ -6305,9 +6367,9 @@ async function obslugaListyCzesci(event) {
                 openProductDetailsModal(produkt, 'add');
                 return;
             }
-            if (action === 'remove' || action === 'remove-oil') {
-                openProductDetailsModal(produkt, 'remove');
-            }
+            if (action === 'remove' || action === 'remove-oil') { openProductDetailsModal(produkt, 'remove'); return; }
+            if (action === 'history') { alert('Historia ruchów: podstawowa struktura jest zapisywana w rekordzie (historiaRuchow), pełny widok będzie rozwijany.'); return; }
+            if (action === 'delete') { activeWarehouseProduct = produkt; if (productEditId) productEditId.value = produkt.id; handleProductDelete(); }
         });
         document.body.appendChild(menu);
         magazynMenuPortal = menu;
@@ -6408,6 +6470,11 @@ async function obslugaListyCzesci(event) {
         const index = productEditIndex?.value.trim();
         const nazwa = productEditName?.value.trim();
         const klient = productEditClient?.value.trim();
+        const active = getProductById(docId);
+        const isPart = isPartItem(active);
+        const typCzesci = productEditPartType?.value || '';
+        const pasujeDo = productEditFits?.value.trim() || '';
+        const notatka = productEditNote?.value.trim() || '';
         if (!index || !nazwa) { alert('Index i nazwa są wymagane.'); return; }
         const duplicate = wszystkieProdukty.find(p => p.id !== docId && (p.index || '').toLowerCase() === index.toLowerCase());
         if (duplicate) { alert('Index musi być unikalny.'); return; }
@@ -6415,7 +6482,10 @@ async function obslugaListyCzesci(event) {
             await updateDoc(doc(db, "magazyn", docId), {
                 index,
                 nazwa,
-                klient: klient || '---',
+                klient: isPart ? '---' : (klient || '---'),
+                typCzesci: isPart ? (typCzesci || null) : null,
+                pasujeDo: isPart ? pasujeDo : null,
+                notatka: isPart ? notatka : null,
                 updatedAt: new Date()
             });
         } catch (e) {
@@ -6568,10 +6638,25 @@ async function obslugaListyCzesci(event) {
         });
     }
 
+
+    const setWarehouseMode = (mode) => {
+        magazynMode = mode === 'parts' ? 'parts' : 'products';
+        magazynModeTabs?.querySelectorAll('[data-warehouse-mode]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.warehouseMode === magazynMode));
+        if (magazynAddBtn) magazynAddBtn.textContent = magazynMode === 'parts' ? 'Dodaj część' : 'Dodaj produkt';
+        if (magazynOilToolsBtn) magazynOilToolsBtn.classList.toggle('is-hidden', magazynMode === 'parts');
+        if (bulkItemsLabel) bulkItemsLabel.textContent = magazynMode === 'parts' ? 'Części' : 'Produkty';
+        if (bulkAddForm?.['bulk-klient']) bulkAddForm['bulk-klient'].closest('.form-group')?.classList.toggle('is-hidden', magazynMode === 'parts');
+        refreshMagazynFilters();
+        renderMagazynTable();
+        renderBulkPreview();
+    };
+
     // MAGAZYN
     if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
     if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
     if (bulkItemsInput) bulkItemsInput.addEventListener('input', renderBulkPreview);
+    if (bulkExistingMode) bulkExistingMode.addEventListener('change', renderBulkPreview);
+    if (magazynModeTabs) magazynModeTabs.addEventListener('click', (event) => { const btn = event.target.closest('[data-warehouse-mode]'); if (btn) setWarehouseMode(btn.dataset.warehouseMode); });
     if (magazynLista) magazynLista.addEventListener('click', handleMagazynRowClick);
     if (magazynSearchInput) magazynSearchInput.addEventListener('input', renderMagazynTable);
     if (magazynFilterClient) magazynFilterClient.addEventListener('change', renderMagazynTable);
@@ -6592,7 +6677,7 @@ async function obslugaListyCzesci(event) {
         });
     }
     if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
-    if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { openModal(bulkAddModal); });
+    if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { renderBulkPreview(); openModal(bulkAddModal); });
     if (magazynOilToolsBtn) {
         magazynOilToolsBtn.addEventListener('click', () => {
             syncOilToolOptions();
