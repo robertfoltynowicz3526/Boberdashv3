@@ -5558,3 +5558,8 @@ textarea {
   .finance-entry-item--cost{grid-template-columns:1fr;align-items:start;}
   .finance-entry-item--compact .finance-entry-item__actions--compact{justify-content:flex-start;}
 }
+
+.warehouse-tabs{display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap;}
+.warehouse-tab{border:1px solid var(--border-color,#d1d5db);background:var(--card-bg,#fff);border-radius:999px;padding:7px 12px;font-weight:600;cursor:pointer;}
+.warehouse-tab.is-active{background:var(--accent-color,#2563eb);border-color:var(--accent-color,#2563eb);color:#fff;}
+.part-fields[hidden]{display:none!important;}
