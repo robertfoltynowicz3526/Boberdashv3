@@ -725,6 +725,9 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
+    let warehouseMode = 'products';
+    let isBulkSaving = false;
+    let isClosingOrder = false;
     const LOW_STOCK_UNITS_THRESHOLD = 1;
     const LOW_STOCK_OIL_LITERS_DEFAULT_THRESHOLD = 5;
     const LOW_STOCK_OIL_LITERS_BY_CONTAINER = {
@@ -1045,6 +1048,8 @@ function initializeApp() {
     const magazynAddBtn = document.getElementById('magazyn-add-btn');
     const magazynBulkBtn = document.getElementById('magazyn-bulk-btn');
     const magazynOilToolsBtn = document.getElementById('magazyn-oil-tools-btn');
+    const warehouseTabButtons = document.querySelectorAll('[data-warehouse-tab]');
+    const warehouseTableTitle = document.getElementById('warehouse-table-title');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
     const bulkItemsInput = document.getElementById('bulk-items');
@@ -1053,6 +1058,9 @@ function initializeApp() {
     const bulkReport = document.getElementById('bulk-add-report');
     const bulkInsertExampleBtn = document.getElementById('bulk-insert-example');
     const bulkValidCount = document.getElementById('bulk-valid-count');
+    const bulkExistingModeSelect = document.getElementById('bulk-existing-mode');
+    const bulkSubmitBtn = document.getElementById('bulk-submit-btn');
+    const bulkItemsLabel = document.getElementById('bulk-items-label');
     const magazynLowStockOnly = document.getElementById('magazyn-low-stock-only');
     const magazynLowStockToggle = document.getElementById('magazyn-low-stock-toggle');
     const magazynClearFiltersBtn = document.getElementById('magazyn-clear-filters-btn');
@@ -1089,6 +1097,12 @@ function initializeApp() {
     const itemOilTypeSelect = document.getElementById('item-oil-type');
     const itemOilContainerSelect = document.getElementById('item-oil-container');
     const itemProductTypeSelect = document.getElementById('item-product-type');
+    const itemPartFields = document.getElementById('item-part-fields');
+    const itemPartTypeSelect = document.getElementById('item-part-type');
+    const itemFitsInput = document.getElementById('item-fits');
+    const itemNoteInput = document.getElementById('item-note');
+    const productAddTitle = document.getElementById('product-add-title');
+    const productAddSubmit = document.getElementById('product-add-submit');
     const oilToolsDrawer = document.getElementById('oil-tools-drawer');
     let quarterlyBonusExpanded = false;
     let quarterlyBonusHistoryExpanded = false;
@@ -2514,9 +2528,9 @@ function initializeApp() {
         zapewnijOpcjePowiazanych();
         const itemsHtml = multiZlecenia.length
             ? multiZlecenia.map((pozycja, index) => {
-                const nazwa = pozycja.klientNazwa || pobierzNazwePowiazania(pozycja.zlecenieId);
+                const nazwa = budujKompaktowaEtykietePowiazania(pozycja);
                 return `<li data-index="${index}">
-                    <span>F: <strong>${formatujLiczbe(pozycja.fakturowane)}</strong> h • J: <strong>${formatujLiczbe(pozycja.jazda)}</strong> h — ${nazwa || pozycja.zlecenieId}</span>
+                    <span>${nazwa || pozycja.zlecenieId}</span>
                     <div class="actions">
                         <button type="button" class="btn-edit multi-edit">Edytuj</button>
                         <button type="button" class="btn-remove multi-remove">Usuń</button>
@@ -2567,8 +2581,10 @@ function initializeApp() {
             alert('Podaj poprawny czas jazdy (0 lub więcej).');
             return;
         }
+        const selectedOrder = _wszystkieZleceniaCache.find(z => z.id === zlecenieId) || {};
+        const selectedMachine = _wszystkieMaszynyCache.find(m => m.id === selectedOrder.maszynaId) || {};
         const klientNazwa = (kalendarzMultiSelect.options[kalendarzMultiSelect.selectedIndex]?.dataset.klientNazwa)
-            || pobierzNazwePowiazania(zlecenieId);
+            || pobierzKlientaZlecenia(selectedOrder) || 'Klient: brak';
         if (multiEdytowanyIndex !== null) {
             const istnieje = multiZlecenia.some((poz, idx) => idx !== multiEdytowanyIndex && poz.zlecenieId === zlecenieId);
             if (istnieje) {
@@ -2579,6 +2595,9 @@ function initializeApp() {
                 entryId: multiZlecenia[multiEdytowanyIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
+                nrZlecenia: selectedOrder.nrZlecenia || '',
+                maszynaTyp: selectedMachine.typMaszyny || '',
+                maszynaModel: selectedMachine.model || '',
                 fakturowane: Number(godziny) || 0,
                 jazda: Number(czasJazdy) || 0
             };
@@ -2592,6 +2611,9 @@ function initializeApp() {
                 entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
+                nrZlecenia: selectedOrder.nrZlecenia || '',
+                maszynaTyp: selectedMachine.typMaszyny || '',
+                maszynaModel: selectedMachine.model || '',
                 fakturowane: Number(godziny) || 0,
                 jazda: Number(czasJazdy) || 0
             });
@@ -3395,6 +3417,15 @@ function initializeApp() {
         if (!zlecenieId) return '';
         const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
         return pobierzNazweZlecenia(zlecenie) || zlecenieId;
+    }
+
+    function budujKompaktowaEtykietePowiazania(pozycja = {}) {
+        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId) || {};
+        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId) || {};
+        const numer = String(pozycja.nrZlecenia || zlecenie.nrZlecenia || '').trim();
+        const klient = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || 'Klient: brak';
+        const maszynaLabel = [pozycja.maszynaTyp || maszyna.typMaszyny, pozycja.maszynaModel || maszyna.model].filter(Boolean).join(' ').trim() || 'Maszyna: brak';
+        return `${numer ? `#${numer}` : '#?'} • ${klient} • ${maszynaLabel} • F: ${formatujLiczbe(pozycja.fakturowane)} h • J: ${formatujLiczbe(pozycja.jazda)} h`;
     }
 
     function normalizujPowiazaneZlecenia(dane) {
@@ -7728,6 +7759,10 @@ async function obslugaListyCzesci(event) {
     async function obslugaZakonczeniaZlecenia(event) {
         if (!completeModalForm || !completeModal) return;
         event.preventDefault();
+        if (isClosingOrder) return;
+        const submitBtn = completeModalForm.querySelector('button[type="submit"]');
+        isClosingOrder = true;
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Zamykam...'; }
         try {
             const docId = document.getElementById('complete-zlecenie-id').value;
             const numerWzValue = (document.getElementById('zakonczenie-wz')?.value || '').trim();
@@ -7872,10 +7907,44 @@ async function obslugaListyCzesci(event) {
         } catch (error) {
             console.error('Błąd podczas zamykania zlecenia:', error);
             alert('Wystąpił nieoczekiwany błąd podczas zamykania zlecenia. Spróbuj ponownie.');
+        } finally {
+            isClosingOrder = false;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Zakończ i zdejmij ze stanu'; }
         }
     }
 
     // --- MAGAZYN: dodawanie / masowe / oleje / konwerter / tabela / zmiana stanu / nasłuchiwanie ---
+
+    const isPartItem = (produkt = {}) => produkt?.warehouseKind === 'part' || produkt?.typProdukt === 'CZESC_WARSZTATOWA';
+    const isProductItem = (produkt = {}) => !isPartItem(produkt);
+    const getWarehouseItemsForMode = () => (warehouseMode === 'parts' ? wszystkieProdukty.filter(isPartItem) : wszystkieProdukty.filter(isProductItem));
+    const setWarehouseMode = (mode) => {
+        warehouseMode = mode === 'parts' ? 'parts' : 'products';
+        warehouseTabButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.warehouseTab === warehouseMode));
+        if (magazynAddBtn) magazynAddBtn.textContent = warehouseMode === 'parts' ? 'Dodaj część' : 'Dodaj produkt';
+        if (magazynOilToolsBtn) magazynOilToolsBtn.hidden = warehouseMode === 'parts';
+        if (warehouseTableTitle) warehouseTableTitle.textContent = warehouseMode === 'parts' ? 'Magazyn części' : 'Stan magazynowy';
+        const headCells = magazynTable?.querySelectorAll('thead th');
+        if (headCells?.[4]) headCells[4].innerHTML = warehouseMode === 'parts' ? '<button type="button" class="sort-btn" data-sort="fits">Pasuje do</button>' : '<button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button>';
+        if (headCells?.[3]) headCells[3].innerHTML = '<button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button>';
+        if (headCells?.[1]) headCells[1].innerHTML = '<button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button>';
+        if (headCells?.[2]) headCells[2].innerHTML = '<button type="button" class="sort-btn" data-sort="typ">Typ</button>';
+
+        if (magazynFilterContainer) magazynFilterContainer.closest('.form-group')?.toggleAttribute('hidden', warehouseMode === 'parts');
+        if (magazynLowStockToggle) magazynLowStockToggle.hidden = warehouseMode === 'parts';
+        refreshMagazynFilters();
+        renderMagazynTable();
+    };
+    const syncProductAddMode = () => {
+        const isPart = warehouseMode === 'parts';
+        if (productAddTitle) productAddTitle.textContent = isPart ? 'Dodaj część' : 'Dodaj produkt';
+        if (productAddSubmit) productAddSubmit.textContent = isPart ? 'Dodaj część' : 'Dodaj produkt';
+        if (itemPartFields) itemPartFields.hidden = !isPart;
+        if (itemProductTypeSelect) itemProductTypeSelect.closest('.form-group')?.toggleAttribute('hidden', isPart);
+        if (itemIsOilCheckbox) itemIsOilCheckbox.closest('.form-group, label')?.toggleAttribute('hidden', isPart);
+        setOilFieldsVisibility(false);
+    };
+
     const normalizeClientName = (value) => {
         const trimmed = (value || '').trim();
         if (!trimmed || trimmed === '---') return 'Brak';
@@ -7959,7 +8028,8 @@ async function obslugaListyCzesci(event) {
         magazynForm.reset();
         if (itemIsOilCheckbox) itemIsOilCheckbox.checked = false;
         if (itemProductTypeSelect) itemProductTypeSelect.value = '';
-        setOilFieldsVisibility(false);
+        if (itemPartTypeSelect) itemPartTypeSelect.value = '';
+        syncProductAddMode();
     };
 
     const ensureDefaultStockItems = async (items = []) => {
@@ -8001,7 +8071,8 @@ async function obslugaListyCzesci(event) {
         const index = magazynForm['item-index'].value.trim();
         const nazwa = magazynForm['item-name'].value.trim();
         const ilosc = Number(magazynForm['item-ilosc'].value || 0);
-        const isOil = Boolean(itemIsOilCheckbox?.checked);
+        const isPartMode = warehouseMode === 'parts';
+        const isOil = !isPartMode && Boolean(itemIsOilCheckbox?.checked);
         const pojemnosc = Number(itemOilContainerSelect?.value || '');
         const typOleju = itemOilTypeSelect?.value || '';
         const typProdukt = itemProductTypeSelect?.value || '';
@@ -8024,9 +8095,13 @@ async function obslugaListyCzesci(event) {
             createdAt: new Date(),
             updatedAt: new Date(),
             jestOlejem: isOil,
+            warehouseKind: isPartMode ? 'part' : 'product',
             typOleju: isOil ? typOleju : null,
             pojemnosc: isOil ? pojemnosc : null,
-            typProdukt: isOil ? typOleju : (typProdukt || null)
+            typProdukt: isPartMode ? 'CZESC_WARSZTATOWA' : (isOil ? typOleju : (typProdukt || null)),
+            typCzesci: isPartMode ? (itemPartTypeSelect?.value || 'Inne') : null,
+            pasujeDo: isPartMode ? (itemFitsInput?.value.trim() || '') : '',
+            notatka: isPartMode ? (itemNoteInput?.value.trim() || '') : ''
         };
         try {
             const docRef = await addDoc(collection(db, "magazyn"), dane);
@@ -8052,23 +8127,21 @@ async function obslugaListyCzesci(event) {
             }
             const [index, nazwa, ilosc] = parts;
             const parsedIlosc = Number(ilosc);
-            if (!index) return { line, index: idx + 1, valid: false, error: 'Brak indexu.' };
+            if (!index) return { line, index: idx + 1, valid: false, error: 'Brak indeksu.' };
             if (!nazwa) return { line, index: idx + 1, valid: false, error: 'Brak nazwy.' };
             const normalizedIndex = index.toLowerCase();
             if (seen.has(normalizedIndex)) {
                 return { line, index: idx + 1, valid: false, error: 'Duplikat indexu w liście.' };
             }
             seen.add(normalizedIndex);
-            if (wszystkieProdukty.some(p => (p.index || '').toLowerCase() === normalizedIndex)) {
-                return { line, index: idx + 1, valid: false, error: 'Index już istnieje.' };
-            }
+            const existing = getWarehouseItemsForMode().find(p => (p.index || '').toLowerCase() === normalizedIndex);
             if (!Number.isFinite(parsedIlosc) || parsedIlosc < 0) {
                 return { line, index: idx + 1, valid: false, error: 'Nieprawidłowa ilość.' };
             }
             if (!Number.isInteger(parsedIlosc)) {
                 return { line, index: idx + 1, valid: false, error: 'Ilość musi być liczbą całkowitą.' };
             }
-            return { line, index: idx + 1, valid: true, data: { index, nazwa, ilosc: parsedIlosc } };
+            return { line, index: idx + 1, valid: true, existing: Boolean(existing), data: { index, nazwa, ilosc: parsedIlosc } };
         });
     };
 
@@ -8083,29 +8156,36 @@ async function obslugaListyCzesci(event) {
         `).join('') || '<li>Brak danych do podglądu.</li>';
         const errors = parsed.filter(item => !item.valid);
         const validCount = parsed.filter(item => item.valid).length;
-        if (bulkValidCount) bulkValidCount.textContent = `• do dodania: ${validCount}`;
-        bulkErrors.textContent = errors.length ? `Błędne wiersze: ${errors.map(item => item.index).join(', ')}.` : '';
+        const existingCount = parsed.filter(item => item.valid && item.existing).length;
+        const mode = bulkExistingModeSelect?.value || 'increase';
+        const newCount = parsed.filter(item => item.valid && !item.existing).length;
+        const updateCount = mode === 'increase' ? existingCount : 0;
+        if (bulkValidCount) bulkValidCount.textContent = `• poprawne: ${validCount} • błędy: ${errors.length} • istniejące: ${existingCount} • nowe: ${newCount} • zaktualizuje: ${updateCount}`;
+        bulkErrors.textContent = errors.length ? `Błędne wiersze: ${errors.map(item => `${item.index}: ${item.error}`).join(' • ')}.` : '';
         if (bulkReport) bulkReport.textContent = '';
     };
 
     async function dodajMasowo(event) {
         event.preventDefault();
+        if (isBulkSaving) return;
         const itemsText = bulkItemsInput?.value || '';
         if (!itemsText.trim()) return;
         const parsed = parseBulkItems(itemsText);
         const validItems = parsed.filter(item => item.valid && item.data);
         const invalidItems = parsed.filter(item => !item.valid);
-        if (!validItems.length) {
-            alert("Nie znaleziono poprawnych rekordów do dodania.");
-            return;
-        }
-        let dodaneCount = 0;
-        const skipped = [];
+        if (!validItems.length) { alert("Nie znaleziono poprawnych rekordów do dodania."); return; }
+        const mode = bulkExistingModeSelect?.value || 'increase';
+        let added = 0, updated = 0, skipped = 0;
+        isBulkSaving = true;
+        if (bulkSubmitBtn) { bulkSubmitBtn.disabled = true; bulkSubmitBtn.textContent = 'Dodaję pozycje...'; }
         try {
             for (const item of validItems) {
-                const existing = wszystkieProdukty.find(p => (p.index || '').toLowerCase() === item.data.index.toLowerCase());
+                const existing = getWarehouseItemsForMode().find(p => (p.index || '').toLowerCase() === item.data.index.toLowerCase());
                 if (existing) {
-                    skipped.push(`${item.data.index}: duplikat indexu`);
+                    if (mode !== 'increase') { skipped++; continue; }
+                    const before = Number(existing.ilosc) || 0;
+                    await updateDoc(doc(db, "magazyn", existing.id), { ilosc: before + item.data.ilosc, updatedAt: new Date() });
+                    updated++;
                     continue;
                 }
                 await addDoc(collection(db, "magazyn"), {
@@ -8114,26 +8194,25 @@ async function obslugaListyCzesci(event) {
                     ilosc: item.data.ilosc,
                     klient: '---',
                     jestOlejem: false,
+                    warehouseKind: warehouseMode === 'parts' ? 'part' : 'product',
+                    typProdukt: warehouseMode === 'parts' ? 'CZESC_WARSZTATOWA' : null,
+                    typCzesci: warehouseMode === 'parts' ? 'Inne' : null,
+                    pasujeDo: '',
+                    notatka: '',
                     createdAt: new Date(),
                     updatedAt: new Date()
                 });
-                dodaneCount++;
+                added++;
             }
-            const invalidReasons = invalidItems.map(item => `${item.index}: ${item.error}`);
-            const skippedCount = invalidItems.length + skipped.length;
-            if (bulkReport) {
-                bulkReport.innerHTML = `
-                    <strong>Raport:</strong> dodano ${dodaneCount}, pominięto ${skippedCount}.
-                    ${skippedCount ? `<div>Powody: ${[...invalidReasons, ...skipped].join(' • ')}</div>` : ''}
-                `;
-            }
-            bulkAddForm?.reset();
-            if (bulkPreviewList) bulkPreviewList.innerHTML = '';
-            if (bulkErrors) bulkErrors.textContent = '';
-            if (bulkAddModal) hideModal(bulkAddModal);
+            if (bulkReport) bulkReport.innerHTML = `<strong>Zakończono:</strong> dodano ${added}, zaktualizowano ${updated}, pominięto ${skipped}, błędy: ${invalidItems.length}.`;
+            if (bulkItemsInput) bulkItemsInput.value = '';
+            renderBulkPreview();
         } catch (error) {
             console.error("Błąd masowego dodawania:", error);
             alert("Wystąpił błąd.");
+        } finally {
+            isBulkSaving = false;
+            if (bulkSubmitBtn) { bulkSubmitBtn.disabled = false; bulkSubmitBtn.textContent = warehouseMode === 'parts' ? 'Dodaj części' : 'Dodaj produkty'; }
         }
     }
 
@@ -8309,10 +8388,10 @@ async function obslugaListyCzesci(event) {
         return (items || []).filter(item => {
             const matchesSearch = !search || [item.index, item.nazwa].some(val => String(val || '').toLowerCase().includes(search));
             const { pojemnosc } = parseOilMeta(item);
-            const productType = resolveWarehouseType(item);
+            const productType = isPartItem(item) ? (item.typCzesci || 'Inne') : resolveWarehouseType(item);
             const matchesProductType = !productTypeFilter || productType === productTypeFilter;
-            const matchesContainer = !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            const matchesLowStock = !lowStockOnly || isWarehouseLowStock(item);
+            const matchesContainer = warehouseMode === 'parts' || !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
+            const matchesLowStock = warehouseMode === 'parts' || !lowStockOnly || isWarehouseLowStock(item);
             return matchesSearch && matchesProductType && matchesContainer && matchesLowStock;
         });
     };
@@ -8332,10 +8411,12 @@ async function obslugaListyCzesci(event) {
                     return ((Number(a.ilosc) || 0) - (Number(b.ilosc) || 0)) * dir;
                 case 'litry':
                     return (getWarehouseOilLiters(a) - getWarehouseOilLiters(b)) * dir;
+                case 'fits':
+                    return String(a.pasujeDo || '').localeCompare(String(b.pasujeDo || ''), 'pl') * dir;
                 case 'index':
                     return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
                 case 'typ':
-                    return resolveWarehouseType(a).localeCompare(resolveWarehouseType(b), 'pl') * dir;
+                    return (isPartItem(a) ? (a.typCzesci || 'Inne') : resolveWarehouseType(a)).localeCompare(isPartItem(b) ? (b.typCzesci || 'Inne') : resolveWarehouseType(b), 'pl') * dir;
                 case 'updatedAt': {
                     const aDate = toDateSafe(a.updatedAt || a.createdAt);
                     const bDate = toDateSafe(b.updatedAt || b.createdAt);
@@ -8362,7 +8443,7 @@ async function obslugaListyCzesci(event) {
             updateSortButtons();
             return;
         }
-        const filtered = sortMagazynItems(applyMagazynFilters(wszystkieProdukty));
+        const filtered = sortMagazynItems(applyMagazynFilters(getWarehouseItemsForMode()));
         const emptyRowHtml = '<tr class="empty-row"><td data-label="Informacja" colspan="7">Brak pozycji w magazynie.</td></tr>';
         if (!filtered.length) {
             magazynLista.innerHTML = emptyRowHtml;
@@ -8372,15 +8453,15 @@ async function obslugaListyCzesci(event) {
         const rows = filtered.map((produkt) => {
             const jestOlejem = Boolean(produkt.jestOlejem);
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
-            const productType = resolveWarehouseType(produkt);
+            const productType = isPartItem(produkt) ? (produkt.typCzesci || 'Inne') : resolveWarehouseType(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? getWarehouseOilLiters(produkt) : null;
             const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
-            const iloscWLitrach = litersValue === null
-                ? '—'
-                : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`;
+            const iloscWLitrach = isPartItem(produkt)
+                ? `<span class="muted">${produkt.pasujeDo || '—'}</span>`
+                : (litersValue === null ? '—' : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
-            const isLowStock = isWarehouseLowStock(produkt);
+            const isLowStock = !isPartItem(produkt) && isWarehouseLowStock(produkt);
             return `<tr class="${isLowStock ? 'is-low-stock' : ''}" data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Indeks">${produkt.index}</td>
                     <td data-label="Nazwa">
@@ -8391,7 +8472,7 @@ async function obslugaListyCzesci(event) {
                     </td>
                     <td data-label="Typ">${productType || 'INNE'}</td>
                     <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
-                    <td data-label="Ilość (L)" class="num">${iloscWLitrach}</td>
+                    <td data-label="${isPartItem(produkt) ? 'Pasuje do' : 'Ilość (L)'}" class="num">${iloscWLitrach}</td>
                     <td data-label="Ostatnia zmiana" class="date-col">${lastChange}</td>
                     <td data-label="Akcje" class="actions-col">
                         <div class="row-action">
@@ -8410,9 +8491,9 @@ async function obslugaListyCzesci(event) {
         const prevContainer = magazynFilterContainer.value;
         const productTypes = new Set();
         const containers = new Set();
-        wszystkieProdukty.forEach(item => {
+        getWarehouseItemsForMode().forEach(item => {
             const { pojemnosc } = parseOilMeta(item);
-            const productType = resolveWarehouseType(item);
+            const productType = isPartItem(item) ? (item.typCzesci || 'Inne') : resolveWarehouseType(item);
             if (productType) productTypes.add(productType);
             if (pojemnosc) containers.add(String(pojemnosc));
         });
@@ -8459,7 +8540,8 @@ async function obslugaListyCzesci(event) {
             { action: 'edit', label: 'Edytuj' },
             { action: 'add', label: 'Dodaj stan' },
             { action: 'remove', label: 'Zdejmij stan' },
-            { action: 'history', label: 'Historia', disabled: true },
+            { action: 'correct', label: 'Korekta stanu' },
+            { action: 'history', label: 'Historia' },
             { action: 'delete', label: 'Usuń', variant: 'danger' }
         ];
     };
@@ -8487,6 +8569,16 @@ async function obslugaListyCzesci(event) {
             }
             if (action === 'remove') {
                 openProductDetailsModal(produkt, 'remove');
+                return;
+            }
+            if (action === 'correct') {
+                const value = Number(prompt('Podaj nowy stan:', produkt.ilosc));
+                if (Number.isFinite(value) && value >= 0 && (produkt.jestOlejem || Number.isInteger(value))) void updateDoc(doc(db, 'magazyn', produkt.id), { ilosc: value, updatedAt: new Date() });
+                else alert('Podaj poprawny stan.');
+                return;
+            }
+            if (action === 'history') {
+                alert('Historia ruchów: przygotowano miejsce w menu. Pełna lista ruchów zostanie podłączona w osobnym kroku.');
                 return;
             }
             if (action === 'delete') {
@@ -8574,6 +8666,16 @@ async function obslugaListyCzesci(event) {
             }
             if (action === 'remove') {
                 openProductDetailsModal(produkt, 'remove');
+                return;
+            }
+            if (action === 'correct') {
+                const value = Number(prompt('Podaj nowy stan:', produkt.ilosc));
+                if (Number.isFinite(value) && value >= 0 && (produkt.jestOlejem || Number.isInteger(value))) void updateDoc(doc(db, 'magazyn', produkt.id), { ilosc: value, updatedAt: new Date() });
+                else alert('Podaj poprawny stan.');
+                return;
+            }
+            if (action === 'history') {
+                alert('Historia ruchów: przygotowano miejsce w menu. Pełna lista ruchów zostanie podłączona w osobnym kroku.');
                 return;
             }
             if (action === 'delete') {
@@ -8787,9 +8889,10 @@ async function obslugaListyCzesci(event) {
     if (magazynForm) magazynForm.addEventListener('submit', dodajProduktDoMagazynu);
     if (bulkAddForm) bulkAddForm.addEventListener('submit', dodajMasowo);
     if (bulkItemsInput) bulkItemsInput.addEventListener('input', renderBulkPreview);
+    if (bulkExistingModeSelect) bulkExistingModeSelect.addEventListener('change', renderBulkPreview);
     if (bulkInsertExampleBtn && bulkItemsInput) {
         bulkInsertExampleBtn.addEventListener('click', () => {
-            bulkItemsInput.value = 'OLEJ-HYGARD-20L;Olej HYGARD 20L;2\nFIL-123;Filtr powietrza;4';
+            bulkItemsInput.value = warehouseMode === 'parts' ? 'RE123424;Filtr oleju;2\nAL156625;Filtr paliwa;1\nM806418;Filtr hydrauliczny;3' : 'OLEJ-HYGARD-20L;Olej HYGARD 20L;2\nFIL-123;Filtr powietrza;4';
             renderBulkPreview();
         });
     }
@@ -8834,8 +8937,9 @@ async function obslugaListyCzesci(event) {
             renderMagazynTable();
         });
     }
+    warehouseTabButtons.forEach(btn => btn.addEventListener('click', () => setWarehouseMode(btn.dataset.warehouseTab)));
     if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
-    if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { openModal(bulkAddModal); });
+    if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { if (bulkItemsLabel) bulkItemsLabel.textContent = `${warehouseMode === 'parts' ? 'Części' : 'Produkty'} (format: INDEKS;NAZWA;ILOŚĆ)`; if (bulkSubmitBtn) bulkSubmitBtn.textContent = warehouseMode === 'parts' ? 'Dodaj części' : 'Dodaj produkty'; renderBulkPreview(); openModal(bulkAddModal); });
     if (magazynOilToolsBtn) {
         magazynOilToolsBtn.addEventListener('click', () => {
             syncOilToolOptions();
