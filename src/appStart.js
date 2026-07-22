@@ -1158,6 +1158,8 @@ function initializeApp() {
     const editZlecenieDocId = document.getElementById('edit-zlecenie-doc-id');
     const editZlecenieClientSelect = document.getElementById('edit-zlecenie-client-select');
     const editZlecenieMachineSelect = document.getElementById('edit-zlecenie-machine-select');
+    const editZlecenieOpisInput = document.getElementById('edit-zlecenie-opis');
+    const editZlecenieOpisLabel = document.querySelector('label[for="edit-zlecenie-opis"]');
     const machineHistoryModal = document.getElementById('machine-history-modal');
     const machineHistoryList = document.getElementById('machine-history-list');
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
@@ -7319,8 +7321,22 @@ function otworzModalEdycjiZlecenia(zlecenieId) {
 
     const nrInput = document.getElementById('edit-zlecenie-nr-input');
     if (nrInput) nrInput.value = zlecenie.nrZlecenia || '';
-    const opisInput = document.getElementById('edit-zlecenie-opis');
-    if (opisInput) opisInput.value = zlecenie.opis || '';
+    const isClosedOrder = isOrderClosed(zlecenie);
+    const initialOpis = (zlecenie.opis || '').toString();
+    const finalNote = (zlecenie.zakonczenieNotatka || '').toString();
+    const valueForEdit = isClosedOrder ? finalNote : initialOpis;
+    if (editZlecenieOpisInput) {
+        editZlecenieOpisInput.value = valueForEdit;
+        editZlecenieOpisInput.placeholder = isClosedOrder
+            ? 'Notatka końcowa / opis wykonanej pracy...'
+            : 'Opis usterki i uwagi...';
+        editZlecenieOpisInput.dataset.editField = isClosedOrder ? 'zakonczenieNotatka' : 'opis';
+    }
+    if (editZlecenieOpisLabel) {
+        editZlecenieOpisLabel.textContent = isClosedOrder
+            ? 'Notatka końcowa / opis wykonanej pracy:'
+            : 'Opis / Notatka:';
+    }
 
     editZlecenieForm['edit-wyfakturowane-godziny'].value = zlecenie.wyfakturowaneGodziny || 0;
     editZlecenieForm['edit-moto-hours'].value = String(Number(zlecenie.motoHours ?? zlecenie.motogodziny ?? 0) || 0);
@@ -7347,7 +7363,7 @@ async function zapiszEdycjeZlecenia(event) {
     const nowyTyp = editZlecenieForm['edit-typ-zlecenia'].value;
     const nowyNumerWz = editZlecenieForm['edit-zakonczenie-wz'].value.trim();
     const nowyNumerZlecenia = (document.getElementById('edit-zlecenie-nr-input')?.value || '').trim();
-    const nowyOpis = (document.getElementById('edit-zlecenie-opis')?.value || '').trim();
+    const nowyOpis = (editZlecenieOpisInput?.value || '').trim();
     const nowyKlientId = editZlecenieClientSelect?.value || '';
     const nowaMaszynaId = editZlecenieMachineSelect?.value || '';
     const noweCompletionDate = normalizeDateOnly(editZlecenieForm['edit-completion-date']?.value || '');
@@ -7375,7 +7391,9 @@ async function zapiszEdycjeZlecenia(event) {
         const staryNumerWz = zlecenieData.zakonczenieNumerWZ || '';
         const stareMotoHours = Number(zlecenieData.motoHours ?? zlecenieData.motogodziny ?? 0) || 0;
         const staryNumerZlecenia = zlecenieData.nrZlecenia || '';
+        const isClosedOrder = isOrderClosed(zlecenieData);
         const staryOpis = zlecenieData.opis || '';
+        const staraNotatkaKoncowa = zlecenieData.zakonczenieNotatka || '';
         const staryKlientId = zlecenieData.klientId || '';
         const staraMaszynaId = zlecenieData.maszynaId || '';
         const staraCompletionDate = normalizeDateOnly(zlecenieData.completionDate || zlecenieData.serviceDate || zlecenieData.completedAt);
@@ -7386,7 +7404,11 @@ async function zapiszEdycjeZlecenia(event) {
         if (stareGodziny !== noweGodziny) zmiany.push(`Godziny zmieniono z ${stareGodziny}h na ${noweGodziny}h`);
         if (staryTyp !== nowyTyp) zmiany.push(`Typ zmieniono z ${staryTyp} na ${nowyTyp}`);
         if (staryNumerZlecenia !== nowyNumerZlecenia) zmiany.push(`Numer zlecenia zmieniono z ${staryNumerZlecenia || 'brak'} na ${nowyNumerZlecenia}`);
-        if (staryOpis !== nowyOpis) zmiany.push('Zmieniono opis/notatkę.');
+        if (isClosedOrder) {
+            if (staraNotatkaKoncowa !== nowyOpis) zmiany.push('Zmieniono notatkę końcową.');
+        } else if (staryOpis !== nowyOpis) {
+            zmiany.push('Zmieniono opis/notatkę.');
+        }
         if (staryKlientId !== nowyKlientId) zmiany.push('Zmieniono klienta.');
         if (staraMaszynaId !== nowaMaszynaId) zmiany.push('Zmieniono maszynę.');
         if (staryNumerWz !== nowyNumerWz) {
@@ -7414,7 +7436,8 @@ async function zapiszEdycjeZlecenia(event) {
             maszynaId: nowaMaszynaId,
             typMaszyny: maszyna?.typMaszyny || zlecenieData.typMaszyny || null,
             model: maszyna?.model || zlecenieData.model || null,
-            opis: nowyOpis,
+            opis: isClosedOrder ? staryOpis : nowyOpis,
+            zakonczenieNotatka: isClosedOrder ? (nowyOpis || null) : (zlecenieData.zakonczenieNotatka ?? null),
             wyfakturowaneGodziny: noweGodziny,
             invoicedHours: noweGodziny,
             motoHours: noweMotoHours,
