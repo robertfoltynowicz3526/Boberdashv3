@@ -3654,3 +3654,10 @@ main,
   overscroll-behavior: contain;
   padding-right: 6px;
 }
+
+.is-hidden { display: none !important; }
+.warehouse-tabs { display: flex; gap: 8px; margin: 0 0 12px; }
+.warehouse-tab { border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: inherit; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.warehouse-tab.is-active { background: #2f7d32; color: #fff; border-color: #2f7d32; }
+.calendar-order-compact { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; }
+.calendar-order-compact small { opacity: .85; }
