@@ -725,7 +725,8 @@ function initializeApp() {
     let edytowanyPrzejazdId = null;
     let stockChangeOperation = null;
     let magazynSort = { key: 'nazwa', dir: 'asc' };
-    let warehouseMode = 'products';
+    let warehouseMode = 'all';
+    let warehouseQuickFilter = 'all';
     let isBulkSaving = false;
     let isClosingOrder = false;
     const LOW_STOCK_UNITS_THRESHOLD = 1;
@@ -1049,6 +1050,7 @@ function initializeApp() {
     const magazynBulkBtn = document.getElementById('magazyn-bulk-btn');
     const magazynOilToolsBtn = document.getElementById('magazyn-oil-tools-btn');
     const warehouseTabButtons = document.querySelectorAll('[data-warehouse-tab]');
+    const warehouseFilterChips = document.querySelectorAll('[data-warehouse-filter]');
     const warehouseTableTitle = document.getElementById('warehouse-table-title');
     const bulkAddForm = document.getElementById('bulk-add-form');
     const stockModal = document.getElementById('stock-change-modal');
@@ -7917,21 +7919,37 @@ async function obslugaListyCzesci(event) {
 
     const isPartItem = (produkt = {}) => produkt?.warehouseKind === 'part' || produkt?.typProdukt === 'CZESC_WARSZTATOWA';
     const isProductItem = (produkt = {}) => !isPartItem(produkt);
-    const getWarehouseItemsForMode = () => (warehouseMode === 'parts' ? wszystkieProdukty.filter(isPartItem) : wszystkieProdukty.filter(isProductItem));
+    const getWarehouseItemsForMode = () => {
+        if (warehouseMode === 'parts') return wszystkieProdukty.filter(isPartItem);
+        if (warehouseMode === 'products') return wszystkieProdukty.filter(isProductItem);
+        return wszystkieProdukty;
+    };
+    const getWarehouseGroupLabel = (item = {}) => isPartItem(item) ? 'Części' : 'Oleje i produkty';
+    const getPartType = (item = {}) => item.typCzesci || 'Nieokreślony';
     const setWarehouseMode = (mode) => {
-        warehouseMode = mode === 'parts' ? 'parts' : 'products';
+        warehouseMode = ['all', 'parts', 'products'].includes(mode) ? mode : 'all';
         warehouseTabButtons.forEach(btn => btn.classList.toggle('is-active', btn.dataset.warehouseTab === warehouseMode));
         if (magazynAddBtn) magazynAddBtn.textContent = warehouseMode === 'parts' ? 'Dodaj część' : 'Dodaj produkt';
         if (magazynOilToolsBtn) magazynOilToolsBtn.hidden = warehouseMode === 'parts';
-        if (warehouseTableTitle) warehouseTableTitle.textContent = warehouseMode === 'parts' ? 'Magazyn części' : 'Stan magazynowy';
+        if (warehouseTableTitle) warehouseTableTitle.textContent = warehouseMode === 'all' ? 'Cały magazyn' : (warehouseMode === 'parts' ? 'Magazyn części' : 'Stan magazynowy');
         const headCells = magazynTable?.querySelectorAll('thead th');
-        if (headCells?.[4]) headCells[4].innerHTML = warehouseMode === 'parts' ? '<button type="button" class="sort-btn" data-sort="fits">Pasuje do</button>' : '<button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button>';
-        if (headCells?.[3]) headCells[3].innerHTML = '<button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button>';
-        if (headCells?.[1]) headCells[1].innerHTML = '<button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button>';
-        if (headCells?.[2]) headCells[2].innerHTML = '<button type="button" class="sort-btn" data-sort="typ">Typ</button>';
-
+        headCells?.forEach(cell => { cell.hidden = false; });
+        if (warehouseMode === 'all') {
+            if (headCells?.[2]) headCells[2].innerHTML = '<button type="button" class="sort-btn" data-sort="group">Grupa</button>';
+            if (headCells?.[3]) headCells[3].innerHTML = '<button type="button" class="sort-btn" data-sort="typ">Typ</button>';
+            if (headCells?.[4]) headCells[4].innerHTML = '<button type="button" class="sort-btn" data-sort="ilosc">Stan</button>';
+            if (headCells?.[5]) headCells[5].innerHTML = '<button type="button" class="sort-btn" data-sort="fits">Pasuje do</button>';
+            if (headCells?.[6]) headCells[6].innerHTML = '<button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button>';
+            if (headCells?.[7]) headCells[7].innerHTML = 'Akcje';
+        } else {
+            if (headCells?.[2]) headCells[2].hidden = true;
+            if (headCells?.[3]) headCells[3].innerHTML = '<button type="button" class="sort-btn" data-sort="typ">Typ</button>';
+            if (headCells?.[4]) headCells[4].innerHTML = '<button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button>';
+            if (headCells?.[5]) headCells[5].innerHTML = warehouseMode === 'parts' ? '<button type="button" class="sort-btn" data-sort="fits">Pasuje do</button>' : '<button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button>';
+            if (headCells?.[6]) headCells[6].innerHTML = '<button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button>';
+            if (headCells?.[7]) headCells[7].innerHTML = 'Akcje';
+        }
         if (magazynFilterContainer) magazynFilterContainer.closest('.form-group')?.toggleAttribute('hidden', warehouseMode === 'parts');
-        if (magazynLowStockToggle) magazynLowStockToggle.hidden = warehouseMode === 'parts';
         refreshMagazynFilters();
         renderMagazynTable();
     };
@@ -8028,7 +8046,7 @@ async function obslugaListyCzesci(event) {
         magazynForm.reset();
         if (itemIsOilCheckbox) itemIsOilCheckbox.checked = false;
         if (itemProductTypeSelect) itemProductTypeSelect.value = '';
-        if (itemPartTypeSelect) itemPartTypeSelect.value = '';
+        if (itemPartTypeSelect) itemPartTypeSelect.value = 'Nieokreślony';
         syncProductAddMode();
     };
 
@@ -8099,7 +8117,7 @@ async function obslugaListyCzesci(event) {
             typOleju: isOil ? typOleju : null,
             pojemnosc: isOil ? pojemnosc : null,
             typProdukt: isPartMode ? 'CZESC_WARSZTATOWA' : (isOil ? typOleju : (typProdukt || null)),
-            typCzesci: isPartMode ? (itemPartTypeSelect?.value || 'Inne') : null,
+            typCzesci: isPartMode ? (itemPartTypeSelect?.value || 'Nieokreślony') : null,
             pasujeDo: isPartMode ? (itemFitsInput?.value.trim() || '') : '',
             notatka: isPartMode ? (itemNoteInput?.value.trim() || '') : ''
         };
@@ -8196,7 +8214,7 @@ async function obslugaListyCzesci(event) {
                     jestOlejem: false,
                     warehouseKind: warehouseMode === 'parts' ? 'part' : 'product',
                     typProdukt: warehouseMode === 'parts' ? 'CZESC_WARSZTATOWA' : null,
-                    typCzesci: warehouseMode === 'parts' ? 'Inne' : null,
+                    typCzesci: warehouseMode === 'parts' ? 'Nieokreślony' : null,
                     pasujeDo: '',
                     notatka: '',
                     createdAt: new Date(),
@@ -8386,21 +8404,28 @@ async function obslugaListyCzesci(event) {
         const containerFilter = magazynFilterContainer?.value || '';
         const lowStockOnly = Boolean(magazynLowStockOnly?.checked);
         return (items || []).filter(item => {
-            const matchesSearch = !search || [item.index, item.nazwa].some(val => String(val || '').toLowerCase().includes(search));
+            const groupLabel = getWarehouseGroupLabel(item);
+            const matchesSearch = !search || [item.index, item.nazwa, isPartItem(item) ? getPartType(item) : resolveWarehouseType(item), groupLabel, item.pasujeDo].some(val => String(val || '').toLowerCase().includes(search));
             const { pojemnosc } = parseOilMeta(item);
-            const productType = isPartItem(item) ? (item.typCzesci || 'Inne') : resolveWarehouseType(item);
+            const productType = isPartItem(item) ? getPartType(item) : resolveWarehouseType(item);
             const matchesProductType = !productTypeFilter || productType === productTypeFilter;
             const matchesContainer = warehouseMode === 'parts' || !containerFilter || (pojemnosc && String(pojemnosc) === containerFilter);
-            const matchesLowStock = warehouseMode === 'parts' || !lowStockOnly || isWarehouseLowStock(item);
-            return matchesSearch && matchesProductType && matchesContainer && matchesLowStock;
+            const matchesLowStock = !lowStockOnly || isWarehouseLowStock(item);
+            const matchesQuick = warehouseQuickFilter === 'all'
+                || (warehouseQuickFilter === 'products' && isProductItem(item))
+                || (warehouseQuickFilter === 'parts' && isPartItem(item))
+                || (warehouseQuickFilter === 'low' && isWarehouseLowStock(item));
+            return matchesSearch && matchesProductType && matchesContainer && matchesLowStock && matchesQuick;
         });
     };
 
     const syncLowStockToggleState = () => {
-        if (!magazynLowStockToggle || !magazynLowStockOnly) return;
-        const isActive = Boolean(magazynLowStockOnly.checked);
-        magazynLowStockToggle.classList.toggle('is-active', isActive);
-        magazynLowStockToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        const isActive = Boolean(magazynLowStockOnly?.checked);
+        if (magazynLowStockToggle) {
+            magazynLowStockToggle.classList.toggle('is-active', isActive);
+            magazynLowStockToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        }
+        warehouseFilterChips.forEach(btn => btn.classList.toggle('is-active', btn.dataset.warehouseFilter === warehouseQuickFilter));
     };
 
     const sortMagazynItems = (items) => {
@@ -8415,8 +8440,10 @@ async function obslugaListyCzesci(event) {
                     return String(a.pasujeDo || '').localeCompare(String(b.pasujeDo || ''), 'pl') * dir;
                 case 'index':
                     return (a.index || '').localeCompare(b.index || '', 'pl') * dir;
+                case 'group':
+                    return getWarehouseGroupLabel(a).localeCompare(getWarehouseGroupLabel(b), 'pl') * dir;
                 case 'typ':
-                    return (isPartItem(a) ? (a.typCzesci || 'Inne') : resolveWarehouseType(a)).localeCompare(isPartItem(b) ? (b.typCzesci || 'Inne') : resolveWarehouseType(b), 'pl') * dir;
+                    return (isPartItem(a) ? getPartType(a) : resolveWarehouseType(a)).localeCompare(isPartItem(b) ? getPartType(b) : resolveWarehouseType(b), 'pl') * dir;
                 case 'updatedAt': {
                     const aDate = toDateSafe(a.updatedAt || a.createdAt);
                     const bDate = toDateSafe(b.updatedAt || b.createdAt);
@@ -8453,15 +8480,22 @@ async function obslugaListyCzesci(event) {
         const rows = filtered.map((produkt) => {
             const jestOlejem = Boolean(produkt.jestOlejem);
             const { pojemnosc, typOleju } = parseOilMeta(produkt);
-            const productType = isPartItem(produkt) ? (produkt.typCzesci || 'Inne') : resolveWarehouseType(produkt);
+            const productType = isPartItem(produkt) ? getPartType(produkt) : resolveWarehouseType(produkt);
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? getWarehouseOilLiters(produkt) : null;
-            const iloscWSztukach = `<span class="qty-cell">${iloscFormatowana} szt</span>`;
-            const iloscWLitrach = isPartItem(produkt)
+            const stockText = jestOlejem && litersValue !== null
+                ? `<span class="qty-cell">${iloscFormatowana} szt. / ${formatujIloscMagazynu(litersValue)} L</span>`
+                : `<span class="qty-cell">${iloscFormatowana} szt.</span>`;
+            const detailQty = `<span class="qty-cell">${iloscFormatowana} szt.</span>`;
+            const detailExtra = isPartItem(produkt)
                 ? `<span class="muted">${produkt.pasujeDo || '—'}</span>`
                 : (litersValue === null ? '—' : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
-            const isLowStock = !isPartItem(produkt) && isWarehouseLowStock(produkt);
+            const isLowStock = isWarehouseLowStock(produkt);
+            const groupLabel = getWarehouseGroupLabel(produkt);
+            const allModeCells = warehouseMode === 'all'
+                ? `<td data-label="Grupa">${groupLabel}</td><td data-label="Typ">${productType || 'INNE'}</td><td data-label="Stan" class="num">${stockText}</td><td data-label="Pasuje do">${isPartItem(produkt) ? (produkt.pasujeDo || '—') : '—'}</td>`
+                : `<td data-label="Typ">${productType || 'INNE'}</td><td data-label="Ilość (szt.)" class="num">${detailQty}</td><td data-label="${isPartItem(produkt) ? 'Pasuje do' : 'Ilość (L)'}" class="num">${detailExtra}</td>`;
             return `<tr class="${isLowStock ? 'is-low-stock' : ''}" data-id="${produkt.id}" data-name="${produkt.nazwa}" data-qty="${produkt.ilosc}" data-is-oil="${jestOlejem}" data-index="${produkt.index}" data-oil-type="${typOleju}" data-product-type="${productType}" data-container="${pojemnosc || ''}">
                     <td data-label="Indeks">${produkt.index}</td>
                     <td data-label="Nazwa">
@@ -8470,9 +8504,7 @@ async function obslugaListyCzesci(event) {
                             ${isLowStock ? '<span class="low-stock-badge">Niski stan</span>' : ''}
                         </div>
                     </td>
-                    <td data-label="Typ">${productType || 'INNE'}</td>
-                    <td data-label="Ilość (szt.)" class="num">${iloscWSztukach}</td>
-                    <td data-label="${isPartItem(produkt) ? 'Pasuje do' : 'Ilość (L)'}" class="num">${iloscWLitrach}</td>
+                    ${allModeCells}
                     <td data-label="Ostatnia zmiana" class="date-col">${lastChange}</td>
                     <td data-label="Akcje" class="actions-col">
                         <div class="row-action">
@@ -8493,7 +8525,7 @@ async function obslugaListyCzesci(event) {
         const containers = new Set();
         getWarehouseItemsForMode().forEach(item => {
             const { pojemnosc } = parseOilMeta(item);
-            const productType = isPartItem(item) ? (item.typCzesci || 'Inne') : resolveWarehouseType(item);
+            const productType = isPartItem(item) ? getPartType(item) : resolveWarehouseType(item);
             if (productType) productTypes.add(productType);
             if (pojemnosc) containers.add(String(pojemnosc));
         });
@@ -8918,6 +8950,7 @@ async function obslugaListyCzesci(event) {
             if (magazynFilterOilType) magazynFilterOilType.value = '';
             if (magazynFilterContainer) magazynFilterContainer.value = '';
             if (magazynLowStockOnly) magazynLowStockOnly.checked = false;
+            warehouseQuickFilter = 'all';
             syncLowStockToggleState();
             renderMagazynTable();
         });
@@ -8938,6 +8971,12 @@ async function obslugaListyCzesci(event) {
         });
     }
     warehouseTabButtons.forEach(btn => btn.addEventListener('click', () => setWarehouseMode(btn.dataset.warehouseTab)));
+    warehouseFilterChips.forEach(btn => btn.addEventListener('click', () => {
+        warehouseQuickFilter = btn.dataset.warehouseFilter || 'all';
+        if (magazynLowStockOnly) magazynLowStockOnly.checked = warehouseQuickFilter === 'low';
+        syncLowStockToggleState();
+        renderMagazynTable();
+    }));
     if (magazynAddBtn) magazynAddBtn.addEventListener('click', () => { resetProductAddForm(); openModal(productAddModal); });
     if (magazynBulkBtn) magazynBulkBtn.addEventListener('click', () => { if (bulkItemsLabel) bulkItemsLabel.textContent = `${warehouseMode === 'parts' ? 'Części' : 'Produkty'} (format: INDEKS;NAZWA;ILOŚĆ)`; if (bulkSubmitBtn) bulkSubmitBtn.textContent = warehouseMode === 'parts' ? 'Dodaj części' : 'Dodaj produkty'; renderBulkPreview(); openModal(bulkAddModal); });
     if (magazynOilToolsBtn) {
