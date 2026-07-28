@@ -322,7 +322,8 @@
             <div id="magazyn-summary" class="summary-container-subtle"></div>
             <h2>Magazyn</h2>
             <div class="warehouse-tabs" role="tablist" aria-label="Tryb magazynu">
-                <button type="button" class="warehouse-tab is-active" data-warehouse-tab="products">Oleje i produkty</button>
+                <button type="button" class="warehouse-tab is-active" data-warehouse-tab="all">Cały magazyn</button>
+                <button type="button" class="warehouse-tab" data-warehouse-tab="products">Oleje i produkty</button>
                 <button type="button" class="warehouse-tab" data-warehouse-tab="parts">Części</button>
             </div>
             <div class="warehouse-shell">
@@ -330,9 +331,15 @@
                     <div class="warehouse-toolbar-group warehouse-toolbar-group--filters">
                         <div class="warehouse-search">
                             <label for="magazyn-search-input">Wyszukaj</label>
-                            <input type="search" id="magazyn-search-input" placeholder="Indeks lub nazwa...">
+                            <input type="search" id="magazyn-search-input" placeholder="Indeks, nazwa, typ, grupa, pasuje do...">
                         </div>
                         <div class="warehouse-filters">
+                            <div class="warehouse-quick-filters" aria-label="Szybkie filtry magazynu">
+                                <button type="button" class="warehouse-filter-chip is-active" data-warehouse-filter="all">Wszystko</button>
+                                <button type="button" class="warehouse-filter-chip" data-warehouse-filter="products">Oleje i produkty</button>
+                                <button type="button" class="warehouse-filter-chip" data-warehouse-filter="parts">Części</button>
+                                <button type="button" class="warehouse-filter-chip" data-warehouse-filter="low">Niski stan</button>
+                            </div>
                             <div class="form-group">
                                 <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
                                 <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
@@ -363,9 +370,10 @@
                                     <tr>
                                         <th class="index-col"><button type="button" class="sort-btn" data-sort="index">Indeks</button></th>
                                         <th class="name-col"><button type="button" class="sort-btn" data-sort="nazwa">Nazwa</button></th>
+                                        <th class="type-col"><button type="button" class="sort-btn" data-sort="group">Grupa</button></th>
                                         <th class="type-col"><button type="button" class="sort-btn" data-sort="typ">Typ</button></th>
-                                        <th class="num"><button type="button" class="sort-btn" data-sort="ilosc">Ilość (szt.)</button></th>
-                                        <th class="num"><button type="button" class="sort-btn" data-sort="litry">Ilość (L)</button></th>
+                                        <th class="num"><button type="button" class="sort-btn" data-sort="ilosc">Stan</button></th>
+                                        <th><button type="button" class="sort-btn" data-sort="fits">Pasuje do</button></th>
                                         <th class="date-col"><button type="button" class="sort-btn" data-sort="updatedAt">Ostatnia zmiana</button></th>
                                         <th class="actions-col">Akcje</th>
                                     </tr>
@@ -687,7 +695,7 @@
                 <div class="form-grid form-grid-2">
                     <div class="form-group"><label for="item-index">Indeks</label><input type="text" id="item-index" required><small class="field-hint">Indeks musi być unikalny.</small></div>
                     <div class="form-group"><label for="item-name">Nazwa</label><input type="text" id="item-name" required></div>
-                    <div class="form-group">
+                    <div class="form-group" id="item-product-type-group">
                         <label for="item-product-type">Typ produktu</label>
                         <select id="item-product-type" required>
                             <option value="">-- Wybierz --</option>
@@ -712,7 +720,7 @@
                     <p class="field-hint oil-fields-hint">Dla oleju możesz przeliczać litry na sztuki w narzędziach oleju.</p>
                 </div>
                 <div class="form-grid form-grid-2 part-fields" id="item-part-fields" hidden>
-                    <div class="form-group"><label for="item-part-type">Typ części</label><select id="item-part-type"><option value="">-- Uzupełnij później --</option><option>Filtr oleju</option><option>Filtr paliwa</option><option>Filtr powietrza</option><option>Filtr hydrauliczny</option><option>Pasek</option><option>Czujnik</option><option>Uszczelka</option><option>Łożysko</option><option>Część elektryczna</option><option>Część hydrauliczna</option><option>Inne</option></select></div>
+                    <div class="form-group"><label for="item-part-type">Typ części</label><select id="item-part-type"><option>Nieokreślony</option><option>Filtr oleju</option><option>Filtr paliwa</option><option>Filtr powietrza</option><option>Filtr hydrauliczny</option><option>Filtr kabinowy</option><option>Filtr AdBlue</option><option>Pasek</option><option>Łożysko</option><option>Uszczelka</option><option>Czujnik</option><option>Elektryka</option><option>Hydraulika</option><option>Układ paliwowy</option><option>Silnik</option><option>Napęd / przekładnia</option><option>Kabina</option><option>Inne</option></select></div>
                     <div class="form-group"><label for="item-fits">Pasuje do</label><input type="text" id="item-fits" placeholder="Np. John Deere 6M, 5105M"></div>
                     <div class="form-group form-group-full"><label for="item-note">Notatka</label><textarea id="item-note" rows="2" placeholder="Opcjonalne uwagi"></textarea></div>
                 </div>

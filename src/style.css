@@ -5563,3 +5563,49 @@ textarea {
 .warehouse-tab{border:1px solid var(--border-color,#d1d5db);background:var(--card-bg,#fff);border-radius:999px;padding:7px 12px;font-weight:600;cursor:pointer;}
 .warehouse-tab.is-active{background:var(--accent-color,#2563eb);border-color:var(--accent-color,#2563eb);color:#fff;}
 .part-fields[hidden]{display:none!important;}
+
+/* Magazyn: kompaktowe filtry i ciemne selecty w modalach */
+.warehouse-quick-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+#magazyn select,
+.modal-content select,
+.drawer-content select {
+  color-scheme: dark;
+  background-color: var(--input-bg, #111827);
+  color: var(--text-color, #e5e7eb);
+  border-color: var(--input-border, rgba(148, 163, 184, 0.35));
+  accent-color: var(--accent-color, #2f7d32);
+}
+
+#magazyn select:hover,
+.modal-content select:hover,
+.drawer-content select:hover {
+  border-color: rgba(74, 222, 128, 0.55);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.16);
+}
+
+#magazyn select:focus,
+.modal-content select:focus,
+.drawer-content select:focus {
+  border-color: rgba(74, 222, 128, 0.85);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+#magazyn select option,
+.modal-content select option,
+.drawer-content select option {
+  background: #111827;
+  color: #e5e7eb;
+}
+
+#magazyn select option:checked,
+.modal-content select option:checked,
+.drawer-content select option:checked {
+  background: #14532d;
+  color: #f8fafc;
+}
