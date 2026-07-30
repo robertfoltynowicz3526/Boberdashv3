@@ -46,6 +46,7 @@ import {
     renderShrubberySummaryHtml,
     renderShrubberyRowsHtml
 } from './finance/financeRender.js';
+import { initWarehouseCustomSelects } from './warehouse/customSelect.js';
 import {
     buildInvoiceStatsByMonth,
     normalizeMonthKey,
@@ -1081,6 +1082,8 @@ function initializeApp() {
     const productEditId = document.getElementById('product-edit-id');
     const productEditIndex = document.getElementById('product-edit-index');
     const productEditName = document.getElementById('product-edit-name');
+    const productEditPartFields = document.getElementById('product-edit-part-fields');
+    const productEditPartType = document.getElementById('product-edit-part-type');
     const productCurrentQty = document.getElementById('product-current-qty');
     const productCurrentLiters = document.getElementById('product-current-liters');
     const productLastChange = document.getElementById('product-last-change');
@@ -8548,6 +8551,12 @@ async function obslugaListyCzesci(event) {
         if (productEditId) productEditId.value = produkt.id;
         if (productEditIndex) productEditIndex.value = produkt.index || '';
         if (productEditName) productEditName.value = produkt.nazwa || '';
+        const isPart = isPartItem(produkt);
+        if (productEditPartFields) productEditPartFields.hidden = !isPart;
+        if (productEditPartType) {
+            productEditPartType.value = getPartType(produkt) || 'Nieokreślony';
+            productEditPartType.dispatchEvent(new Event('change'));
+        }
         if (productCurrentQty) productCurrentQty.textContent = iloscFormatowana;
         if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : `${litersValue.toFixed(2)} L`;
         if (productLastChange) productLastChange.textContent = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
@@ -8740,6 +8749,7 @@ async function obslugaListyCzesci(event) {
             await updateDoc(doc(db, "magazyn", docId), {
                 index,
                 nazwa,
+                ...(isPartItem(activeWarehouseProduct) ? { typCzesci: productEditPartType?.value || 'Nieokreślony' } : {}),
                 updatedAt: new Date()
             });
         } catch (e) {
@@ -8819,6 +8829,7 @@ async function obslugaListyCzesci(event) {
     }
 
     initializeMachineTypeSelects();
+    initWarehouseCustomSelects();
 
    // --- PODPIĘCIE EVENTÓW ---
     if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.addEventListener('click', handleQuickActionClick);

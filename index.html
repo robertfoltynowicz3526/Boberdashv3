@@ -342,11 +342,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="magazyn-filter-oil-type">Typ produktu/oleju</label>
-                                <select id="magazyn-filter-oil-type"><option value="">Wszystkie</option></select>
+                                <select id="magazyn-filter-oil-type" data-warehouse-custom-select><option value="">Wszystkie</option></select>
                             </div>
                             <div class="form-group">
                                 <label for="magazyn-filter-container">Pojemnik</label>
-                                <select id="magazyn-filter-container"><option value="">Wszystkie</option></select>
+                                <select id="magazyn-filter-container" data-warehouse-custom-select><option value="">Wszystkie</option></select>
                             </div>
                             <div class="warehouse-low-stock-filter">
                                 <input type="checkbox" id="magazyn-low-stock-only" class="sr-only-control">
@@ -667,6 +667,7 @@
                     <div class="form-grid form-grid-2">
                         <div class="form-group"><label for="product-edit-index">Indeks</label><input type="text" id="product-edit-index" required></div>
                         <div class="form-group"><label for="product-edit-name">Nazwa</label><input type="text" id="product-edit-name" required></div>
+                        <div class="form-group" id="product-edit-part-fields" hidden><label for="product-edit-part-type">Typ części</label><select id="product-edit-part-type" data-warehouse-custom-select><option>Nieokreślony</option><option>Filtr oleju</option><option>Filtr paliwa</option><option>Filtr powietrza</option><option>Filtr hydrauliczny</option><option>Filtr kabinowy</option><option>Filtr AdBlue</option><option>Pasek</option><option>Łożysko</option><option>Uszczelka</option><option>Czujnik</option><option>Elektryka</option><option>Hydraulika</option><option>Układ paliwowy</option><option>Silnik</option><option>Napęd / przekładnia</option><option>Kabina</option><option>Inne</option></select></div>
                     </div>
                     <button type="submit">Zapisz dane</button>
                 </form>
@@ -697,7 +698,7 @@
                     <div class="form-group"><label for="item-name">Nazwa</label><input type="text" id="item-name" required></div>
                     <div class="form-group" id="item-product-type-group">
                         <label for="item-product-type">Typ produktu</label>
-                        <select id="item-product-type" required>
+                        <select id="item-product-type" required data-warehouse-custom-select>
                             <option value="">-- Wybierz --</option>
                             <option value="OLEJ">Olej</option>
                             <option value="FILTR">Filtr</option>
@@ -711,16 +712,16 @@
                 <div class="form-grid form-grid-2 oil-fields" id="item-oil-fields">
                     <div class="form-group">
                         <label for="item-oil-type">Typ oleju</label>
-                        <select id="item-oil-type"><option value="">-- Wybierz --</option><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select>
+                        <select id="item-oil-type" data-warehouse-custom-select><option value="">-- Wybierz --</option><option value="HYGARD">HYGARD</option><option value="PLUS50">PLUS50</option><option value="COOLGARD">COOLGARD</option><option value="EXTGARD">EXTGARD</option></select>
                     </div>
                     <div class="form-group">
                         <label for="item-oil-container">Pojemnik (L)</label>
-                        <select id="item-oil-container"><option value="">-- Wybierz --</option><option value="208">208</option><option value="55">55</option><option value="50">50</option><option value="20">20</option></select>
+                        <select id="item-oil-container" data-warehouse-custom-select><option value="">-- Wybierz --</option><option value="208">208</option><option value="55">55</option><option value="50">50</option><option value="20">20</option></select>
                     </div>
                     <p class="field-hint oil-fields-hint">Dla oleju możesz przeliczać litry na sztuki w narzędziach oleju.</p>
                 </div>
                 <div class="form-grid form-grid-2 part-fields" id="item-part-fields" hidden>
-                    <div class="form-group"><label for="item-part-type">Typ części</label><select id="item-part-type"><option>Nieokreślony</option><option>Filtr oleju</option><option>Filtr paliwa</option><option>Filtr powietrza</option><option>Filtr hydrauliczny</option><option>Filtr kabinowy</option><option>Filtr AdBlue</option><option>Pasek</option><option>Łożysko</option><option>Uszczelka</option><option>Czujnik</option><option>Elektryka</option><option>Hydraulika</option><option>Układ paliwowy</option><option>Silnik</option><option>Napęd / przekładnia</option><option>Kabina</option><option>Inne</option></select></div>
+                    <div class="form-group"><label for="item-part-type">Typ części</label><select id="item-part-type" data-warehouse-custom-select><option>Nieokreślony</option><option>Filtr oleju</option><option>Filtr paliwa</option><option>Filtr powietrza</option><option>Filtr hydrauliczny</option><option>Filtr kabinowy</option><option>Filtr AdBlue</option><option>Pasek</option><option>Łożysko</option><option>Uszczelka</option><option>Czujnik</option><option>Elektryka</option><option>Hydraulika</option><option>Układ paliwowy</option><option>Silnik</option><option>Napęd / przekładnia</option><option>Kabina</option><option>Inne</option></select></div>
                     <div class="form-group"><label for="item-fits">Pasuje do</label><input type="text" id="item-fits" placeholder="Np. John Deere 6M, 5105M"></div>
                     <div class="form-group form-group-full"><label for="item-note">Notatka</label><textarea id="item-note" rows="2" placeholder="Opcjonalne uwagi"></textarea></div>
                 </div>
@@ -737,7 +738,7 @@
                     <label for="bulk-items" id="bulk-items-label">Produkty (format: INDEKS;NAZWA;ILOŚĆ)</label>
                     <textarea id="bulk-items" rows="6" placeholder="INDEKS;NAZWA;ILOŚĆ" required></textarea>
                     <small class="field-hint">Przykład: <em>OLEJ-HYGARD-20L;Olej HYGARD 20L;2</em><br><em>FIL-123;Filtr powietrza;4</em></small>
-                    <div class="form-group"><label for="bulk-existing-mode">Istniejące indeksy</label><select id="bulk-existing-mode"><option value="increase">Zwiększ stan istniejących</option><option value="skip">Pomiń istniejące</option><option value="new-only">Dodaj tylko nowe</option></select></div><button type="button" id="bulk-insert-example" class="btn-secondary btn-small">Wklej przykład</button>
+                    <div class="form-group"><label for="bulk-existing-mode">Istniejące indeksy</label><select id="bulk-existing-mode" data-warehouse-custom-select><option value="increase">Zwiększ stan istniejących</option><option value="skip">Pomiń istniejące</option><option value="new-only">Dodaj tylko nowe</option></select></div><button type="button" id="bulk-insert-example" class="btn-secondary btn-small">Wklej przykład</button>
                 </div>
                 <div class="bulk-preview">
                     <h4>Podgląd parsowania <span id="bulk-valid-count"></span></h4>
@@ -797,7 +798,7 @@
                 <section class="drawer-tab-panel is-active" data-drawer-panel="converter">
                     <div class="form-group">
                         <label for="oil-converter-container">Pojemnik (L)</label>
-                        <select id="oil-converter-container"></select>
+                        <select id="oil-converter-container" data-warehouse-custom-select></select>
                     </div>
                     <div class="form-grid form-grid-2">
                         <div class="form-group">
@@ -815,11 +816,11 @@
                     <div class="form-grid form-grid-2">
                         <div class="form-group">
                             <label for="oil-quick-type">Typ oleju</label>
-                            <select id="oil-quick-type"></select>
+                            <select id="oil-quick-type" data-warehouse-custom-select></select>
                         </div>
                         <div class="form-group">
                             <label for="oil-quick-container">Pojemnik (L)</label>
-                            <select id="oil-quick-container"></select>
+                            <select id="oil-quick-container" data-warehouse-custom-select></select>
                         </div>
                     </div>
                     <div class="form-grid form-grid-2">
@@ -829,7 +830,7 @@
                         </div>
                         <div class="form-group">
                             <label for="oil-quick-unit">Jednostka</label>
-                            <select id="oil-quick-unit">
+                            <select id="oil-quick-unit" data-warehouse-custom-select>
                                 <option value="szt">szt.</option>
                                 <option value="L">L</option>
                             </select>
