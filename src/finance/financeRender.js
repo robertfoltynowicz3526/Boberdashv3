@@ -1,9 +1,6 @@
-const PL_CURRENCY = new Intl.NumberFormat('pl-PL', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2
-});
+import { formatMoney } from '../utils/moneyPrivacy.js';
 
-const money = (value) => `${PL_CURRENCY.format(Number(value) || 0)} zł`;
+const money = (value) => formatMoney(value, { locale: true });
 
 const escapeHtml = (value) => String(value || '')
   .replaceAll('&', '&amp;')
