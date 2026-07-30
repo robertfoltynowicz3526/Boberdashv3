@@ -32,6 +32,16 @@ const readManualTotals = (manualDayDoc = {}) => ({
   over: parsePlNumber(manualDayDoc.over ?? 0),
 });
 
+// `billed` is also kept as a backwards-compatible, denormalized day total.
+// New records keep the value entered manually in a separate canonical field so
+// removing the last linked order cannot turn its old total into a manual value.
+export const resolveManualBilled = (dayDoc = {}, hasLinkedOrders = false) => {
+  if (Object.prototype.hasOwnProperty.call(dayDoc, 'manualBilled')) {
+    return parsePlNumber(dayDoc.manualBilled);
+  }
+  return hasLinkedOrders ? 0 : parsePlNumber(dayDoc.billed ?? dayDoc.fakturowane ?? 0);
+};
+
 const buildOrderKey = (order) => {
   if (!order) return '';
   const entryId = order?.entryId ?? order?.id ?? null;
@@ -155,4 +165,5 @@ export const __testables = {
   parsePlNumber,
   readManualTotals,
   sumOrderContributions,
+  resolveManualBilled,
 };

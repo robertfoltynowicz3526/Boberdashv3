@@ -1,12 +1,12 @@
 import { db, auth } from './firebase-config.js';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, startAt, endBefore, limit, deleteField } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, runTransaction, addDoc, setDoc, where, getDocs, serverTimestamp, startAt, endBefore, limit, deleteField, writeBatch } from "firebase/firestore";
 import Papa from 'papaparse';
 import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
-import { aggregateDayData, computeDayTotals, configureDayTotals } from './calendar/computeDayTotals.js';
+import { aggregateDayData, computeDayTotals, configureDayTotals, resolveManualBilled } from './calendar/computeDayTotals.js';
 import { aggregateMonthlyDriveHours, getMonthlyDriveHoursFromCalendar } from './calendar/driveHoursAggregation.js';
 import { loadYearReportingData } from './reporting/reportingData.js';
 import { computeYearReport } from './reporting/reportingAggregation.js';
@@ -2450,12 +2450,9 @@ function initializeApp() {
                 kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
                 kalendarzForm['czas-jazdy'].value = normalized.drive || 0;
                 kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
-                manualFakturowaneValue = Number(dane.fakturowane ?? normalized.billed) || 0;
                 const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
+                manualFakturowaneValue = resolveManualBilled(dane, maPowiazania);
                 multiZlecenia = powiazane;
-                if (maPowiazania) {
-                    manualFakturowaneValue = suma;
-                }
                 renderMultiZlecenia();
                 if (kalendarzForm['godziny-fakturowane'] && !maPowiazania) {
                     aktualizujPoleFakturowane(manualFakturowaneValue, false);
@@ -2678,7 +2675,8 @@ function initializeApp() {
         const sumaFakturowane = powiazane.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         const wartoscZFormularza = Number(kalendarzForm['godziny-fakturowane'].value) || 0;
         const fakturowaneDoZapisu = powiazane.length > 0 ? sumaFakturowane : wartoscZFormularza;
-        manualFakturowaneValue = fakturowaneDoZapisu;
+        const manualBilled = powiazane.length > 0 ? manualFakturowaneValue : wartoscZFormularza;
+        manualFakturowaneValue = manualBilled;
 
         const selectedLeaveKind = getSelectedDayLeaveValue();
         const leaveAmount = selectedLeaveKind === 'URL' ? parseLeaveAmount(dayLeaveAmountInput?.value, 1) : 0;
@@ -2694,6 +2692,7 @@ function initializeApp() {
             work: Number(kalendarzForm['godziny-pracy'].value) || 0,
             drive: Number(kalendarzForm['czas-jazdy'].value) || 0,
             billed: fakturowaneDoZapisu,
+            manualBilled,
             praca: Number(kalendarzForm['godziny-pracy'].value) || 0,
             fakturowane: fakturowaneDoZapisu,
             nadgodziny: Number(kalendarzForm['nadgodziny'].value) || 0,
@@ -3476,7 +3475,8 @@ function initializeApp() {
             leaveKind,
             flags,
             powiazane,
-            zleceniaPowiazane: powiazane
+            zleceniaPowiazane: powiazane,
+            manualBilled: resolveManualBilled(dayDoc, powiazane.length > 0)
         };
     }
 
@@ -8200,16 +8200,24 @@ async function obslugaListyCzesci(event) {
         isBulkSaving = true;
         if (bulkSubmitBtn) { bulkSubmitBtn.disabled = true; bulkSubmitBtn.textContent = 'Dodaję pozycje...'; }
         try {
+            const warehouseByIndex = new Map(
+                getWarehouseItemsForMode().map(item => [String(item.index || '').toLowerCase(), item])
+            );
+            const writes = [];
             for (const item of validItems) {
-                const existing = getWarehouseItemsForMode().find(p => (p.index || '').toLowerCase() === item.data.index.toLowerCase());
+                const indexKey = item.data.index.toLowerCase();
+                const existing = warehouseByIndex.get(indexKey);
                 if (existing) {
                     if (mode !== 'increase') { skipped++; continue; }
                     const before = Number(existing.ilosc) || 0;
-                    await updateDoc(doc(db, "magazyn", existing.id), { ilosc: before + item.data.ilosc, updatedAt: new Date() });
+                    const nextAmount = before + item.data.ilosc;
+                    writes.push({ ref: doc(db, "magazyn", existing.id), data: { ilosc: nextAmount, updatedAt: new Date() }, merge: true });
+                    existing.ilosc = nextAmount;
                     updated++;
                     continue;
                 }
-                await addDoc(collection(db, "magazyn"), {
+                const newRef = doc(collection(db, "magazyn"));
+                const newData = {
                     index: item.data.index,
                     nazwa: item.data.nazwa,
                     ilosc: item.data.ilosc,
@@ -8222,8 +8230,20 @@ async function obslugaListyCzesci(event) {
                     notatka: '',
                     createdAt: new Date(),
                     updatedAt: new Date()
-                });
+                };
+                writes.push({ ref: newRef, data: newData, merge: false });
+                warehouseByIndex.set(indexKey, { id: newRef.id, ...newData });
                 added++;
+            }
+            // Firestore batches are limited to 500 writes. Keep some headroom and
+            // commit once per chunk instead of awaiting every row separately.
+            for (let offset = 0; offset < writes.length; offset += 450) {
+                const batch = writeBatch(db);
+                writes.slice(offset, offset + 450).forEach(({ ref, data, merge }) => {
+                    if (merge) batch.set(ref, data, { merge: true });
+                    else batch.set(ref, data);
+                });
+                await batch.commit();
             }
             if (bulkReport) bulkReport.innerHTML = `<strong>Zakończono:</strong> dodano ${added}, zaktualizowano ${updated}, pominięto ${skipped}, błędy: ${invalidItems.length}.`;
             if (bulkItemsInput) bulkItemsInput.value = '';
