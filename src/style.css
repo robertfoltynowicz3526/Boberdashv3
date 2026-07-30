@@ -3737,31 +3737,45 @@ label{ font-size:.9rem; color:var(--ab-muted); }
 }
 
 .warehouse-filter-chip {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 40px;
   padding: 0.5rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(120, 160, 110, 0.35);
+  background: rgba(20, 35, 24, 0.95);
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #e8f1e4;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 
 .warehouse-filter-chip:hover {
-  border-color: rgba(255, 222, 0, 0.45);
-  color: var(--text-color);
+  border-color: rgba(120, 160, 110, 0.6);
+  background: rgba(55, 90, 45, 0.9);
+  color: #ffffff;
 }
 
 .warehouse-filter-chip.is-active {
-  border-color: rgba(255, 222, 0, 0.68);
-  background: rgba(255, 222, 0, 0.2);
-  color: var(--text-strong);
-  box-shadow: inset 0 0 0 1px rgba(255, 222, 0, 0.22);
+  border-color: #4c8f36;
+  background: #4c8f36;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.warehouse-filter-chip.is-active:hover {
+  border-color: #579f40;
+  background: #579f40;
+}
+
+.warehouse-filter-chip:focus-visible {
+  outline: 2px solid rgba(74, 222, 128, 0.75);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
 }
 
 #magazyn-table tbody tr.is-low-stock td {
@@ -5560,8 +5574,23 @@ textarea {
 }
 
 .warehouse-tabs{display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap;}
-.warehouse-tab{border:1px solid var(--border-color,#d1d5db);background:var(--card-bg,#fff);border-radius:999px;padding:7px 12px;font-weight:600;cursor:pointer;}
-.warehouse-tab.is-active{background:var(--accent-color,#2563eb);border-color:var(--accent-color,#2563eb);color:#fff;}
+.warehouse-tab{
+  appearance:none;
+  -webkit-appearance:none;
+  border:1px solid rgba(120,160,110,.35);
+  background:rgba(20,35,24,.95);
+  color:#e8f1e4;
+  border-radius:999px;
+  padding:7px 12px;
+  font:inherit;
+  font-weight:600;
+  cursor:pointer;
+  transition:background-color .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease;
+}
+.warehouse-tab:not(.is-active):hover{background:rgba(55,90,45,.9);border-color:rgba(120,160,110,.6);color:#fff;}
+.warehouse-tab.is-active{background:#4c8f36;border-color:#4c8f36;color:#fff;}
+.warehouse-tab.is-active:hover{background:#579f40;border-color:#579f40;}
+.warehouse-tab:focus-visible{outline:2px solid rgba(74,222,128,.75);outline-offset:2px;box-shadow:0 0 0 3px rgba(34,197,94,.16);}
 .part-fields[hidden]{display:none!important;}
 
 /* Magazyn: kompaktowe filtry i ciemne selecty w modalach */
