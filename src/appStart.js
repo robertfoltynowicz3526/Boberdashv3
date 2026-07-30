@@ -47,6 +47,7 @@ import {
     renderShrubberyRowsHtml
 } from './finance/financeRender.js';
 import { initWarehouseCustomSelects } from './warehouse/customSelect.js';
+import { formatMoney } from './utils/moneyPrivacy.js';
 import {
     buildInvoiceStatsByMonth,
     normalizeMonthKey,
@@ -3546,11 +3547,13 @@ function initializeApp() {
 
     function monthStats(monthDays = []) {
         const uniqByDate = new Map();
-        let work = 0, l4Days = 0, urlopDays = 0;
+        let work = 0, over = 0, l4Days = 0, urlopDays = 0;
 
         (monthDays || []).forEach(day => {
             const normalized = normalizeDayRecord(day.id || day.date, day);
             work += Number(normalized.work) || 0;
+            // Ten sam skonfigurowany agregator dnia zasila kalendarz i ewidencję czasu.
+            over += Number(aggregateDayData(normalized.date).nadgodziny) || 0;
 
             const key = normalized.date;
             if (!key) return;
@@ -3565,7 +3568,7 @@ function initializeApp() {
             urlopDays += Number(v.urlop) || 0;
         }
 
-        return { work, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
+        return { work, over, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
     }
 
     async function obliczPodsumowaniaMiesieczne(wpisy) {
@@ -3584,13 +3587,13 @@ function initializeApp() {
         const miesiace = [];
         const sumyRocznePerRok = [];
         const lata = Object.keys(grouped).map(Number).sort((a, b) => a - b);
-        const globalTotals = { work: 0, drive: 0, billed: 0, gross: 0, net: 0, l4Days: 0, urlopDays: 0 };
+        const globalTotals = { work: 0, drive: 0, billed: 0, over: 0, gross: 0, net: 0, l4Days: 0, urlopDays: 0 };
         const yearsDetailed = [];
 
         lata.forEach(year => {
             const months = grouped[year];
             const monthNumbers = Object.keys(months).map(Number).sort((a, b) => a - b);
-            const yearSum = { work: 0, drive: 0, billed: 0, gross: 0, net: 0, l4Days: 0, urlopDays: 0 };
+            const yearSum = { work: 0, drive: 0, billed: 0, over: 0, gross: 0, net: 0, l4Days: 0, urlopDays: 0 };
             const yearMonths = [];
 
             monthNumbers.forEach(month => {
@@ -3615,6 +3618,7 @@ function initializeApp() {
                     work: stats.work,
                     drive: stats.drive,
                     billed: stats.billed,
+                    over: stats.over,
                     gross: stats.gross,
                     net: stats.net,
                     l4Days: stats.l4Days,
@@ -3623,6 +3627,7 @@ function initializeApp() {
                     wyfakturowaneGodziny: stats.billed,
                     praca: stats.work,
                     jazda: stats.drive,
+                    nadgodziny: stats.over,
                     urlopDaysUsed: stats.urlopDays
                 };
                 miesiace.push(monthRecord);
@@ -3631,6 +3636,7 @@ function initializeApp() {
                 yearSum.work += stats.work;
                 yearSum.drive += stats.drive;
                 yearSum.billed += stats.billed;
+                yearSum.over += stats.over;
                 yearSum.gross += stats.gross;
                 yearSum.net += stats.net;
                 yearSum.l4Days += stats.l4Days;
@@ -3645,6 +3651,7 @@ function initializeApp() {
                 praca: yearSum.work,
                 jazda: yearSum.drive,
                 wyfakturowaneGodziny: yearSum.billed,
+                nadgodziny: yearSum.over,
                 gross: yearSum.gross,
                 net: yearSum.net,
                 l4Days: yearSum.l4Days,
@@ -3672,6 +3679,7 @@ function initializeApp() {
             globalTotals.work += yearSum.work;
             globalTotals.drive += yearSum.drive;
             globalTotals.billed += yearSum.billed;
+            globalTotals.over += yearSum.over;
             globalTotals.gross += yearSum.gross;
             globalTotals.net += yearSum.net;
             globalTotals.l4Days += yearSum.l4Days;
@@ -3682,6 +3690,7 @@ function initializeApp() {
             work: globalTotals.work,
             drive: globalTotals.drive,
             billed: globalTotals.billed,
+            over: globalTotals.over,
             gross: globalTotals.gross,
             net: globalTotals.net,
             l4Days: globalTotals.l4Days,
@@ -3689,6 +3698,7 @@ function initializeApp() {
             praca: globalTotals.work,
             jazda: globalTotals.drive,
             wyfakturowaneGodziny: globalTotals.billed,
+            nadgodziny: globalTotals.over,
             urlopDaysUsed: globalTotals.urlopDays,
             absorpcja: obliczAbsorpcja(globalTotals.billed, globalTotals.work)
         };
@@ -3783,8 +3793,8 @@ function initializeApp() {
         metricsGrid.className = 'metrics-grid';
         metricsGrid.innerHTML = `
     <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${(sumaGodzin || 0).toFixed(1)} h</div></div>
-    <div class="metric"><div class="label">Brutto</div><div class="value num">${(sumaBrutto || 0).toFixed(2)} zł</div></div>
-    <div class="metric"><div class="label">Netto</div><div class="value num">${(sumaNetto || 0).toFixed(2)} zł</div></div>
+    <div class="metric"><div class="label">Brutto</div><div class="value num">${formatMoney(sumaBrutto)}</div></div>
+    <div class="metric"><div class="label">Netto</div><div class="value num">${formatMoney(sumaNetto)}</div></div>
     <div class="metric"><div class="label">Absorpcja</div><div class="value num">${fmtPct(absorpcja)}</div></div>
   `;
 
@@ -3980,7 +3990,7 @@ function initializeApp() {
                     <span class="quarterly-bonus__summary">
                         <span class="quarterly-bonus__summary-chip"><em>Okres</em><strong>${current.period.label}</strong></span>
                         <span class="quarterly-bonus__summary-chip"><em>Próg</em><strong>${current.threshold ? current.threshold.name : 'poza progami'}</strong></span>
-                        <span class="quarterly-bonus__summary-chip"><em>Premia brutto</em><strong>${current.grossBonus.toFixed(2)} zł</strong></span>
+                        <span class="quarterly-bonus__summary-chip"><em>Premia brutto</em><strong>${formatMoney(current.grossBonus)}</strong></span>
                         <span class="quarterly-bonus__summary-chip"><em>Do kolejnego progu</em><strong>${current.nextThreshold ? `${current.missingHours.toFixed(2)} h` : '0.00 h'}</strong></span>
                     </span>
                 </button>
@@ -3994,9 +4004,9 @@ function initializeApp() {
                     </div>
                     <div class="quarterly-bonus__bonus-grid">
                         <div class="quarterly-bonus__mini-card"><span>Próg</span><strong>${current.threshold ? current.threshold.name : 'poza progami'} <small>${periodRange}</small></strong></div>
-                        <div class="quarterly-bonus__mini-card"><span>Stawka</span><strong>${(current.threshold?.rate || 0).toFixed(2)} zł</strong></div>
-                        <div class="quarterly-bonus__mini-card"><span>Premia brutto</span><strong>${current.grossBonus.toFixed(2)} zł</strong></div>
-                        <div class="quarterly-bonus__mini-card"><span>Premia po -30%</span><strong>${current.netBonus.toFixed(2)} zł</strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Stawka</span><strong>${formatMoney(current.threshold?.rate)}</strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Premia brutto</span><strong>${formatMoney(current.grossBonus)}</strong></div>
+                        <div class="quarterly-bonus__mini-card"><span>Premia po -30%</span><strong>${formatMoney(current.netBonus)}</strong></div>
                     </div>
                     <div class="quarterly-bonus__focus">
                         <div class="quarterly-bonus__focus-box">
@@ -4024,7 +4034,7 @@ function initializeApp() {
                         <table class="tbl tbl--light">
                             <thead><tr><th>Okres</th><th>Średnia</th><th>Próg</th><th>Stawka</th><th>Premia brutto</th><th>Premia po -30%</th></tr></thead>
                             <tbody>
-                                ${visibleHistory.map((item) => `<tr><td>${item.period.label}</td><td>${item.average.toFixed(2)} h</td><td>${item.threshold ? item.threshold.name : '—'}</td><td>${(item.threshold?.rate || 0).toFixed(2)} zł</td><td>${item.grossBonus.toFixed(2)} zł</td><td>${item.netBonus.toFixed(2)} zł</td></tr>`).join('') || '<tr><td colspan="6">Brak zakończonych okresów.</td></tr>'}
+                                ${visibleHistory.map((item) => `<tr><td>${item.period.label}</td><td>${item.average.toFixed(2)} h</td><td>${item.threshold ? item.threshold.name : '—'}</td><td>${formatMoney(item.threshold?.rate)}</td><td>${formatMoney(item.grossBonus)}</td><td>${formatMoney(item.netBonus)}</td></tr>`).join('') || '<tr><td colspan="6">Brak zakończonych okresów.</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -4070,8 +4080,9 @@ ${years.map(y => `
             <span>Praca: ${formatHours(y.sum.work)}</span>
             <span>Jazda: ${formatHours(y.sum.drive)}</span>
             <span>Wyfakturowane: ${formatHours(y.sum.billed)}</span>
-            <span>Brutto: ${(Number(y.sum.gross)||0).toFixed(2)} zł</span>
-            <span>Netto: ${(Number(y.sum.net)||0).toFixed(2)} zł</span>
+            <span>Nadgodziny: ${formatHours(y.sum.over)}</span>
+            <span>Brutto: ${formatMoney(y.sum.gross)}</span>
+            <span>Netto: ${formatMoney(y.sum.net)}</span>
             <span>Absorpcja: ${(Number(y.sum.absorpcja)||0).toFixed(1)}%</span>
             <span>L4: ${formatDaysValue(y.sum.l4Days)}</span>
             <span>Urlop: ${formatDaysValue(y.sum.urlopDays)}</span>
@@ -4084,7 +4095,7 @@ ${years.map(y => `
       <table class="tbl">
         <thead><tr>
           <th>Miesiąc</th><th>Godziny pracy</th><th>Czas jazdy</th>
-          <th>Wyfakturowane</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
+          <th>Wyfakturowane</th><th>Nadgodziny</th><th>Brutto (zł)</th><th>Netto (zł)</th><th>Absorpcja</th><th>L4 (dni)</th><th>Urlop (dni)</th>
         </tr></thead>
         <tbody>
           ${y.months.map(m=>`
@@ -4093,8 +4104,9 @@ ${years.map(y => `
               <td>${m.work.toFixed(2)} h</td>
               <td>${m.drive.toFixed(2)} h</td>
               <td>${m.billed.toFixed(2)} h</td>
-              <td>${(Number(m.gross)||0).toFixed(2)} zł</td>
-              <td>${(Number(m.net)||0).toFixed(2)} zł</td>
+              <td>${(Number(m.over) || 0).toFixed(2)} h</td>
+              <td>${formatMoney(m.gross)}</td>
+              <td>${formatMoney(m.net)}</td>
               <td><span class="badge-value">${(Number(m.absorpcja)||0).toFixed(1)}%</span></td>
               <td>${m.l4Days}</td>
               <td>${formatDaysValue(m.urlopDays)}</td>
@@ -4106,8 +4118,9 @@ ${years.map(y => `
             <td>${y.sum.work.toFixed(2)} h</td>
             <td>${y.sum.drive.toFixed(2)} h</td>
             <td>${y.sum.billed.toFixed(2)} h</td>
-            <td>${(Number(y.sum.gross)||0).toFixed(2)} zł</td>
-            <td>${(Number(y.sum.net)||0).toFixed(2)} zł</td>
+            <td>${(Number(y.sum.over) || 0).toFixed(2)} h</td>
+            <td>${formatMoney(y.sum.gross)}</td>
+            <td>${formatMoney(y.sum.net)}</td>
             <td><span class="badge-value">${(Number(y.sum.absorpcja)||0).toFixed(1)}%</span></td>
             <td>${y.sum.l4Days}</td>
             <td>${formatDaysValue(y.sum.urlopDays)}</td>
@@ -6507,8 +6520,8 @@ function renderClientStatsView() {
             <div class="metric"><div class="label">Liczba zleceń</div><div class="value num">${summary.orders}</div></div>
             <div class="metric"><div class="label">Łączne wyfakturowane</div><div class="value num">${summary.billed.toFixed(1)} h</div></div>
             <div class="metric"><div class="label">Łączny czas jazdy</div><div class="value num">${summary.drive.toFixed(1)} h</div></div>
-            <div class="metric"><div class="label">Łączne brutto</div><div class="value num">${summary.gross.toFixed(2)} zł</div></div>
-            <div class="metric"><div class="label">Łączne netto</div><div class="value num">${summary.net.toFixed(2)} zł</div></div>
+            <div class="metric"><div class="label">Łączne brutto</div><div class="value num">${formatMoney(summary.gross)}</div></div>
+            <div class="metric"><div class="label">Łączne netto</div><div class="value num">${formatMoney(summary.net)}</div></div>
         </div>
     `;
 
@@ -6554,8 +6567,8 @@ function renderClientStatsView() {
                         <td>${row.ordersCount}</td>
                         <td>${row.billedHours.toFixed(1)} h</td>
                         <td>${row.driveHours.toFixed(1)} h</td>
-                        <td>${row.gross.toFixed(2)} zł</td>
-                        <td>${row.net.toFixed(2)} zł</td>
+                        <td>${formatMoney(row.gross)}</td>
+                        <td>${formatMoney(row.net)}</td>
                     </tr>
                 `).join('')}
             </tbody>
@@ -6574,9 +6587,9 @@ function renderClientStatsView() {
                 <p class="order-card-cell"><span class="key">Liczba zleceń</span><strong>${selected.ordersCount}</strong></p>
                 <p class="order-card-cell"><span class="key">Wyfakturowane</span><strong>${selected.billedHours.toFixed(1)} h</strong></p>
                 <p class="order-card-cell"><span class="key">Czas jazdy</span><strong>${selected.driveHours.toFixed(1)} h</strong></p>
-                <p class="order-card-cell"><span class="key">Brutto</span><strong>${selected.gross.toFixed(2)} zł</strong></p>
-                <p class="order-card-cell"><span class="key">Netto</span><strong>${selected.net.toFixed(2)} zł</strong></p>
-                <p class="order-card-cell"><span class="key">Średnia wartość zlecenia</span><strong>${avgOrderValue.toFixed(2)} zł</strong></p>
+                <p class="order-card-cell"><span class="key">Brutto</span><strong>${formatMoney(selected.gross)}</strong></p>
+                <p class="order-card-cell"><span class="key">Netto</span><strong>${formatMoney(selected.net)}</strong></p>
+                <p class="order-card-cell"><span class="key">Średnia wartość zlecenia</span><strong>${formatMoney(avgOrderValue)}</strong></p>
                 <p class="order-card-cell"><span class="key">Śr. godzin / zlecenie</span><strong>${avgHoursPerOrder.toFixed(2)} h</strong></p>
                 <p class="order-card-cell"><span class="key">Stosunek jazdy / wyfakturowanych</span><strong>${driveRatio === null ? '—' : `${(driveRatio * 100).toFixed(1)}%`}</strong></p>
             </div>
@@ -6597,7 +6610,7 @@ function renderClientStatsView() {
                                 <td>${order.date || '—'}</td>
                                 <td>${order.machine || '—'}</td>
                                 <td>${order.billedHours.toFixed(1)} h</td>
-                                <td>${order.gross.toFixed(2)} zł / ${order.net.toFixed(2)} zł</td>
+                                <td>${formatMoney(order.gross)} / ${formatMoney(order.net)}</td>
                             </tr>
                         `).join('')
                         : '<tr><td colspan="5">Brak zleceń dla klienta.</td></tr>'
@@ -6617,8 +6630,8 @@ function renderClientStatsView() {
                                 <td>${month.ordersCount}</td>
                                 <td>${month.billedHours.toFixed(1)} h</td>
                                 <td>${month.driveHours.toFixed(1)} h</td>
-                                <td>${month.gross.toFixed(2)} zł</td>
-                                <td>${month.net.toFixed(2)} zł</td>
+                                <td>${formatMoney(month.gross)}</td>
+                                <td>${formatMoney(month.net)}</td>
                             </tr>
                         `).join('')
                         : '<tr><td colspan="6">Brak danych miesięcznych dla tego klienta.</td></tr>'
@@ -6771,7 +6784,7 @@ function wyswietlZlecenia() {
                                 <div class="order-card-row order-card-row--metrics">
                                     <p class="order-card-cell"><span class="key">Typ</span><strong>${zlecenie.typZlecenia || '?'}</strong></p>
                                     <p class="order-card-cell"><span class="key">Motogodziny</span><strong>${motoHoursVal.toFixed(1)} h</strong></p>
-                                    <p class="order-card-cell order-card-cell--settlement"><span class="key">Rozliczenie (brutto / netto)</span><strong>${(amounts.grossCents / 100).toFixed(2)} zł / ${(amounts.netCents / 100).toFixed(2)} zł</strong></p>
+                                    <p class="order-card-cell order-card-cell--settlement"><span class="key">Rozliczenie (brutto / netto)</span><strong>${formatMoney(amounts.grossCents / 100)} / ${formatMoney(amounts.netCents / 100)}</strong></p>
                                 </div>
                                 <p class="order-card-note"><span class="key">Opis / notatka końcowa</span><span>${orderDescription}</span></p>
                             </div>
@@ -7553,8 +7566,8 @@ async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = 
                 <div class="details-group"><strong>Miesiąc rozliczenia</strong><p>${resolveOrderSettlementMonth(zlecenie) || deriveBillingMonthFromCompletionDate(serviceDate) || '—'}</p></div>
                 <div class="details-group"><strong>Wyfakturowane</strong><p>${getOrderInvoicedHours(zlecenie)} h</p></div>
                 <div class="details-group"><strong>Motogodziny</strong><p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
-                <div class="details-group"><strong>Brutto</strong><p>${getOrderGrossAmount(zlecenie).toFixed(2)} zł</p></div>
-                <div class="details-group"><strong>Netto</strong><p>${getOrderNetAmount(zlecenie).toFixed(2)} zł</p></div>
+                <div class="details-group"><strong>Brutto</strong><p>${formatMoney(getOrderGrossAmount(zlecenie))}</p></div>
+                <div class="details-group"><strong>Netto</strong><p>${formatMoney(getOrderNetAmount(zlecenie))}</p></div>
                 <div class="details-group"><strong>Typ zlecenia</strong><p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
                 <div class="details-group"><strong>Użyte części</strong><p>${uzyteCzesciOpis}</p></div>
                 ${wzHtml}
