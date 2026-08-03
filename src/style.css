@@ -5734,8 +5734,8 @@ textarea {
 
 .money-privacy-toggle {
   position: fixed;
-  right: 14px;
-  bottom: 14px;
+  left: 16px;
+  bottom: 20px;
   z-index: 1600;
   width: auto;
   min-height: 34px;
