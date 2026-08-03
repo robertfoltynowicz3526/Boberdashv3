@@ -5734,7 +5734,9 @@ textarea {
 
 .money-privacy-toggle {
   position: fixed;
-  left: 16px;
+  /* The desktop sidebar is 280px wide (desktop-only.css). Anchor the control
+     to the content edge instead of the viewport edge. */
+  left: calc(280px + 20px);
   bottom: 20px;
   z-index: 1600;
   width: auto;
@@ -5747,6 +5749,13 @@ textarea {
   box-shadow: 0 5px 18px rgba(0, 0, 0, 0.35);
   font-size: 0.78rem;
   line-height: 1;
+}
+
+@media (max-width: 767px) {
+  .money-privacy-toggle {
+    left: 16px;
+    bottom: 16px;
+  }
 }
 
 .money-privacy-toggle:hover,
