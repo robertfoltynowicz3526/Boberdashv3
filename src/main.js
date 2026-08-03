@@ -1,16 +1,9 @@
 // ZASADA NA PRZYSZŁOŚĆ: DATA → AGREGACJA → RENDER, bez skrótów.
 import { clearAppLockSession, createLockScreen, getAppLockConfig, isAppUnlocked, unlockWithPassword } from './appLock.js';
 import { startApp } from './appStart.js';
-import { isMoneyHidden, setMoneyHidden } from './utils/moneyPrivacy.js';
+import { isMoneyHidden, refreshMoneyVisibility, setMoneyHidden } from './utils/moneyPrivacy.js';
 
 const mountMoneyPrivacyToggle = () => {
-  if (isMoneyHidden()) {
-    document.querySelectorAll('option').forEach((option) => {
-      if (/\d+(?:[.,]\d+)?\s*zł/i.test(option.textContent || '')) {
-        option.textContent = option.textContent.replace(/\d+(?:[.,]\d+)?\s*zł/gi, '•••••• zł');
-      }
-    });
-  }
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'money-privacy-toggle';
@@ -23,7 +16,8 @@ const mountMoneyPrivacyToggle = () => {
   update();
   button.addEventListener('click', () => {
     setMoneyHidden(!isMoneyHidden());
-    window.location.reload();
+    refreshMoneyVisibility();
+    update();
   });
   document.body.appendChild(button);
 };
