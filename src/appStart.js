@@ -1131,6 +1131,10 @@ function initializeApp() {
     let financeShrubberyWorkDraft = { date: '', hours: '' };
     let financeShrubberyEditingWorkEntryId = null;
     let financeShrubberyEditingCostId = null;
+    // Firebase is the data source, these flags only describe data already held in
+    // memory. Changing the main view or an inner tab must never be a data fetch.
+    const loadedFinanceTabs = new Set();
+    let activeMainTab = null;
     const oilToolsTabs = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-tab]') : [];
     const oilToolsPanels = oilToolsDrawer ? oilToolsDrawer.querySelectorAll('[data-drawer-panel]') : [];
     const oilConverterContainer = document.getElementById('oil-converter-container');
@@ -1778,18 +1782,21 @@ function initializeApp() {
     };
 
     const showTab = (tabName) => {
+        if (activeMainTab === tabName) return;
         document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
         document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
         const target = document.getElementById(tabName);
         if (target) target.style.display = 'block';
         const trigger = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
         if (trigger) trigger.classList.add('active');
+        activeMainTab = tabName;
         handleTabActivation(tabName);
     };
 
     const handleTabActivation = (tabName) => {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
+            renderMagazynTable();
         }
         if (tabName === 'finanse') {
             void initFinanceModule();
@@ -1801,6 +1808,9 @@ function initializeApp() {
                 return;
             }
             void initCalendarModule('tab-activation');
+        }
+        if (tabName === 'podsumowanie') {
+            void renderPodsumowanie();
         }
     };
 
@@ -4670,10 +4680,17 @@ ${years.map(y => `
         renderFinanceAgroTab();
     };
 
-    const loadFinanceData = async () => {
-        financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
-        financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
-        financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
+    const ensureFinanceTabData = async (tab = financeInnerTab) => {
+        const cacheKey = `${tab}:${tab === 'agro' ? financeYear : tab === 'overtime' ? financeOvertimeYear : financeShrubberyYear}`;
+        if (loadedFinanceTabs.has(cacheKey)) return;
+        if (tab === 'overtime') {
+            financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+        } else if (tab === 'shrubbery') {
+            financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
+        } else {
+            financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
+        }
+        loadedFinanceTabs.add(cacheKey);
     };
 
     const initFinanceModule = async () => {
@@ -4681,7 +4698,7 @@ ${years.map(y => `
         financeYear = Number.isFinite(financeYear) ? financeYear : 2026;
         financeOvertimeYear = Number.isFinite(financeOvertimeYear) ? financeOvertimeYear : 2026;
         try {
-            await loadFinanceData();
+            await ensureFinanceTabData();
         } catch (error) {
             console.error('[finance] load failed', error);
         }
@@ -9304,13 +9321,10 @@ async function obslugaListyCzesci(event) {
         financeView.addEventListener('click', async (event) => {
             const tabBtn = event.target.closest('[data-finance-tab]');
             if (tabBtn) {
-                financeInnerTab = ['agro', 'overtime', 'shrubbery'].includes(tabBtn.dataset.financeTab) ? tabBtn.dataset.financeTab : 'agro';
-                if (financeInnerTab === 'overtime') {
-                    financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
-                }
-                if (financeInnerTab === 'shrubbery') {
-                    financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
-                }
+                const nextFinanceTab = ['agro', 'overtime', 'shrubbery'].includes(tabBtn.dataset.financeTab) ? tabBtn.dataset.financeTab : 'agro';
+                if (financeInnerTab === nextFinanceTab) return;
+                financeInnerTab = nextFinanceTab;
+                await ensureFinanceTabData();
                 financeAgroEditingMonth = null;
                 financeAgroDraft = null;
                 financeOvertimeFormMonth = null;
@@ -9518,7 +9532,7 @@ async function obslugaListyCzesci(event) {
             const yearSelect = event.target.closest('#finance-year');
             if (yearSelect) {
                 financeYear = Number(yearSelect.value) || 2026;
-                financeAgroRowsByMonth = await loadAgroEffectYear(db, financeYear);
+                await ensureFinanceTabData('agro');
                 financeAgroEditingMonth = null;
                 financeAgroDraft = null;
                 renderFinanceView();
@@ -9527,7 +9541,7 @@ async function obslugaListyCzesci(event) {
             const overtimeYearSelect = event.target.closest('#finance-overtime-year');
             if (overtimeYearSelect) {
                 financeOvertimeYear = Number(overtimeYearSelect.value) || 2026;
-                financeOvertimeEntries = await listOvertimeEntriesForYear(db, financeOvertimeYear);
+                await ensureFinanceTabData('overtime');
                 financeOvertimeFormMonth = null;
                 financeOvertimeEditId = null;
                 financeOvertimeExpandedMonths = new Set();
@@ -9537,7 +9551,7 @@ async function obslugaListyCzesci(event) {
             const shrubberyYearSelect = event.target.closest('#finance-shrubbery-year');
             if (shrubberyYearSelect) {
                 financeShrubberyYear = Number(shrubberyYearSelect.value) || 2026;
-                financeShrubberyData = await loadShrubberyYear(db, financeShrubberyYear);
+                await ensureFinanceTabData('shrubbery');
                 renderFinanceView();
                 return;
             }
