@@ -53,6 +53,7 @@
                                     </select>
             </div>
             <button type="button" id="app-lock-button" class="btn-secondary app-lock-button">Zablokuj</button>
+            <div id="money-privacy-toggle-slot" class="money-privacy-toggle-slot" aria-label="Przełącznik incognito"></div>
         </div>
     </header>
     <main class="mainContent">
@@ -575,6 +576,7 @@
                             <input type="number" step="0.5" class="multi-zlecenie-fh" placeholder="Fakturowane h" inputmode="decimal">
                             <input type="number" step="0.25" class="multi-zlecenie-drive" placeholder="Czas jazdy h" inputmode="decimal">
                             <button type="button" class="btn-add multi-add">Dodaj</button>
+                            <button type="button" class="btn-secondary btn-small multi-cancel" hidden>Anuluj</button>
                         </div>
                         <ul id="kalendarz-zlecenia-list"></ul>
                     </div>

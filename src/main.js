@@ -19,7 +19,8 @@ const mountMoneyPrivacyToggle = () => {
     refreshMoneyVisibility();
     update();
   });
-  document.body.appendChild(button);
+  const slot = document.getElementById('money-privacy-toggle-slot') || document.body;
+  slot.appendChild(button);
 };
 
 const ensureDomReady = () => new Promise((resolve) => {

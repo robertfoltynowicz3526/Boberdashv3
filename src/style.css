@@ -2934,6 +2934,7 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
@@ -2944,6 +2945,14 @@ select {
 #kalendarz-zlecenia-list li .actions {
   display: flex;
   gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+#kalendarz-zlecenia-list li .actions button {
+  min-width: 76px;
+  width: auto;
+  white-space: nowrap;
+  padding-inline: 0.65rem;
 }
 
 #kalendarz-zlecenia-list li.empty {
@@ -5732,30 +5741,26 @@ textarea {
   color: #dcfce7;
 }
 
+.money-privacy-toggle-slot {
+  width: 100%;
+  margin-top: 0.45rem;
+}
+
 .money-privacy-toggle {
-  position: fixed;
-  /* The desktop sidebar is 280px wide (desktop-only.css). Anchor the control
-     to the content edge instead of the viewport edge. */
-  left: calc(280px + 20px);
-  bottom: 20px;
-  z-index: 1600;
-  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   min-height: 34px;
   padding: 7px 11px;
   border: 1px solid rgba(148, 163, 184, 0.45);
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(15, 23, 42, 0.94);
   color: #e2e8f0;
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
   font-size: 0.78rem;
   line-height: 1;
-}
-
-@media (max-width: 767px) {
-  .money-privacy-toggle {
-    left: 16px;
-    bottom: 16px;
-  }
+  white-space: nowrap;
 }
 
 .money-privacy-toggle:hover,
