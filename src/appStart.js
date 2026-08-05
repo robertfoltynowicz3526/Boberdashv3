@@ -1153,6 +1153,7 @@ function initializeApp() {
     const kalendarzMultiHoursInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-fh') : null;
     const kalendarzMultiDriveInput = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-zlecenie-drive') : null;
     const kalendarzMultiAddButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-add') : null;
+    const kalendarzMultiCancelButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-cancel') : null;
     const kalendarzMultiList = document.getElementById('kalendarz-zlecenia-list');
     const clientDrawer = document.getElementById('client-drawer');
     const clientDrawerTitle = document.getElementById('client-drawer-title');
@@ -2527,6 +2528,27 @@ function initializeApp() {
         if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = '';
         if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = '';
         if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj';
+        if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.hidden = true;
+    }
+
+    function canonicalOrderLinkId(entry = {}) {
+        return String(entry.zlecenieId || entry.orderId || entry.linkedOrderId || entry.idZlecenia || entry.order?.id || '').trim();
+    }
+
+    function buildOrderLinkPayload({ entryId, zlecenieId, klientNazwa, selectedOrder = {}, selectedMachine = {}, fakturowane = 0, jazda = 0 }) {
+        return {
+            entryId,
+            zlecenieId,
+            orderId: zlecenieId,
+            klientNazwa,
+            nrZlecenia: selectedOrder.nrZlecenia || '',
+            maszynaTyp: selectedMachine.typMaszyny || '',
+            maszynaModel: selectedMachine.model || '',
+            fakturowane: Number(fakturowane) || 0,
+            invoicedForOrderHours: Number(fakturowane) || 0,
+            jazda: Number(jazda) || 0,
+            driveForOrderHours: Number(jazda) || 0
+        };
     }
 
     function aktualizujPoleFakturowane(wartosc, tylkoOdczyt = false) {
@@ -2599,44 +2621,51 @@ function initializeApp() {
         const klientNazwa = (kalendarzMultiSelect.options[kalendarzMultiSelect.selectedIndex]?.dataset.klientNazwa)
             || pobierzKlientaZlecenia(selectedOrder) || 'Klient: brak';
         if (multiEdytowanyIndex !== null) {
-            const istnieje = multiZlecenia.some((poz, idx) => idx !== multiEdytowanyIndex && poz.zlecenieId === zlecenieId);
+            const istnieje = multiZlecenia.some((poz, idx) => idx !== multiEdytowanyIndex && canonicalOrderLinkId(poz) === zlecenieId);
             if (istnieje) {
-                alert('To zlecenie jest już powiązane z tym dniem.');
+                alert('Nie można w trybie edycji zmienić wpisu na zlecenie już obecne w tym dniu.');
                 return;
             }
-            multiZlecenia[multiEdytowanyIndex] = {
+            multiZlecenia[multiEdytowanyIndex] = buildOrderLinkPayload({
                 entryId: multiZlecenia[multiEdytowanyIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
-                nrZlecenia: selectedOrder.nrZlecenia || '',
-                maszynaTyp: selectedMachine.typMaszyny || '',
-                maszynaModel: selectedMachine.model || '',
-                fakturowane: Number(godziny) || 0,
-                jazda: Number(czasJazdy) || 0
-            };
-        } else {
-            const istnieje = multiZlecenia.some(poz => poz.zlecenieId === zlecenieId);
-            if (istnieje) {
-                alert('To zlecenie jest już powiązane z tym dniem.');
-                return;
-            }
-            multiZlecenia.push({
-                entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
-                zlecenieId,
-                klientNazwa,
-                nrZlecenia: selectedOrder.nrZlecenia || '',
-                maszynaTyp: selectedMachine.typMaszyny || '',
-                maszynaModel: selectedMachine.model || '',
-                fakturowane: Number(godziny) || 0,
-                jazda: Number(czasJazdy) || 0
+                selectedOrder,
+                selectedMachine,
+                fakturowane: godziny,
+                jazda: czasJazdy
             });
+        } else {
+            const existingIndex = multiZlecenia.findIndex(poz => canonicalOrderLinkId(poz) === zlecenieId);
+            if (existingIndex >= 0) {
+                const existing = multiZlecenia[existingIndex];
+                multiZlecenia[existingIndex] = buildOrderLinkPayload({
+                    entryId: existing.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
+                    zlecenieId,
+                    klientNazwa: existing.klientNazwa || klientNazwa,
+                    selectedOrder,
+                    selectedMachine,
+                    fakturowane: (Number(existing.fakturowane ?? existing.invoicedForOrderHours ?? existing.fakturowaneDlaZlecenia) || 0) + (Number(godziny) || 0),
+                    jazda: (Number(existing.jazda ?? existing.driveForOrderHours ?? existing.czasJazdyDlaZlecenia) || 0) + (Number(czasJazdy) || 0)
+                });
+            } else {
+                multiZlecenia.push(buildOrderLinkPayload({
+                    entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
+                    zlecenieId,
+                    klientNazwa,
+                    selectedOrder,
+                    selectedMachine,
+                    fakturowane: godziny,
+                    jazda: czasJazdy
+                }));
+            }
         }
         resetujFormularzMulti();
         renderMultiZlecenia();
     }
 
     function obslugaListyMulti(event) {
-        const target = event.target;
+        const target = event.target?.closest?.('button') || event.target;
         const li = target.closest('li');
         if (!li || !li.dataset.index) return;
         const index = Number(li.dataset.index);
@@ -2668,7 +2697,8 @@ function initializeApp() {
             }
             if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = Number(pozycja.fakturowane) || 0;
             if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = Number(pozycja.jazda) || 0;
-            if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Zapisz';
+            if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Zapisz zmiany';
+            if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.hidden = false;
         }
     }
 
@@ -2678,10 +2708,13 @@ function initializeApp() {
         const data = kalendarzForm['kalendarz-data'].value;
         const powiazane = multiZlecenia.map((p, index) => ({
             entryId: String(p.entryId || `${data}:${p.zlecenieId}:${index}`),
-            zlecenieId: p.zlecenieId,
-            klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
-            fakturowane: Number(p.fakturowane) || 0,
-            jazda: Number(p.jazda) || 0
+            zlecenieId: canonicalOrderLinkId(p),
+            orderId: canonicalOrderLinkId(p),
+            klientNazwa: p.klientNazwa || pobierzNazwePowiazania(canonicalOrderLinkId(p)),
+            fakturowane: Number(p.fakturowane ?? p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia) || 0,
+            invoicedForOrderHours: Number(p.fakturowane ?? p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia) || 0,
+            jazda: Number(p.jazda ?? p.driveForOrderHours ?? p.czasJazdyDlaZlecenia) || 0,
+            driveForOrderHours: Number(p.jazda ?? p.driveForOrderHours ?? p.czasJazdyDlaZlecenia) || 0
         }));
         const sumaFakturowane = powiazane.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         const wartoscZFormularza = Number(kalendarzForm['godziny-fakturowane'].value) || 0;
@@ -2766,9 +2799,7 @@ function initializeApp() {
             }
             hideModal(kalendarzModal);
             await odswiezPodsumowania({ skipRender: true });
-            renderPulpit();
-            renderZlecenia();
-            renderPodsumowanie();
+            renderCalendarModalSummary(dayKey);
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
         }
@@ -3446,14 +3477,17 @@ function initializeApp() {
     function normalizujPowiazaneZlecenia(dane) {
         const lista = Array.isArray(dane?.zleceniaPowiazane) ? dane.zleceniaPowiazane : [];
         const powiazane = lista
-            .filter(p => p && p.zlecenieId)
-            .map((p, index) => ({
-                entryId: String(p.entryId || p.id || `${dane?.date || dane?.id || 'unknown-day'}:${p.zlecenieId}:${index}`),
-                zlecenieId: p.zlecenieId,
+            .filter(p => p && canonicalOrderLinkId(p))
+            .map((p, index) => {
+                const zlecenieId = canonicalOrderLinkId(p);
+                return ({
+                entryId: String(p.entryId || `${dane?.date || dane?.id || 'unknown-day'}:${zlecenieId}:${index}`),
+                zlecenieId,
                 klientNazwa: p.klientNazwa || pobierzNazwePowiazania(p.zlecenieId),
                 fakturowane: Number(p.invoicedForOrderHours ?? p.fakturowaneDlaZlecenia ?? p.fakturowane) || 0,
-                jazda: Number(p.driveForOrderHours ?? p.czasJazdyDlaZlecenia ?? p.jazda) || 0
-            }));
+                jazda: Number(p.driveForOrderHours ?? p.czasJazdyDlaZlecenia ?? p.jazda ?? p.driveHours ?? p.czasJazdy) || 0
+            });
+            });
 
         if (!powiazane.length && dane?.zlecenieId) {
             powiazane.push({
@@ -9634,6 +9668,7 @@ async function obslugaListyCzesci(event) {
         kalendarzModalCloseButton.onclick = () => { hideModal(kalendarzModal); };
     }
     if (kalendarzMultiAddButton) kalendarzMultiAddButton.addEventListener('click', dodajLubZapiszMultiZlecenie);
+    if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.addEventListener('click', () => { resetujFormularzMulti(); renderMultiZlecenia(); });
     if (kalendarzMultiList) kalendarzMultiList.addEventListener('click', obslugaListyMulti);
 
     const wyswietlKlientowDebounced = debounce(() => wyswietlKlientow(), 200);
