@@ -138,7 +138,7 @@ function initializeApp() {
         Z: { nazwa: "Zbrojenie", stawka: 30 },
         P: { nazwa: "Poprawka",  stawka: 0  }
     };
-    const MACHINE_TYPE_OPTIONS = ['Traktor', 'Kombajn', 'Prasa', 'Sieczkarnia', 'Opryskiwacz', 'Inna'];
+    const MACHINE_TYPE_OPTIONS = ['Traktor', 'Kombajn', 'Prasa', 'Sieczkarnia', 'Opryskiwacz', 'Agregat', 'Beczka', 'Przyczepa', 'Inna'];
     const fhOf = (event) => {
         const evType = event?.extendedProps?.type || event?.extendedProps?.typ;
         const isLeave = typeof evType === 'string' && evType.startsWith('LEAVE');
@@ -8088,6 +8088,8 @@ async function obslugaListyCzesci(event) {
         return (Number(produkt.ilosc) || 0) * pojemnosc;
     };
 
+    const formatWarehouseLiters = (value) => `${formatujIloscMagazynu(value)} L`;
+
     const getWarehouseOilLowStockThreshold = (produkt = {}) => {
         if (!produkt?.jestOlejem) return 0;
         const { pojemnosc } = parseOilMeta(produkt);
@@ -8571,12 +8573,12 @@ async function obslugaListyCzesci(event) {
             const iloscFormatowana = formatujIloscMagazynu(produkt.ilosc);
             const litersValue = jestOlejem && pojemnosc ? getWarehouseOilLiters(produkt) : null;
             const stockText = jestOlejem && litersValue !== null
-                ? `<span class="qty-cell">${iloscFormatowana} szt. / ${formatujIloscMagazynu(litersValue)} L</span>`
+                ? `<span class="qty-cell">${iloscFormatowana} szt. / <span class="warehouse-liter-value">${formatWarehouseLiters(litersValue)}</span></span>`
                 : `<span class="qty-cell">${iloscFormatowana} szt.</span>`;
             const detailQty = `<span class="qty-cell">${iloscFormatowana} szt.</span>`;
             const detailExtra = isPartItem(produkt)
                 ? `<span class="muted">${produkt.pasujeDo || '—'}</span>`
-                : (litersValue === null ? '—' : `<span class="qty-cell">${formatujIloscMagazynu(litersValue)} L</span>`);
+                : (litersValue === null ? '—' : `<span class="qty-cell warehouse-liter-value">${formatWarehouseLiters(litersValue)}</span>`);
             const lastChange = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
             const isLowStock = isWarehouseLowStock(produkt);
             const groupLabel = getWarehouseGroupLabel(produkt);
@@ -8642,7 +8644,7 @@ async function obslugaListyCzesci(event) {
             productEditPartType.dispatchEvent(new Event('change'));
         }
         if (productCurrentQty) productCurrentQty.textContent = iloscFormatowana;
-        if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : `${litersValue.toFixed(2)} L`;
+        if (productCurrentLiters) productCurrentLiters.textContent = litersValue === null ? '—' : formatWarehouseLiters(litersValue);
         if (productLastChange) productLastChange.textContent = formatWarehouseDate(produkt.updatedAt || produkt.createdAt);
         if (productChangeQtyInput) {
             productChangeQtyInput.value = '';
