@@ -611,6 +611,11 @@ td.num {
   font-variant-numeric: tabular-nums;
 }
 
+.warehouse-liter-value {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .qty-value {
   display: inline-block;
   min-width: 3.5ch;
