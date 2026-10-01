@@ -74,25 +74,29 @@
                 </div>
                 <div id="pulpit-weekly-preview" class="summary-container-subtle summary-compact"></div>
             </section>
-            <section class="pulpit-stats-bar" aria-label="Statystyki miesiąca">
+            <section class="pulpit-stats-bar pulpit-month-panel" aria-label="Statystyki miesiąca">
                 <div class="pulpit-stats-header">
-                    <h3>Statystyki miesiąca</h3>
+                    <h3>Statystyki miesiąca <span id="pulpit-month-label"></span></h3>
                 </div>
                 <div id="kalendarz-podsumowanie" class="summary-container-subtle summary-compact"></div>
-            </section>
-            <section class="pulpit-charts" aria-label="Wykresy pulpitu">
-                <h3>Wyfakturowane – ostatnie 3 mies.</h3>
-                <div class="summary-container-subtle">
-                    <div class="metrics-chart" id="fh3m-pulpit"></div>
-                </div>
-            </section>
-            <section class="pulpit-activity" aria-label="Ostatnie działania">
-                <div class="pulpit-stats-header">
-                    <h3 id="pulpit-activity-title">Ostatnie działania</h3>
-                    <button type="button" id="pulpit-activity-toggle" class="btn-ghost">Pokaż</button>
-                </div>
-                <div id="pulpit-activity" class="summary-container-subtle">
-                    <ul id="pulpit-activity-list" class="activity-list"></ul>
+                <div class="pulpit-month-columns">
+                    <div class="pulpit-month-chart" aria-label="Godziny w miesiącu">
+                        <h4>Godziny w miesiącu</h4>
+                        <div id="pulpit-month-hours" class="month-hours-chart"></div>
+                        <div class="pulpit-trend-chart">
+                            <h4>Wyfakturowane — ostatnie 3 mies.</h4>
+                            <div class="metrics-chart" id="fh3m-pulpit"></div>
+                        </div>
+                    </div>
+                    <section class="pulpit-activity" aria-label="Ostatnie działania">
+                        <div class="pulpit-stats-header">
+                            <h4 id="pulpit-activity-title">Ostatnie działania</h4>
+                            <button type="button" id="pulpit-activity-toggle" class="btn-ghost">Pokaż</button>
+                        </div>
+                        <div id="pulpit-activity" class="summary-container-subtle">
+                            <ul id="pulpit-activity-list" class="activity-list"></ul>
+                        </div>
+                    </section>
                 </div>
             </section>
         </div>
