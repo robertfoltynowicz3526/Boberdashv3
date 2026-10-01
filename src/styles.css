@@ -891,11 +891,11 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 
 /* Pulpit: zwarty, wspólny układ roboczy. Reguły są celowo ograniczone do #pulpit. */
 #pulpit.page-wide {
-  width: min(100%, 1480px);
-  max-width: 1480px;
+  width: min(100%, 1600px);
+  max-width: 1600px;
   margin-inline: auto;
-  padding: 12px 18px 28px;
-  gap: 12px;
+  padding: 14px 20px 30px;
+  gap: 14px;
 }
 
 #pulpit .pulpit-header { min-height: 34px; }
@@ -905,7 +905,7 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-weekly,
 #pulpit .pulpit-month-panel {
   margin: 0;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: #111914;
@@ -923,7 +923,7 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-stats-header h3,
 #pulpit .pulpit-stats-header h4 {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text-primary);
 }
 
@@ -931,13 +931,13 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 
 #pulpit .quick-actions-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 
 #pulpit .quick-action-card {
   min-width: 0;
-  min-height: 58px;
-  padding: 8px 10px;
+  min-height: 64px;
+  padding: 10px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: #172019;
@@ -945,14 +945,14 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 }
 
 #pulpit .quick-action-icon {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   border-radius: 7px;
   background: rgba(77, 155, 66, .14);
 }
 
-#pulpit .quick-action-label { min-width: 0; line-height: 1.2; }
+#pulpit .quick-action-label { min-width: 0; font-size: 14px; line-height: 1.2; }
 #pulpit .quick-action-note { color: var(--text-secondary); opacity: 1; }
 
 #pulpit .summary-container-subtle,
@@ -968,16 +968,16 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-month-panel > .summary-container-subtle .metrics-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 #pulpit .pulpit-weekly .metric,
 #pulpit .pulpit-month-panel > .summary-container-subtle .metric {
   display: flex;
   min-width: 0;
-  min-height: 76px;
-  padding: 11px 12px;
+  min-height: 84px;
+  padding: 13px 14px;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
@@ -992,13 +992,13 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-weekly .metric .label,
 #pulpit .pulpit-month-panel .metric .label {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.2;
 }
 
 #pulpit .pulpit-weekly .metric .value,
 #pulpit .pulpit-month-panel .metric .value {
-  font-size: clamp(18px, 1.35vw, 22px);
+  font-size: clamp(21px, 1.45vw, 25px);
   line-height: 1.1;
   color: var(--text-primary);
 }
@@ -1018,10 +1018,10 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 
 #pulpit .pulpit-month-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 12px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, .9fr);
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1029,7 +1029,7 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-activity {
   min-width: 0;
   margin: 0;
-  padding: 13px 14px;
+  padding: 15px 16px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: #0e1511;
@@ -1037,48 +1037,44 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 
 #pulpit .pulpit-month-chart h4,
 #pulpit .pulpit-trend-chart h4 {
-  margin: 0 0 11px;
-  font-size: 13px;
+  margin: 0 0 13px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
-#pulpit .month-hours-chart { display: grid; gap: 9px; }
+#pulpit .month-hours-chart { display: grid; gap: 12px; padding-block: 2px 4px; }
 #pulpit .month-hours-row {
   display: grid;
-  grid-template-columns: 112px minmax(80px, 1fr) 62px;
+  grid-template-columns: 124px minmax(80px, 1fr) 68px;
   align-items: center;
-  gap: 9px;
-  font-size: 12px;
+  gap: 11px;
+  font-size: 13px;
 }
 #pulpit .month-hours-label { display: flex; align-items: center; gap: 7px; color: var(--text-secondary); }
 #pulpit .month-hours-dot { width: 7px; height: 7px; border-radius: 50%; background: #5a8dff; }
 #pulpit .month-hours-dot--drive, #pulpit .month-hours-fill--drive { background: #81928a; }
 #pulpit .month-hours-dot--billed, #pulpit .month-hours-fill--billed { background: var(--accent-green); }
 #pulpit .month-hours-dot--overtime, #pulpit .month-hours-fill--overtime { background: var(--accent-yellow); }
-#pulpit .month-hours-track { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.055); }
+#pulpit .month-hours-track { height: 10px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.055); }
 #pulpit .month-hours-fill { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: #5a8dff; }
-#pulpit .month-hours-row strong { color: var(--text-primary); font-size: 12px; text-align: right; }
+#pulpit .month-hours-row strong { color: var(--text-primary); font-size: 13px; text-align: right; }
 #pulpit .month-hours-skeleton { height: 96px; border-radius: 6px; background: rgba(255,255,255,.04); }
 
 #pulpit .pulpit-trend-chart {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 17px;
+  padding-top: 15px;
   border-top: 1px solid var(--border-subtle);
 }
-#pulpit .fh3m .bars { height: 48px; gap: 10px; }
+#pulpit .fh3m .bars { height: 56px; gap: 12px; }
 #pulpit .fh3m .bar { background: var(--accent-green); opacity: .9; }
 #pulpit .fh3m .legend, #pulpit .fh3m .trend-note { color: var(--text-secondary); font-size: 11px; }
 
-#pulpit .pulpit-activity { display: flex; flex-direction: column; gap: 9px; }
-#pulpit .pulpit-activity .summary-container-subtle { max-height: 214px; overflow: auto; }
+#pulpit .pulpit-activity { display: flex; flex-direction: column; gap: 11px; }
+#pulpit .pulpit-activity .summary-container-subtle { max-height: 238px; overflow: auto; }
 #pulpit .activity-list { gap: 4px; }
-#pulpit .activity-item { padding: 6px 7px; border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: 0; background: transparent; }
+#pulpit .activity-item { padding: 7px 8px; border: 0; border-bottom: 1px solid var(--border-subtle); border-radius: 0; background: transparent; }
 #pulpit .activity-icon { width: 26px; height: 26px; flex: 0 0 26px; border-radius: 6px; font-size: 13px; }
 #pulpit .activity-text { font-size: 12px; }
-
-@media (max-width: 1450px) {
-  #pulpit .quick-actions-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
 
 @media (max-width: 1180px) {
   #pulpit .pulpit-weekly .metrics-grid,
