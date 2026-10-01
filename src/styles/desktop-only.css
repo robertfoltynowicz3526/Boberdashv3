@@ -187,3 +187,13 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #calendar-shell .fc .fc-daygrid-day {
   width: calc(100% / 7);
 }
+
+/* Laptop nie jest „mobilnym desktopem”: wykorzystuj viewport bez sztucznego 1366px. */
+html, body, #app { width: 100% !important; min-width: 0 !important; }
+@media (max-width: 1440px) {
+  aside, .sidebar { width: 230px !important; min-width: 230px !important; }
+  .main-grid { grid-template-columns: 230px minmax(0, 1fr) !important; }
+  .mainContent { width: calc(100vw - 230px) !important; min-width: 0; padding: 16px !important; }
+  .tab-content { min-width: 0; }
+  .table-section, .warehouse-table-wrap, .modal-content { overflow-x: auto; }
+}

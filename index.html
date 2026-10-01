@@ -1137,6 +1137,27 @@
             </form>
         </div>
     </div>
+    <div id="notes-preview-modal" class="modal" aria-hidden="true">
+        <div class="modal-content modal-content-notes note-preview-modal" role="dialog" aria-modal="true" aria-labelledby="notes-preview-title">
+            <button type="button" class="close-button" id="notes-preview-close" aria-label="Zamknij podgląd">&times;</button>
+            <div class="note-preview-heading">
+                <div>
+                    <p class="eyebrow">Podgląd notatki</p>
+                    <h2 id="notes-preview-title">Notatka</h2>
+                </div>
+                <span id="notes-preview-pin" class="status-chip" hidden>📌 Przypięta</span>
+            </div>
+            <div class="note-preview-meta">
+                <span id="notes-preview-date">—</span>
+                <span id="notes-preview-relation">Wolna</span>
+            </div>
+            <div id="notes-preview-content" class="note-preview-content"></div>
+            <div class="modal-actions">
+                <button type="button" id="notes-preview-edit" class="btn-add">Edytuj</button>
+                <button type="button" id="notes-preview-cancel" class="btn-secondary">Zamknij</button>
+            </div>
+        </div>
+    </div>
     <div id="machine-history-modal" class="modal">
         <div class="modal-content modal-content-large">
              <span class="close-button">&times;</span>

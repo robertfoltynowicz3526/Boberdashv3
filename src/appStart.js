@@ -1189,6 +1189,17 @@ function initializeApp() {
     const machineHistoryList = document.getElementById('machine-history-list');
     const editZlecenieCloseButton = editZlecenieModal ? editZlecenieModal.querySelector('.close-button') : null;
     const machineHistoryCloseButton = machineHistoryModal ? machineHistoryModal.querySelector('.close-button') : null;
+    const notesPreviewModal = document.getElementById('notes-preview-modal');
+    const notesPreviewTitle = document.getElementById('notes-preview-title');
+    const notesPreviewContent = document.getElementById('notes-preview-content');
+    const notesPreviewDate = document.getElementById('notes-preview-date');
+    const notesPreviewRelation = document.getElementById('notes-preview-relation');
+    const notesPreviewPin = document.getElementById('notes-preview-pin');
+    const notesPreviewEdit = document.getElementById('notes-preview-edit');
+    const notesPreviewClose = document.getElementById('notes-preview-close');
+    const notesPreviewCancel = document.getElementById('notes-preview-cancel');
+    let returnToMachineHistory = false;
+    let machineHistoryScrollTop = 0;
     const magazynTab = document.getElementById('magazyn');
     const magazynSummaryBox = document.getElementById('magazyn-summary');
 
@@ -1670,7 +1681,7 @@ function initializeApp() {
     }
 
     const trackedModals = [];
-    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal]
+    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal, notesPreviewModal]
         .forEach(modal => { if (modal) trackedModals.push(modal); });
 
     const modalBackdrop = document.createElement('div');
@@ -3242,6 +3253,17 @@ function initializeApp() {
         if (!notesModal) return;
         if (notesDirty && !window.confirm('Masz niezapisane zmiany. Zamknąć?')) return;
         hideModal(notesModal);
+    };
+    const openNotePreview = (note) => {
+        if (!note || !notesPreviewModal) return;
+        selectedNoteId = note.id;
+        notesPreviewTitle.textContent = note.title || '(bez tytułu)';
+        notesPreviewContent.textContent = note.contentText || '';
+        notesPreviewDate.textContent = `Aktualizacja: ${toDateLabel(note.updatedAt || note.createdAt)}`;
+        notesPreviewRelation.textContent = `Powiązanie: ${note.relationLabel || notesOrderLabelsById.get(note.linkedOrderId) || 'Wolna'}`;
+        notesPreviewPin.hidden = !note.pinned;
+        notesPreviewModal.setAttribute('aria-hidden', 'false');
+        openModal(notesPreviewModal);
     };
 
     function setActivityCollapsed(collapsed) {
@@ -5429,6 +5451,8 @@ async function obslugaListyKlientow(event) {
         const docId = target.dataset.id || row?.dataset.id;
         if (!docId) return;
         if (target.classList.contains('details-zlecenie-btn')) {
+            returnToMachineHistory = true;
+            machineHistoryScrollTop = machineHistoryModal?.querySelector('.modal-content')?.scrollTop || 0;
             handleDetailsButtonClick(docId, event);
         }
         if (target.classList.contains('edit-zlecenie-btn')) {
@@ -9246,7 +9270,11 @@ async function obslugaListyCzesci(event) {
         if (event.key !== 'Escape') return;
         closeMagazynRowMenu();
         const openModalItem = [...trackedModals].reverse().find((modal) => modal && modal.style.display === 'block');
-        if (openModalItem) hideModal(openModalItem);
+        if (openModalItem === detailsZlecenieModal && returnToMachineHistory) {
+            detailsZlecenieCloseButton?.click();
+        } else if (openModalItem) {
+            hideModal(openModalItem);
+        }
     });
 
     if (vacationTabs) {
@@ -9713,13 +9741,23 @@ async function obslugaListyCzesci(event) {
     if (clientDeleteBtn) clientDeleteBtn.addEventListener('click', usunKlienta);
     if (machineDeleteBtn) machineDeleteBtn.addEventListener('click', usunMaszyne);
     if (detailsZlecenieCloseButton && detailsZlecenieModal) {
-        detailsZlecenieCloseButton.onclick = () => { hideModal(detailsZlecenieModal); };
+        detailsZlecenieCloseButton.onclick = () => {
+            hideModal(detailsZlecenieModal);
+            if (returnToMachineHistory && machineHistoryModal) {
+                openModal(machineHistoryModal);
+                requestAnimationFrame(() => {
+                    const content = machineHistoryModal.querySelector('.modal-content');
+                    if (content) content.scrollTop = machineHistoryScrollTop;
+                });
+            }
+            returnToMachineHistory = false;
+        };
     }
     if (editZlecenieCloseButton && editZlecenieModal) {
         editZlecenieCloseButton.onclick = () => { hideModal(editZlecenieModal); };
     }
     if (machineHistoryCloseButton && machineHistoryModal) {
-        machineHistoryCloseButton.onclick = () => { hideModal(machineHistoryModal); };
+        machineHistoryCloseButton.onclick = () => { returnToMachineHistory = false; hideModal(machineHistoryModal); };
     }
 
     [clientDrawer, machineDrawer, oilToolsDrawer].forEach((drawer) => {
@@ -9795,7 +9833,7 @@ async function obslugaListyCzesci(event) {
             const note = allNotes.find((item) => item.id === noteId);
             if (!note) return;
             renderNotesList();
-            openNoteEditor(note);
+            openNotePreview(note);
         };
         notesListContainer.addEventListener('click', (event) => {
             openNoteFromCard(event.target.closest('[data-note-id]'));
@@ -9808,6 +9846,19 @@ async function obslugaListyCzesci(event) {
             openNoteFromCard(noteCard);
         });
     }
+    const closeNotePreview = () => {
+        if (!notesPreviewModal) return;
+        notesPreviewModal.setAttribute('aria-hidden', 'true');
+        hideModal(notesPreviewModal);
+    };
+    notesPreviewClose?.addEventListener('click', closeNotePreview);
+    notesPreviewCancel?.addEventListener('click', closeNotePreview);
+    notesPreviewEdit?.addEventListener('click', () => {
+        const note = allNotes.find((item) => item.id === selectedNoteId);
+        if (!note) return;
+        closeNotePreview();
+        openNoteEditor(note);
+    });
     if (notesEditorForm) {
         notesEditorForm.addEventListener('input', () => { notesDirty = true; });
         notesEditorForm.addEventListener('change', (event) => {
