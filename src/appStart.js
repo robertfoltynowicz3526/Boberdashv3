@@ -2961,6 +2961,13 @@ function initializeApp() {
     };
 
     function renderPulpitStatystykiMiesiaca(podsumowanie) {
+        const monthLabel = document.getElementById('pulpit-month-label');
+        const selectedMonth = getSelectedMonth();
+        if (monthLabel && selectedMonth) {
+            const [year, month] = selectedMonth.split('-').map(Number);
+            const date = new Date(year, month - 1, 1);
+            monthLabel.textContent = `— ${date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}`;
+        }
         renderMonthStats(kalendarzPodsumowanieDiv, podsumowanie);
     }
 
