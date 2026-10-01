@@ -18,6 +18,7 @@ export const renderNotesListView = ({ host, model, selectedNoteId }) => {
         <p class="noteCard__meta"><span class="noteCard__metaLabel">Powiązanie:</span> ${esc(note.relationLabel || (note.linkType === 'order' ? note.orderLabel : 'Wolna'))}</p>
       </header>
       <p class="notePreview">${esc(note.preview || "")}</p>
+      <footer class="noteCard__footer"><time>${esc(note.updatedLabel || note.createdLabel || '—')}</time><span aria-hidden="true">•••</span></footer>
     </article>
   `).join('');
 };

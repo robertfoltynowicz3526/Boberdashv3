@@ -7,6 +7,11 @@ const toMs = (value) => {
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
+const toDateLabel = (value) => {
+  const timestamp = toMs(value);
+  return timestamp ? new Date(timestamp).toLocaleDateString('pl-PL') : '—';
+};
+
 export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
   const orderLabelsById = filters.orderLabelsById instanceof Map ? filters.orderLabelsById : new Map();
   const q = (filters.search || '').trim().toLowerCase();
@@ -24,6 +29,7 @@ export const buildNotesViewModel = ({ notes = [], filters = {} } = {}) => {
       return {
         ...note,
         preview,
+        updatedLabel: toDateLabel(note.updatedAt || note.createdAt),
         orderLabel,
         relationLabel: note.linkType === NOTE_LINK_TYPES.ORDER ? (orderLabel || note.orderLabel || 'Brak zlecenia') : 'Wolna'
       };

@@ -798,3 +798,93 @@ input::placeholder{color:var(--jd-text-500)}
 .fc-daygrid .fc-daygrid-bg-harness,
 .fc .fc-bg-event { z-index: 0 !important; }
 .fc-popover { z-index: 50; }
+
+/* Boberdash Dark 2.0 — wspólna, lekka warstwa wizualna. */
+:root {
+  --bg-app: #080d0a;
+  --bg-sidebar: #0d1b11;
+  --bg-panel: #111914;
+  --bg-panel-secondary: #172019;
+  --border-subtle: rgba(226, 239, 226, .10);
+  --text-primary: #f2f6f2;
+  --text-secondary: #aebcaf;
+  --accent-green: #4d9b42;
+  --accent-yellow: #f2cb24;
+  --danger: #df6262;
+  --radius-panel: 9px;
+  --radius-control: 7px;
+}
+
+html, body { background: radial-gradient(circle at 15% 0, #102016 0, var(--bg-app) 42%); color: var(--text-primary); }
+body { font-size: 14px; line-height: 1.45; }
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: 12px 0 30px rgba(0, 0, 0, .18);
+}
+.tab-button { border: 0; border-radius: var(--radius-control); color: var(--text-secondary); transition: background-color .16s ease, color .16s ease; }
+.tab-button:hover { background: rgba(255,255,255,.045); color: var(--text-primary); }
+.tab-button.active { background: var(--accent-yellow); color: #15170d; box-shadow: none; }
+.tab-content > h2, .pulpit-header h2 { font-size: clamp(24px, 2vw, 28px); letter-spacing: -.02em; }
+.table-section, .form-section, .summary-container-subtle, .orders-grid .side, .orders-grid .main {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 12px 28px rgba(0,0,0,.14);
+}
+button, input, select, textarea, .btn, .btn-add, .btn-secondary { border-radius: var(--radius-control); }
+button { transition: background-color .16s ease, border-color .16s ease, color .16s ease; }
+table { border-collapse: collapse; }
+th { background: #152019; color: var(--text-secondary); font-size: 12px; letter-spacing: .035em; text-transform: uppercase; }
+td, th { border-color: var(--border-subtle) !important; padding: 8px 10px; }
+tbody tr { transition: background-color .16s ease; }
+tbody tr:hover { background: rgba(242, 203, 36, .045); }
+
+#pulpit { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr); gap: 12px; }
+#pulpit .pulpit-header, #pulpit .pulpit-quick-actions, #pulpit .pulpit-weekly, #pulpit .pulpit-stats-bar { grid-column: 1 / -1; }
+#pulpit .pulpit-charts { grid-column: 1; }
+#pulpit .pulpit-activity { grid-column: 2; }
+.pulpit-header { align-items: center; margin-bottom: 0; }
+.pulpit-quick-actions, .pulpit-weekly, .pulpit-stats-bar, .pulpit-charts, .pulpit-activity { padding: 12px; margin: 0; border-radius: var(--radius-panel); }
+.quick-actions-grid { grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 8px; }
+.quick-action-card { min-height: 52px; padding: 8px 10px; border-radius: var(--radius-control); background: var(--bg-panel-secondary); border-color: var(--border-subtle); }
+#pulpit .metrics-grid { grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 8px; }
+#pulpit .metric { min-height: 70px; padding: 10px 12px; border: 0; border-left: 2px solid var(--accent-green); border-radius: 5px; background: var(--bg-panel-secondary); }
+#pulpit .metric--accent { border-left-color: var(--accent-yellow); }
+#pulpit .metric .label { color: var(--text-secondary); font-size: 12px; }
+#pulpit .metric .value { font-size: 21px; color: var(--text-primary); }
+
+.fc .fc-col-header-cell { background: #162019; color: var(--text-secondary); }
+.fc .fc-daygrid-day { background: #111914; }
+.fc .fc-day-sat, .fc .fc-day-sun { background: #0e1511; }
+.fc .fc-day-today { background: rgba(242,203,36,.10) !important; box-shadow: inset 0 0 0 1px rgba(242,203,36,.48); }
+.fc .fc-daygrid-day-number { color: var(--text-primary); font-weight: 650; }
+
+.notes-layout { display: grid; grid-template-columns: 250px minmax(0,1fr); gap: 12px; }
+.notesGrid { column-count: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.noteCard { break-inside: initial; margin: 0; min-height: 132px; padding: 12px; border-radius: var(--radius-panel); border: 1px solid var(--border-subtle); border-left: 3px solid var(--note-accent); background: var(--bg-panel-secondary); }
+.notePreview { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--text-secondary); }
+.noteCard__footer { display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; color: var(--text-secondary); font-size: 12px; }
+.note-preview-heading, .note-preview-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.note-preview-meta { justify-content: flex-start; flex-wrap: wrap; color: var(--text-secondary); font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle); }
+.note-preview-content { min-height: 180px; max-height: 50vh; overflow: auto; padding: 18px 2px; white-space: pre-wrap; color: var(--text-primary); }
+.eyebrow { margin: 0 0 2px; color: var(--accent-yellow); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; }
+.status-chip { padding: 4px 8px; border-radius: 999px; background: rgba(242,203,36,.12); color: var(--accent-yellow); }
+
+.warehouse-tabs { padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.warehouse-tab { border-radius: var(--radius-control); background: var(--bg-panel-secondary); }
+.warehouse-tab.is-active { background: var(--accent-yellow); color: #17180d; border-color: var(--accent-yellow); }
+.warehouse-toolbar { gap: 10px; }
+.machine-history-table { min-width: 850px; }
+.modal-content { border-radius: var(--radius-panel); background: var(--bg-panel); border-color: var(--border-subtle); }
+
+@media (max-width: 1450px) {
+  .quick-actions-grid { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
+  #pulpit .metrics-grid { grid-template-columns: repeat(5, minmax(105px, 1fr)); }
+  .notesGrid { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+}
+@media (max-width: 1100px) {
+  #pulpit { grid-template-columns: 1fr; }
+  #pulpit .pulpit-charts, #pulpit .pulpit-activity { grid-column: 1; }
+  #pulpit .metrics-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+}
