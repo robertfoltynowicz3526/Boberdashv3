@@ -16,6 +16,7 @@ import { buildNotesViewModel, buildNoteOrderOptionsModel, filterNoteOrderOptions
 import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
 import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
+import { renderInvoiceHoursChart } from './components/invoiceHoursChart.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
 import {
     getFinanceMonthsForYear,
@@ -406,23 +407,11 @@ function initializeApp() {
         if (!host) return;
         const months = lastMonthsInclusive(y, m, 3);
         const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
-        const max = Math.max(...vals, 1);
         const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
         const curr = vals[2];
         const prev = vals[1];
         const deltaPct = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
-        host.innerHTML = `
-    <div class="fh3m fh3m--trend">
-      <div class="bars">
-        ${vals.map((v, i) => `
-          <div class="fh3m-column" title="${labels[i]}: ${v.toFixed(1)} h">
-            <strong class="fh3m-value">${v.toFixed(1)} h</strong>
-            <div class="fh3m-track"><span class="bar ${i < 2 ? 'dim' : ''}" style="height:${(v / max) * 100}%;"></span></div>
-            <span class="fh3m-label">${labels[i]}</span>
-          </div>`).join('')}
-      </div>
-      <p class="trend-note">Zmiana vs poprzedni miesiąc: <span class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</span></p>
-    </div>`;
+        renderInvoiceHoursChart(host, { labels, values: vals, deltaPct });
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
     const DEFAULT_VACATION_ALLOWANCE = 26;
