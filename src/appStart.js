@@ -414,10 +414,12 @@ function initializeApp() {
         host.innerHTML = `
     <div class="fh3m fh3m--trend">
       <div class="bars">
-        ${vals.map((v, i) => `<div class="bar ${i < 2 ? 'dim' : ''}" style="height:${(v / max) * 100}%;" title="${labels[i]}: ${v.toFixed(1)} h"></div>`).join('')}
-      </div>
-      <div class="legend">
-        <span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span>
+        ${vals.map((v, i) => `
+          <div class="fh3m-column" title="${labels[i]}: ${v.toFixed(1)} h">
+            <strong class="fh3m-value">${v.toFixed(1)} h</strong>
+            <div class="fh3m-track"><span class="bar ${i < 2 ? 'dim' : ''}" style="height:${(v / max) * 100}%;"></span></div>
+            <span class="fh3m-label">${labels[i]}</span>
+          </div>`).join('')}
       </div>
       <p class="trend-note">Zmiana vs poprzedni miesiąc: <span class="delta ${deltaPct >= 0 ? 'up' : 'down'}">${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%</span></p>
     </div>`;
@@ -3046,6 +3048,11 @@ function initializeApp() {
             return;
         }
         weeklyMissingDays = model.missingDaysList;
+        const missingStatus = document.querySelector('#pulpit .pulpit-weekly [data-weekly-missing]');
+        if (missingStatus) {
+            missingStatus.textContent = `Braki: ${model.missingDaysCount} dni`;
+            missingStatus.hidden = false;
+        }
         const tilesHtml = model.tiles.map(tile => `
             <div class="metric">
                 <div class="label">${tile.label}</div>
@@ -3056,7 +3063,6 @@ function initializeApp() {
             <div class="metrics-grid">
                 ${tilesHtml}
             </div>
-            <span class="weekly-missing" data-weekly-missing>Braki: ${model.missingDaysCount} dni</span>
         `;
     };
 
@@ -3096,8 +3102,12 @@ function initializeApp() {
         }
         if (!model.length) {
             pulpitActivityList.innerHTML = '<li class="loading-state">Brak ostatnich działań.</li>';
+            pulpitActivityContainer?.closest('.pulpit-activity')?.classList.add('is-empty');
+            pulpitActivityContainer?.closest('.pulpit-month-columns')?.classList.add('activity-is-empty');
             return;
         }
+        pulpitActivityContainer?.closest('.pulpit-activity')?.classList.remove('is-empty');
+        pulpitActivityContainer?.closest('.pulpit-month-columns')?.classList.remove('activity-is-empty');
         pulpitActivityList.innerHTML = model.map(item => `
             <li class="activity-item" data-activity-id="${item.id}" data-activity-type="${item.type}" data-activity-ref="${item.refId || ''}">
                 <span class="activity-icon">${item.icon}</span>

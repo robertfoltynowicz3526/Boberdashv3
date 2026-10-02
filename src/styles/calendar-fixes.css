@@ -208,6 +208,50 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   text-overflow: ellipsis;
 }
 
+/* Fluid month grid: seven equal columns, bounded events and a predictable row height. */
+.calendar-shell.view-month .fc-scrollgrid-sync-table,
+.calendar-shell.view-month .fc-col-header,
+.calendar-shell.view-month .fc-daygrid-body,
+.calendar-shell.view-month .fc-daygrid-body table {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.calendar-shell.view-month .fc-col-header-cell,
+.calendar-shell.view-month .fc-daygrid-day {
+  width: 14.285714% !important;
+  max-width: 14.285714% !important;
+}
+
+.calendar-shell.view-month .fc-daygrid-day-frame {
+  min-height: clamp(126px, 8.7vw, 168px) !important;
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.calendar-shell.view-month .fc-daygrid-day-events {
+  min-width: 0;
+  margin-inline: 4px;
+  overflow: hidden;
+}
+
+.calendar-shell.view-month .fc-daygrid-event,
+.calendar-shell.view-month .fc-daygrid-event-harness,
+.calendar-shell.view-month .fc-event-main,
+.calendar-shell.view-month .fc-event-main-frame {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.calendar-shell.view-month .day-summary {
+  left: 4px;
+  right: 4px;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 /* Komórka dnia musi być relative, żeby “dół” działał */
 .fc .fc-daygrid-day-frame { position: relative; }
 
