@@ -1083,3 +1083,159 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
   }
   #pulpit .pulpit-month-columns { grid-template-columns: 1fr; }
 }
+
+/* Fluid-layout polish: dashboard proportions, lightweight trend chart and order rows. */
+#pulpit.page-wide {
+  width: 100%;
+  max-width: none;
+}
+
+#pulpit .pulpit-weekly .metrics-grid,
+#pulpit .pulpit-month-panel > .summary-container-subtle .metrics-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: 1180px;
+}
+
+#pulpit .pulpit-weekly .metric {
+  min-height: 104px;
+  padding: 17px 18px;
+}
+
+#pulpit .pulpit-month-panel > .summary-container-subtle .metric {
+  min-height: 96px;
+  padding: 16px 17px;
+}
+
+#pulpit .pulpit-weekly .metric .label,
+#pulpit .pulpit-month-panel .metric .label {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+#pulpit .pulpit-weekly .metric .value,
+#pulpit .pulpit-month-panel .metric .value {
+  font-size: clamp(24px, 1.65vw, 29px);
+  font-weight: 750;
+}
+
+#pulpit .weekly-missing {
+  margin: 0;
+  cursor: pointer;
+}
+
+#pulpit .pulpit-month-columns.activity-is-empty {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+#pulpit .pulpit-activity.is-empty {
+  width: max-content;
+  min-width: 190px;
+  align-self: start;
+  padding: 11px 13px;
+}
+
+#pulpit .pulpit-activity.is-empty .summary-container-subtle {
+  max-height: none;
+}
+
+#pulpit .pulpit-activity.is-empty .activity-list {
+  margin: 0;
+}
+
+#pulpit .pulpit-activity.is-empty .loading-state {
+  padding: 2px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.fh3m .bars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(76px, 1fr));
+  align-items: stretch;
+  gap: clamp(12px, 2vw, 26px);
+  height: 148px;
+}
+
+.fh3m .fh3m-column {
+  display: grid;
+  grid-template-rows: 22px minmax(0, 1fr) 18px;
+  gap: 5px;
+  min-width: 0;
+  text-align: center;
+}
+
+.fh3m .fh3m-value {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fh3m .fh3m-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 0;
+  border-bottom: 1px solid rgba(255,255,255,.13);
+  background: linear-gradient(to top, rgba(255,255,255,.025), transparent);
+}
+
+.fh3m .bar {
+  display: block;
+  width: min(54px, 56%);
+  min-height: 3px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #61bd68, var(--accent-green));
+  box-shadow: 0 0 18px rgba(67, 165, 79, .12);
+}
+
+.fh3m .bar.dim { opacity: .68; }
+.fh3m .fh3m-label { color: var(--text-secondary); font-size: 11px; }
+.fh3m .trend-note { margin: 10px 0 0; }
+#pulpit .fh3m .bars { height: 148px; gap: clamp(12px, 2vw, 26px); }
+
+/* Stable, content-led columns without large nested tiles. */
+.order-active-summary {
+  grid-template-columns: minmax(105px, .65fr) minmax(170px, 1.15fr) minmax(260px, 1.8fr) minmax(105px, .65fr) 44px;
+  gap: 8px 16px;
+}
+
+.order-closed-compact-summary {
+  grid-template-columns: minmax(105px, .65fr) minmax(170px, 1.15fr) minmax(240px, 1.7fr) minmax(112px, .75fr) minmax(120px, .8fr) 44px;
+  gap: 8px 16px;
+}
+
+.order-active-summary .order-card-cell,
+.order-closed-compact-summary .order-card-cell {
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.order-active-summary .order-card-cell strong,
+.order-closed-compact-summary .order-card-cell strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-list-item__actions button { white-space: nowrap; }
+
+@media (max-width: 1400px) {
+  #pulpit .pulpit-weekly .metrics-grid,
+  #pulpit .pulpit-month-panel > .summary-container-subtle .metrics-grid {
+    max-width: none;
+  }
+  .order-active-summary,
+  .order-closed-compact-summary { gap-inline: 10px; }
+}
+
+@media (max-width: 1180px) {
+  #pulpit .pulpit-weekly .metrics-grid,
+  #pulpit .pulpit-month-panel > .summary-container-subtle .metrics-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
