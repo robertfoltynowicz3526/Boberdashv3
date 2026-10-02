@@ -489,64 +489,71 @@
 }
 
 /* Widok miesiąca – minimalistyczny overview */
-.calendar-shell.view-month{
+#calendar-shell.view-month{
   --calendar-month-min-height: 420px;
+  height: auto;
+  min-height: auto;
 }
 
-.calendar-shell.view-month .calendar-main{
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
-  overscroll-behavior: contain;
+#calendar-shell.view-month .calendar-main{
+  min-height: auto;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
-.calendar-shell.view-month .fc{
+#calendar-shell.view-month #kalendarz{
+  height: auto;
+  min-height: auto;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+#calendar-shell.view-month .fc{
   --calendar-day-min-height: clamp(72px, 12vh, 110px);
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
   --day-summary-space: 28px;
-  height: 100%;
-  min-height: 0;
+  height: auto !important;
+  min-height: auto;
 }
 
-.calendar-shell.view-month .fc .fc-view-harness{
-  height: 100% !important;
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+#calendar-shell.view-month .fc .fc-view-harness{
+  height: auto !important;
+  min-height: auto;
+  flex: 0 0 auto;
+  display: block;
 }
 
-.calendar-shell.view-month .fc .fc-view-harness-active,
-.calendar-shell.view-month .fc .fc-scrollgrid,
-.calendar-shell.view-month .fc .fc-daygrid-body-unbalanced{
-  height: 100% !important;
-}
-
-.calendar-shell.view-month .fc .fc-scroller{
-  overflow-y: auto;
-  max-height: 100%;
-}
-
-.calendar-shell.view-month .fc .fc-daygrid-body{
+#calendar-shell.view-month .fc .fc-view-harness-active,
+#calendar-shell.view-month .fc .fc-scrollgrid,
+#calendar-shell.view-month .fc .fc-daygrid-body-unbalanced{
   height: auto !important;
 }
 
-.calendar-shell.view-month .fc .fc-daygrid-body table{
+#calendar-shell.view-month .fc .fc-scroller{
+  overflow: visible !important;
+  max-height: none;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-body{
+  height: auto !important;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-body table{
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   grid-template-rows: repeat(var(--calendar-visible-weeks, 6), minmax(90px, 1fr));
 }
 
-.calendar-shell.view-month .fc .fc-daygrid-body tr{
+#calendar-shell.view-month .fc .fc-daygrid-body tr{
   display: contents;
 }
 
-.calendar-shell.view-month .fc .fc-daygrid-day{
+#calendar-shell.view-month .fc .fc-daygrid-day{
   display: block;
 }
 
-.calendar-shell.view-month .fc .fc-daygrid-day-frame{
+#calendar-shell.view-month .fc .fc-daygrid-day-frame{
   overflow: hidden;
   min-height: var(--calendar-day-min-height);
 }
