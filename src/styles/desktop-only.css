@@ -1,183 +1,71 @@
-/* ===== DESKTOP-ONLY (ładuj NA KOŃCU) ===== */
-html, body, #app { width: 100vw !important; height: 100%; overflow-x: hidden; }
-body { min-width: 1366px !important; }  /* wymuś szerokość dla PC */
-
-.app-shell, .content, .page, .page-section, [data-section] {
-  max-width: none !important;
-  width: 100% !important;
+/* ===== DESKTOP LAYOUT (loaded last) =====
+ * The sidebar and main are direct flex children of body. Keep the sidebar at
+ * its existing width and let main consume the complete remaining viewport.
+ */
+html,
+body,
+#app {
+  width: 100%;
+  min-width: 0;
 }
 
-/* Siatka z lewym menu: prawa kolumna = pełna szerokość */
-.main-grid { grid-template-columns: 280px 1fr !important; }
-.main-grid > .main, .main, .content-inner { grid-column: 2 / -1 !important; width: 100% !important; }
-
-/* Sidebar – sztywna szerokość, by łatwo wyliczyć main */
-aside, .sidebar { width: 280px !important; min-width: 280px !important; }
-
-/* Karta z kalendarzem – wyśrodkowana, bez rozciągania na boki */
-.calendar-card, [data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 12px !important;
+body {
+  overflow-x: hidden;
 }
 
-/* Kalendarz – auto height, bez wymuszonych min-height */
-#calendar,
-#kalendarz { height: auto !important; min-height: auto !important; }
-.fc-view-harness { min-height: auto !important; }
-.fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
-
-/* Pop-over „+X więcej” – zostaje */
-.fc-popover { background:#0f1f14; border:1px solid rgba(255,255,255,.1); color:#e9ffe9; border-radius:12px; }
-.fc-popover .fc-popover-header{ background:#12341e; color:#e9ffe9; border-bottom:1px solid rgba(255,255,255,.08); }
-
-/* Chippy godzin oraz ikony wolnego/L4/święta */
-.ab-chip{
-  position:absolute; left:6px; right:6px; bottom:6px;
-  background:rgba(49,128,83,.96); color:#eaffea;
-  border-radius:10px; padding:6px 8px; font-size:12px; line-height:1.25;
-  border:1px solid rgba(255,255,255,.12)
-}
-.leave-flag{ position:absolute; inset:0; display:grid; place-items:center;
-  font-size:32px; opacity:.9; pointer-events:none; }
-
-/* ===== SCROLLE W LISTACH ===== */
-/* Zakończone zlecenia / Maszyny / Klienci – przewijanie pionowe listy */
-[data-section="zlecenia"] .closed-list,
-[data-section="zlecenia"] .list-panel,
-[data-section="maszyny"] .items,
-[data-section="klienci"] .items,
-.list-scroll, .list-panel {
-  max-height: calc(100vh - 260px) !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
+.mainContent {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 20px 24px;
 }
 
-/* Nagłówki list „przyklejone”, żeby zawsze było widać filtr/sumę */
-.list-panel .list-header, .closed-list .list-header, .items .list-header {
-  position: sticky; top: 0; z-index: 2;
-  background: rgba(0,0,0,.35);
-  backdrop-filter: blur(4px);
+/* Every module fills main; width limits remain local to forms and modals. */
+.mainContent > .tab-content,
+.mainContent > [data-section],
+.page-wide {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
 }
 
-/* Ubicie typowych mobilnych reguł zawężających */
-@media (max-width: 1200px){
-  body { min-width: 1366px !important; }
-  .main, .content, .page, .page-section { width: calc(100vw - 280px) !important; }
+/* Dashboard keeps its redesigned panel grid without a second side gutter. */
+#pulpit.page-wide {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
 }
 
-/* === WYŁĄCZ CENTROWANIE I MAX-WIDTH KONTENERÓW === */
-.container, .wrapper, .app-content, .app-shell, .content, .content-inner,
-.page, .page-container, .page-section, [data-section] {
-  max-width: none !important;
-  width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+/* Wide data regions scroll locally instead of widening the application. */
+.table-section,
+.warehouse-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
-/* Układ z lewym menu: sidebar 280px, reszta = 1fr */
-aside, .sidebar { width: 280px !important; min-width: 280px !important; }
-.main-grid { grid-template-columns: 280px 1fr !important; }
-.main-grid > .main, .main, .content-inner { grid-column: 2 / -1 !important; }
-
-/* === KARTA KALENDARZA – PEŁNA SZEROKOŚĆ PRAWEJ KOLUMNY === */
+/* FullCalendar uses all of the width supplied by main. */
 .calendar-card,
 [data-section="pulpit"] .card.kalendarz,
 [data-section="kalendarz"] .card,
-#calendar-wrapper, .calendar-wrapper {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 12px !important;
+#calendar-wrapper,
+.calendar-wrapper {
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
-/* FullCalendar niech używa 100% rodzica */
-#calendar, #kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid {
-  width: 100% !important;
-}
-
-/* W dół – większe kratki i wysoki harness */
 #calendar,
-#kalendarz { height: auto !important; min-height: auto !important; }
-.fc-view-harness { min-height: auto !important; }
-.fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
-
-/* === LISTY – PRZEWIJANIE (ZAKOŃCZONE, MASZYNY, KLIENCI) === */
-[data-section="zlecenia"] .closed-list,
-[data-section="zlecenia"] .list-panel,
-#closed-orders, .closed-orders,
-[data-section="maszyny"] .items, #machines-list,
-[data-section="klienci"] .items, #clients-list {
-  max-height: calc(100vh - 260px) !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-}
-
-/* Przyklejony nagłówek listy (jeśli jest) */
-.list-header, .closed-list .list-header {
-  position: sticky; top: 0; z-index: 2;
-  background: rgba(0,0,0,.35); backdrop-filter: blur(4px);
-}
-
-/* Upewnij się, że żaden rodzic NIE utnie przewijania */
-[data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"] {
-  overflow: visible !important;
-}
-
-/* === KALENDARZ NA CAŁĄ SZEROKOŚĆ PRAWEJ KOLUMNY === */
-aside, .sidebar { width: 280px !important; min-width: 280px !important; }
-.main-grid { grid-template-columns: 280px 1fr !important; }
-.main-grid > .main, .main, .content, .content-inner, .page, .page-container {
-  grid-column: 2 / -1 !important;
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-}
-
-/* Karta z kalendarzem = viewport - sidebar */
-#calendar-wrapper, .calendar-wrapper,
-[data-section="pulpit"] .card.kalendarz, [data-section="kalendarz"] .card {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 12px !important;
-}
-
-/* FullCalendar niech zawsze bierze 100% szerokości rodzica */
-#kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid { width: 100% !important; }
-
-/* Wysokość automatyczna – bez wymuszania wysokich kratek */
-#kalendarz { height: auto !important; min-height: auto !important; }
-.fc-view-harness { min-height: auto !important; }
-.fc-daygrid-day-frame { min-height: auto !important; }
-
-/* === SCROLL W DŁUGICH LISTACH === */
-#closed-orders, .closed-orders,          /* zakończone zlecenia */
-#machines-list, .machines-list,          /* maszyny */
-#clients-list, .clients-list {           /* klienci */
-  max-height: calc(100vh - 260px) !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-}
-
-/* upewnij się, że rodzice nie blokują scrolla */
-[data-section="zlecenia"], [data-section="maszyny"], [data-section="klienci"],
-.page, .page-container, .content, .main { overflow: visible !important; }
-
-/* Sticky nagłówki w panelach list (jeśli są) */
-.list-header { position: sticky; top: 0; z-index: 2; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); }
-
-/* Kalendarz: wymuś siatkę 7 kolumn */
-#calendar-shell .fc .fc-scrollgrid,
-#calendar-shell .fc .fc-daygrid,
+#kalendarz,
+.fc,
+.fc .fc-scrollgrid,
+.fc .fc-daygrid,
 #calendar-shell .fc .fc-daygrid-body table,
 #calendar-shell .fc .fc-scrollgrid table {
-  width: 100% !important;
-}
-
-#calendar-shell .fc .fc-daygrid-body {
-  display: table-row-group;
+  width: 100%;
 }
 
 #calendar-shell .fc .fc-daygrid-body table {
@@ -188,12 +76,34 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   width: calc(100% / 7);
 }
 
-/* Laptop nie jest „mobilnym desktopem”: wykorzystuj viewport bez sztucznego 1366px. */
-html, body, #app { width: 100% !important; min-width: 0 !important; }
+/* Long module lists retain their own vertical scroll. */
+[data-section="zlecenia"] .closed-list,
+[data-section="zlecenia"] .list-panel,
+#closed-orders,
+.closed-orders,
+[data-section="maszyny"] .items,
+#machines-list,
+[data-section="klienci"] .items,
+#clients-list,
+.list-scroll,
+.list-panel {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.list-panel .list-header,
+.closed-list .list-header,
+.items .list-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+}
+
 @media (max-width: 1440px) {
-  aside, .sidebar { width: 230px !important; min-width: 230px !important; }
-  .main-grid { grid-template-columns: 230px minmax(0, 1fr) !important; }
-  .mainContent { width: calc(100vw - 230px) !important; min-width: 0; padding: 16px !important; }
-  .tab-content { min-width: 0; }
-  .table-section, .warehouse-table-wrap, .modal-content { overflow-x: auto; }
+  .mainContent {
+    padding: 20px;
+  }
 }
