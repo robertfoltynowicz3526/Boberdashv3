@@ -699,6 +699,13 @@ function initializeApp() {
     const syncCalendarShellHeight = () => {
         if (!calendarShell) return;
         if (calendarShell.offsetParent === null) return;
+        // The month grid must be allowed to define its own height. Constraining
+        // it to the remaining viewport clips the last week on shorter screens.
+        if (calendarShell.classList.contains('view-month')) {
+            calendarShell.style.removeProperty('--calendar-shell-height');
+            calendarShell.style.removeProperty('--calendar-shell-min-height');
+            return;
+        }
         const rect = calendarShell.getBoundingClientRect();
         const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.bottom || 0;
         const available = Math.max(viewportHeight - rect.top - CALENDAR_SHELL_BOTTOM_GUTTER, CALENDAR_SHELL_MIN_HEIGHT);
@@ -2284,7 +2291,7 @@ function initializeApp() {
                     selectable: true,
                     selectMirror: true,
                     unselectAuto: true,
-                    expandRows: true,
+                    expandRows: false,
                     dayMaxEvents: true,
                     dayMaxEventRows: 3,
                     moreLinkText: (num) => `+${num}`,
