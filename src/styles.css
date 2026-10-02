@@ -203,25 +203,8 @@ input::placeholder{color:var(--jd-text-500)}
   box-shadow: none;
 }
 
-#calendar-shell.view-month .fc .fc-scrollgrid,
-#calendar-shell.view-month .fc .fc-view-harness,
-#calendar-shell.view-month .fc .fc-view-harness-active{
-  height: 100% !important;
-  min-height: 0;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body{
-  height: auto !important;
-}
-
-#calendar-shell.view-month .fc .fc-scroller{
-  overflow-y: auto;
-  max-height: 100%;
-}
-
 #calendar-shell.view-month .fc .fc-daygrid-body table{
   table-layout: fixed;
-  height: auto;
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day,
@@ -671,22 +654,19 @@ input::placeholder{color:var(--jd-text-500)}
 .calendarSection{
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   gap: 1rem;
 }
 
 .calendarGridWrap{
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
 }
 
 /* Kalendarz zawsze w ramie – nic nie wystaje */
 .calendar-wrap{width:100%;max-width:none;margin:0 auto;overflow:visible}
-.calendar-wrap.calendarGridWrap{
-  overflow-y: auto;
-  overflow-x: hidden;
-}
+.calendar-wrap.calendarGridWrap{overflow:visible}
 .fc{width:100%}
 
 /* Layout aplikacji – pełna szerokość kontentu */

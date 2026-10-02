@@ -24,7 +24,6 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
 #kalendarz, .fc, .fc .fc-scrollgrid, .fc .fc-daygrid { width: 100% !important; }
 
 /* Większe kratki (czytelne) */
-.fc-view-harness { min-height: 100% !important; }
 .fc-daygrid-day-frame { min-height: var(--calendar-day-min-height, 160px) !important; }
 
 /* Look & feel FullCalendar */
@@ -67,41 +66,11 @@ aside, .sidebar { width: 280px !important; min-width: 280px !important; }
   background: rgba(255,255,255,.2); border-radius: 8px;
 }
 
-/* --- Kalendarz na pełną wysokość i szerokość prawej kolumny --- */
+/* --- Kalendarz na pełną szerokość prawej kolumny --- */
 .calendar-shell {
   width: 100%;
-  height: var(--calendar-shell-height, auto);
   margin: 0 auto;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: var(--calendar-shell-min-height, 420px);
-}
-
-.calendar-shell #calendar,
-.calendar-shell #kalendarz,
-.calendar-shell .fc,
-.calendar-shell .fc-scrollgrid,
-.calendar-shell .fc-view-harness,
-.calendar-shell .fc-view-harness-active {
-  height: 100% !important;
-  min-height: 0;
-}
-
-.calendar-shell .fc-daygrid-body,
-.calendar-shell .fc-daygrid-body-unbalanced {
-  height: 100% !important;
-  min-height: 0;
-}
-
-.calendar-shell.view-month .fc .fc-daygrid-body,
-.calendar-shell.view-month .fc .fc-daygrid-body-unbalanced {
-  height: auto !important;
-}
-
-.calendar-shell.view-month .fc .fc-scroller {
-  overflow: visible;
-  max-height: none;
 }
 
 .calendar-shell.view-month .fc .fc-daygrid-day-frame {
