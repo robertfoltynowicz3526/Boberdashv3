@@ -694,27 +694,7 @@ function initializeApp() {
         api.setOption('dayMaxEventRows', shouldLimit ? rows : false);
     };
 
-    const CALENDAR_SHELL_MIN_HEIGHT = 420;
-    const CALENDAR_SHELL_BOTTOM_GUTTER = 24;
-    const syncCalendarShellHeight = () => {
-        if (!calendarShell) return;
-        if (calendarShell.offsetParent === null) return;
-        // The month grid must be allowed to define its own height. Constraining
-        // it to the remaining viewport clips the last week on shorter screens.
-        if (calendarShell.classList.contains('view-month')) {
-            calendarShell.style.removeProperty('--calendar-shell-height');
-            calendarShell.style.removeProperty('--calendar-shell-min-height');
-            return;
-        }
-        const rect = calendarShell.getBoundingClientRect();
-        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || rect.bottom || 0;
-        const available = Math.max(viewportHeight - rect.top - CALENDAR_SHELL_BOTTOM_GUTTER, CALENDAR_SHELL_MIN_HEIGHT);
-        calendarShell.style.setProperty('--calendar-shell-height', `${Math.round(available)}px`);
-        calendarShell.style.setProperty('--calendar-shell-min-height', `${CALENDAR_SHELL_MIN_HEIGHT}px`);
-    };
-
     const handleCalendarResize = () => {
-        syncCalendarShellHeight();
         try {
             getCalendarApi()?.updateSize();
         } catch (_) { }
@@ -1812,7 +1792,7 @@ function initializeApp() {
             void initFinanceModule();
         }
         if (tabName === 'kalendarz-tab') {
-            syncCalendarShellHeight();
+            requestAnimationFrame(() => getCalendarApi()?.updateSize?.());
             if (!bootstrapReady) {
                 pendingCalendarInit = true;
                 return;
@@ -2291,6 +2271,7 @@ function initializeApp() {
                     selectable: true,
                     selectMirror: true,
                     unselectAuto: true,
+                    height: 'auto',
                     expandRows: false,
                     dayMaxEvents: true,
                     dayMaxEventRows: 3,

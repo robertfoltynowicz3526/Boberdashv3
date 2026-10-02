@@ -1207,11 +1207,6 @@ select {
   width: 100%;
   max-width: none;
   margin: 0;
-  flex: 1;
-  min-height: var(--calendar-shell-min-height, 420px);
-  height: var(--calendar-shell-height, auto);
-  display: flex;
-  flex-direction: column;
 }
 
 #pulpit .summary-container-subtle {
@@ -1254,12 +1249,7 @@ select {
 }
 
 #calendar-shell #kalendarz {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
   overflow: visible;
-  display: flex;
-  flex-direction: column;
 }
 
 @media (max-height: 820px), (max-width: 1366px) {
@@ -1289,17 +1279,6 @@ select {
   .quick-actions-grid {
     grid-template-columns: 1fr;
   }
-}
-
-#calendar-shell .fc,
-#calendar-shell .fc-view-harness,
-#calendar-shell .fc-view-harness-active,
-#calendar-shell .fc-scroller,
-#calendar-shell .fc-scrollgrid,
-#calendar-shell .fc-daygrid-body,
-#calendar-shell .fc-daygrid-body-unbalanced {
-  height: 100% !important;
-  min-height: 0;
 }
 
 #calendar-shell .fc .fc-scrollgrid,

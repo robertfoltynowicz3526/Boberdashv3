@@ -5,9 +5,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
-  flex: 1;
-  min-height: var(--calendar-shell-min-height, 420px);
-  height: var(--calendar-shell-height, auto);
   background: var(--calendar-bg);
   border: 1px solid var(--calendar-border);
   border-radius: 18px;
@@ -24,10 +21,6 @@
 
 #calendar, #kalendarz{
   width: 100%;
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 #calendar {
@@ -489,68 +482,11 @@
 }
 
 /* Widok miesiąca – minimalistyczny overview */
-#calendar-shell.view-month{
-  --calendar-month-min-height: 420px;
-  height: auto;
-  min-height: auto;
-}
-
-#calendar-shell.view-month .calendar-main{
-  min-height: auto;
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
-#calendar-shell.view-month #kalendarz{
-  height: auto;
-  min-height: auto;
-  flex: 0 0 auto;
-  overflow: visible;
-}
-
 #calendar-shell.view-month .fc{
   --calendar-day-min-height: clamp(72px, 12vh, 110px);
   --calendar-cell-padding: 6px;
   --calendar-event-font: 11px;
   --day-summary-space: 28px;
-  height: auto !important;
-  min-height: auto;
-}
-
-#calendar-shell.view-month .fc .fc-view-harness{
-  height: auto !important;
-  min-height: auto;
-  flex: 0 0 auto;
-  display: block;
-}
-
-#calendar-shell.view-month .fc .fc-view-harness-active,
-#calendar-shell.view-month .fc .fc-scrollgrid,
-#calendar-shell.view-month .fc .fc-daygrid-body-unbalanced{
-  height: auto !important;
-}
-
-#calendar-shell.view-month .fc .fc-scroller{
-  overflow: visible !important;
-  max-height: none;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body{
-  height: auto !important;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body table{
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  grid-template-rows: repeat(var(--calendar-visible-weeks, 6), minmax(90px, 1fr));
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-body tr{
-  display: contents;
-}
-
-#calendar-shell.view-month .fc .fc-daygrid-day{
-  display: block;
 }
 
 #calendar-shell.view-month .fc .fc-daygrid-day-frame{
@@ -558,28 +494,6 @@
   min-height: var(--calendar-day-min-height);
 }
 
-
-.calendar-shell[data-range-mode="week"],
-.calendar-shell[data-range-mode="twoWeeks"]{
-  min-height: auto;
-  height: auto;
-}
-
-.calendar-shell[data-range-mode="week"] .fc,
-.calendar-shell[data-range-mode="week"] .fc-view-harness,
-.calendar-shell[data-range-mode="week"] .fc-view-harness-active,
-.calendar-shell[data-range-mode="week"] .fc-scrollgrid,
-.calendar-shell[data-range-mode="week"] .fc-daygrid-body,
-.calendar-shell[data-range-mode="week"] .fc-daygrid-body-unbalanced,
-.calendar-shell[data-range-mode="twoWeeks"] .fc,
-.calendar-shell[data-range-mode="twoWeeks"] .fc-view-harness,
-.calendar-shell[data-range-mode="twoWeeks"] .fc-view-harness-active,
-.calendar-shell[data-range-mode="twoWeeks"] .fc-scrollgrid,
-.calendar-shell[data-range-mode="twoWeeks"] .fc-daygrid-body,
-.calendar-shell[data-range-mode="twoWeeks"] .fc-daygrid-body-unbalanced{
-  height: auto !important;
-  min-height: 0;
-}
 
 /* Breakpointy */
 @media (min-width: 1440px) {
