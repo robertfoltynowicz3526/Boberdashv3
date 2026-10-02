@@ -581,3 +581,203 @@
     --day-summary-space: 44px;
   }
 }
+
+/* Calendar visual refresh
+ * Keep sizing and view behaviour in FullCalendar; this section only skins the
+ * existing grid and makes sure content is allowed to participate in row size. */
+.calendar-wrap {
+  --calendar-workday-bg: #101914;
+  --calendar-weekend-bg: #0e1715;
+  --calendar-header-bg: #121c18;
+  --calendar-soft-grid: rgba(128, 158, 141, 0.14);
+  --calendar-chip-bg: #173524;
+  --calendar-chip-border: rgba(112, 174, 126, 0.38);
+  --calendar-chip-text: #edf5ef;
+  --calendar-summary-bg: #0b1510;
+  --calendar-summary-border: rgba(75, 133, 91, 0.42);
+  --calendar-summary-text: #cbd9cf;
+  background: #0d1511;
+  border-color: rgba(124, 153, 135, 0.16);
+}
+
+.fc {
+  --fc-border-color: var(--calendar-soft-grid);
+  color: #e6eee8;
+}
+
+.fc-theme-standard .fc-scrollgrid,
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border-color: var(--calendar-soft-grid);
+}
+
+.fc .fc-col-header-cell {
+  background: var(--calendar-header-bg);
+  color: #b9c8ce;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding-block: 8px;
+  color: inherit;
+}
+
+.fc .fc-daygrid-day {
+  background: var(--calendar-workday-bg);
+  transition: background-color 160ms ease;
+}
+
+.fc .fc-daygrid-day:nth-child(6),
+.fc .fc-daygrid-day:nth-child(7) {
+  background: var(--calendar-weekend-bg);
+}
+
+.fc .fc-daygrid-day:hover {
+  background: #132019;
+}
+
+.fc .fc-daygrid-day:nth-child(6):hover,
+.fc .fc-daygrid-day:nth-child(7):hover {
+  background: #111e1b;
+}
+
+.fc .fc-day-today {
+  background: rgba(197, 181, 55, 0.075) !important;
+  box-shadow: inset 0 0 0 1px rgba(227, 201, 76, 0.78);
+  position: relative;
+  z-index: 1;
+}
+
+.fc .fc-daygrid-day-number {
+  color: #d6e0d9 !important;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  padding: 6px 7px 4px;
+}
+
+.fc .fc-day-other .fc-daygrid-day-number {
+  color: #647269 !important;
+}
+
+/* Entries may increase the height of their week rather than being clipped. */
+.fc .fc-daygrid-day,
+.fc .fc-daygrid-day-frame,
+.fc .fc-daygrid-day-events,
+.fc .fc-daygrid-event-harness,
+.calendar-shell.view-month .fc .fc-daygrid-day-frame,
+.calendar-shell.view-month .fc .fc-daygrid-day-events {
+  overflow: visible !important;
+}
+
+.fc .fc-daygrid-day-events {
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.fc .bober-chip.fc-event,
+.fc .order-event.fc-event,
+.fc .bober-chip--client,
+.fc .fc-client-chip,
+.fc .client-chip {
+  background: var(--calendar-chip-bg) !important;
+  border: 1px solid var(--calendar-chip-border) !important;
+  border-radius: 5px !important;
+  color: var(--calendar-chip-text) !important;
+  padding: 2px 6px !important;
+  line-height: 1.25 !important;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.fc .bober-chip.fc-event:hover,
+.fc .order-event.fc-event:hover,
+.fc .bober-chip--client:hover,
+.fc .fc-client-chip:hover,
+.fc .client-chip:hover {
+  background: #20452f !important;
+  border-color: rgba(135, 196, 148, 0.58) !important;
+}
+
+.fc .fc-title-only,
+.fc .fc-event-title {
+  color: inherit;
+  font-weight: 650;
+}
+
+.fc .day-summary {
+  background: var(--calendar-summary-bg);
+  border-color: var(--calendar-summary-border);
+  border-radius: 5px;
+  color: var(--calendar-summary-text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.fc .cell-leave-icon .leave-chip {
+  border-radius: 6px;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+}
+
+.fc .cell-leave-icon--L4 .leave-chip {
+  background: #4a2926;
+  border-color: #79504a;
+  color: #f1d3cf;
+}
+
+.fc .cell-leave-icon--URL .leave-chip,
+.fc .cell-leave-icon--SZKOLENIE .leave-chip {
+  background: #302b52;
+  border-color: #59517e;
+  color: #dfdcf5;
+}
+
+.fc .cell-leave-icon--WOLNE .leave-chip {
+  background: #263842;
+  border-color: #4b626f;
+  color: #d7e3e9;
+}
+
+.fc .cell-leave-icon--SWIETO .leave-chip {
+  background: #4b252c;
+  border-color: #78434d;
+  color: #f2d2d7;
+}
+
+#calendar-toolbar .btn,
+#calendar-toolbar .btn-ghost,
+.calendar-range-switch .btn-ghost {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+#calendar-toolbar .btn:hover,
+#calendar-toolbar .btn-ghost:hover,
+.calendar-range-switch .btn-ghost:hover {
+  background: rgba(69, 128, 81, 0.16);
+  border-color: rgba(105, 164, 117, 0.38);
+}
+
+#calendar-toolbar .is-active,
+.calendar-range-switch .btn-ghost.is-active {
+  background: #285f38;
+  border-color: #438655;
+  color: #f1f7f2;
+}
+
+@media (min-width: 1366px) and (max-width: 1439px) {
+  .calendar-shell.view-month .fc .bober-chip.fc-event,
+  .calendar-shell.view-month .fc .order-event.fc-event {
+    font-size: 10px !important;
+    padding-inline: 5px !important;
+  }
+
+  .calendar-shell.view-month .fc .day-summary {
+    font-size: 9px;
+    padding-inline: 3px;
+  }
+}
