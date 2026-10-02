@@ -587,15 +587,15 @@
  * existing grid and makes sure content is allowed to participate in row size. */
 .calendar-wrap {
   --calendar-workday-bg: #101914;
-  --calendar-weekend-bg: #0e1715;
+  --calendar-weekend-bg: #0f1817;
   --calendar-header-bg: #121c18;
-  --calendar-soft-grid: rgba(128, 158, 141, 0.14);
-  --calendar-chip-bg: #173524;
-  --calendar-chip-border: rgba(112, 174, 126, 0.38);
+  --calendar-soft-grid: rgba(128, 158, 141, 0.11);
+  --calendar-chip-bg: #173822;
+  --calendar-chip-border: rgba(112, 184, 126, 0.46);
   --calendar-chip-text: #edf5ef;
-  --calendar-summary-bg: #0b1510;
-  --calendar-summary-border: rgba(75, 133, 91, 0.42);
-  --calendar-summary-text: #cbd9cf;
+  --calendar-summary-bg: #0b1710;
+  --calendar-summary-border: rgba(75, 143, 91, 0.48);
+  --calendar-summary-text: #dbe7de;
   background: #0d1511;
   border-color: rgba(124, 153, 135, 0.16);
 }
@@ -614,10 +614,11 @@
 .fc .fc-col-header-cell {
   background: var(--calendar-header-bg);
   color: #b9c8ce;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.055em;
   text-transform: uppercase;
+  border-bottom-color: rgba(150, 181, 161, 0.2);
 }
 
 .fc .fc-col-header-cell-cushion {
@@ -645,8 +646,8 @@
 }
 
 .fc .fc-day-today {
-  background: rgba(197, 181, 55, 0.075) !important;
-  box-shadow: inset 0 0 0 1px rgba(227, 201, 76, 0.78);
+  background: rgba(227, 201, 76, 0.045) !important;
+  box-shadow: inset 0 0 0 1px rgba(227, 201, 76, 0.72);
   position: relative;
   z-index: 1;
 }
@@ -654,7 +655,7 @@
 .fc .fc-daygrid-day-number {
   color: #d6e0d9 !important;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1;
   padding: 6px 7px 4px;
 }
@@ -687,9 +688,10 @@
   border: 1px solid var(--calendar-chip-border) !important;
   border-radius: 5px !important;
   color: var(--calendar-chip-text) !important;
-  padding: 2px 6px !important;
+  padding: 3px 7px !important;
+  font-size: 12px !important;
   line-height: 1.25 !important;
-  box-shadow: none;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.14);
   transition: background-color 160ms ease, border-color 160ms ease;
 }
 
@@ -706,6 +708,10 @@
 .fc .fc-event-title {
   color: inherit;
   font-weight: 650;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fc .day-summary {
@@ -713,15 +719,18 @@
   border-color: var(--calendar-summary-border);
   border-radius: 5px;
   color: var(--calendar-summary-text);
-  font-size: 10px;
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1.2;
+  padding: 4px 6px;
 }
 
 .fc .cell-leave-icon .leave-chip {
   border-radius: 6px;
   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+  padding: 0.38rem 0.78rem;
+  font-size: 0.8rem;
 }
 
 .fc .cell-leave-icon--L4 .leave-chip {
@@ -755,6 +764,10 @@
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
+#calendar-toolbar .calendar-toolbar-group {
+  gap: 9px;
+}
+
 #calendar-toolbar .btn:hover,
 #calendar-toolbar .btn-ghost:hover,
 .calendar-range-switch .btn-ghost:hover {
@@ -772,12 +785,12 @@
 @media (min-width: 1366px) and (max-width: 1439px) {
   .calendar-shell.view-month .fc .bober-chip.fc-event,
   .calendar-shell.view-month .fc .order-event.fc-event {
-    font-size: 10px !important;
-    padding-inline: 5px !important;
+    font-size: 11px !important;
+    padding-inline: 6px !important;
   }
 
   .calendar-shell.view-month .fc .day-summary {
-    font-size: 9px;
-    padding-inline: 3px;
+    font-size: 10.5px;
+    padding-inline: 4px;
   }
 }
