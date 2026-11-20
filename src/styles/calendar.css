@@ -189,88 +189,146 @@
 .day-summary--short{font-size: 10px;line-height:1.1;}
 .day-summary-row{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-#calendar-shell.view-month .fc .dayCellContent{
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 100%;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 2px;
+/* Kafelki w obrębie istniejącej siatki FullCalendar */
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .fc-daygrid-day {
+  --day-tile-border: color-mix(in srgb, var(--calendar-border) 75%, transparent);
+  --day-tile-bg: color-mix(in srgb, var(--calendar-bg) 94%, var(--jd-green-primary));
+  background: var(--day-tile-bg);
+  box-shadow: inset 0 0 0 1px var(--day-tile-border);
 }
 
-#calendar-shell.view-month .fc .cell-client-chips,
-#calendar-shell.view-month .fc .clientsStack{
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  max-width: 100%;
-  min-width: 0;
-  margin-top: 8px;
-  margin-bottom: 0;
-  flex: 0 0 auto;
-  max-height: 74px;
-  overflow: hidden;
-  z-index: 3;
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc :is(.fc-day-sat, .fc-day-sun).fc-daygrid-day {
+  --day-tile-bg: color-mix(in srgb, var(--calendar-bg) 86%, var(--jd-green-primary));
 }
 
-#calendar-shell.view-month .fc .cell-client-chip{
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .fc-daygrid-day.is-selected-day {
+  --day-tile-border: color-mix(in srgb, var(--jd-green-primary) 72%, var(--calendar-client-chip-text));
+  box-shadow: inset 0 0 0 2px var(--day-tile-border);
+}
+
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .fc-day-today .fc-daygrid-day-number > .fc-daygrid-day-number {
+  color: var(--calendar-cta) !important;
+  box-shadow: inset 0 -2px var(--calendar-cta);
+}
+
+#calendar-shell.view-month .fc .dayCellContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+#calendar-shell.view-month .fc .fc-daygrid-day-events:not(:has(.fc-event, .fc-more-link)) ~ .dayCellContent {
+  margin-top: calc(-1 * var(--day-summary-space));
+}
+
+#calendar-shell.view-month .fc .clientsStack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+#calendar-shell.view-month .fc .clientsStackRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+#calendar-shell.view-month .fc .cell-client-chip,
+#calendar-shell:is(.view-week, .view-day) .fc .fc-client-chip.fc-event {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   min-width: 0;
-  width: fit-content;
-  height: 22px;
-  padding: 0 9px;
-  border-radius: 999px;
+  padding: 1px 5px;
+  border-radius: 5px;
   border: 1px solid var(--calendar-client-chip-border);
-  background: var(--calendar-client-chip-bg);
+  background: color-mix(in srgb, var(--calendar-bg) 70%, var(--jd-green-primary));
   color: var(--calendar-client-chip-text);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
+  line-height: 13px;
+  box-shadow: none;
+}
+
+#calendar-shell:is(.view-week, .view-day) .fc .fc-client-chip.fc-event {
+  max-width: calc(100% - 4px);
+}
+
+#calendar-shell.view-month .fc .cell-client-chip--more {
+  flex: none;
+  background: var(--calendar-client-chip-more-bg);
+  font-weight: 700;
+}
+
+#calendar-shell.view-month .fc .clientChipText,
+#calendar-shell:is(.view-week, .view-day) .fc .fc-client-chip .client-chip-title {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  position: relative;
-  z-index: 3;
-  transform: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  white-space: nowrap;
 }
 
-#calendar-shell.view-month .fc .cell-client-chip:hover{
-  border-color: color-mix(in srgb, var(--calendar-client-chip-border) 76%, #fff 24%);
+#calendar-shell:is(.view-week, .view-day) .fc .fc-client-chip .fc-event-main {
+  display: block;
+  min-width: 0;
+  color: inherit;
 }
 
-#calendar-shell.view-month .fc .cell-client-chip--more{
-  font-weight: 700;
-  max-width: 44px;
-  justify-content: center;
-  background: var(--calendar-client-chip-more-bg);
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .summaryTile {
+  --calendar-summary-bg: color-mix(in srgb, var(--calendar-bg) 92%, var(--calendar-cta));
+  --calendar-summary-border: color-mix(in srgb, var(--calendar-cta) 35%, transparent);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 4px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow: visible;
+  box-shadow: none;
 }
 
-#calendar-shell.view-month .fc .day-summary--month{
-  width: 100%;
-  max-width: 100%;
-}
-
-#calendar-shell.view-month .fc .summaryTile{
-  flex: 0 0 auto;
+#calendar-shell.view-month .fc .summaryTile {
+  position: static;
   margin-top: auto;
   z-index: 1;
-  max-width: 100%;
-  position: relative;
 }
 
-#calendar-shell.view-month .fc .clientChipText{
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .day-summary-pair {
   min-width: 0;
-  display: block;
 }
 
+#calendar-shell.view-day .fc .summaryTile {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#calendar-shell:is(.view-month, .view-week) .fc .day-summary--full .day-summary-pair:nth-child(n + 3) {
+  grid-column: 1 / -1;
+}
+
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .day-summary-name {
+  font-weight: 500;
+  text-decoration: none;
+}
+
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .day-summary-value {
+  white-space: nowrap;
+}
+
+#calendar-shell:is(.view-month, .view-week, .view-day) .fc .cell-leave-icon .leave-chip {
+  padding: 3px 6px;
+  border-radius: 5px;
+  border-color: color-mix(in srgb, currentColor 50%, transparent);
+  font-size: 11px;
+  line-height: 13px;
+  box-shadow: none;
+}
 
 /* More-link */
 .fc-more-link{ color: var(--calendar-muted); font-weight:600; }
