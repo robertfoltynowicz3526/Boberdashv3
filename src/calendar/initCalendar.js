@@ -9,6 +9,12 @@ const SUMMARY_DISPLAY_DESKTOP_BREAKPOINT = 1440;
 const SUMMARY_DISPLAY_LAPTOP_BREAKPOINT = 1024;
 const SUMMARY_DISPLAY_TABLET_BREAKPOINT = 768;
 const SUMMARY_DISPLAY_DEFAULT = 'short';
+const SUMMARY_FIELDS = [
+  ['praca', 'P', 'Praca'],
+  ['jazda', 'J', 'Jazda'],
+  ['fakturowane', 'F', 'Fakturowane'],
+  ['nadgodziny', 'N', 'Nadgodziny'],
+];
 let summaryDisplayMode = SUMMARY_DISPLAY_DEFAULT;
 let summaryDisplayEffective = null;
 let summaryDisplayCalendarEl = null;
@@ -200,6 +206,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   }
 
   const frame = cellEl.querySelector('.fc-daygrid-day-frame') || cellEl;
+  const isMonthView = (arg?.view || window.__fcCalendar?.view)?.type === 'dayGridMonth';
   const vm = buildDayCellViewModel({ dayKey, data: readDayData(dayKey, decorations) });
   const planned = decorations.plannedLeaveByDay?.[dayKey];
 
@@ -221,12 +228,12 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     chip.textContent = vm.dayStatus.label;
     statusWrap.appendChild(chip);
     content.appendChild(statusWrap);
-  }
-
-  if (vm.flags.hasAnyClients) {
+  } else if (isMonthView && vm.flags.hasAnyClients) {
     const chips = document.createElement('div');
     chips.className = 'cell-client-chips clientsStack';
-    vm.visibleClients.forEach((client) => {
+    vm.visibleClients.forEach((client, index) => {
+      const row = document.createElement('div');
+      row.className = 'clientsStackRow';
       const chip = document.createElement('span');
       chip.className = 'cell-client-chip clientChip';
       chip.title = client;
@@ -235,49 +242,40 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
       chipText.className = 'clientChipText';
       chipText.textContent = client;
       chip.appendChild(chipText);
+      row.appendChild(chip);
 
-      chips.appendChild(chip);
+      if (index === vm.visibleClients.length - 1 && vm.overflowCount > 0) {
+        const more = document.createElement('span');
+        more.className = 'cell-client-chip cell-client-chip--more clientChip';
+        more.textContent = `+${vm.overflowCount}`;
+        row.appendChild(more);
+      }
+      chips.appendChild(row);
     });
-    if (vm.overflowCount > 0) {
-      const chip = document.createElement('span');
-      chip.className = 'cell-client-chip cell-client-chip--more clientChip';
-      chip.textContent = `+${vm.overflowCount}`;
-      chips.appendChild(chip);
-    }
     content.appendChild(chips);
   }
 
-  if (vm.flags.hasAnyWork && vm.flags.hasPositiveTotals) {
+  if (!vm.flags.hasStatus && vm.flags.hasAnyWork && vm.flags.hasPositiveTotals) {
     const footer = document.createElement('div');
     const displayMode = getEffectiveSummaryDisplayMode(cellEl);
-    const shell = cellEl.closest?.('#calendar-shell');
-    const isMonthView = shell?.classList?.contains('view-month');
-    footer.className = `day-summary summaryTile day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
-    const row1 = document.createElement('div');
-    row1.className = 'day-summary-row';
-    const row2 = document.createElement('div');
-    row2.className = 'day-summary-row';
-    if (isMonthView) {
+    footer.className = `day-summary summaryTile day-summary--${displayMode}`;
+
+    SUMMARY_FIELDS.forEach(([key, abbreviation, label]) => {
+      const pair = document.createElement('span');
+      pair.className = 'day-summary-pair';
+      const name = document.createElement(displayMode === 'short' ? 'abbr' : 'span');
+      name.className = 'day-summary-name';
+      name.textContent = displayMode === 'short' ? abbreviation : label;
       if (displayMode === 'short') {
-        row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)} • Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
-        footer.appendChild(row1);
-      } else {
-        row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
-        row2.textContent = `Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
-        footer.appendChild(row1);
-        footer.appendChild(row2);
+        name.title = label;
+        name.setAttribute('aria-label', label);
       }
-    } else if (displayMode === 'short') {
-      row1.textContent = `P: ${formatSummaryValue(vm.summaryForDay.praca)} • J: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
-      row2.textContent = `F: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • N: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
-    } else {
-      row1.textContent = `Praca: ${formatSummaryValue(vm.summaryForDay.praca)} • Jazda: ${formatSummaryValue(vm.summaryForDay.jazda)}`;
-      row2.textContent = `Fakturowane: ${formatSummaryValue(vm.summaryForDay.fakturowane)} • Nadgodziny: ${formatSummaryValue(vm.summaryForDay.nadgodziny)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
-    }
+      const value = document.createElement('span');
+      value.className = 'day-summary-value';
+      value.textContent = formatSummaryValue(vm.summaryForDay[key]);
+      pair.append(name, ' ', value);
+      footer.appendChild(pair);
+    });
     content.appendChild(footer);
   }
 
@@ -469,11 +467,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         eventType === 'client' ||
         info?.event?.classNames?.includes?.('client-chip') ||
         info?.event?.classNames?.includes?.('fc-client-chip');
-      const title = info.event.title || '';
-      if (isClientChip) {
-        return { html: `<div class="fc-title-only client-chip-title">${title}</div>` };
-      }
-      return { html: `<div class="fc-title-only">${title}</div>` };
+      const title = document.createElement('div');
+      title.className = isClientChip ? 'fc-title-only client-chip-title' : 'fc-title-only';
+      title.textContent = info.event.title || '';
+      return { domNodes: [title] };
     },
     eventDidMount: (info) => {
       const eventType = info?.event?.extendedProps?.type;
