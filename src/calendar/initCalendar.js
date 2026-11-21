@@ -93,7 +93,6 @@ const setSummaryDisplayMode = (mode) => {
 };
 
 const refreshCalendarSummaries = (calendarEl) => {
-  try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
   try { applyDecorationsFromPlaceholders(calendarEl?.ownerDocument || document); } catch (_) {}
 };
 
@@ -621,11 +620,14 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (titleEl) {
         titleEl.textContent = computedTitle;
       }
+      const calendarEl = window.__fcCalendar?.el;
       if (typeof extraDatesSet === 'function') extraDatesSet(...args);
-      try { window.__fcCalendar?.rerenderDates?.(); } catch (_) {}
-      try { applyDecorationsFromPlaceholders(); } catch (_) {}
-      try { applySummaryDisplayAttributes(window.__fcCalendar?.el); } catch (_) {}
-      try { ensureSummaryDisplayControl(window.__fcCalendar?.el); } catch (_) {}
+      const previousDisplay = summaryDisplayEffective;
+      applySummaryDisplayAttributes(calendarEl);
+      ensureSummaryDisplayControl(calendarEl);
+      if (previousDisplay !== summaryDisplayEffective || typeof extraDatesSet !== 'function') {
+        applyDecorationsFromPlaceholders(calendarEl);
+      }
     },
     eventsSet: (...args) => {
       if (typeof extraEventsSet === 'function') extraEventsSet(...args);
@@ -656,16 +658,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
   };
 
   let calendar = null;
+  window.__applyCalendarDecorations = () => applyDecorationsFromPlaceholders(el);
 
   try {
     calendar = new Calendar(el, resourceOptions);
     window.__fcCalendar = calendar;
     calendar.render();
     summaryDisplayCalendarEl = calendar.el;
-    applySummaryDisplayAttributes(calendar.el);
-    ensureSummaryDisplayControl(calendar.el);
-    window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
-    try { applyDecorationsFromPlaceholders(); } catch (_) {}
   } catch (e) {
     const msg = String(e?.message || e);
     console.warn('[calendar] resources unavailable -> fallback', e);
@@ -676,10 +675,6 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         window.__fcCalendar = calendar;
         calendar.render();
         summaryDisplayCalendarEl = calendar.el;
-        applySummaryDisplayAttributes(calendar.el);
-        ensureSummaryDisplayControl(calendar.el);
-        window.__applyCalendarDecorations = applyDecorationsFromPlaceholders;
-        try { applyDecorationsFromPlaceholders(); } catch (_) {}
         const noteId = 'calendar-fallback-note';
         if (!document.getElementById(noteId)) {
           const note = document.createElement('div');
@@ -785,8 +780,6 @@ export async function initCalendar(hostEl, events = [], flags = [], extraOptions
     };
   }
   if (calendar) {
-    calendar.refetchEvents();
-    try { calendar.rerenderDates?.(); } catch (_) {}
     window.__calendarApi = calendar;
     return { ok: true, calendar };
   }
@@ -801,17 +794,5 @@ export function updateCalendarData(calendar, events = [], flags = []) {
   if (!calendar) return;
   setCalendarEvents(events);
   setDayFlags(flags);
-  try { calendar.removeAllEvents?.(); } catch (_) {}
-  try { calendar.removeAllEventSources?.(); } catch (_) {}
-  try {
-    if (typeof calendar.addEventSource === 'function') {
-      calendar.addEventSource(Array.isArray(events) ? events : []);
-    } else if (typeof calendar.setOption === 'function') {
-      calendar.setOption('events', Array.isArray(events) ? events : []);
-    }
-  } catch (e) {
-    console.warn('[calendar] failed to add event source', e);
-  }
   calendar.refetchEvents();
-  try { calendar.rerenderDates?.(); } catch (_) {}
 }

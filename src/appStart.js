@@ -117,8 +117,6 @@ const setDecorations = (decorations) => {
     if (window.calendar) {
         window.__fcCalendar = window.calendar;
     }
-    try { window.__fcCalendar?.rerenderDates?.(); } catch (_) { }
-    try { window.__fcCalendar?.refetchEvents?.(); } catch (_) { }
     try { window.__applyCalendarDecorations?.(); } catch (_) { }
 };
 
@@ -494,6 +492,8 @@ function initializeApp() {
     let selectedYearTotals = null;
     let selectedYearNeedsRefresh = true;
     let selectedYearLoadedFor = null;
+    let dayEntriesLoaded = false;
+    let pendingDayEntries = null;
     let isExportingYearReport = false;
     let summaryBillingMode = 'calendar';
     let availableSummaryYears = [currentYear];
@@ -514,11 +514,12 @@ function initializeApp() {
     let calendar;
     window.calendar = null;
     window.__calendarApi = null;
-    const getCalendarApi = () => calendar || window.__calendarApi || null;
+    const getCalendarApi = () => calendar || window.__calendarApi || window.__fcCalendar || null;
     const setCalendarApi = (api) => {
         calendar = api || null;
         window.calendar = calendar;
         window.__calendarApi = calendar;
+        window.__fcCalendar = calendar;
     };
     const CALENDAR_PANEL_PINNED_STORAGE_KEY = 'calendarDayPanelPinned';
     const CALENDAR_BREAKPOINTS = {
@@ -614,17 +615,6 @@ function initializeApp() {
         }
     };
 
-    const focusDayPanelOrder = (orderId) => {
-        if (!calendarDayPanel || !orderId) return;
-        const safeId = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(orderId) : String(orderId).replace(/["\\]/g, '\\$&');
-        const target = calendarDayPanel.querySelector(`[data-order-id="${safeId}"]`);
-        if (target) {
-            target.classList.add('is-focused');
-            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            window.setTimeout(() => target.classList.remove('is-focused'), 1200);
-        }
-    };
-
     const renderCalendarModalSummary = (dayKey) => {
         if (!kalendarzSummaryTiles) return;
         const result = computeDayTotals(dayKey);
@@ -686,13 +676,16 @@ function initializeApp() {
         if (!api) return;
         const viewKey = fcViewToCalendarKey(api.view?.type);
         const width = window.innerWidth || 0;
-        const monthRows = width >= 1440 ? 2 : width >= 1024 ? 1 : 1;
+        const monthRows = width >= 1440 ? 2 : 1;
         const rows = viewKey === 'month'
             ? monthRows
             : (width >= CALENDAR_BREAKPOINTS.desktop ? 3 : width >= CALENDAR_BREAKPOINTS.laptop ? 2 : 1);
         const shouldLimit = viewKey === 'week' || viewKey === 'month';
-        api.setOption('dayMaxEvents', shouldLimit);
-        api.setOption('dayMaxEventRows', shouldLimit ? rows : false);
+        const maxRows = shouldLimit ? rows : false;
+        api.batchRendering(() => {
+            if (api.getOption('dayMaxEvents') !== shouldLimit) api.setOption('dayMaxEvents', shouldLimit);
+            if (api.getOption('dayMaxEventRows') !== maxRows) api.setOption('dayMaxEventRows', maxRows);
+        });
     };
 
     const handleCalendarResize = () => {
@@ -764,7 +757,6 @@ function initializeApp() {
         machines: { initialized: false, inFlight: false },
         orders: { initialized: false, inFlight: false },
         stock: { initialized: false, inFlight: false },
-        summary: { initialized: false, inFlight: false },
         activity: { initialized: false, inFlight: false }
     };
     let bootstrapReady = false;
@@ -1630,9 +1622,8 @@ function initializeApp() {
         lastLeaveByDay = leaveByDayOut;
         lastNoteByDay = noteByDay;
         setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, noteByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
-        console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
-        workEvents = [...orderEvents];
-        updateCalendarData(calendar, workEvents, []);
+        workEvents = orderEvents;
+        updateCalendarData(getCalendarApi(), workEvents, []);
         renderDayPanel();
     };
 
@@ -2399,11 +2390,6 @@ function initializeApp() {
                         return 'none';
                     },
                     datesSet(viewInfo) {
-                        if (viewInfo?.view?.currentStart && viewInfo?.view?.currentEnd) {
-                            obliczSumeGodzinZKalendarza(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                            rebuildCalendarDecorations(viewInfo.view.currentStart, viewInfo.view.currentEnd);
-                        }
-                        const viewKey = fcViewToCalendarKey(viewInfo?.view?.type);
                         persistCalendarView(viewInfo?.view?.type);
                         const focusDate = getCalendarApi()?.getDate?.();
                         const focusKey = focusDate ? formatDateForStorage(focusDate) : null;
@@ -2411,7 +2397,9 @@ function initializeApp() {
                         updateCalendarToolbarState();
                         applyCalendarResponsiveOptions();
                         applyDayPanelState();
-                        renderDayPanel();
+                        const { currentStart, currentEnd } = viewInfo.view;
+                        obliczSumeGodzinZKalendarza(currentStart);
+                        rebuildCalendarDecorations(currentStart, currentEnd);
                         if (selectedCalendarDayKey) {
                             setSelectedCalendarDay(selectedCalendarDayKey);
                         }
@@ -2915,28 +2903,18 @@ function initializeApp() {
         }
     }
 
-    function przerysujZdarzeniaKalendarza() {
-        if (!calendar) return;
-        updateCalendarData(calendar, workEvents, []);
-        if (calendar.view) {
-            obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
-        }
-    }
-
     const applyDayEntriesData = (entries = [], { render = true } = {}) => {
         wszystkieWpisyKalendarza = [];
         manualByDay = new Map();
         ordersByDay = new Map();
         dayDocsByDay = new Map();
         leaveByDay = new Map();
-        window.__lastDayDocs = {};
 
         const orderIndex = buildOrderIndex();
         (entries || []).forEach(({ id, data }) => {
             const dane = data || {};
             const dayStr = normalizeDayKey(id, 'godziny_pracy.id');
             if (!dayStr) return;
-            window.__lastDayDocs[dayStr] = dane;
             const normalizedDay = normalizeDayRecord(id, dane);
             const { powiazane, suma } = normalizujPowiazaneZlecenia(dane);
             const wpis = {
@@ -2956,9 +2934,9 @@ function initializeApp() {
             if (leaveKind) {
                 leaveByDay.set(dayStr, leaveKind);
             }
-            computeDayTotals(dayStr);
         });
 
+        dayEntriesLoaded = true;
         if (render) {
             invalidateMonthStatsCache();
             rebuildCalendarDecorations();
@@ -2966,27 +2944,28 @@ function initializeApp() {
             selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
             const now = new Date();
-            obliczSumeGodzinZKalendarza(new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 1));
+            obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || now);
         }
     };
 
-    function wyswietlWpisyKalendarza() {
-        if (_wszystkieZleceniaCache.length === 0 && (_wszystkieKlienciCache.length > 0 || _wszystkieMaszynyCache.length > 0)) {
-            if (calendar) calendar.removeAllEvents();
-            return;
-        }
-        onSnapshot(collection(db, "godziny_pracy"), (snapshotGodziny) => {
-            const entries = snapshotGodziny.docs.map((docSnap) => ({
-                id: docSnap.id,
-                data: docSnap.data()
-            }));
-            applyDayEntriesData(entries);
+    function loadInitialDayEntries() {
+        return new Promise((resolve, reject) => {
+            let initialSnapshot = true;
+            onSnapshot(collection(db, 'godziny_pracy'), (snapshot) => {
+                const entries = snapshot.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
+                if (initialSnapshot) {
+                    initialSnapshot = false;
+                    resolve(entries);
+                } else if (!bootstrapReady) {
+                    pendingDayEntries = entries;
+                } else {
+                    applyDayEntriesData(entries);
+                }
+            }, (error) => {
+                if (initialSnapshot) reject(error);
+                else console.error('[calendar-data] odczyt ewidencji nie powiódł się', error);
+            });
         });
-    }
-
-    function nasluchujNaUrlopy() {
-        // Źródłem prawdy dla statusu dnia jest dokument "godziny_pracy".
-        // Zewnętrzne kolekcje (np. events) nie wpływają na dekoracje kalendarza.
     }
 
     function agregujPodsumowanieMiesiaca(start, end, wpisy) {
@@ -3397,13 +3376,19 @@ function initializeApp() {
 
     setActivityCollapsed(notesActivityCollapsed);
 
-    function obliczSumeGodzinZKalendarza(start, end) {
+    let monthStatsTimer;
+    function obliczSumeGodzinZKalendarza(start) {
+        clearTimeout(monthStatsTimer);
         const monthKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
         const cached = monthStatsCache.read(monthKey);
-        if (cached?.value) renderPulpitStatystykiMiesiaca(cached.value);
-        else renderMonthStatsSkeleton(kalendarzPodsumowanieDiv);
+        if (cached?.value) {
+            renderPulpitStatystykiMiesiaca(cached.value);
+            renderPulpitWykresy();
+            return;
+        }
+        renderMonthStatsSkeleton(kalendarzPodsumowanieDiv);
         const startedAt = performance.now();
-        setTimeout(() => {
+        monthStatsTimer = setTimeout(() => {
             const closedOrderIds = new Set((_wszystkieZleceniaCache || []).filter((o) => isOrderClosed(o)).map((o) => String(o.id)));
             const podsumowanie = aggregateMonthStats(wszystkieWpisyKalendarza, monthKey, { closedOrderIds });
             const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache);
@@ -3752,7 +3737,7 @@ function initializeApp() {
         return { work, over, l4Days, urlopDays, urlopDaysUsed: urlopDays, absorpcja: 0 };
     }
 
-    async function obliczPodsumowaniaMiesieczne(wpisy) {
+    function obliczPodsumowaniaMiesieczne(wpisy) {
         const grouped = groupByYearMonth(wpisy || []);
         const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache);
         const invoiceByMonth = invoiceStats.monthStats;
@@ -4625,29 +4610,37 @@ ${years.map(y => `
     }
 
     async function ensureSelectedYearData() {
-        if (!selectedYearNeedsRefresh && selectedYearLoadedFor === selectedYear) {
-            return;
+        const year = selectedYear;
+        if (!selectedYearNeedsRefresh && selectedYearLoadedFor === year) return;
+        let entries;
+        let summary;
+        if (dayEntriesLoaded) {
+            const { startKey, endKey } = getYearRange(year);
+            entries = wszystkieWpisyKalendarza.filter(({ id }) => id >= startKey && id < endKey);
+            summary = ostatnieZestawienieMiesieczne;
+        } else {
+            entries = await fetchSelectedYearEntries(year);
+            if (year !== selectedYear || dayEntriesLoaded) return;
+            summary = obliczPodsumowaniaMiesieczne(entries);
         }
+        selectedYearEntries = entries;
+        selectedYearSummary = (summary.years || []).find(y => Number(y.year) === year) || null;
+        selectedYearTotals = (summary.sumyRocznePerRok || []).find(r => Number(r.rok) === year) || null;
         selectedYearNeedsRefresh = false;
-        selectedYearLoadedFor = selectedYear;
-        selectedYearEntries = await fetchSelectedYearEntries(selectedYear);
-        const summary = await obliczPodsumowaniaMiesieczne(selectedYearEntries);
-        selectedYearSummary = (summary.years || []).find(y => Number(y.year) === Number(selectedYear)) || null;
-        selectedYearTotals = (summary.sumyRocznePerRok || []).find(r => Number(r.rok) === Number(selectedYear)) || null;
+        selectedYearLoadedFor = year;
     }
 
     async function renderVacationSummary() {
         if (!vacationAllowanceInput || !vacationUsedSpan || !vacationRemainingSpan || !vacationAdjustmentsDiv) return;
-        const allowance = await getVacationAllowance(selectedYear);
+        const [allowance, plannedTotal, adjustments] = await Promise.all([
+            getVacationAllowance(selectedYear),
+            refreshPlannedLeaveEntries().catch(error => {
+                console.error('[vacation] refresh planned leave failed', error);
+                return 0;
+            }),
+            listVacationAdjustments(selectedYear)
+        ]);
         vacationAllowanceInput.value = allowance;
-        let plannedTotal = 0;
-        try {
-            plannedTotal = await refreshPlannedLeaveEntries();
-        } catch (error) {
-            console.error('[vacation] refresh planned leave failed', error);
-        }
-
-        const adjustments = await listVacationAdjustments(selectedYear);
         const adjustmentsSum = adjustments.reduce((acc, adj) => acc + (Number(adj.days) || 0), 0);
         const yearTotals = getSelectedYearTotals();
         const usedFromCalendar = Number(yearTotals?.urlopDaysUsed) || 0;
@@ -4709,16 +4702,15 @@ ${years.map(y => `
         const activityModel = buildActivityModel(activityData);
         renderActivity(activityModel);
 
-        if (calendar?.view) {
-            obliczSumeGodzinZKalendarza(calendar.view.currentStart, calendar.view.currentEnd);
-        }
+        obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || new Date());
     }
 
     function renderZlecenia() { wyswietlZlecenia(); }
 
     async function odswiezPodsumowania(options = {}) {
         const { skipRender = false } = options;
-        ostatnieZestawienieMiesieczne = await obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza);
+        ostatnieZestawienieMiesieczne = obliczPodsumowaniaMiesieczne(wszystkieWpisyKalendarza);
+        selectedYearNeedsRefresh = true;
         window.ostatnieZestawienieMiesieczne = ostatnieZestawienieMiesieczne;
         if (miesiacSummaryInput && ostatnieZestawienieMiesieczne.miesiace.length) {
             const miesiace = ostatnieZestawienieMiesieczne.miesiace;
@@ -7055,6 +7047,7 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
     });
     if (render) {
         invalidateMonthStatsCache();
+        obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || new Date());
         wyswietlZlecenia();
         renderClientStatsView();
         odswiezPodsumowania();
@@ -10091,10 +10084,7 @@ async function obslugaListyCzesci(event) {
                 const snapshot = await getDocs(query(collection(db, "magazyn"), orderBy("createdAt", "desc")));
                 return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
             }),
-            safeLoad('ewidencji czasu', async () => {
-                const snapshot = await getDocs(collection(db, "godziny_pracy"));
-                return snapshot.docs.map(docSnap => ({ id: docSnap.id, data: docSnap.data() }));
-            }),
+            safeLoad('ewidencji czasu', loadInitialDayEntries),
             safeLoad('aktywności', async () => {
                 const snapshot = await getDocs(query(collection(db, "activity"), orderBy("timestamp", "desc"), limit(20)));
                 return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -10117,7 +10107,8 @@ async function obslugaListyCzesci(event) {
         }));
         applyStockData(normalizedStock, { render: false, status: loaded.stock.ok ? 'ready' : 'error' });
 
-        applyDayEntriesData(loaded.dayEntries.data, { render: false });
+        if (loaded.dayEntries.ok) applyDayEntriesData(pendingDayEntries ?? loaded.dayEntries.data, { render: false });
+        pendingDayEntries = null;
         applyActivityData(loaded.activity.data, { render: false, status: loaded.activity.ok ? 'ready' : 'error' });
         rebuildCalendarDecorations();
         updateUnfinishedSummary();
@@ -10150,19 +10141,12 @@ async function obslugaListyCzesci(event) {
     };
 
     const initModules = () => {
-        try { nasluchujNaUrlopy(); } catch (error) { console.error('[urlopy] init error', error); }
         safeInitModule('clients', listaKlientowDiv, () => nasluchujNaKlientow(), 'Moduł klientów niedostępny.');
         safeInitModule('machines', listaMaszynDiv, () => nasluchujNaMaszyny(), 'Moduł maszyn niedostępny.');
         safeInitModule('orders', aktywneZleceniaLista || ukonczoneZleceniaLista, () => nasluchujNaZlecenia(), 'Moduł zleceń niedostępny.');
         safeInitModule('stock', magazynLista || magazynTable || magazynSummaryBox, () => wyswietlMagazyn(), 'Moduł magazynu niedostępny.');
-        safeInitModule('summary', zakonczoneSummaryContainer || annualSummaryContainer || l4SummaryContainer, () => odswiezPodsumowania(), 'Moduł podsumowań niedostępny.');
         safeInitModule('activity', pulpitActivityList, () => nasluchujNaActivity(), 'Moduł aktywności niedostępny.');
         safeInitModule('notes', notesListContainer, () => nasluchujNaNotatki(), 'Moduł notatnika niedostępny.');
-        try {
-            wyswietlWpisyKalendarza();
-        } catch (error) {
-            console.error('[calendar-data] init error', error);
-        }
     };
 
     // --- INICJALIZACJA (MUSI BYĆ WEWNĄTRZ initializeApp) ---
@@ -10180,6 +10164,10 @@ async function obslugaListyCzesci(event) {
         aggregateInitialData(initialData);
         await renderInitialViews(initialData);
         bootstrapReady = true;
+        if (pendingDayEntries) {
+            applyDayEntriesData(pendingDayEntries);
+            pendingDayEntries = null;
+        }
         if (pendingCalendarInit) {
             pendingCalendarInit = false;
             void initCalendarModule('bootstrap');
