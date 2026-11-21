@@ -19,6 +19,7 @@ import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthSta
 import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
 import { renderInvoiceHoursChart } from './components/invoiceHoursChart.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
+import { buildOrderTimeIndex, getOrderTime, ORDER_TIME_LABEL } from './orders/orderTimeEntries.js';
 import {
     getFinanceMonthsForYear,
     aggregateAgroEffectYear,
@@ -57,8 +58,6 @@ import {
     resolveOrderSettlementMonth,
     resolveOrderBillingMonth,
     getOrderInvoicedHours,
-    getOrderGrossAmount,
-    getOrderNetAmount,
     computeOrderAmounts,
     isOrderClosed
 } from './orders/invoiceStats.js';
@@ -741,6 +740,7 @@ function initializeApp() {
     };
     let unfinishedDrawerView = { mode: 'summary', days: [] };
     let ordersFilterMode = null;
+    let orderTimeIndex = new Map();
     let expandedActiveOrderIds = new Set();
     let expandedClosedOrderIds = new Set();
     let unfinishedDrawer = null;
@@ -1143,6 +1143,8 @@ function initializeApp() {
     const editMaszynaKlientDropdown = document.getElementById('edit-maszyna-klient-dropdown');
     const editMaszynaKlientClearBtn = editMaszynaKlientInput?.closest('.combobox')?.querySelector('.combobox-clear');
     const detailsZlecenieModal = document.getElementById('details-zlecenie-modal');
+    const notesModal = document.getElementById('notes-editor-modal');
+    let notesReturnOrderId = null;
     const detailsZlecenieCloseButton = detailsZlecenieModal ? detailsZlecenieModal.querySelector('.close-button') : null;
     const klientSearchInput = document.getElementById('klient-search-input');
     const clientViewPanel = document.getElementById('client-view');
@@ -1658,7 +1660,7 @@ function initializeApp() {
     }
 
     const trackedModals = [];
-    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal, notesPreviewModal]
+    [kalendarzModal, completeModal, stockModal, productDetailsModal, productAddModal, assignModal, detailsZlecenieModal, editZlecenieModal, machineHistoryModal, notesPreviewModal, notesModal]
         .forEach(modal => { if (modal) trackedModals.push(modal); });
 
     const modalBackdrop = document.createElement('div');
@@ -2868,6 +2870,7 @@ function initializeApp() {
             } else {
                 wszystkieWpisyKalendarza.push(localRecord);
             }
+            refreshOrderTime();
             rebuildCalendarDecorations();
             renderWeekPreview(buildWeekPreviewModel(getWeekPreviewData()));
             updateUnfinishedSummary();
@@ -2937,6 +2940,7 @@ function initializeApp() {
         });
 
         dayEntriesLoaded = true;
+        refreshOrderTime();
         if (render) {
             invalidateMonthStatsCache();
             rebuildCalendarDecorations();
@@ -3198,7 +3202,6 @@ function initializeApp() {
 
 
     const notesData = createNotesDataLayer(db);
-    const notesModal = document.getElementById('notes-editor-modal');
     const notesEditorForm = document.getElementById('notes-editor-form');
     const notesEditorId = document.getElementById('notes-editor-id');
     const notesEditorTitle = document.getElementById('notes-editor-title');
@@ -3343,10 +3346,16 @@ function initializeApp() {
         notesDirty = false;
         openModal(notesModal);
     };
+    const finishNoteEditor = () => {
+        const returnOrderId = notesReturnOrderId;
+        notesReturnOrderId = null;
+        hideModal(notesModal);
+        if (returnOrderId) handleDetailsButtonClick(returnOrderId);
+    };
     const closeNoteEditor = () => {
         if (!notesModal) return;
         if (notesDirty && !window.confirm('Masz niezapisane zmiany. Zamknąć?')) return;
-        hideModal(notesModal);
+        finishNoteEditor();
     };
     const openNotePreview = (note) => {
         if (!note || !notesPreviewModal) return;
@@ -6928,6 +6937,10 @@ function wyswietlZlecenia() {
                         `,
                         metaHtml: '',
                         actionsHtml: `
+                    <div class="order-time-tile">
+                        <span>${ORDER_TIME_LABEL}</span>
+                        <strong data-order-time-total>${formatujLiczbe(getOrderTime(orderTimeIndex, zlecenie.id).total)} h</strong>
+                    </div>
                     <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
                     <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
                     ${przycisk}                    
@@ -7302,22 +7315,37 @@ async function dodajZlecenie(event) {
 
 function renderOrderNotes(orderId = null) {
     const host = document.getElementById('details-order-notes');
-    if (!host) return;
-    const currentOrderId = orderId || host.dataset.orderId || '';
+    const currentOrderId = orderId || host?.dataset.orderId;
+    if (!host || !currentOrderId) return;
     host.dataset.orderId = currentOrderId;
     const notes = buildNotesViewModel({ notes: allNotes, filters: { linkType: NOTE_LINK_TYPES.ORDER, linkedOrderId: currentOrderId } }).results;
     host.innerHTML = `
         <div class="order-notes-actions"><button type="button" class="btn-secondary" id="order-note-add">Dodaj notatkę</button><button type="button" class="btn-secondary" id="order-notes-export">Eksportuj .txt</button></div>
-        ${notes.length ? notes.map((note) => `<div class="note-item"><strong>${note.title || '(bez tytułu)'}</strong><p>${note.contentText || ''}</p></div>`).join('') : '<p class="loading-state">Brak notatek do zlecenia.</p>'}
     `;
-    host.querySelector('#order-note-add')?.addEventListener('click', async () => {
-        const payload = promptNotePayload();
-        if (!payload || !currentOrderId) return;
-        await createNote({ ...payload, linkedType: NOTE_LINKED_TYPES.ORDER, linkedOrderId: currentOrderId });
-    });
-    host.querySelector('#order-notes-export')?.addEventListener('click', () => {
-        exportManyNotes(notes, `notatki-zlecenie-${currentOrderId || 'brak'}.txt`);
-    });
+    if (notes.length) {
+        notes.forEach(note => {
+            const row = document.createElement('div');
+            row.className = 'note-item';
+            const title = document.createElement('strong');
+            title.textContent = note.title || '(bez tytułu)';
+            const content = document.createElement('p');
+            content.textContent = note.contentText || '';
+            row.append(title, content);
+            host.append(row);
+        });
+    } else {
+        const empty = document.createElement('p');
+        empty.className = 'order-detail-empty';
+        empty.textContent = 'Brak notatek do zlecenia.';
+        host.append(empty);
+    }
+    host.querySelector('#order-note-add').onclick = () => {
+        notesReturnOrderId = currentOrderId;
+        openNoteEditor({ linkType: NOTE_LINK_TYPES.ORDER, linkedOrderId: currentOrderId });
+    };
+    host.querySelector('#order-notes-export').onclick = () => {
+        exportManyNotes(notes, `notatki-zlecenie-${currentOrderId}.txt`);
+    };
 }
 
 function handleDetailsButtonClick(docId, event) {
@@ -7326,15 +7354,7 @@ function handleDetailsButtonClick(docId, event) {
         event.preventDefault();
         event.stopPropagation();
     }
-    const infoDiv = document.getElementById('details-zlecenie-info');
-    const historiaDiv = document.getElementById('details-zlecenie-historia');
-    const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
-    if (infoDiv) infoDiv.innerHTML = '<p>Ładowanie danych zlecenia...</p>';
-    if (historiaDiv) historiaDiv.innerHTML = '';
-    if (kalendarzDiv) kalendarzDiv.innerHTML = '';
-    closeAllModals();
-    openModal(detailsZlecenieModal);
-    otworzModalSzczegolowZlecenia(docId, { skipOpen: true });
+    otworzModalSzczegolowZlecenia(docId);
 }
 
 async function obslugaListyZlecen(event) {
@@ -7361,6 +7381,7 @@ async function obslugaListyZlecen(event) {
         const shouldExpand = !expandedSet.has(docId);
         if (shouldExpand) expandedSet.add(docId);
         else expandedSet.delete(docId);
+        if (isActive && shouldExpand) updateOrderTimeTile(li);
         updateExpandUi(li, shouldExpand);
         return true;
     };
@@ -7700,127 +7721,132 @@ async function zapiszEdycjeZlecenia(event) {
     }
 }
 
-async function otworzModalSzczegolowZlecenia(zlecenieId, { skipOpen = false } = {}) {
-    const zlecenie = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
-    if (!zlecenie) { alert("Nie znaleziono zlecenia!"); return; }
-    const titleEl = document.getElementById('details-zlecenie-title');
-    const infoDiv = document.getElementById('details-zlecenie-info');
-    const historiaDiv = document.getElementById('details-zlecenie-historia');
-    const kalendarzDiv = document.getElementById('details-zlecenie-kalendarz');
-    const usterkaDiv = document.getElementById('details-zlecenie-usterka');
-    const opisDiv = document.getElementById('details-zlecenie-opis');
-    const historiaTitleEl = document.getElementById('details-zlecenie-historia-title');
-    const historiaToggleBtn = document.getElementById('details-zlecenie-historia-toggle');
-    if (!detailsZlecenieModal || !titleEl || !infoDiv || !historiaDiv || !kalendarzDiv || !usterkaDiv || !opisDiv || !historiaTitleEl || !historiaToggleBtn) return;
-    closeAllModals(detailsZlecenieModal);
-    const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId);
-    const klient = _wszystkieKlienciCache.find(k => k.id === zlecenie.klientId);
-    const typStawkiOpis = STAWKI[zlecenie.typZlecenia]?.nazwa || 'Brak danych';
-    const uzyteCzesci = Array.isArray(zlecenie.uzyteCzesci) ? zlecenie.uzyteCzesci : [];
-    const uzyteCzesciOpis = uzyteCzesci.length > 0
-        ? uzyteCzesci.map(czesc => {
-            const ilosc = Number(czesc.ilosc);
-            const wyswietlanaIlosc = Number.isFinite(ilosc) ? ilosc : 0;
-            const oznaczenieOleju = czesc.jestOlejem ? ' (olej)' : '';
-            return `${czesc.nazwa} (x${wyswietlanaIlosc})${oznaczenieOleju}`;
-        }).join(', ')
-        : 'Brak';
-    const serviceDate = resolveServiceDate(zlecenie);
-    const calendarEntries = (wszystkieWpisyKalendarza || []).slice().sort((a, b) => (b.id || '').localeCompare(a.id || ''));
-    const powiazaneWpisy = [];
-    let sumaFakturowanych = 0;
-    for (const wpis of calendarEntries) {
-        const { powiazane } = normalizujPowiazaneZlecenia(wpis);
-        const powiazanie = powiazane.find(p => p.zlecenieId === zlecenieId);
-        if (!powiazanie) continue;
-        powiazaneWpisy.push({ wpis, powiazanie });
-        sumaFakturowanych += Number(powiazanie.fakturowane) || 0;
-    }
+function updateOrderTimeTile(card) {
+    const total = card.querySelector('[data-order-time-total]');
+    if (total) total.textContent = `${formatujLiczbe(getOrderTime(orderTimeIndex, card.dataset.id).total)} h`;
+}
 
-    titleEl.textContent = `Szczegóły zlecenia #${zlecenie.nrZlecenia}`;
-    const machineDetails = maszyna ? `${maszyna.typMaszyny} ${maszyna.model}` : (zlecenie.machineModelText || '---');
-    const clientDetails = klient ? klient.nazwa : (zlecenie.status === 'nieprzypisane' ? 'Szybkie zlecenie (bez klienta)' : '---');
-    infoDiv.innerHTML = `
-        <div class="details-grid">
-            <div class="details-group"><strong>Numer</strong><p>#${zlecenie.nrZlecenia || '—'}</p></div>
-            <div class="details-group"><strong>Status</strong><p>${zlecenie.status}</p></div>
-            <div class="details-group"><strong>Klient</strong><p>${clientDetails}</p></div>
-            <div class="details-group"><strong>Maszyna / model</strong><p>${machineDetails}</p></div>
-            <div class="details-group"><strong>Data rozpoczęcia</strong><p>${normalizeDateOnly(zlecenie.startDate || zlecenie.startAt || zlecenie.createdDate) || '—'}</p></div>
-            <div class="details-group"><strong>Wyfakturowane z ewidencji</strong><p>${formatujLiczbe(sumaFakturowanych)} h</p></div>
-        </div>
-    `;
-
-    if (zlecenie.status === 'zakończone') {
-         const wzHtml = zlecenie.zakonczenieNumerWZ ? `<div class="details-group"><strong>Numer WZ</strong><p>${zlecenie.zakonczenieNumerWZ}</p></div>` : '';       
-        infoDiv.innerHTML += `
-            <div class="details-grid details-grid--closed">
-                <div class="details-group"><strong>Data wykonania</strong><p>${serviceDate || '—'}</p></div>
-                <div class="details-group"><strong>Miesiąc rozliczenia</strong><p>${resolveOrderSettlementMonth(zlecenie) || deriveBillingMonthFromCompletionDate(serviceDate) || '—'}</p></div>
-                <div class="details-group"><strong>Wyfakturowane</strong><p>${getOrderInvoicedHours(zlecenie)} h</p></div>
-                <div class="details-group"><strong>Motogodziny</strong><p>${(zlecenie.motoHours ?? 0).toFixed(1)} h</p></div>
-                <div class="details-group"><strong>Brutto</strong><p>${formatMoney(getOrderGrossAmount(zlecenie))}</p></div>
-                <div class="details-group"><strong>Netto</strong><p>${formatMoney(getOrderNetAmount(zlecenie))}</p></div>
-                <div class="details-group"><strong>Typ zlecenia</strong><p>${zlecenie.typZlecenia} (${typStawkiOpis})</p></div>
-                <div class="details-group"><strong>Użyte części</strong><p>${uzyteCzesciOpis}</p></div>
-                ${wzHtml}
-            </div>
-        `;
-    }
-
-    usterkaDiv.innerHTML = `<div class="details-text-block"><p>${zlecenie.opis || '—'}</p></div>`;
-
-    const historiaEntries = Array.isArray(zlecenie.historia) ? zlecenie.historia.slice() : [];
-    historiaTitleEl.textContent = `Historia zlecenia (${historiaEntries.length})`;
-    historiaDiv.hidden = true;
-    historiaDiv.classList.remove('is-open');
-    historiaToggleBtn.textContent = 'Pokaż';
-    historiaToggleBtn.setAttribute('aria-expanded', 'false');
-
-    historiaToggleBtn.onclick = () => {
-        const isExpanded = historiaToggleBtn.getAttribute('aria-expanded') === 'true';
-        const nextExpanded = !isExpanded;
-        historiaToggleBtn.setAttribute('aria-expanded', String(nextExpanded));
-        historiaToggleBtn.textContent = nextExpanded ? 'Ukryj' : 'Pokaż';
-        historiaDiv.hidden = !nextExpanded;
-        historiaDiv.classList.toggle('is-open', nextExpanded);
-    };
-
-    if (historiaEntries.length > 0) {
-        historiaDiv.innerHTML = historiaEntries
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-            .map(wpis => `
-                <div class="history-item">
-                    <span class="date">[${new Date(wpis.timestamp).toLocaleString('pl-PL')}]</span>
-                    ${wpis.akcja}
-                </div>
-            `).join('');
+function renderOrderTimeDetails(orderId) {
+    const host = document.getElementById('details-zlecenie-kalendarz');
+    const { rows, total } = getOrderTime(orderTimeIndex, orderId);
+    host.replaceChildren();
+    if (rows.length) {
+        const table = document.createElement('table');
+        table.className = 'order-time-table';
+        table.innerHTML = '<thead><tr><th scope="col">Data</th><th scope="col">Godziny fakturowane</th></tr></thead>';
+        const body = table.createTBody();
+        rows.forEach(({ date, hours }) => {
+            const row = body.insertRow();
+            row.insertCell().textContent = date;
+            row.insertCell().textContent = `${formatujLiczbe(hours)} h`;
+        });
+        host.append(table);
     } else {
-        historiaDiv.innerHTML = '<p>Brak historii dla tego zlecenia.</p>';
+        const empty = document.createElement('p');
+        empty.className = 'order-detail-empty';
+        empty.textContent = 'Brak powiązanych wpisów.';
+        host.append(empty);
     }
+    const summary = document.createElement('p');
+    summary.className = 'order-time-total';
+    const value = document.createElement('strong');
+    value.textContent = `${formatujLiczbe(total)} h`;
+    summary.append(ORDER_TIME_LABEL, value);
+    host.append(summary);
+}
 
-    if (kalendarzDiv) {
-        kalendarzDiv.innerHTML = '<p>Ładowanie wpisów z kalendarza...</p>';
+function refreshOrderTime() {
+    orderTimeIndex = buildOrderTimeIndex(wszystkieWpisyKalendarza);
+    aktywneZleceniaLista?.querySelectorAll('.order-list-item.is-expanded').forEach(updateOrderTimeTile);
+    if (detailsZlecenieModal?.style.display === 'block' && detailsZlecenieModal.dataset.orderId) {
+        renderOrderTimeDetails(detailsZlecenieModal.dataset.orderId);
     }
-    let kalendarzHtml = '';
-    for (const { wpis, powiazanie } of powiazaneWpisy) {
-        const dataWpisu = wpis.id || '—';
-        kalendarzHtml += `
-            <div class="calendar-entry-item">
-                <span class="date">[${dataWpisu}]</span>
-                Praca: ${formatujLiczbe(wpis.praca || 0)}h | Fakturowane dla zlecenia: ${formatujLiczbe(powiazanie.fakturowane)}h | Nadgodziny: ${formatujLiczbe(wpis.nadgodziny || 0)}h | Jazda: ${formatujLiczbe(wpis.jazda || 0)}h
-                ${wpis.notatka ? `<br><small>Notatka: ${wpis.notatka}</small>` : ''}
-            </div>`;
-    }
-    if (kalendarzDiv) {
-        kalendarzDiv.innerHTML = `<div class="details-calendar-list">${kalendarzHtml || '<p>Brak powiązanych wpisów w kalendarzu.</p>'}</div>`;
-    }
-    opisDiv.innerHTML = `<div class="details-text-block">${zlecenie.zakonczenieNotatka ? `<p>${zlecenie.zakonczenieNotatka}</p>` : '<p>Brak opisu.</p>'}</div>`;
-    renderOrderNotes(zlecenie.id);
+}
 
-    if (!skipOpen) {
-        openModal(detailsZlecenieModal);
-    }
+function renderOrderDetailFields(hostId, fields) {
+    const host = document.getElementById(hostId);
+    host.replaceChildren();
+    fields.forEach(([label, value, money = false]) => {
+        const group = document.createElement('div');
+        const term = document.createElement('dt');
+        term.textContent = label;
+        const data = document.createElement('dd');
+        if (money) data.innerHTML = formatMoney(value);
+        else data.textContent = value || '—';
+        group.append(term, data);
+        host.append(group);
+    });
+}
+
+function otworzModalSzczegolowZlecenia(zlecenieId) {
+    const order = _wszystkieZleceniaCache.find(z => z.id === zlecenieId);
+    if (!order) { alert('Nie znaleziono zlecenia!'); return; }
+    const machine = _wszystkieMaszynyCache.find(m => m.id === order.maszynaId);
+    const client = _wszystkieKlienciCache.find(k => k.id === order.klientId);
+    const closed = isOrderClosed(order);
+    const status = document.getElementById('details-zlecenie-status');
+    document.getElementById('details-zlecenie-title').textContent = `Zlecenie #${order.nrZlecenia || '—'}`;
+    status.textContent = closed ? 'Zakończone' : order.status === 'nieprzypisane' ? 'Nieprzypisane' : 'Aktywne';
+    status.classList.toggle('is-closed', closed);
+    detailsZlecenieModal.dataset.orderId = order.id;
+
+    const start = normalizeDateOnly(order.startDate || order.startAt || order.createdOn || order.createdDate || order.createdAt);
+    const service = normalizeDateOnly(resolveServiceDate(order) || order.completedOn || order.endDate || order.endAt);
+    const created = normalizeDateOnly(order.createdOn || order.createdDate || order.createdAt);
+    const dates = [
+        ...(created && created !== start ? [['Utworzono', created]] : []),
+        ...(start ? [['Rozpoczęto', start]] : []),
+        ...(service ? [['Wykonano', service]] : []),
+    ];
+    renderOrderDetailFields('details-zlecenie-info', [
+        ['Klient', client?.nazwa || order.klientNazwa],
+        ['Maszyna', machine ? [machine.typMaszyny, machine.model].filter(Boolean).join(' ') : order.machineModelText],
+        ['Typ zlecenia', STAWKI[order.typZlecenia]?.nazwa || order.typZlecenia],
+        ...dates,
+    ]);
+
+    const amounts = computeOrderAmounts(order);
+    const hasAmounts = closed || amounts.grossCents !== 0 || amounts.netCents !== 0 || amounts.source.startsWith('stored:');
+    renderOrderDetailFields('details-zlecenie-billing', [
+        ['Miesiąc rozliczenia', resolveOrderSettlementMonth(order) || (closed ? deriveBillingMonthFromCompletionDate(service) : '')],
+        ['Godziny zapisane na zleceniu', `${formatujLiczbe(getOrderInvoicedHours(order))} h`],
+        ['Brutto', hasAmounts ? amounts.grossCents / 100 : null, hasAmounts],
+        ['Netto', hasAmounts ? amounts.netCents / 100 : null, hasAmounts],
+    ]);
+
+    const parts = Array.isArray(order.uzyteCzesci) ? order.uzyteCzesci : [];
+    renderOrderDetailFields('details-zlecenie-repair', [
+        ['Opis usterki', order.opis],
+        ['Opis końcowy', order.zakonczenieNotatka],
+        ['Motogodziny', order.motoHours != null ? `${formatujLiczbe(order.motoHours)} h` : ''],
+        ['Użyte części', parts.map(part => `${part.nazwa} × ${part.ilosc}${part.jestOlejem ? ' (olej)' : ''}`).join(', ')],
+        ...(order.zakonczenieNumerWZ ? [['Numer WZ', order.zakonczenieNumerWZ]] : []),
+    ]);
+
+    const entries = Array.isArray(order.historia) ? order.historia.slice() : [];
+    const history = document.getElementById('details-zlecenie-historia');
+    const toggle = document.getElementById('details-zlecenie-historia-toggle');
+    document.getElementById('details-zlecenie-historia-title').textContent = `Historia zlecenia (${entries.length})`;
+    history.replaceChildren();
+    history.hidden = true;
+    toggle.hidden = !entries.length;
+    toggle.textContent = 'Pokaż';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.onclick = () => {
+        history.hidden = !history.hidden;
+        toggle.textContent = history.hidden ? 'Pokaż' : 'Ukryj';
+        toggle.setAttribute('aria-expanded', String(!history.hidden));
+    };
+    entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'history-item';
+        row.textContent = `[${new Date(entry.timestamp).toLocaleString('pl-PL')}] ${entry.akcja || ''}`;
+        history.append(row);
+    });
+
+    renderOrderTimeDetails(order.id);
+    renderOrderNotes(order.id);
+    openModal(detailsZlecenieModal);
 }
 
 function updateAssignModeUI() {
@@ -9388,7 +9414,9 @@ async function obslugaListyCzesci(event) {
         if (event.key !== 'Escape') return;
         closeMagazynRowMenu();
         const openModalItem = [...trackedModals].reverse().find((modal) => modal && modal.style.display === 'block');
-        if (openModalItem === detailsZlecenieModal && returnToMachineHistory) {
+        if (openModalItem === notesModal) {
+            closeNoteEditor();
+        } else if (openModalItem === detailsZlecenieModal && returnToMachineHistory) {
             detailsZlecenieCloseButton?.click();
         } else if (openModalItem) {
             hideModal(openModalItem);
@@ -10015,7 +10043,7 @@ async function obslugaListyCzesci(event) {
             if (linkType === NOTE_LINK_TYPES.ORDER && !payload.linkedOrderId) return alert('Wybierz zlecenie do powiązania.');
             if (noteId) await notesData.updateNote(noteId, payload); else await notesData.createNote(payload);
             notesDirty = false;
-            hideModal(notesModal);
+            finishNoteEditor();
         });
     }
     if (notesToolbar && notesEditorContent) {

@@ -986,33 +986,36 @@
             </div>
         </div>
     </div>
-    <div id="details-zlecenie-modal" class="modal">
+    <div id="details-zlecenie-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="details-zlecenie-title">
         <div class="modal-content modal-content-large">
             <span class="close-button">&times;</span>
-            <h2 id="details-zlecenie-title">Szczegóły zlecenia</h2>
+            <div class="order-detail-heading">
+                <h2 id="details-zlecenie-title">Szczegóły zlecenia</h2>
+                <span id="details-zlecenie-status" class="order-detail-status"></span>
+            </div>
             <div class="zlecenie-details-container">
-                <h3>Podstawowe informacje</h3>
-                <div id="details-zlecenie-info"></div>
-                <hr>
-                <h3>Opis usterki</h3>
-                <div id="details-zlecenie-usterka"></div>
-                <hr>
-                <h3>Opis końcowy</h3>
-                <div id="details-zlecenie-opis"></div>
-                <hr>
-                <h3>Notatki</h3>
-                <div id="details-order-notes"></div>
-                <hr>
-                <div class="details-collapsible-section">
+                <dl id="details-zlecenie-info" class="order-detail-fields"></dl>
+                <section class="order-detail-section">
+                    <h3>Rozliczenie</h3>
+                    <dl id="details-zlecenie-billing" class="order-detail-fields"></dl>
+                    <h4>Powiązane wpisy</h4>
+                    <div id="details-zlecenie-kalendarz"></div>
+                </section>
+                <section class="order-detail-section">
+                    <h3>Przebieg naprawy</h3>
+                    <dl id="details-zlecenie-repair" class="order-detail-fields order-detail-fields--repair"></dl>
+                </section>
+                <section class="order-detail-section">
+                    <h3>Notatki</h3>
+                    <div id="details-order-notes"></div>
+                </section>
+                <section class="order-detail-section">
                     <div class="details-collapsible-header">
                         <h3 id="details-zlecenie-historia-title">Historia zlecenia (0)</h3>
-                        <button id="details-zlecenie-historia-toggle" type="button" class="details-collapsible-toggle" aria-expanded="false">Pokaż</button>
+                        <button id="details-zlecenie-historia-toggle" type="button" class="details-collapsible-toggle" aria-controls="details-zlecenie-historia" aria-expanded="false">Pokaż</button>
                     </div>
                     <div id="details-zlecenie-historia" class="details-collapsible-content" hidden></div>
-                </div>
-                <hr>
-                <h3>Powiązane wpisy z kalendarza (Ewidencja czasu)</h3>
-                <div id="details-zlecenie-kalendarz"></div>
+                </section>
             </div>
         </div>
     </div>

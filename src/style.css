@@ -5746,3 +5746,112 @@ textarea {
   border-color: #4ade80;
   color: #dcfce7;
 }
+
+.order-detail-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  margin: 0 1.5rem 0.85rem 0;
+}
+
+.order-detail-heading h2 {
+  margin: 0;
+}
+
+.order-detail-status {
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-primary) 35%, var(--color-surface));
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.order-detail-status.is-closed {
+  background: var(--color-surface-2);
+}
+
+.order-detail-section {
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.order-detail-section h3,
+.order-detail-section h4 {
+  margin: 0 0 0.4rem;
+}
+
+.order-detail-section h4 {
+  margin-top: 0.65rem;
+  font-size: 0.9rem;
+}
+
+.order-detail-fields {
+  display: grid;
+  gap: 0.4rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  margin: 0;
+}
+
+.order-detail-fields--repair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.order-detail-fields dt,
+.order-detail-empty {
+  color: var(--color-muted-text);
+  font-size: 0.85rem;
+}
+
+.order-detail-fields dd {
+  margin: 0.12rem 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.order-detail-empty {
+  margin: 0.25rem 0;
+}
+
+.order-time-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-time-table :is(th, td) {
+  padding: 0.25rem 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: start;
+}
+
+.order-time-table :is(th, td):last-child {
+  text-align: end;
+}
+
+.order-time-total {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.3rem 1rem;
+  margin: 0.45rem 0 0;
+}
+
+.order-time-tile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.65rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  background: var(--color-surface-2);
+  color: var(--color-muted-text);
+  font-size: 0.8rem;
+}
+
+.order-time-tile strong,
+.order-time-total strong {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}

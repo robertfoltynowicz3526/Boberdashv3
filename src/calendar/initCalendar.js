@@ -201,7 +201,7 @@ const SUMMARY_FIELDS = [
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-badge, .cell-note-date').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-badge').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
@@ -218,15 +218,6 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     icon.setAttribute('aria-hidden', 'true');
     badge.append(icon);
     header.prepend(badge);
-
-    // FullCalendar leaves the tile's date empty in week view.
-    const dateLabel = header.querySelector('.fc-daygrid-day-number .fc-daygrid-day-number');
-    if (dateLabel && !dateLabel.textContent.trim()) {
-      const date = document.createElement('span');
-      date.className = 'cell-note-date';
-      date.textContent = String(Number(dayKey.slice(-2)));
-      dateLabel.append(date);
-    }
   }
 
   const leave = decorations.leaveByDay?.[dayKey];
@@ -264,7 +255,9 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const shell = cellEl.closest?.('#calendar-shell');
     const isMonthView = shell?.classList?.contains('view-month');
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
-    for (const [key, abbreviation, label] of SUMMARY_FIELDS) {
+    const groups = [document.createElement('div'), document.createElement('div')];
+    groups.forEach(group => { group.className = 'day-summary-group'; });
+    SUMMARY_FIELDS.forEach(([key, abbreviation, label], index) => {
       const pair = document.createElement('span');
       pair.className = 'day-summary-pair';
       const short = displayMode === 'short';
@@ -274,8 +267,9 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
       const value = document.createElement('strong');
       value.textContent = formatSummaryValue(summary[key], { compact: isMonthView && short });
       pair.append(name, ' ', value);
-      footer.appendChild(pair);
-    }
+      groups[Math.floor(index / 2)].append(pair);
+    });
+    footer.append(...groups);
     frame.appendChild(footer);
   }
 
@@ -535,10 +529,13 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       renderDayCellDecorations(arg.el, day, decorations, extraDayCellDidMount, arg);
     },
     dayCellContent: (arg) => {
-      const day = normalizeDateKey(arg.date, 'dayCellContent');
-      const dayNumber = arg.dayNumberText || '';
-      const placeholder = day ? `<div class="cell-sum-placeholder" data-day="${day}"></div>` : '';
-      return { html: `<div class="fc-daygrid-day-number">${dayNumber}</div>${placeholder}` };
+      const date = document.createElement('span');
+      date.className = 'calendar-tile-date';
+      date.textContent = String(arg.date.getDate());
+      const placeholder = document.createElement('span');
+      placeholder.className = 'cell-sum-placeholder';
+      placeholder.dataset.day = normalizeDateKey(arg.date, 'dayCellContent');
+      return { domNodes: [date, placeholder] };
     },
     events: async (info, success) => {
       try {
@@ -589,10 +586,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
         info?.event?.classNames?.includes?.('client-chip') ||
         info?.event?.classNames?.includes?.('fc-client-chip');
       const title = info.event.title || '';
-      if (isClientChip) {
-        return { html: `<div class="fc-title-only client-chip-title">${title}</div>` };
-      }
-      return { html: `<div class="fc-title-only">${title}</div>` };
+      const label = document.createElement('div');
+      label.className = isClientChip ? 'fc-title-only client-chip-title' : 'fc-title-only';
+      label.textContent = title;
+      return { domNodes: [label] };
     },
     eventDidMount: (info) => {
       const eventType = info?.event?.extendedProps?.type;
