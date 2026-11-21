@@ -24,6 +24,10 @@
                 <p class="app-subtitle">Zarządzanie serwisem i magazynem</p>
             </div>
         </div>
+        <div class="global-search" role="search">
+            <input type="search" id="global-search-input" aria-label="Szukaj klientów, maszyn i zleceń" placeholder="Szukaj w serwisie" autocomplete="off" aria-controls="global-search-results">
+            <div id="global-search-results" class="global-search-results" hidden></div>
+        </div>
         <nav class="sidebar-nav tabs-row">
             <div class="nav-group">
                 <p class="nav-group-label">Główne</p>
@@ -573,6 +577,11 @@
                         </div>
                     </div>
                     <p class="field-hint">Najpierw przypisz zlecenia do dnia, potem uzupełnij ręcznie brakujące godziny.</p>
+                    <div class="multi-row" id="calendar-quick-entry" hidden>
+                        <select id="calendar-quick-order" aria-label="Ostatnio używane zlecenie"></select>
+                        <input type="number" id="calendar-quick-hours" step="any" min="0" inputmode="decimal" placeholder="Fakturowane h" aria-label="Dodatkowe godziny fakturowane">
+                        <button type="button" id="calendar-quick-save" class="btn-secondary">Dopisz i zapisz</button>
+                    </div>
                     <div id="kalendarz-zlecenia-multi" class="calendar-day-form__orders">
                         <div class="multi-row">
                             <select class="multi-zlecenie-select">

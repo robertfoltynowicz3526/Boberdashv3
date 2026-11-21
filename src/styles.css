@@ -1228,3 +1228,36 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+
+.global-search {
+  position: relative;
+  min-width: 0;
+  padding: 0.5rem;
+}
+
+.global-search input {
+  width: 100%;
+}
+
+.global-search-results {
+  position: absolute;
+  z-index: 20;
+  inset: 100% 0.5rem auto;
+  max-height: min(50vh, 26rem);
+  overflow: auto;
+  padding: 0.5rem;
+  background: #16221c;
+  border: 1px solid #476352;
+  border-radius: 0.5rem;
+}
+
+.global-search-results button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+#calendar-quick-entry[hidden] {
+  display: none;
+}

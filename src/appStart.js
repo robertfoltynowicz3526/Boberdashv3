@@ -5,6 +5,7 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
+import { findGlobalResults } from './search/globalSearch.js';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals, resolveManualBilled } from './calendar/computeDayTotals.js';
 import { aggregateMonthlyDriveHours, getMonthlyDriveHoursFromCalendar } from './calendar/driveHoursAggregation.js';
@@ -723,6 +724,9 @@ function initializeApp() {
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
     let manualFakturowaneValue = 0;
+    let calendarDayReady = false;
+    let calendarDayRequest = 0;
+    let savingCalendarDay = false;
     let manualByDay = new Map();
     let ordersByDay = new Map();
     let dayDocsByDay = new Map();
@@ -1787,6 +1791,56 @@ function initializeApp() {
         handleTabActivation(tabName);
     };
 
+    const searchInput = document.getElementById('global-search-input');
+    const searchResults = document.getElementById('global-search-results');
+    const closeGlobalSearch = () => { searchResults.hidden = true; };
+    const renderGlobalSearch = () => {
+        searchResults.replaceChildren();
+        if (!searchInput.value.trim()) {
+            closeGlobalSearch();
+            return;
+        }
+        const results = findGlobalResults(searchInput.value, {
+            clients: _wszystkieKlienciCache,
+            machines: _wszystkieMaszynyCache,
+            orders: _wszystkieZleceniaCache,
+        });
+        const types = { client: 'Klient', machine: 'Maszyna', order: 'Zlecenie' };
+        results.forEach(({ type, id, label }) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = `${types[type]} · ${label}`;
+            button.addEventListener('click', () => {
+                searchInput.value = '';
+                closeGlobalSearch();
+                if (type === 'client') {
+                    showTab('klienci');
+                    openClientDrawer(id, 'view');
+                } else if (type === 'machine') {
+                    showTab('maszyny');
+                    void pokazHistorieSerwisowaMaszyny(id, label);
+                } else {
+                    showTab('zlecenia');
+                    handleDetailsButtonClick(id);
+                }
+            });
+            searchResults.append(button);
+        });
+        if (!results.length) searchResults.textContent = 'Brak wyników';
+        searchResults.hidden = false;
+    };
+    searchInput.addEventListener('input', renderGlobalSearch);
+    searchInput.addEventListener('focus', renderGlobalSearch);
+    searchInput.closest('.global-search').addEventListener('focusout', (event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) closeGlobalSearch();
+    });
+    searchInput.closest('.global-search').addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || searchResults.hidden) return;
+        event.stopPropagation();
+        searchInput.focus();
+        closeGlobalSearch();
+    });
+
     const handleTabActivation = (tabName) => {
         if (tabName === 'magazyn') {
             ensureMagazynSummaryPlacement();
@@ -1873,7 +1927,7 @@ function initializeApp() {
         {
             key: 'daysWithoutSummary',
             title: 'Dni bez podsumowania',
-            description: 'Dni z wpisem bez wypełnionego podsumowania.',
+            description: 'Dni bez uzupełnionej ewidencji.',
             count: unfinishedSummary.daysWithoutSummary.length
         },
         {
@@ -1896,7 +1950,7 @@ function initializeApp() {
         const empty = unfinishedDrawer.querySelector('[data-unfinished-empty]');
         if (!list || !empty) return;
         if (unfinishedDrawerView.mode === 'week-missing') {
-            const days = Array.isArray(unfinishedDrawerView.days) ? unfinishedDrawerView.days : [];
+            const days = weeklyMissingDays;
             list.innerHTML = `
                 <div class="unfinished-subheader">
                     <button type="button" class="btn-ghost" data-unfinished-back>← Wróć</button>
@@ -1912,6 +1966,29 @@ function initializeApp() {
                 `).join('') || '<div class="unfinished-empty-inline">Brak braków w tym tygodniu.</div>'}
             `;
             empty.style.display = 'none';
+            list.style.display = 'grid';
+            return;
+        }
+        const group = getUnfinishedItemConfig().find(item => item.key === unfinishedDrawerView.mode);
+        if (group) {
+            const orders = buildOrderIndex();
+            const plans = new Map(plannedLeaveEntries.map(entry => [entry.id, entry]));
+            list.innerHTML = '<div class="unfinished-subheader"><button type="button" class="btn-ghost" data-unfinished-back>← Wróć</button><span></span></div>';
+            list.querySelector('span').textContent = group.title;
+            unfinishedSummary[group.key].forEach(id => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'unfinished-item';
+                button.dataset.unfinishedTarget = id;
+                const plan = plans.get(id);
+                button.textContent = group.key === 'ordersWithoutBilling'
+                    ? pobierzNazweZlecenia(orders.get(id)) || id
+                    : group.key === 'plannedLeaveWithoutCalendar' && plan
+                        ? `${plan.startDate} – ${plan.endDate} · ${plan.type}`
+                        : id;
+                list.append(button);
+            });
+            empty.style.display = group.count ? 'none' : 'block';
             list.style.display = 'grid';
             return;
         }
@@ -1943,37 +2020,15 @@ function initializeApp() {
         }
     };
 
-    const setUnfinishedDrawerView = (mode = 'summary', days = []) => {
-        unfinishedDrawerView = {
-            mode,
-            days: Array.isArray(days) ? days : []
-        };
+    const setUnfinishedDrawerView = (mode = 'summary') => {
+        unfinishedDrawerView = { mode };
         renderUnfinishedDrawer();
     };
 
-    const handleUnfinishedItemClick = (key) => {
-        if (!key) return;
-        if (key !== 'ordersWithoutBilling') {
-            ordersFilterMode = null;
-        }
-        if (key === 'daysWithoutSummary') {
-            showTab('kalendarz-tab');
-            const target = unfinishedSummary.daysWithoutSummary[0];
-            if (target && calendar?.gotoDate) {
-                calendar.gotoDate(target);
-            }
-        }
-        if (key === 'ordersWithoutBilling') {
-            ordersFilterMode = 'unbilled';
-            showTab('zlecenia');
-            wyswietlZlecenia();
-        }
-        if (key === 'plannedLeaveWithoutCalendar') {
-            showTab('podsumowanie');
-            setActiveVacationTab('planned');
-            plannedLeaveList?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        setUnfinishedDrawerOpen(false);
+    const openUnfinishedDay = (day) => {
+        showTab('kalendarz-tab');
+        focusCalendarDay(day);
+        void otworzModalGodzin(day);
     };
 
     const updateUnfinishedSummary = () => {
@@ -2002,15 +2057,33 @@ function initializeApp() {
             if (dayButton) {
                 const dayKey = dayButton.dataset.unfinishedDay;
                 if (dayKey) {
-                    showTab('kalendarz-tab');
-                    focusCalendarDay(dayKey);
+                    setUnfinishedDrawerOpen(false);
+                    openUnfinishedDay(dayKey);
                 }
                 setUnfinishedDrawerOpen(false);
                 return;
             }
+            const item = event.target.closest('[data-unfinished-target]');
+            if (item) {
+                const id = item.dataset.unfinishedTarget;
+                setUnfinishedDrawerOpen(false);
+                if (unfinishedDrawerView.mode === 'daysWithoutSummary') {
+                    openUnfinishedDay(id);
+                } else if (unfinishedDrawerView.mode === 'ordersWithoutBilling') {
+                    showTab('zlecenia');
+                    handleDetailsButtonClick(id);
+                } else {
+                    const entry = plannedLeaveEntries.find(plan => plan.id === id);
+                    if (!entry) return;
+                    showTab('podsumowanie');
+                    setActiveVacationTab('planned');
+                    setPlannedLeaveFormState(entry);
+                    plannedLeaveForm?.scrollIntoView({ block: 'center' });
+                }
+                return;
+            }
             const target = event.target.closest('[data-unfinished-item]');
-            if (!target) return;
-            handleUnfinishedItemClick(target.dataset.unfinishedItem);
+            if (target) setUnfinishedDrawerView(target.dataset.unfinishedItem);
         });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && unfinishedDrawerOpen) {
@@ -2424,8 +2497,31 @@ function initializeApp() {
         }
     };
 
+    const quickEntry = document.getElementById('calendar-quick-entry');
+    const quickOrder = document.getElementById('calendar-quick-order');
+    const quickHours = document.getElementById('calendar-quick-hours');
+    const quickSave = document.getElementById('calendar-quick-save');
+
+    function renderCalendarQuickEntry() {
+        const orders = buildOrderIndex();
+        const recent = new Set();
+        [...ordersByDay.keys()].sort().reverse().forEach(day => {
+            for (const { orderId } of ordersByDay.get(day)) {
+                const order = orders.get(orderId);
+                if (order?.status === 'aktywne' || order?.status === 'nieprzypisane') recent.add(orderId);
+            }
+        });
+        quickOrder.replaceChildren(new Option('Wybierz ostatnio używane zlecenie', ''));
+        [...recent].slice(0, 5).forEach(id => quickOrder.add(new Option(pobierzNazweZlecenia(orders.get(id)), id)));
+        quickEntry.hidden = !calendarDayReady || !recent.size;
+    }
+
     async function otworzModalGodzin(data, options = {}) {
         if (!kalendarzForm || !kalendarzModal || !kalendarzModalTitle) return;
+        if (savingCalendarDay) return;
+        const request = ++calendarDayRequest;
+        calendarDayReady = false;
+        quickEntry.hidden = true;
         const shouldOpenModal = options?.openModal !== false;
         const dayKey = isoDay(data, 'otworzModalGodzin');
         kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
@@ -2449,6 +2545,8 @@ function initializeApp() {
         const docRef = doc(db, "godziny_pracy", data);
         try {
             const docSnap = await getDoc(docRef);
+            if (request !== calendarDayRequest) return;
+            calendarDayReady = true;
             if (docSnap.exists()) {
                 const dane = docSnap.data();
                 const normalized = normalizeDayRecord(data, dane);
@@ -2491,6 +2589,8 @@ function initializeApp() {
         } catch (error) {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
         }
+        if (request !== calendarDayRequest) return;
+        renderCalendarQuickEntry();
         if (dayKey) {
             renderCalendarModalSummary(dayKey);
         }
@@ -2570,7 +2670,6 @@ function initializeApp() {
         kalendarzMultiList.innerHTML = itemsHtml;
         const suma = multiZlecenia.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         if (multiZlecenia.length > 0) {
-            manualFakturowaneValue = suma;
             aktualizujPoleFakturowane(suma, true);
         } else {
             aktualizujPoleFakturowane(manualFakturowaneValue, false);
@@ -2598,30 +2697,36 @@ function initializeApp() {
         const zlecenieId = kalendarzMultiSelect.value;
         const godziny = Number(kalendarzMultiHoursInput.value);
         const czasJazdy = Number(kalendarzMultiDriveInput.value || 0);
+        if (applyCalendarOrderHours(zlecenieId, godziny, czasJazdy, multiEdytowanyIndex)) {
+            resetujFormularzMulti();
+            renderMultiZlecenia();
+        }
+    }
+
+    function applyCalendarOrderHours(zlecenieId, godziny, czasJazdy, editIndex) {
         if (!zlecenieId) {
             alert('Wybierz zlecenie do powiązania.');
-            return;
+            return false;
         }
         if (!Number.isFinite(godziny) || godziny <= 0) {
             alert('Podaj dodatnią liczbę godzin.');
-            return;
+            return false;
         }
         if (!Number.isFinite(czasJazdy) || czasJazdy < 0) {
             alert('Podaj poprawny czas jazdy (0 lub więcej).');
-            return;
+            return false;
         }
         const selectedOrder = _wszystkieZleceniaCache.find(z => z.id === zlecenieId) || {};
         const selectedMachine = _wszystkieMaszynyCache.find(m => m.id === selectedOrder.maszynaId) || {};
-        const klientNazwa = (kalendarzMultiSelect.options[kalendarzMultiSelect.selectedIndex]?.dataset.klientNazwa)
-            || pobierzKlientaZlecenia(selectedOrder) || 'Klient: brak';
-        if (multiEdytowanyIndex !== null) {
-            const istnieje = multiZlecenia.some((poz, idx) => idx !== multiEdytowanyIndex && canonicalOrderLinkId(poz) === zlecenieId);
+        const klientNazwa = pobierzKlientaZlecenia(selectedOrder) || 'Klient: brak';
+        if (editIndex !== null) {
+            const istnieje = multiZlecenia.some((poz, idx) => idx !== editIndex && canonicalOrderLinkId(poz) === zlecenieId);
             if (istnieje) {
                 alert('Nie można w trybie edycji zmienić wpisu na zlecenie już obecne w tym dniu.');
-                return;
+                return false;
             }
-            multiZlecenia[multiEdytowanyIndex] = buildOrderLinkPayload({
-                entryId: multiZlecenia[multiEdytowanyIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
+            multiZlecenia[editIndex] = buildOrderLinkPayload({
+                entryId: multiZlecenia[editIndex]?.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                 zlecenieId,
                 klientNazwa,
                 selectedOrder,
@@ -2633,7 +2738,7 @@ function initializeApp() {
             const existingIndex = multiZlecenia.findIndex(poz => canonicalOrderLinkId(poz) === zlecenieId);
             if (existingIndex >= 0) {
                 const existing = multiZlecenia[existingIndex];
-                multiZlecenia[existingIndex] = buildOrderLinkPayload({
+                multiZlecenia[existingIndex] = { ...existing, ...buildOrderLinkPayload({
                     entryId: existing.entryId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
                     zlecenieId,
                     klientNazwa: existing.klientNazwa || klientNazwa,
@@ -2641,7 +2746,7 @@ function initializeApp() {
                     selectedMachine,
                     fakturowane: (Number(existing.fakturowane ?? existing.invoicedForOrderHours ?? existing.fakturowaneDlaZlecenia) || 0) + (Number(godziny) || 0),
                     jazda: (Number(existing.jazda ?? existing.driveForOrderHours ?? existing.czasJazdyDlaZlecenia) || 0) + (Number(czasJazdy) || 0)
-                });
+                }) };
             } else {
                 multiZlecenia.push(buildOrderLinkPayload({
                     entryId: (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${zlecenieId}:${Date.now()}`),
@@ -2654,8 +2759,7 @@ function initializeApp() {
                 }));
             }
         }
-        resetujFormularzMulti();
-        renderMultiZlecenia();
+        return true;
     }
 
     function obslugaListyMulti(event) {
@@ -2699,6 +2803,7 @@ function initializeApp() {
     async function obslugaZapisuGodzin(event) {
         if (!kalendarzForm || !kalendarzModal) return;
         event.preventDefault();
+        if (savingCalendarDay || !calendarDayReady) return false;
         const data = kalendarzForm['kalendarz-data'].value;
         const powiazane = multiZlecenia.map((p, index) => ({
             entryId: String(p.entryId || `${data}:${p.zlecenieId}:${index}`),
@@ -2714,7 +2819,6 @@ function initializeApp() {
         const wartoscZFormularza = Number(kalendarzForm['godziny-fakturowane'].value) || 0;
         const fakturowaneDoZapisu = powiazane.length > 0 ? sumaFakturowane : wartoscZFormularza;
         const manualBilled = powiazane.length > 0 ? manualFakturowaneValue : wartoscZFormularza;
-        manualFakturowaneValue = manualBilled;
 
         const selectedLeaveKind = getSelectedDayLeaveValue();
         const leaveAmount = selectedLeaveKind === 'URL' ? parseLeaveAmount(dayLeaveAmountInput?.value, 1) : 0;
@@ -2743,12 +2847,15 @@ function initializeApp() {
             leaveAmount,
             flags
         };
+        savingCalendarDay = true;
+        quickSave.disabled = true;
         try {
             const dayKey = isoDay(data, 'obslugaZapisuGodzin');
             if (!dayKey) {
                 console.error('[calendar] invalid save day key', { data });
                 return;
             }
+            await setDoc(doc(db, "godziny_pracy", data), dane, { merge: true });
             const orderIndex = buildOrderIndex();
             const dayDocForTotals = buildDayDocForTotals({
                 ...normalizeDayRecord(dayKey, dane),
@@ -2763,39 +2870,48 @@ function initializeApp() {
             } else {
                 leaveByDay.delete(dayKey);
             }
-            rebuildCalendarDecorations();
-            updateUnfinishedSummary();
-
-            await setDoc(doc(db, "godziny_pracy", data), dane);
-            await syncLeaveEventForDay(data, selectedLeaveKind);
-            await logActivityEvent({
-                type: 'TIME_EDIT',
-                refId: dayKey,
-                label: `Ewidencja ${dayKey}: P ${dane.work}h, J ${dane.drive}h, F ${fakturowaneDoZapisu}h, N ${dane.nadgodziny}h`
-            });
-            const normalizedLeaveKind = normalizeDayLeaveValue(selectedLeaveKind || '');
-            if (normalizedLeaveKind && normalizedLeaveKind !== DAY_LEAVE_NONE) {
-                await logActivityEvent({
-                    type: 'DAY_STATUS_SET',
-                    refId: dayKey,
-                    label: `Status dnia ${dayKey}: ${LEAVE_LABELS[normalizedLeaveKind] || normalizedLeaveKind}`
-                });
-            }
             const localRecord = normalizeDayRecord(data, dane);
             localRecord.fakturowane = fakturowaneDoZapisu;
             localRecord.billed = fakturowaneDoZapisu;
-            localRecord.nadgodziny = Number(kalendarzForm['nadgodziny'].value) || 0;
+            localRecord.nadgodziny = dane.nadgodziny;
             const existingIndex = wszystkieWpisyKalendarza.findIndex(w => w.id === data);
             if (existingIndex >= 0) {
                 wszystkieWpisyKalendarza[existingIndex] = { ...wszystkieWpisyKalendarza[existingIndex], ...localRecord };
             } else {
                 wszystkieWpisyKalendarza.push(localRecord);
             }
+            rebuildCalendarDecorations();
+            renderWeekPreview(buildWeekPreviewModel(getWeekPreviewData()));
+            updateUnfinishedSummary();
+            try {
+                await syncLeaveEventForDay(data, selectedLeaveKind);
+                await logActivityEvent({
+                    type: 'TIME_EDIT',
+                    refId: dayKey,
+                    label: `Ewidencja ${dayKey}: P ${dane.work}h, J ${dane.drive}h, F ${fakturowaneDoZapisu}h, N ${dane.nadgodziny}h`
+                });
+                const normalizedLeaveKind = normalizeDayLeaveValue(selectedLeaveKind || '');
+                if (normalizedLeaveKind && normalizedLeaveKind !== DAY_LEAVE_NONE) {
+                    await logActivityEvent({
+                        type: 'DAY_STATUS_SET',
+                        refId: dayKey,
+                        label: `Status dnia ${dayKey}: ${LEAVE_LABELS[normalizedLeaveKind] || normalizedLeaveKind}`
+                    });
+                }
+            } catch (error) {
+                console.error('Błąd synchronizacji po zapisie ewidencji:', error);
+            }
             hideModal(kalendarzModal);
-            await odswiezPodsumowania({ skipRender: true });
+            void odswiezPodsumowania({ skipRender: true }).catch(error => console.error('Błąd odświeżenia podsumowania:', error));
             renderCalendarModalSummary(dayKey);
+            return true;
         } catch (e) {
             console.error("Błąd zapisu godzin: ", e);
+            alert('Nie udało się zapisać ewidencji. Spróbuj ponownie.');
+            return false;
+        } finally {
+            savingCalendarDay = false;
+            quickSave.disabled = false;
         }
     }
 
@@ -3002,7 +3118,8 @@ function initializeApp() {
             if (dayOfWeek === 0 || dayOfWeek === 6) return false;
             const status = data.statuses.get(dayKey);
             if (status && DAY_OFF_STATUSES.includes(status)) return false;
-            return !dayDocsByDay.has(dayKey);
+            const dayDoc = dayDocsByDay.get(dayKey);
+            return !dayDoc || (Boolean(String(dayDoc.notatka ?? '').trim()) && !computeDayTotals(dayKey).hasData);
         });
 
         const tiles = [
@@ -3359,7 +3476,7 @@ function initializeApp() {
     };
 
     const openWeeklyMissingDrawer = () => {
-        setUnfinishedDrawerView('week-missing', weeklyMissingDays);
+        setUnfinishedDrawerView('week-missing');
         setUnfinishedDrawerOpen(true);
     };
 
@@ -9687,6 +9804,18 @@ async function obslugaListyCzesci(event) {
     }
 
     // KALENDARZ (modal + klik w kalendarzu)
+    quickSave.addEventListener('click', async (event) => {
+        if (savingCalendarDay || !calendarDayReady || !kalendarzForm.reportValidity()) return;
+        const previous = multiZlecenia.slice();
+        if (!applyCalendarOrderHours(quickOrder.value, Number(quickHours.value), 0, null)) return;
+        renderMultiZlecenia();
+        if (await obslugaZapisuGodzin(event)) {
+            resetujFormularzMulti();
+            return;
+        }
+        multiZlecenia = previous;
+        renderMultiZlecenia();
+    });
     if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
     if (kalendarzForm) {
         kalendarzForm.querySelectorAll('input[name="dayLeave"]').forEach((radio) => {
