@@ -202,10 +202,21 @@ const SUMMARY_FIELDS = [
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-icon').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
+  }
+
+  const dateLabel = cellEl.querySelector('.fc-daygrid-day-number .fc-daygrid-day-number');
+  if (dateLabel && decorations.noteByDay?.[dayKey]) {
+    const marker = document.createElement('span');
+    marker.className = 'cell-note-icon';
+    marker.textContent = '▤';
+    marker.title = 'Jest notatka';
+    marker.setAttribute('role', 'img');
+    marker.setAttribute('aria-label', marker.title);
+    dateLabel.appendChild(marker);
   }
 
   const leave = decorations.leaveByDay?.[dayKey];

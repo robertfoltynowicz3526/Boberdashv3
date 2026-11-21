@@ -848,3 +848,13 @@
     padding-inline: 4px;
   }
 }
+
+#calendar-shell .cell-note-icon {
+  margin-inline-start: 0.35em;
+  color: #8fd3ab;
+  font-size: 0.8em;
+}
+
+#calendar-shell .fc-day-today .cell-note-icon {
+  color: #34462c;
+}

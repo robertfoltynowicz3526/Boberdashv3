@@ -730,6 +730,7 @@ function initializeApp() {
     let plannedLeaveByDay = new Map();
     let lastSummaryByDay = {};
     let lastLeaveByDay = {};
+    let lastNoteByDay = {};
     let plannedLeaveEntries = [];
     let plannedLeaveEditId = null;
     let vacationSectionCollapsed = true;
@@ -1566,6 +1567,7 @@ function initializeApp() {
         const end = rangeEnd || view?.currentEnd || null;
         const summaryByDay = {};
         const leaveByDayOut = {};
+        const noteByDay = {};
         const orderEvents = [];
         const orderIndex = buildOrderIndex();
         const daysToRender = start && end ? listDaysInRange(start, end) : Array.from(new Set([
@@ -1578,12 +1580,13 @@ function initializeApp() {
         daysToRender.forEach((dayStr) => {
             const normalizedDay = normalizeDayKey(dayStr, 'rebuildCalendarDecorations');
             if (!normalizedDay) return;
+            const dayDoc = dayDocsByDay.get(normalizedDay);
+            if (typeof dayDoc?.notatka === 'string' && dayDoc.notatka.trim()) noteByDay[normalizedDay] = true;
             const { praca, jazda, fakturowane, nadgodziny, status, hasAnyData } = aggregateDayData(normalizedDay);
             if (status) {
                 leaveByDayOut[normalizedDay] = status;
                 return;
             }
-            const dayDoc = dayDocsByDay.get(normalizedDay);
             const ordersForDay = Array.isArray(ordersByDay.get(normalizedDay)) ? ordersByDay.get(normalizedDay) : [];
             if (dayDoc) {
                 const { powiazane } = normalizujPowiazaneZlecenia(dayDoc);
@@ -1621,7 +1624,8 @@ function initializeApp() {
 
         lastSummaryByDay = summaryByDay;
         lastLeaveByDay = leaveByDayOut;
-        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
+        lastNoteByDay = noteByDay;
+        setDecorations({ summaryByDay, leaveByDay: leaveByDayOut, noteByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
         console.log('orderEvents:', orderEvents.length, orderEvents.slice(0, 5));
         workEvents = [...orderEvents];
         updateCalendarData(calendar, workEvents, []);
@@ -4021,11 +4025,9 @@ function initializeApp() {
             return;
         }
         const current = model.current;
-        const hasAnyCurrentData = current.months.some((month) => month.billed > 0 || month.drive > 0);
-        if (!hasAnyCurrentData) {
-            quarterlyBonusSummaryContainer.innerHTML = '<p>Brak danych do wyliczenia premii kwartalnej.</p>';
-            return;
-        }
+        const hasHours = (item) => item.months.some((month) => month.billed > 0 || month.drive > 0);
+        const hasAnyCurrentData = hasHours(current);
+        const previous = model.history.find((item) => item.period.id < current.period.id && hasHours(item));
         const historyPreviewLimit = 3;
         const visibleHistory = quarterlyBonusHistoryExpanded
             ? model.history
@@ -4048,14 +4050,25 @@ function initializeApp() {
                         <span class="quarterly-bonus__title">Premia kwartalna</span>
                     </span>
                     <span class="quarterly-bonus__summary">
+                        ${hasAnyCurrentData ? `
                         <span class="quarterly-bonus__summary-chip"><em>Okres</em><strong>${current.period.label}</strong></span>
                         <span class="quarterly-bonus__summary-chip"><em>Próg</em><strong>${current.threshold ? current.threshold.name : 'poza progami'}</strong></span>
                         <span class="quarterly-bonus__summary-chip"><em>Premia brutto</em><strong>${formatMoney(current.grossBonus)}</strong></span>
                         <span class="quarterly-bonus__summary-chip"><em>Do kolejnego progu</em><strong>${current.nextThreshold ? `${current.missingHours.toFixed(2)} h` : '0.00 h'}</strong></span>
+                        ` : `
+                        <span class="quarterly-bonus__summary-chip"><strong>Brak danych w bieżącym okresie</strong></span>
+                        ${previous ? `
+                            <span class="quarterly-bonus__summary-chip"><em>Ostatni okres z danymi</em><strong>${previous.period.label}</strong></span>
+                            <span class="quarterly-bonus__summary-chip"><em>Wyfakturowane + jazda</em><strong>${previous.totals.billed.toFixed(2)} h + ${previous.totals.drive.toFixed(2)} h</strong></span>
+                            <span class="quarterly-bonus__summary-chip"><em>Próg</em><strong>${previous.threshold?.name || 'poza progami'}</strong></span>
+                            <span class="quarterly-bonus__summary-chip"><em>Premia brutto</em><strong>${formatMoney(previous.grossBonus)}</strong></span>
+                        ` : ''}
+                        `}
                     </span>
                 </button>
                 ${quarterlyBonusExpanded ? `
                 <div class="quarterly-bonus__content" id="quarterly-bonus-content">
+                    ${hasAnyCurrentData ? `
                     <div class="quarterly-bonus__top-metrics">
                         <div class="metric"><div class="label">Wyfakturowane</div><div class="value num">${current.totals.billed.toFixed(2)} h</div></div>
                         <div class="metric"><div class="label">Czas jazdy</div><div class="value num">${current.totals.drive.toFixed(2)} h</div></div>
@@ -4086,6 +4099,7 @@ function initializeApp() {
                             </tbody>
                         </table>
                     </div>
+                    ` : ''}
                     <div class="quarterly-bonus__history-head">
                         <h4>Historia premii</h4>
                         ${hasMoreHistory ? `<button type="button" class="quarterly-bonus__history-toggle">${quarterlyBonusHistoryExpanded ? 'Pokaż mniej' : 'Pokaż więcej'}</button>` : ''}
@@ -4382,7 +4396,7 @@ ${years.map(y => `
             const days = listDaysInclusive(entry.startDate, entry.endDate);
             days.forEach(day => plannedLeaveByDay.set(day, entry.type || 'PLAN'));
         });
-        setDecorations({ summaryByDay: lastSummaryByDay, leaveByDay: lastLeaveByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
+        setDecorations({ summaryByDay: lastSummaryByDay, leaveByDay: lastLeaveByDay, noteByDay: lastNoteByDay, plannedLeaveByDay: Object.fromEntries(plannedLeaveByDay) });
     };
 
     const renderPlannedLeaveList = () => {
