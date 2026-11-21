@@ -586,12 +586,12 @@
  * Keep sizing and view behaviour in FullCalendar; this section only skins the
  * existing grid and makes sure content is allowed to participate in row size. */
 .calendar-wrap {
-  --calendar-workday-bg: #101914;
-  --calendar-weekend-bg: #0f1817;
+  --calendar-workday-bg: #15221b;
+  --calendar-weekend-bg: #192926;
   --calendar-header-bg: #121c18;
   --calendar-soft-grid: rgba(128, 158, 141, 0.11);
-  --calendar-chip-bg: #173822;
-  --calendar-chip-border: rgba(112, 184, 126, 0.46);
+  --calendar-chip-bg: #214b34;
+  --calendar-chip-border: #407856;
   --calendar-chip-text: #edf5ef;
   --calendar-summary-bg: #0b1710;
   --calendar-summary-border: rgba(75, 143, 91, 0.48);
@@ -662,6 +662,60 @@
 
 .fc .fc-day-other .fc-daygrid-day-number {
   color: #647269 !important;
+}
+
+#calendar-shell .fc .fc-daygrid-day {
+  --tile-outline: #354b3e;
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 2px #0d1511, inset 0 0 0 3px var(--tile-outline);
+}
+
+#calendar-shell .fc .fc-daygrid-day.is-selected-day {
+  --tile-outline: #86c89a;
+}
+
+#calendar-shell .fc .fc-day-today .fc-daygrid-day-number:not(:empty):not(:has(.fc-daygrid-day-number)),
+#calendar-shell .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  background: #dfcc84;
+  border-radius: 6px;
+  color: #242517 !important;
+}
+
+#calendar-shell .fc .fc-client-chip.fc-event {
+  border-radius: 7px !important;
+  box-shadow: inset 2px 0 #76b68b;
+}
+
+#calendar-shell .fc .fc-client-chip .fc-event-main {
+  min-width: 0;
+  color: var(--calendar-chip-text);
+}
+
+#calendar-shell .fc .day-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+#calendar-shell .fc .day-summary-pair {
+  white-space: nowrap;
+  color: #b3cabb;
+}
+
+#calendar-shell .fc .day-summary-pair strong {
+  color: #f0f7f2;
+  font-variant-numeric: tabular-nums;
+}
+
+#calendar-shell .fc .day-summary-pair abbr {
+  text-decoration: none;
+}
+
+#calendar-shell .fc .cell-leave-icon .leave-chip {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  font-weight: 650;
+  box-shadow: none;
 }
 
 /* Entries may increase the height of their week rather than being clipped. */

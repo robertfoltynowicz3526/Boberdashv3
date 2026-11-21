@@ -193,6 +193,13 @@ const formatSummaryValue = (value, { compact = false } = {}) => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
+const SUMMARY_FIELDS = [
+  ['praca', 'P', 'Praca'],
+  ['jazda', 'J', 'Jazda'],
+  ['fakturowane', 'F', 'Fakturowane'],
+  ['nadgodziny', 'N', 'Nadgodziny'],
+];
+
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
   cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave').forEach((node) => node.remove());
@@ -236,30 +243,17 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const shell = cellEl.closest?.('#calendar-shell');
     const isMonthView = shell?.classList?.contains('view-month');
     footer.className = `day-summary day-summary--${displayMode}${isMonthView ? ' day-summary--month' : ''}`;
-    const row1 = document.createElement('div');
-    row1.className = 'day-summary-row';
-    const row2 = document.createElement('div');
-    row2.className = 'day-summary-row';
-    if (isMonthView) {
-      if (displayMode === 'short') {
-        row1.textContent = `P ${formatSummaryValue(summary.praca, { compact: true })} • J ${formatSummaryValue(summary.jazda, { compact: true })} • F ${formatSummaryValue(summary.fakturowane, { compact: true })} • N ${formatSummaryValue(summary.nadgodziny, { compact: true })}`;
-        footer.appendChild(row1);
-      } else {
-        row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-        row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
-        footer.appendChild(row1);
-        footer.appendChild(row2);
-      }
-    } else if (displayMode === 'short') {
-      row1.textContent = `P: ${formatSummaryValue(summary.praca)} • J: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `F: ${formatSummaryValue(summary.fakturowane)} • N: ${formatSummaryValue(summary.nadgodziny)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
-    } else {
-      row1.textContent = `Praca: ${formatSummaryValue(summary.praca)} • Jazda: ${formatSummaryValue(summary.jazda)}`;
-      row2.textContent = `Fakturowane: ${formatSummaryValue(summary.fakturowane)} • Nadgodziny: ${formatSummaryValue(summary.nadgodziny)}`;
-      footer.appendChild(row1);
-      footer.appendChild(row2);
+    for (const [key, abbreviation, label] of SUMMARY_FIELDS) {
+      const pair = document.createElement('span');
+      pair.className = 'day-summary-pair';
+      const short = displayMode === 'short';
+      const name = document.createElement(short ? 'abbr' : 'span');
+      name.textContent = short ? abbreviation : label;
+      if (short) name.title = label;
+      const value = document.createElement('strong');
+      value.textContent = formatSummaryValue(summary[key], { compact: isMonthView && short });
+      pair.append(name, ' ', value);
+      footer.appendChild(pair);
     }
     frame.appendChild(footer);
   }
