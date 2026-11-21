@@ -114,17 +114,6 @@
 .fc .fc-daygrid-day-frame,
 .fc .fc-daygrid-body { overflow: visible; }
 
-/* Karty zleceń – czytelne, nie nachodzą */
-.fc .job-event {
-  border: 0;
-  background: #4b83ff;
-  color: #fff;
-  border-radius: 8px;
-  padding: 2px 6px;
-  font-size: 12px;
-  line-height: 1.2;
-}
-
 /* Minimalistyczne chipy klientów */
 .fc .bober-chip--client,
 .fc .fc-client-chip,
@@ -173,7 +162,6 @@
   z-index: 4;
 }
 .day-summary--short{font-size: 10px;line-height:1.1;}
-.day-summary-row{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 /* More-link */
 .fc-more-link{ color: var(--calendar-muted); font-weight:600; }

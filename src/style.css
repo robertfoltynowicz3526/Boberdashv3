@@ -1367,13 +1367,6 @@ select {
   font-size: 11px;
 }
 
-.fc .day-summary .day-summary-row {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .fc-event.leave-event {
   background: transparent !important;
   border: none !important;

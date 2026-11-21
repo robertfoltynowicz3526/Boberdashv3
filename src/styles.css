@@ -237,12 +237,6 @@ input::placeholder{color:var(--jd-text-500)}
   text-overflow: ellipsis;
 }
 
-#calendar-shell.view-month .fc .day-summary--month .day-summary-row{
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 #calendar-shell.view-month .fc .bober-chip--client,
 #calendar-shell.view-month .fc .fc-client-chip,
 #calendar-shell.view-month .fc .client-chip,
