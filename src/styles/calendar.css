@@ -836,7 +836,6 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  container: calendar-day-header / inline-size;
 }
 
 #calendar-shell .fc-daygrid-day-top:has(> .cell-note-badge) > .fc-daygrid-day-number {
@@ -847,7 +846,6 @@
 #calendar-shell .cell-note-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   padding-inline: 4px;
   background: var(--calendar-chip-bg);
   border: 1px solid var(--calendar-chip-border);
@@ -877,10 +875,4 @@
   background:
     linear-gradient(currentColor, currentColor) center 4px / 6px 1px no-repeat,
     linear-gradient(currentColor, currentColor) center 7px / 6px 1px no-repeat;
-}
-
-@container calendar-day-header (max-width: 87px) {
-  #calendar-shell .cell-note-badge__label {
-    display: none;
-  }
 }

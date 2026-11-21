@@ -217,10 +217,7 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
     const icon = document.createElement('span');
     icon.className = 'cell-note-badge__icon';
     icon.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
-    label.className = 'cell-note-badge__label';
-    label.textContent = 'Notatka';
-    badge.append(icon, label);
+    badge.append(icon);
     header.prepend(badge);
 
     // FullCalendar leaves the tile's date empty in week view.
