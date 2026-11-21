@@ -202,21 +202,35 @@ const SUMMARY_FIELDS = [
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
-  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-icon').forEach((node) => node.remove());
+  cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-badge, .cell-note-date').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
     return;
   }
 
-  const dateLabel = cellEl.querySelector('.fc-daygrid-day-number .fc-daygrid-day-number');
-  if (dateLabel && decorations.noteByDay?.[dayKey]) {
-    const marker = document.createElement('span');
-    marker.className = 'cell-note-icon';
-    marker.textContent = '▤';
-    marker.title = 'Jest notatka';
-    marker.setAttribute('role', 'img');
-    marker.setAttribute('aria-label', marker.title);
-    dateLabel.appendChild(marker);
+  const header = cellEl.querySelector('.fc-daygrid-day-top');
+  if (header && decorations.noteByDay?.[dayKey]) {
+    const badge = document.createElement('span');
+    badge.className = 'cell-note-badge';
+    badge.setAttribute('role', 'img');
+    badge.setAttribute('aria-label', 'Notatka');
+    const icon = document.createElement('span');
+    icon.className = 'cell-note-badge__icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'cell-note-badge__label';
+    label.textContent = 'Notatka';
+    badge.append(icon, label);
+    header.prepend(badge);
+
+    // FullCalendar leaves the tile's date empty in week view.
+    const dateLabel = header.querySelector('.fc-daygrid-day-number .fc-daygrid-day-number');
+    if (dateLabel && !dateLabel.textContent.trim()) {
+      const date = document.createElement('span');
+      date.className = 'cell-note-date';
+      date.textContent = String(Number(dayKey.slice(-2)));
+      dateLabel.append(date);
+    }
   }
 
   const leave = decorations.leaveByDay?.[dayKey];

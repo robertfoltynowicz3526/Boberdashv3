@@ -590,9 +590,12 @@
   --calendar-weekend-bg: #192926;
   --calendar-header-bg: #121c18;
   --calendar-soft-grid: rgba(128, 158, 141, 0.11);
-  --calendar-chip-bg: #214b34;
-  --calendar-chip-border: #407856;
-  --calendar-chip-text: #edf5ef;
+  --calendar-chip-bg: color-mix(in srgb, var(--color-primary) 38%, var(--color-surface));
+  --calendar-chip-border: color-mix(in srgb, var(--color-success) 48%, var(--color-surface));
+  --calendar-chip-text: var(--color-text);
+  --calendar-status-bg: color-mix(in srgb, var(--color-text) 10%, var(--color-background));
+  --calendar-status-border: color-mix(in srgb, var(--color-text) 32%, var(--color-background));
+  --calendar-selection: var(--calendar-cta);
   --calendar-summary-bg: #0b1710;
   --calendar-summary-border: rgba(75, 143, 91, 0.48);
   --calendar-summary-text: #dbe7de;
@@ -646,8 +649,7 @@
 }
 
 .fc .fc-day-today {
-  background: rgba(227, 201, 76, 0.045) !important;
-  box-shadow: inset 0 0 0 1px rgba(227, 201, 76, 0.72);
+  background: color-mix(in srgb, var(--calendar-selection) 6%, var(--calendar-workday-bg)) !important;
   position: relative;
   z-index: 1;
 }
@@ -670,20 +672,20 @@
   box-shadow: inset 0 0 0 2px #0d1511, inset 0 0 0 3px var(--tile-outline);
 }
 
-#calendar-shell .fc .fc-daygrid-day.is-selected-day {
-  --tile-outline: #86c89a;
+#calendar-shell .fc .fc-daygrid-day:is(.is-selected-day, .fc-day-today) {
+  --tile-outline: var(--calendar-selection);
 }
 
 #calendar-shell .fc .fc-day-today .fc-daygrid-day-number:not(:empty):not(:has(.fc-daygrid-day-number)),
 #calendar-shell .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
-  background: #dfcc84;
+  background: var(--calendar-selection);
   border-radius: 6px;
   color: #242517 !important;
 }
 
 #calendar-shell .fc .fc-client-chip.fc-event {
   border-radius: 7px !important;
-  box-shadow: inset 2px 0 #76b68b;
+  box-shadow: inset 2px 0 var(--color-success);
 }
 
 #calendar-shell .fc .fc-client-chip .fc-event-main {
@@ -710,12 +712,6 @@
 
 #calendar-shell .fc .day-summary-pair abbr {
   text-decoration: none;
-}
-
-#calendar-shell .fc .cell-leave-icon .leave-chip {
-  border-color: color-mix(in srgb, currentColor 55%, transparent);
-  font-weight: 650;
-  box-shadow: none;
 }
 
 /* Entries may increase the height of their week rather than being clipped. */
@@ -754,8 +750,8 @@
 .fc .bober-chip--client:hover,
 .fc .fc-client-chip:hover,
 .fc .client-chip:hover {
-  background: #20452f !important;
-  border-color: rgba(135, 196, 148, 0.58) !important;
+  background: color-mix(in srgb, var(--color-primary) 52%, var(--color-surface)) !important;
+  border-color: var(--calendar-chip-border) !important;
 }
 
 .fc .fc-title-only,
@@ -780,36 +776,23 @@
   padding: 4px 6px;
 }
 
-.fc .cell-leave-icon .leave-chip {
+#calendar-shell .fc .cell-leave-icon .leave-chip {
   border-radius: 6px;
-  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
   padding: 0.38rem 0.78rem;
   font-size: 0.8rem;
+  font-weight: 650;
+  background: var(--calendar-status-bg);
+  border-color: var(--calendar-status-border);
+  color: var(--color-text);
+  box-shadow: none;
 }
 
-.fc .cell-leave-icon--L4 .leave-chip {
-  background: #4a2926;
-  border-color: #79504a;
-  color: #f1d3cf;
+#calendar-shell .fc .cell-leave-icon--L4 .leave-chip {
+  border-color: color-mix(in srgb, var(--color-error) 64%, var(--calendar-status-bg));
 }
 
-.fc .cell-leave-icon--URL .leave-chip,
-.fc .cell-leave-icon--SZKOLENIE .leave-chip {
-  background: #302b52;
-  border-color: #59517e;
-  color: #dfdcf5;
-}
-
-.fc .cell-leave-icon--WOLNE .leave-chip {
-  background: #263842;
-  border-color: #4b626f;
-  color: #d7e3e9;
-}
-
-.fc .cell-leave-icon--SWIETO .leave-chip {
-  background: #4b252c;
-  border-color: #78434d;
-  color: #f2d2d7;
+#calendar-shell .cell-planned-leave {
+  background: var(--calendar-status-border);
 }
 
 #calendar-toolbar .btn,
@@ -829,11 +812,10 @@
   border-color: rgba(105, 164, 117, 0.38);
 }
 
-#calendar-toolbar .is-active,
-.calendar-range-switch .btn-ghost.is-active {
-  background: #285f38;
-  border-color: #438655;
-  color: #f1f7f2;
+#calendar-toolbar .calendar-range-switch .btn-ghost.is-active {
+  background: var(--calendar-cta);
+  border-color: var(--calendar-cta);
+  color: var(--color-background);
 }
 
 @media (min-width: 1366px) and (max-width: 1439px) {
@@ -849,12 +831,56 @@
   }
 }
 
-#calendar-shell .cell-note-icon {
-  margin-inline-start: 0.35em;
-  color: #8fd3ab;
-  font-size: 0.8em;
+#calendar-shell .fc-daygrid-day-top:has(> .cell-note-badge) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  container: calendar-day-header / inline-size;
 }
 
-#calendar-shell .fc-day-today .cell-note-icon {
-  color: #34462c;
+#calendar-shell .fc-daygrid-day-top:has(> .cell-note-badge) > .fc-daygrid-day-number {
+  padding-inline: 0;
+  flex-shrink: 0;
+}
+
+#calendar-shell .cell-note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 4px;
+  background: var(--calendar-chip-bg);
+  border: 1px solid var(--calendar-chip-border);
+  border-radius: 5px;
+  color: var(--calendar-chip-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+#calendar-shell .cell-note-badge__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+#calendar-shell .cell-note-badge__icon::before {
+  content: "";
+  box-sizing: border-box;
+  width: 12px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background:
+    linear-gradient(currentColor, currentColor) center 4px / 6px 1px no-repeat,
+    linear-gradient(currentColor, currentColor) center 7px / 6px 1px no-repeat;
+}
+
+@container calendar-day-header (max-width: 87px) {
+  #calendar-shell .cell-note-badge__label {
+    display: none;
+  }
 }
