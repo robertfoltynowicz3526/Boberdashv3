@@ -5777,14 +5777,8 @@ textarea {
   border-top: 1px solid var(--color-border);
 }
 
-.order-detail-section h3,
-.order-detail-section h4 {
+.order-detail-section h3 {
   margin: 0 0 0.4rem;
-}
-
-.order-detail-section h4 {
-  margin-top: 0.65rem;
-  font-size: 0.9rem;
 }
 
 .order-detail-fields {
@@ -5814,31 +5808,17 @@ textarea {
   margin: 0.25rem 0;
 }
 
-.order-time-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-variant-numeric: tabular-nums;
-}
-
-.order-time-table :is(th, td) {
-  padding: 0.25rem 0.4rem;
-  border-bottom: 1px solid var(--color-border);
-  text-align: start;
-}
-
-.order-time-table :is(th, td):last-child {
-  text-align: end;
-}
-
-.order-time-total {
+.order-list-item__action-buttons {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.3rem 1rem;
-  margin: 0.45rem 0 0;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
 }
 
 .order-time-tile {
+  margin-inline-start: auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -5850,8 +5830,7 @@ textarea {
   font-size: 0.8rem;
 }
 
-.order-time-tile strong,
-.order-time-total strong {
+.order-time-tile strong {
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }

@@ -6937,14 +6937,16 @@ function wyswietlZlecenia() {
                         `,
                         metaHtml: '',
                         actionsHtml: `
+                    <div class="order-list-item__action-buttons">
+                        <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
+                        <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
+                        ${przycisk}
+                        <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
+                    </div>
                     <div class="order-time-tile">
                         <span>${ORDER_TIME_LABEL}</span>
                         <strong data-order-time-total>${formatujLiczbe(getOrderTime(orderTimeIndex, zlecenie.id).total)} h</strong>
                     </div>
-                    <button type="button" class="btn-szczegoly details-zlecenie-btn" data-id="${zlecenie.id}">Szczegóły</button>
-                    <button type="button" class="btn-edit edit-zlecenie-btn" data-id="${zlecenie.id}">Edytuj</button>
-                    ${przycisk}                    
-                    <button type="button" class="delete-btn" data-id="${zlecenie.id}">Usuń</button>
                 `
                     }
                 );
@@ -7726,40 +7728,12 @@ function updateOrderTimeTile(card) {
     if (total) total.textContent = `${formatujLiczbe(getOrderTime(orderTimeIndex, card.dataset.id).total)} h`;
 }
 
-function renderOrderTimeDetails(orderId) {
-    const host = document.getElementById('details-zlecenie-kalendarz');
-    const { rows, total } = getOrderTime(orderTimeIndex, orderId);
-    host.replaceChildren();
-    if (rows.length) {
-        const table = document.createElement('table');
-        table.className = 'order-time-table';
-        table.innerHTML = '<thead><tr><th scope="col">Data</th><th scope="col">Godziny fakturowane</th></tr></thead>';
-        const body = table.createTBody();
-        rows.forEach(({ date, hours }) => {
-            const row = body.insertRow();
-            row.insertCell().textContent = date;
-            row.insertCell().textContent = `${formatujLiczbe(hours)} h`;
-        });
-        host.append(table);
-    } else {
-        const empty = document.createElement('p');
-        empty.className = 'order-detail-empty';
-        empty.textContent = 'Brak powiązanych wpisów.';
-        host.append(empty);
-    }
-    const summary = document.createElement('p');
-    summary.className = 'order-time-total';
-    const value = document.createElement('strong');
-    value.textContent = `${formatujLiczbe(total)} h`;
-    summary.append(ORDER_TIME_LABEL, value);
-    host.append(summary);
-}
-
 function refreshOrderTime() {
     orderTimeIndex = buildOrderTimeIndex(wszystkieWpisyKalendarza);
     aktywneZleceniaLista?.querySelectorAll('.order-list-item.is-expanded').forEach(updateOrderTimeTile);
-    if (detailsZlecenieModal?.style.display === 'block' && detailsZlecenieModal.dataset.orderId) {
-        renderOrderTimeDetails(detailsZlecenieModal.dataset.orderId);
+    if (detailsZlecenieModal?.style.display === 'block') {
+        const order = _wszystkieZleceniaCache.find(item => item.id === detailsZlecenieModal.dataset.orderId);
+        if (order) renderOrderBilling(order);
     }
 }
 
@@ -7776,6 +7750,20 @@ function renderOrderDetailFields(hostId, fields) {
         group.append(term, data);
         host.append(group);
     });
+}
+
+function renderOrderBilling(order) {
+    const closed = isOrderClosed(order);
+    const service = normalizeDateOnly(resolveServiceDate(order) || order.completedOn || order.endDate || order.endAt);
+    const amounts = computeOrderAmounts(order);
+    const hasAmounts = closed || amounts.grossCents !== 0 || amounts.netCents !== 0 || amounts.source.startsWith('stored:');
+    renderOrderDetailFields('details-zlecenie-billing', [
+        ['Miesiąc rozliczenia', resolveOrderSettlementMonth(order) || (closed ? deriveBillingMonthFromCompletionDate(service) : '')],
+        ['Godziny zapisane na zleceniu', `${formatujLiczbe(getOrderInvoicedHours(order))} h`],
+        [ORDER_TIME_LABEL, `${formatujLiczbe(getOrderTime(orderTimeIndex, order.id).total)} h`],
+        ['Brutto', hasAmounts ? amounts.grossCents / 100 : null, hasAmounts],
+        ['Netto', hasAmounts ? amounts.netCents / 100 : null, hasAmounts],
+    ]);
 }
 
 function otworzModalSzczegolowZlecenia(zlecenieId) {
@@ -7805,14 +7793,7 @@ function otworzModalSzczegolowZlecenia(zlecenieId) {
         ...dates,
     ]);
 
-    const amounts = computeOrderAmounts(order);
-    const hasAmounts = closed || amounts.grossCents !== 0 || amounts.netCents !== 0 || amounts.source.startsWith('stored:');
-    renderOrderDetailFields('details-zlecenie-billing', [
-        ['Miesiąc rozliczenia', resolveOrderSettlementMonth(order) || (closed ? deriveBillingMonthFromCompletionDate(service) : '')],
-        ['Godziny zapisane na zleceniu', `${formatujLiczbe(getOrderInvoicedHours(order))} h`],
-        ['Brutto', hasAmounts ? amounts.grossCents / 100 : null, hasAmounts],
-        ['Netto', hasAmounts ? amounts.netCents / 100 : null, hasAmounts],
-    ]);
+    renderOrderBilling(order);
 
     const parts = Array.isArray(order.uzyteCzesci) ? order.uzyteCzesci : [];
     renderOrderDetailFields('details-zlecenie-repair', [
@@ -7844,7 +7825,6 @@ function otworzModalSzczegolowZlecenia(zlecenieId) {
         history.append(row);
     });
 
-    renderOrderTimeDetails(order.id);
     renderOrderNotes(order.id);
     openModal(detailsZlecenieModal);
 }

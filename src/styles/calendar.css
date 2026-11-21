@@ -689,7 +689,7 @@
 
 #calendar-shell .fc-daygrid-event-harness:has(> .fc-client-chip) +
 .fc-daygrid-event-harness:has(> .fc-client-chip) {
-  border-top: 1px solid var(--calendar-soft-grid);
+  border-top: 1px solid transparent;
 }
 
 #calendar-shell .fc .fc-client-chip .fc-event-main {
@@ -725,7 +725,7 @@
   margin-top: auto;
   padding: 5px 2px 0;
   border: 0 !important;
-  border-top: 1px solid var(--calendar-soft-grid) !important;
+  border-top: 1px solid transparent !important;
   border-radius: 0;
   background: transparent !important;
   box-shadow: none;
@@ -880,7 +880,7 @@
   align-items: center;
   gap: 4px;
   min-height: 26px;
-  border-bottom: 1px solid var(--calendar-soft-grid);
+  border-bottom: 1px solid transparent;
 }
 
 #calendar-shell .fc-daygrid-day-top > .fc-daygrid-day-number {
