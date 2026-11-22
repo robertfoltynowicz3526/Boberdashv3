@@ -88,6 +88,21 @@
                 <div id="pulpit-weekly-preview" aria-label="Statystyki tygodnia" hidden></div>
                 <div id="kalendarz-podsumowanie" aria-label="Statystyki miesiąca"></div>
             </section>
+            <div class="pulpit-dashboard-panels">
+                <section class="pulpit-dashboard-panel" aria-labelledby="pulpit-missing-days-title">
+                    <h3 id="pulpit-missing-days-title">Ewidencja do uzupełnienia</h3>
+                    <ul id="pulpit-missing-days" class="pulpit-dashboard-list"></ul>
+                    <p id="pulpit-missing-days-empty" class="pulpit-dashboard-empty" hidden>Ewidencja uzupełniona</p>
+                </section>
+                <section class="pulpit-dashboard-panel" aria-labelledby="pulpit-active-orders-title">
+                    <div class="pulpit-stats-header">
+                        <h3 id="pulpit-active-orders-title">Aktywne zlecenia</h3>
+                        <a id="pulpit-all-active-orders" href="#zlecenia">Wszystkie aktywne</a>
+                    </div>
+                    <ul id="pulpit-active-orders" class="pulpit-dashboard-list"></ul>
+                    <p id="pulpit-active-orders-empty" class="pulpit-dashboard-empty" hidden>Brak aktywnych zleceń</p>
+                </section>
+            </div>
             <section class="pulpit-activity pulpit-dashboard-activity" aria-label="Ostatnie działania">
                 <div class="pulpit-stats-header">
                     <h3 id="pulpit-activity-title">Ostatnie działania</h3>

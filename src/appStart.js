@@ -15,8 +15,8 @@ import { exportYearlyOrdersCsv, exportYearlyPdf, exportYearlySummaryCsv } from '
 import { createNotesDataLayer, mapNoteDoc, NOTE_LINK_TYPES } from './notes/notesData.js';
 import { buildNotesViewModel, buildNoteOrderOptionsModel, filterNoteOrderOptions } from './notes/notesAggregation.js';
 import { buildNoteTxt, renderNotesListView } from './notes/notesRender.js';
-import { aggregateMonthStats, createMonthStatsCache } from './dashboard/monthStatsAggregation.js';
-import { renderMonthStats, renderMonthStatsSkeleton } from './dashboard/monthStatsRender.js';
+import { aggregateTimeStats, buildRecentActiveOrders } from './dashboard/pulpitAggregation.js';
+import { renderTimeStats } from './dashboard/timeStatsRender.js';
 import { renderInvoiceHoursChart } from './components/invoiceHoursChart.js';
 import { normalizeDateOnly } from './orders/orderDates.js';
 import { buildOrderTimeIndex, getOrderTime, ORDER_TIME_LABEL } from './orders/orderTimeEntries.js';
@@ -517,8 +517,6 @@ function initializeApp() {
     let selectedNoteId = null;
     let notesActivityCollapsed = true;
     let hasEnsuredDefaultStock = false;
-    const monthStatsCache = createMonthStatsCache();
-    const invalidateMonthStatsCache = () => monthStatsCache.clear();
     let calendar;
     window.calendar = null;
     window.__calendarApi = null;
@@ -926,6 +924,11 @@ function initializeApp() {
     const pulpitActivityEmpty = document.getElementById('pulpit-activity-empty');
     const pulpitWeeklyMissing = document.querySelector('#pulpit [data-weekly-missing]');
     const pulpitPeriodSwitch = document.querySelector('#pulpit .pulpit-period-switch');
+    const pulpitMissingDays = document.getElementById('pulpit-missing-days');
+    const pulpitMissingDaysEmpty = document.getElementById('pulpit-missing-days-empty');
+    const pulpitActiveOrders = document.getElementById('pulpit-active-orders');
+    const pulpitActiveOrdersEmpty = document.getElementById('pulpit-active-orders-empty');
+    const pulpitAllActiveOrders = document.getElementById('pulpit-all-active-orders');
     const pulpitMonthLabel = document.getElementById('pulpit-month-label');
     const notesListContainer = document.getElementById('notes-list');
     const notesSearchInput = document.getElementById('notes-search');
@@ -2413,7 +2416,6 @@ function initializeApp() {
                         applyCalendarResponsiveOptions();
                         applyDayPanelState();
                         const { currentStart, currentEnd } = viewInfo.view;
-                        obliczSumeGodzinZKalendarza(currentStart);
                         rebuildCalendarDecorations(currentStart, currentEnd);
                         if (selectedCalendarDayKey) {
                             setSelectedCalendarDay(selectedCalendarDayKey);
@@ -2885,7 +2887,7 @@ function initializeApp() {
             }
             refreshOrderTime();
             rebuildCalendarDecorations();
-            renderWeekPreview(buildWeekPreviewModel(getWeekPreviewData()));
+            renderPulpitTime();
             updateUnfinishedSummary();
             try {
                 await syncLeaveEventForDay(data, selectedLeaveKind);
@@ -2955,13 +2957,12 @@ function initializeApp() {
         dayEntriesLoaded = true;
         refreshOrderTime();
         if (render) {
-            invalidateMonthStatsCache();
             rebuildCalendarDecorations();
+            renderPulpitTime();
             updateUnfinishedSummary();
             selectedYearNeedsRefresh = true;
             odswiezPodsumowania();
-            const now = new Date();
-            obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || now);
+            renderPulpitWykresy();
         }
     };
 
@@ -3064,17 +3065,6 @@ function initializeApp() {
         pulpitQuickActionsContainer.innerHTML = primaryActions + more;
     };
 
-    function renderPulpitStatystykiMiesiaca(podsumowanie) {
-        const monthLabel = pulpitMonthLabel;
-        const selectedMonth = getSelectedMonth();
-        if (monthLabel && selectedMonth) {
-            const [year, month] = selectedMonth.split('-').map(Number);
-            const date = new Date(year, month - 1, 1);
-            monthLabel.textContent = `— ${date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}`;
-        }
-        renderMonthStats(kalendarzPodsumowanieDiv, podsumowanie);
-    }
-
     function renderPulpitWykresy() {
         const chartHost = document.getElementById('fh3m-pulpit');
         if (!chartHost) return;
@@ -3082,94 +3072,75 @@ function initializeApp() {
         renderFH3M(chartHost, y, m);
     }
 
-    const getWeekPreviewData = () => {
-        const today = normalizeAllDayDate(new Date());
-        if (!today) return null;
-        const day = today.getDay();
-        const diffToMonday = day === 0 ? -6 : 1 - day;
-        const weekStart = addDaysToDate(today, diffToMonday);
-        const weekEnd = addDaysToDate(weekStart, 6);
-        if (!weekStart || !weekEnd) return null;
-        const days = listDaysInclusive(weekStart, weekEnd);
-        const entries = (wszystkieWpisyKalendarza || []).filter((entry) => {
-            const key = normalizeDayKey(entry?.id || entry?.date, 'weekPreview.entry');
-            return key && days.includes(key);
+    const getWeekPreviewData = (now) => {
+        const today = normalizeAllDayDate(now);
+        const weekday = today.getDay();
+        const start = addDaysToDate(today, weekday === 0 ? -6 : 1 - weekday);
+        const days = listDaysInRange(start, addDaysToDate(start, 7));
+        return { days, statuses: new Map(days.map(day => [day, resolveDayStatus(day)])) };
+    };
+
+    const buildWeekPreviewModel = ({ days, statuses }) => {
+        const missingDays = days.filter(day => {
+            if (isWeekend(day) || DAY_OFF_STATUSES.includes(statuses.get(day))) return false;
+            const entry = dayDocsByDay.get(day);
+            return !entry || (Boolean(String(entry.notatka ?? '').trim()) && !computeDayTotals(day).hasData);
         });
-        return {
-            days,
-            entries,
-            statuses: new Map(days.map(dayKey => [dayKey, resolveDayStatus(dayKey)]))
-        };
+        return { stats: aggregateTimeStats(days), missingDays };
     };
 
-    const buildWeekPreviewModel = (data) => {
-        if (!data) return null;
-        const totals = data.entries.reduce((acc, entry) => {
-            if (entry?.leaveKind || entry?.flags?.urlop || entry?.flags?.l4 || entry?.flags?.swieto || entry?.flags?.wolne || entry?.flags?.szkolenie) {
-                return acc;
-            }
-            acc.praca += Number(entry.praca ?? entry.work ?? 0) || 0;
-            acc.jazda += Number(entry.jazda ?? entry.drive ?? 0) || 0;
-            acc.fakturowane += Number(entry.fakturowane ?? entry.billed ?? 0) || 0;
-            acc.nadgodziny += Number(entry.nadgodziny ?? 0) || 0;
-            return acc;
-        }, { praca: 0, jazda: 0, fakturowane: 0, nadgodziny: 0 });
-        const absorpcja = totals.praca > 0 ? (totals.fakturowane / totals.praca) * 100 : 0;
+    const renderWeekPreview = ({ stats, missingDays }) => {
+        weeklyMissingDays = missingDays;
+        const count = missingDays.length;
+        pulpitWeeklyMissing.textContent = count === 0
+            ? 'Ewidencja uzupełniona'
+            : count + (count === 1 ? ' dzień' : ' dni') + ' bez ewidencji';
+        pulpitWeeklyMissing.disabled = count === 0;
 
-        const missingDaysList = data.days.filter((dayKey) => {
-            const date = toDateSafe(dayKey);
-            if (!date) return false;
-            const dayOfWeek = date.getDay();
-            if (dayOfWeek === 0 || dayOfWeek === 6) return false;
-            const status = data.statuses.get(dayKey);
-            if (status && DAY_OFF_STATUSES.includes(status)) return false;
-            const dayDoc = dayDocsByDay.get(dayKey);
-            return !dayDoc || (Boolean(String(dayDoc.notatka ?? '').trim()) && !computeDayTotals(dayKey).hasData);
+        pulpitMissingDays.replaceChildren();
+        pulpitMissingDaysEmpty.hidden = count !== 0;
+        missingDays.forEach(day => {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.day = day;
+            button.textContent = formatDateLabel(`${day}T00:00:00`, day);
+            button.addEventListener('click', () => openUnfinishedDay(day));
+            item.append(button);
+            pulpitMissingDays.append(item);
         });
-
-        const tiles = [
-            { label: 'Praca', value: `${totals.praca.toFixed(1)} h` },
-            { label: 'Jazda', value: `${totals.jazda.toFixed(1)} h` },
-            { label: 'Fakturowane', value: `${totals.fakturowane.toFixed(1)} h` },
-            { label: 'Nadgodziny', value: `${totals.nadgodziny.toFixed(1)} h` },
-            { label: 'Absorpcja', value: fmtPct(absorpcja) }
-        ];
-
-        return {
-            totals,
-            tiles,
-            missingDaysCount: missingDaysList.length,
-            missingDaysList
-        };
+        renderTimeStats(pulpitWeeklyContainer, stats);
     };
 
-    const renderWeekPreview = (model) => {
-        if (!pulpitWeeklyContainer) return;
-        if (!model) {
-            pulpitWeeklyContainer.innerHTML = '<p class="loading-state">Brak danych tygodniowych.</p>';
-            weeklyMissingDays = [];
-            return;
-        }
-        weeklyMissingDays = model.missingDaysList;
-        if (pulpitWeeklyMissing) {
-            const count = model.missingDaysCount;
-            pulpitWeeklyMissing.textContent = count === 0
-                ? 'Ewidencja uzupełniona'
-                : count + (count === 1 ? ' dzień' : ' dni') + ' bez ewidencji';
-            pulpitWeeklyMissing.disabled = count === 0;
-        }
-        const tilesHtml = model.tiles.map(tile => `
-            <div class="metric">
-                <div class="label">${tile.label}</div>
-                <div class="value num">${tile.value}</div>
-            </div>
-        `).join('');
-        pulpitWeeklyContainer.innerHTML = `
-            <div class="metrics-grid">
-                ${tilesHtml}
-            </div>
-        `;
-    };
+    function renderPulpitTime(now = new Date()) {
+        renderWeekPreview(buildWeekPreviewModel(getWeekPreviewData(now)));
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        pulpitMonthLabel.textContent = `— ${start.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' })}`;
+        renderTimeStats(kalendarzPodsumowanieDiv, aggregateTimeStats(listDaysInRange(start, end)));
+    }
+
+    function renderPulpitActiveOrders() {
+        const orders = buildRecentActiveOrders(_wszystkieZleceniaCache, _wszystkieKlienciCache, _wszystkieMaszynyCache);
+        pulpitActiveOrders.replaceChildren();
+        pulpitActiveOrdersEmpty.hidden = orders.length !== 0;
+        orders.forEach(order => {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.orderId = order.id;
+            const number = document.createElement('strong');
+            number.textContent = `#${order.number}`;
+            const client = document.createElement('span');
+            client.textContent = order.client;
+            const machine = document.createElement('span');
+            machine.textContent = order.machine;
+            button.append(number, client, machine);
+            button.addEventListener('click', () => handleDetailsButtonClick(order.id));
+            item.append(button);
+            pulpitActiveOrders.append(item);
+        });
+    }
 
     const getActivityData = () => ({
         entries: Array.isArray(recentActivity) ? recentActivity : []
@@ -3411,31 +3382,6 @@ function initializeApp() {
     };
 
     setActivityCollapsed(notesActivityCollapsed);
-
-    let monthStatsTimer;
-    function obliczSumeGodzinZKalendarza(start) {
-        clearTimeout(monthStatsTimer);
-        const monthKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
-        const cached = monthStatsCache.read(monthKey);
-        if (cached?.value) {
-            renderPulpitStatystykiMiesiaca(cached.value);
-            renderPulpitWykresy();
-            return;
-        }
-        renderMonthStatsSkeleton(kalendarzPodsumowanieDiv);
-        const startedAt = performance.now();
-        monthStatsTimer = setTimeout(() => {
-            const closedOrderIds = new Set((_wszystkieZleceniaCache || []).filter((o) => isOrderClosed(o)).map((o) => String(o.id)));
-            const podsumowanie = aggregateMonthStats(wszystkieWpisyKalendarza, monthKey, { closedOrderIds });
-            const invoiceStats = buildInvoiceStatsByMonth(_wszystkieZleceniaCache);
-            podsumowanie.fakturowaneRozliczone = invoiceStats.monthStats.get(monthKey)?.invoicedHours ?? 0;
-            podsumowanie.absorpcja = podsumowanie.praca > 0 ? (podsumowanie.fakturowaneRozliczone / podsumowanie.praca) * 100 : 0;
-            monthStatsCache.write(monthKey, podsumowanie);
-            renderPulpitStatystykiMiesiaca(podsumowanie);
-            if (import.meta.env.DEV) console.info('[perf] month-stats', monthKey, `${Math.round(performance.now() - startedAt)}ms`);
-            renderPulpitWykresy();
-        }, 0);
-    }
 
     const waitForCalendarReady = async (attempts = 8, delayMs = 200) => {
         for (let i = 0; i < attempts; i += 1) {
@@ -4725,15 +4671,14 @@ ${years.map(y => `
         const quickActionsModel = buildQuickActionsModel(quickActionsData);
         renderQuickActions(quickActionsModel);
 
-        const weeklyData = getWeekPreviewData();
-        const weeklyModel = buildWeekPreviewModel(weeklyData);
-        renderWeekPreview(weeklyModel);
+        renderPulpitTime();
+        renderPulpitActiveOrders();
 
         const activityData = getActivityData();
         const activityModel = buildActivityModel(activityData);
         renderActivity(activityModel);
 
-        obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || new Date());
+        renderPulpitWykresy();
     }
 
     function renderZlecenia() { wyswietlZlecenia(); }
@@ -5312,6 +5257,7 @@ const applyClientsData = (clients = [], { render = true } = {}) => {
     wyswietlMaszyny();
     wyswietlKlientow();
     renderClientStatsView();
+    renderPulpitActiveOrders();
   }
 };
 
@@ -6136,6 +6082,7 @@ async function obslugaListyKlientow(event) {
             wyswietlMaszyny();
             wyswietlKlientow();
             renderClientStatsView();
+            renderPulpitActiveOrders();
         }
     };
 
@@ -7083,11 +7030,11 @@ const applyOrdersData = (orders = [], { render = true } = {}) => {
             .catch((error) => console.warn('[Migracja dat zlecenia] Nie udało się zaktualizować', order.id, error));
     });
     if (render) {
-        invalidateMonthStatsCache();
-        obliczSumeGodzinZKalendarza(calendar?.view?.currentStart || new Date());
+        renderPulpitActiveOrders();
         wyswietlZlecenia();
         renderClientStatsView();
         odswiezPodsumowania();
+        renderPulpitWykresy();
         rebuildCalendarDecorations();
         updateUnfinishedSummary();
         przeprowadzMigracjeStartEnd().catch(err => console.error('[Migracja start/end] Błąd aktualizacji:', err));
@@ -7545,7 +7492,6 @@ async function obslugaListyZlecen(event) {
                 zakonczenieNumerWZ: null,
                 historia: nowaHistoria
             });
-            invalidateMonthStatsCache();
             await odswiezPodsumowania({ skipRender: false });
             wyswietlZlecenia();
             renderPulpit();
@@ -7959,7 +7905,6 @@ async function zapiszPrzypisanie(event) {
         if (import.meta.env.DEV) console.debug('[assign-save] payload', payload);
         await updateDoc(zlecenieRef, payload);
         if (import.meta.env.DEV) console.debug('[assign-save] success', { zlecenieId, mode });
-        invalidateMonthStatsCache();
         wyswietlZlecenia();
         hideModal(assignModal);
     } catch (error) {
@@ -9126,6 +9071,16 @@ async function obslugaListyCzesci(event) {
 
    // --- PODPIĘCIE EVENTÓW ---
     if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.addEventListener('click', handleQuickActionClick);
+    pulpitAllActiveOrders?.addEventListener('click', event => {
+        event.preventDefault();
+        showTab('zlecenia');
+        if (ordersFilterMode || zlecenieSearchInput?.value) {
+            ordersFilterMode = null;
+            if (zlecenieSearchInput) zlecenieSearchInput.value = '';
+            wyswietlZlecenia();
+        }
+        aktywneZleceniaLista?.closest('.orders-active')?.scrollIntoView({ block: 'start' });
+    });
     pulpitWeeklyMissing?.addEventListener('click', openWeeklyMissingDrawer);
     pulpitPeriodSwitch?.addEventListener('click', (event) => {
         const button = event.target.closest('[data-pulpit-period]');

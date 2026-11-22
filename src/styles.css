@@ -1259,8 +1259,10 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 /* Pulpit: działania, braki ewidencji i statystyki w jednym widoku. */
 #pulpit.page-wide {
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 16px;
 }
+
+#pulpit.page-wide > * + * { margin-block-start: 16px; }
 
 #pulpit .pulpit-dashboard-header {
   flex-wrap: wrap;
@@ -1322,6 +1324,7 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 .pulpit-dashboard-missing,
 .pulpit-dashboard-trend,
 .pulpit-dashboard-stats,
+.pulpit-dashboard-panel,
 #pulpit .pulpit-dashboard-activity {
   min-width: 0;
   padding: 14px 16px;
@@ -1412,12 +1415,72 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 }
 
 #pulpit .pulpit-dashboard-stats .metric .value { font-size: 20px; text-align: start; }
+.pulpit-dashboard-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pulpit-dashboard-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+#pulpit-all-active-orders {
+  color: var(--text-primary);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.pulpit-dashboard-list {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pulpit-dashboard-list button {
+  display: grid;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.pulpit-dashboard-list button:is(:hover, :focus-visible) {
+  background: var(--bg-panel);
+  border-color: var(--border-subtle);
+}
+
+#pulpit-missing-days button {
+  grid-template-columns: minmax(0, 1fr);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+#pulpit-active-orders button {
+  grid-template-columns: minmax(4em, auto) minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+
+#pulpit-active-orders button span { color: var(--text-secondary); }
+.pulpit-dashboard-empty { margin: 8px 0 0; color: var(--text-secondary); }
+
 #pulpit .pulpit-dashboard-activity { grid-column: 1 / -1; padding-block: 9px; }
 #pulpit-activity-empty { color: var(--text-secondary); font-size: 12px; }
 #pulpit .pulpit-dashboard-activity [hidden],
 #pulpit .pulpit-dashboard-stats [hidden] { display: none !important; }
 
 @media (max-width: 780px) {
-  .pulpit-dashboard-overview { grid-template-columns: minmax(0, 1fr); }
+  .pulpit-dashboard-overview,
+  .pulpit-dashboard-panels { grid-template-columns: minmax(0, 1fr); }
   #pulpit .pulpit-dashboard-stats .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
