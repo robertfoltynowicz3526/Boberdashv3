@@ -5834,3 +5834,30 @@ textarea {
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
+
+.order-time-breakdown {
+  margin-top: 0.35rem;
+}
+
+.order-time-breakdown summary {
+  color: var(--color-muted-text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.order-time-breakdown:not([open]) .order-time-breakdown__hide,
+.order-time-breakdown[open] .order-time-breakdown__show {
+  display: none;
+}
+
+.order-time-breakdown ul {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}

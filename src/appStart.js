@@ -7733,7 +7733,7 @@ function refreshOrderTime() {
     aktywneZleceniaLista?.querySelectorAll('.order-list-item.is-expanded').forEach(updateOrderTimeTile);
     if (detailsZlecenieModal?.style.display === 'block') {
         const order = _wszystkieZleceniaCache.find(item => item.id === detailsZlecenieModal.dataset.orderId);
-        if (order) renderOrderBilling(order);
+        if (order) renderOrderBilling(order, { preserveExpansion: true });
     }
 }
 
@@ -7746,13 +7746,50 @@ function renderOrderDetailFields(hostId, fields) {
         term.textContent = label;
         const data = document.createElement('dd');
         if (money) data.innerHTML = formatMoney(value);
+        else if (value instanceof Node) data.append(value);
         else data.textContent = value || '—';
         group.append(term, data);
         host.append(group);
     });
 }
 
-function renderOrderBilling(order) {
+function renderOrderTimeBreakdown({ total, rows }, expanded) {
+    const value = document.createDocumentFragment();
+    const sum = document.createElement('span');
+    sum.textContent = `${formatujLiczbe(total)} h`;
+    value.append(sum);
+    if (!rows.length) return value;
+
+    const details = document.createElement('details');
+    details.className = 'order-time-breakdown';
+    details.open = expanded;
+    const toggle = document.createElement('summary');
+    const show = document.createElement('span');
+    show.className = 'order-time-breakdown__show';
+    show.textContent = 'Pokaż godziny według dni';
+    const hide = document.createElement('span');
+    hide.className = 'order-time-breakdown__hide';
+    hide.textContent = 'Ukryj godziny według dni';
+    toggle.append(show, hide);
+
+    const list = document.createElement('ul');
+    const formatHours = new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 });
+    rows.forEach(({ date, hours }) => {
+        const item = document.createElement('li');
+        const day = document.createElement('time');
+        day.dateTime = date;
+        day.textContent = formatDateLabel(`${date}T00:00:00`, date);
+        item.append(day, ` — ${formatHours.format(hours)} h`);
+        list.append(item);
+    });
+    details.append(toggle, list);
+    value.append(details);
+    return value;
+}
+
+function renderOrderBilling(order, { preserveExpansion = false } = {}) {
+    const expanded = preserveExpansion && Boolean(detailsZlecenieModal.querySelector('.order-time-breakdown[open]'));
+    const orderTime = getOrderTime(orderTimeIndex, order.id);
     const closed = isOrderClosed(order);
     const service = normalizeDateOnly(resolveServiceDate(order) || order.completedOn || order.endDate || order.endAt);
     const amounts = computeOrderAmounts(order);
@@ -7760,7 +7797,7 @@ function renderOrderBilling(order) {
     renderOrderDetailFields('details-zlecenie-billing', [
         ['Miesiąc rozliczenia', resolveOrderSettlementMonth(order) || (closed ? deriveBillingMonthFromCompletionDate(service) : '')],
         ['Godziny zapisane na zleceniu', `${formatujLiczbe(getOrderInvoicedHours(order))} h`],
-        [ORDER_TIME_LABEL, `${formatujLiczbe(getOrderTime(orderTimeIndex, order.id).total)} h`],
+        [ORDER_TIME_LABEL, renderOrderTimeBreakdown(orderTime, expanded)],
         ['Brutto', hasAmounts ? amounts.grossCents / 100 : null, hasAmounts],
         ['Netto', hasAmounts ? amounts.netCents / 100 : null, hasAmounts],
     ]);
