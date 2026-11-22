@@ -924,8 +924,6 @@ function initializeApp() {
     const pulpitActivityEmpty = document.getElementById('pulpit-activity-empty');
     const pulpitWeeklyMissing = document.querySelector('#pulpit [data-weekly-missing]');
     const pulpitPeriodSwitch = document.querySelector('#pulpit .pulpit-period-switch');
-    const pulpitMissingDays = document.getElementById('pulpit-missing-days');
-    const pulpitMissingDaysEmpty = document.getElementById('pulpit-missing-days-empty');
     const pulpitActiveOrders = document.getElementById('pulpit-active-orders');
     const pulpitActiveOrdersEmpty = document.getElementById('pulpit-active-orders-empty');
     const pulpitAllActiveOrders = document.getElementById('pulpit-all-active-orders');
@@ -3097,18 +3095,6 @@ function initializeApp() {
             : count + (count === 1 ? ' dzień' : ' dni') + ' bez ewidencji';
         pulpitWeeklyMissing.disabled = count === 0;
 
-        pulpitMissingDays.replaceChildren();
-        pulpitMissingDaysEmpty.hidden = count !== 0;
-        missingDays.forEach(day => {
-            const item = document.createElement('li');
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.dataset.day = day;
-            button.textContent = formatDateLabel(`${day}T00:00:00`, day);
-            button.addEventListener('click', () => openUnfinishedDay(day));
-            item.append(button);
-            pulpitMissingDays.append(item);
-        });
         renderTimeStats(pulpitWeeklyContainer, stats);
     };
 

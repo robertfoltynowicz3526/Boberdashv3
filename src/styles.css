@@ -1415,12 +1415,6 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 }
 
 #pulpit .pulpit-dashboard-stats .metric .value { font-size: 20px; text-align: start; }
-.pulpit-dashboard-panels {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
 .pulpit-dashboard-panel h3 {
   margin: 0;
   font-size: 16px;
@@ -1458,12 +1452,6 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
   border-color: var(--border-subtle);
 }
 
-#pulpit-missing-days button {
-  grid-template-columns: minmax(0, 1fr);
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
 #pulpit-active-orders button {
   grid-template-columns: minmax(4em, auto) minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: baseline;
@@ -1480,7 +1468,6 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit .pulpit-dashboard-stats [hidden] { display: none !important; }
 
 @media (max-width: 780px) {
-  .pulpit-dashboard-overview,
-  .pulpit-dashboard-panels { grid-template-columns: minmax(0, 1fr); }
+  .pulpit-dashboard-overview { grid-template-columns: minmax(0, 1fr); }
   #pulpit .pulpit-dashboard-stats .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
