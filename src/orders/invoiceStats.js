@@ -29,12 +29,12 @@ const resolveCanonicalInvoicedHours = (order = {}) => {
   return 0;
 };
 
-const RATE_BY_ORDER_TYPE = {
-  S: 45,
-  W: 35,
-  G: 35,
-  Z: 30,
-  P: 0
+export const ORDER_TYPES = {
+  S: { name: 'Wyjazdowe', rate: 45 },
+  W: { name: 'Warsztat', rate: 35 },
+  G: { name: 'Gwarancja', rate: 30 },
+  Z: { name: 'Zbrojenie', rate: 30 },
+  P: { name: 'Poprawka', rate: 0 },
 };
 
 const LEGACY_NET_RATIO = 0.7;
@@ -93,7 +93,7 @@ export const computeOrderAmounts = (order = {}) => {
 
   const invoicedHours = getOrderInvoicedHours(order);
   const explicitRate = parseAmount(order?.stawka ?? order?.rate ?? order?.hourlyRate);
-  const orderTypeRate = parseAmount(RATE_BY_ORDER_TYPE[String(order?.typZlecenia || '').trim()] ?? 0);
+  const orderTypeRate = ORDER_TYPES[String(order?.typZlecenia || '').trim()]?.rate ?? 0;
   const hourlyRate = explicitRate > 0 ? explicitRate : orderTypeRate;
 
   if (!hourlyRate && invoicedHours > 0) {

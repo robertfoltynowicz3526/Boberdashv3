@@ -59,6 +59,7 @@ import {
     resolveOrderBillingMonth,
     getOrderInvoicedHours,
     computeOrderAmounts,
+    ORDER_TYPES,
     isOrderClosed
 } from './orders/invoiceStats.js';
 
@@ -130,13 +131,6 @@ function initializeApp() {
     console.info('Firebase initialized:', Boolean(db && auth));
     // ZASADA: 3 warstwy i żadnych skrótów → DATA → AGREGACJA → RENDER.
     // --- STAŁE I ZMIENNE GLOBALNE ---
-    const STAWKI = {
-        S: { nazwa: "Wyjazdowe", stawka: 45 },
-        W: { nazwa: "Warsztat",  stawka: 35 },
-        G: { nazwa: "Gwarancja", stawka: 35 },
-        Z: { nazwa: "Zbrojenie", stawka: 30 },
-        P: { nazwa: "Poprawka",  stawka: 0  }
-    };
     const MACHINE_TYPE_OPTIONS = ['Traktor', 'Kombajn', 'Prasa', 'Sieczkarnia', 'Opryskiwacz', 'Agregat', 'Beczka', 'Przyczepa', 'Inna'];
     const fhOf = (event) => {
         const evType = event?.extendedProps?.type || event?.extendedProps?.typ;
@@ -979,6 +973,11 @@ function initializeApp() {
     const ukonczoneZleceniaLista = document.getElementById('ukonczone-zlecenia-lista');
     const completeModal = document.getElementById('complete-zlecenie-modal');
     const completeModalForm = document.getElementById('complete-zlecenie-form');
+    for (const id of ['typ-zlecenia', 'edit-typ-zlecenia']) {
+        document.getElementById(id)?.replaceChildren(...Object.entries(ORDER_TYPES).map(([code, { name, rate }]) =>
+            new Option(`${code} - ${name} (${rate} zł)`, code)
+        ));
+    }
     const closeModalButton = completeModal ? completeModal.querySelector('.close-button') : null;
     const zakonczoneSummaryContainer = document.getElementById('summary-container');
     const clientStatsSearchInput = document.getElementById('client-stats-search');
@@ -1593,7 +1592,8 @@ function initializeApp() {
             const normalizedDay = normalizeDayKey(dayStr, 'rebuildCalendarDecorations');
             if (!normalizedDay) return;
             const dayDoc = dayDocsByDay.get(normalizedDay);
-            if (typeof dayDoc?.notatka === 'string' && dayDoc.notatka.trim()) noteByDay[normalizedDay] = true;
+            const note = typeof dayDoc?.notatka === 'string' ? dayDoc.notatka.trim() : '';
+            if (note) noteByDay[normalizedDay] = note;
             const { praca, jazda, fakturowane, nadgodziny, status, hasAnyData } = aggregateDayData(normalizedDay);
             if (status) {
                 leaveByDayOut[normalizedDay] = status;
@@ -2599,6 +2599,7 @@ function initializeApp() {
         }
         if (shouldOpenModal) {
             openModal(kalendarzModal);
+            if (options.focusNote) kalendarzForm['kalendarz-notatka'].focus();
         }
     }
 
@@ -3876,7 +3877,7 @@ function initializeApp() {
                 console.info('[billing-debug]', {
                     id: order?.id,
                     wyfakturowaneGodziny: getOrderInvoicedHours(order),
-                    stawka: order?.stawka ?? STAWKI[order?.typZlecenia]?.stawka ?? null,
+                    stawka: order?.stawka ?? ORDER_TYPES[order?.typZlecenia]?.rate ?? null,
                     grossOrder: order?.grossAmount ?? order?.kwotaBrutto ?? order?.brutto ?? order?.gross ?? order?.valueGross ?? null,
                     netOrder: order?.netAmount ?? order?.kwotaNetto ?? order?.netto ?? order?.net ?? order?.valueNet ?? null,
                     grossComputed: amounts.grossCents / 100,
@@ -7780,7 +7781,7 @@ function otworzModalSzczegolowZlecenia(zlecenieId) {
     renderOrderDetailFields('details-zlecenie-info', [
         ['Klient', client?.nazwa || order.klientNazwa],
         ['Maszyna', machine ? [machine.typMaszyny, machine.model].filter(Boolean).join(' ') : order.machineModelText],
-        ['Typ zlecenia', STAWKI[order.typZlecenia]?.nazwa || order.typZlecenia],
+        ['Typ zlecenia', ORDER_TYPES[order.typZlecenia]?.name || order.typZlecenia],
         ...dates,
     ]);
 
@@ -9842,6 +9843,10 @@ async function obslugaListyCzesci(event) {
             }
         });
     }
+    kalendarzContainer?.addEventListener('calendar:open-note', (event) => {
+        restoreCalendarFormToModal();
+        void otworzModalGodzin(event.detail, { focusNote: true });
+    });
     if (kalendarzContainer) kalendarzContainer.addEventListener('click', obslugaKalendarza);
     if (kalendarzModalCloseButton && kalendarzModal) {
         kalendarzModalCloseButton.onclick = () => { hideModal(kalendarzModal); };

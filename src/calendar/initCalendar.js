@@ -1,3 +1,4 @@
+import { createDayNoteButton, dismissDayNotePreview } from './dayNotePreview.js';
 import { Calendar, dayGridPlugin, interactionPlugin } from '../fullcalendar-shims/core.js';
 import { loadEventsFromDb, setCalendarEvents, setDayFlags } from '../data/dailyTotals.js';
 import { computeRange, generateGrid, startOfDay } from './rangeUtils.js';
@@ -201,6 +202,7 @@ const SUMMARY_FIELDS = [
 
 const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMount, arg) => {
   if (!cellEl) return;
+  dismissDayNotePreview(cellEl.querySelector('.cell-note-badge'));
   cellEl.querySelectorAll('.day-summary, .cell-leave-icon, .cell-planned-leave, .cell-note-badge').forEach((node) => node.remove());
   if (!decorations || !dayKey) {
     if (typeof extraDayCellDidMount === 'function' && arg) extraDayCellDidMount(arg);
@@ -208,17 +210,8 @@ const renderDayCellDecorations = (cellEl, dayKey, decorations, extraDayCellDidMo
   }
 
   const header = cellEl.querySelector('.fc-daygrid-day-top');
-  if (header && decorations.noteByDay?.[dayKey]) {
-    const badge = document.createElement('span');
-    badge.className = 'cell-note-badge';
-    badge.setAttribute('role', 'img');
-    badge.setAttribute('aria-label', 'Notatka');
-    const icon = document.createElement('span');
-    icon.className = 'cell-note-badge__icon';
-    icon.setAttribute('aria-hidden', 'true');
-    badge.append(icon);
-    header.prepend(badge);
-  }
+  const note = decorations.noteByDay?.[dayKey];
+  if (header && note) header.prepend(createDayNoteButton(dayKey, note));
 
   const leave = decorations.leaveByDay?.[dayKey];
   const planned = decorations.plannedLeaveByDay?.[dayKey];
@@ -345,6 +338,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
 
   const {
     dayCellDidMount: extraDayCellDidMount,
+    dayCellWillUnmount: extraDayCellWillUnmount,
     dayCellClassNames: extraDayCellClassNames,
     datesSet: extraDatesSet,
     eventsSet: extraEventsSet,
@@ -528,6 +522,10 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       const decorations = window.__calendarDecorations || null;
       renderDayCellDecorations(arg.el, day, decorations, extraDayCellDidMount, arg);
     },
+    dayCellWillUnmount: (arg) => {
+      dismissDayNotePreview(arg.el.querySelector('.cell-note-badge'));
+      extraDayCellWillUnmount?.(arg);
+    },
     dayCellContent: (arg) => {
       const date = document.createElement('span');
       date.className = 'calendar-tile-date';
@@ -630,6 +628,7 @@ export function inicjalizujKalendarz(extraOptions = {}, hostEl = null) {
       if (typeof extraEventsSet === 'function') extraEventsSet(...args);
     },
     dateClick: (info) => {
+      if (info.jsEvent?.target?.closest?.('.cell-note-badge')) return;
       if (typeof extraDateClick === 'function') extraDateClick(info);
     },
     select: (info) => {

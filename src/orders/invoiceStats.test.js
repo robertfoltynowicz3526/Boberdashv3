@@ -61,3 +61,16 @@ test('prefers wyfakturowaneGodziny over invoicedHours when values differ', () =>
   assert.equal(order.wyfakturowaneGodziny, 2);
   assert.equal(amounts.grossCents, 9000);
 });
+
+test('uses the current warranty rate while preserving workshop rates and stored warranty amounts', () => {
+  const warranty = { status: 'zakończone', settlementMonth: '2026-11', typZlecenia: 'G', invoicedHours: 10 };
+  const workshop = { ...warranty, typZlecenia: 'W' };
+  const historical = { ...warranty, settlementMonth: '2026-10', grossAmount: 350, netAmount: 245 };
+  const stats = buildInvoiceStatsByMonth([warranty, historical]);
+  assert.equal(stats.monthStats.get('2026-11').grossAmount, 300);
+  assert.equal(stats.monthStats.get('2026-11').netAmount, 210);
+  assert.equal(stats.monthStats.get('2026-10').grossAmount, 350);
+  assert.equal(stats.monthStats.get('2026-10').netAmount, 245);
+  assert.equal(computeOrderAmounts(workshop).grossCents, 35000);
+  assert.equal(computeOrderAmounts(workshop).netCents, 24500);
+});

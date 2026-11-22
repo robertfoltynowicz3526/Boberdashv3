@@ -897,7 +897,12 @@
 #calendar-shell .cell-note-badge {
   display: inline-flex;
   align-items: center;
-  padding-inline: 4px;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0 4px;
+  box-shadow: none;
+  cursor: pointer;
   background: var(--calendar-chip-bg);
   border: 1px solid var(--calendar-chip-border);
   border-radius: 5px;
@@ -926,4 +931,32 @@
   background:
     linear-gradient(currentColor, currentColor) center 4px / 6px 1px no-repeat,
     linear-gradient(currentColor, currentColor) center 7px / 6px 1px no-repeat;
+}
+
+.calendar-day-note-preview {
+  position: fixed;
+  z-index: 1000;
+  width: max-content;
+  max-width: min(22rem, calc(100vw - 24px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.calendar-day-note-preview > div {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
 }
