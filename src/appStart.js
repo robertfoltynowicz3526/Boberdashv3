@@ -405,11 +405,20 @@ function initializeApp() {
         if (!host) return;
         const months = lastMonthsInclusive(y, m, 3);
         const vals = months.map(({ y, m }) => getFHfromSummary(y, m));
-        const labels = months.map(({ y, m }) => `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
+        const isDashboard = host.id === 'fh3m-pulpit';
+        const labels = months.map(({ y, m }) => isDashboard
+            ? new Date(y, m - 1, 1).toLocaleDateString('pl-PL', { month: 'long' })
+            : `${String(m).padStart(2, '0')}.${String(y).slice(-2)}`);
         const curr = vals[2];
         const prev = vals[1];
         const deltaPct = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
-        renderInvoiceHoursChart(host, { labels, values: vals, deltaPct });
+        const today = new Date();
+        const isClosedMonth = y * 12 + m < today.getFullYear() * 12 + today.getMonth() + 1;
+        renderInvoiceHoursChart(host, {
+            labels,
+            values: vals,
+            deltaPct: isDashboard && (!isClosedMonth || prev <= 0) ? null : deltaPct
+        });
     }
     const stripEwidencjaPrefix = (title = '') => (title || '').replace(/^Ewidencja dnia\s*[:•-]?\s*/i, '');
     const DEFAULT_VACATION_ALLOWANCE = 26;
@@ -914,6 +923,10 @@ function initializeApp() {
     const pulpitActivityContainer = document.getElementById('pulpit-activity');
     const pulpitActivityTitle = document.getElementById('pulpit-activity-title');
     const pulpitActivityToggle = document.getElementById('pulpit-activity-toggle');
+    const pulpitActivityEmpty = document.getElementById('pulpit-activity-empty');
+    const pulpitWeeklyMissing = document.querySelector('#pulpit [data-weekly-missing]');
+    const pulpitPeriodSwitch = document.querySelector('#pulpit .pulpit-period-switch');
+    const pulpitMonthLabel = document.getElementById('pulpit-month-label');
     const notesListContainer = document.getElementById('notes-list');
     const notesSearchInput = document.getElementById('notes-search');
     const notesFilterType = document.getElementById('notes-filter-type');
@@ -3031,19 +3044,28 @@ function initializeApp() {
 
     const renderQuickActions = (model = []) => {
         if (!pulpitQuickActionsContainer) return;
-        pulpitQuickActionsContainer.innerHTML = model.map(action => `
-            <button type="button" class="quick-action-card" data-quick-action="${action.id}" ${action.disabled ? 'disabled' : ''}>
-                <span class="quick-action-icon">${action.icon}</span>
-                <span class="quick-action-label">
-                    <span>${action.label}</span>
-                    <span class="quick-action-note">${action.note || action.route}</span>
-                </span>
-            </button>
-        `).join('') || '<p class="loading-state">Brak akcji do wyświetlenia.</p>';
+        const primaryIds = ['add-entry-today', 'add-order', 'calendar-today'];
+        const actionsById = new Map(model.map(action => [action.id, action]));
+        const moreActions = model.filter(action => !primaryIds.includes(action.id));
+        const moreOpen = pulpitQuickActionsContainer.querySelector('details')?.open;
+        const renderAction = (action) => {
+            const isPrimary = action.id === 'add-entry-today';
+            const label = action.id.startsWith('add-') ? `+ ${action.label}` : action.label;
+            return `<button type="button" class="pulpit-shortcut${isPrimary ? ' pulpit-shortcut--primary' : ''}"
+                data-quick-action="${action.id}" ${action.disabled ? 'disabled' : ''}>${label}</button>`;
+        };
+        const primaryActions = primaryIds.map(id => actionsById.get(id)).filter(Boolean).map(renderAction).join('');
+        const more = moreActions.length
+            ? `<details class="pulpit-more-actions" ${moreOpen ? 'open' : ''}>
+                <summary class="pulpit-shortcut">Więcej <span aria-hidden="true">▾</span></summary>
+                <div class="pulpit-more-list">${moreActions.map(renderAction).join('')}</div>
+               </details>`
+            : '';
+        pulpitQuickActionsContainer.innerHTML = primaryActions + more;
     };
 
     function renderPulpitStatystykiMiesiaca(podsumowanie) {
-        const monthLabel = document.getElementById('pulpit-month-label');
+        const monthLabel = pulpitMonthLabel;
         const selectedMonth = getSelectedMonth();
         if (monthLabel && selectedMonth) {
             const [year, month] = selectedMonth.split('-').map(Number);
@@ -3110,7 +3132,7 @@ function initializeApp() {
             { label: 'Jazda', value: `${totals.jazda.toFixed(1)} h` },
             { label: 'Fakturowane', value: `${totals.fakturowane.toFixed(1)} h` },
             { label: 'Nadgodziny', value: `${totals.nadgodziny.toFixed(1)} h` },
-            { label: 'Absorpcja tygodnia', value: fmtPct(absorpcja) }
+            { label: 'Absorpcja', value: fmtPct(absorpcja) }
         ];
 
         return {
@@ -3129,10 +3151,12 @@ function initializeApp() {
             return;
         }
         weeklyMissingDays = model.missingDaysList;
-        const missingStatus = document.querySelector('#pulpit .pulpit-weekly [data-weekly-missing]');
-        if (missingStatus) {
-            missingStatus.textContent = `Braki: ${model.missingDaysCount} dni`;
-            missingStatus.hidden = false;
+        if (pulpitWeeklyMissing) {
+            const count = model.missingDaysCount;
+            pulpitWeeklyMissing.textContent = count === 0
+                ? 'Ewidencja uzupełniona'
+                : count + (count === 1 ? ' dzień' : ' dni') + ' bez ewidencji';
+            pulpitWeeklyMissing.disabled = count === 0;
         }
         const tilesHtml = model.tiles.map(tile => `
             <div class="metric">
@@ -3173,6 +3197,10 @@ function initializeApp() {
 
     const renderActivity = (model = []) => {
         if (!pulpitActivityList) return;
+        const isEmpty = activityStatus === 'ready' && model.length === 0;
+        if (pulpitActivityEmpty) pulpitActivityEmpty.hidden = !isEmpty;
+        if (pulpitActivityToggle) pulpitActivityToggle.hidden = isEmpty;
+        if (pulpitActivityContainer) pulpitActivityContainer.hidden = isEmpty || notesActivityCollapsed;
         if (activityStatus === 'loading') {
             pulpitActivityList.innerHTML = '<li class="loading-state">Ładowanie aktywności...</li>';
             return;
@@ -3183,12 +3211,8 @@ function initializeApp() {
         }
         if (!model.length) {
             pulpitActivityList.innerHTML = '<li class="loading-state">Brak ostatnich działań.</li>';
-            pulpitActivityContainer?.closest('.pulpit-activity')?.classList.add('is-empty');
-            pulpitActivityContainer?.closest('.pulpit-month-columns')?.classList.add('activity-is-empty');
             return;
         }
-        pulpitActivityContainer?.closest('.pulpit-activity')?.classList.remove('is-empty');
-        pulpitActivityContainer?.closest('.pulpit-month-columns')?.classList.remove('activity-is-empty');
         pulpitActivityList.innerHTML = model.map(item => `
             <li class="activity-item" data-activity-id="${item.id}" data-activity-type="${item.type}" data-activity-ref="${item.refId || ''}">
                 <span class="activity-icon">${item.icon}</span>
@@ -3372,7 +3396,10 @@ function initializeApp() {
     function setActivityCollapsed(collapsed) {
         notesActivityCollapsed = Boolean(collapsed);
         if (pulpitActivityContainer) pulpitActivityContainer.hidden = notesActivityCollapsed;
-        if (pulpitActivityToggle) pulpitActivityToggle.textContent = notesActivityCollapsed ? 'Pokaż' : 'Ukryj';
+        if (pulpitActivityToggle) {
+            pulpitActivityToggle.textContent = notesActivityCollapsed ? 'Pokaż' : 'Ukryj';
+            pulpitActivityToggle.setAttribute('aria-expanded', String(!notesActivityCollapsed));
+        }
         const count = Array.isArray(recentActivity) ? recentActivity.length : 0;
         if (pulpitActivityTitle) pulpitActivityTitle.textContent = `Ostatnie działania (${count})`;
         try { localStorage.setItem(NOTES_STORAGE_KEY, notesActivityCollapsed ? '1' : '0'); } catch (_) { }
@@ -3466,18 +3493,13 @@ function initializeApp() {
         if (!button) return;
         const actionId = button.dataset.quickAction;
         if (button.disabled) return;
+        button.closest('details')?.removeAttribute('open');
         void runQuickAction(actionId);
     };
 
     const openWeeklyMissingDrawer = () => {
         setUnfinishedDrawerView('week-missing');
         setUnfinishedDrawerOpen(true);
-    };
-
-    const handleWeeklyMissingClick = (event) => {
-        const trigger = event.target.closest('[data-weekly-missing]');
-        if (!trigger) return;
-        openWeeklyMissingDrawer();
     };
 
     const handleActivityClick = (event) => {
@@ -9104,7 +9126,18 @@ async function obslugaListyCzesci(event) {
 
    // --- PODPIĘCIE EVENTÓW ---
     if (pulpitQuickActionsContainer) pulpitQuickActionsContainer.addEventListener('click', handleQuickActionClick);
-    if (pulpitWeeklyContainer) pulpitWeeklyContainer.addEventListener('click', handleWeeklyMissingClick);
+    pulpitWeeklyMissing?.addEventListener('click', openWeeklyMissingDrawer);
+    pulpitPeriodSwitch?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-pulpit-period]');
+        if (!button || !pulpitWeeklyContainer || !kalendarzPodsumowanieDiv || !pulpitMonthLabel) return;
+        const showWeek = button.dataset.pulpitPeriod === 'week';
+        pulpitWeeklyContainer.hidden = !showWeek;
+        kalendarzPodsumowanieDiv.hidden = showWeek;
+        pulpitMonthLabel.hidden = showWeek;
+        pulpitPeriodSwitch.querySelectorAll('button').forEach((item) => {
+            item.setAttribute('aria-pressed', String(item === button));
+        });
+    });
     if (pulpitActivityList) pulpitActivityList.addEventListener('click', handleActivityClick);
     if (klientForm) klientForm.addEventListener('submit', dodajKlienta);
     if (clientAddMachineToggle) {

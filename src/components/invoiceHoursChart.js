@@ -22,7 +22,7 @@ export const buildInvoiceHoursChartHtml = ({ labels, values, deltaPct }) => {
           </div>`;
         }).join('')}
       </div>
-      <p class="trend-note">Zmiana vs poprzedni miesiąc: <span class="delta ${trend.className}">${trend.arrow ? `${trend.arrow} ` : ''}${trend.prefix}${deltaPct.toFixed(0)}%</span></p>
+      ${Number.isFinite(deltaPct) ? `<p class="trend-note">Zmiana vs poprzedni miesiąc: <span class="delta ${trend.className}">${trend.arrow ? `${trend.arrow} ` : ''}${trend.prefix}${deltaPct.toFixed(0)}%</span></p>` : ''}
     </div>`;
 };
 

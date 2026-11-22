@@ -62,46 +62,40 @@
     </header>
     <main class="mainContent">
         <div id="pulpit" class="tab-content page-wide" data-section="pulpit">
-            <div class="pulpit-header">
+            <div class="pulpit-header pulpit-dashboard-header">
                 <h2>Pulpit</h2>
-                <div id="unfinished-button-slot" class="pulpit-actions"></div>
+                <nav id="pulpit-quick-actions" class="pulpit-dashboard-shortcuts" aria-label="Szybkie akcje"></nav>
             </div>
-            <section class="pulpit-quick-actions" aria-label="Szybkie akcje">
+            <div class="pulpit-dashboard-overview">
+                <section class="pulpit-dashboard-missing" aria-label="Braki ewidencji w tym tygodniu">
+                    <button type="button" class="weekly-missing" data-weekly-missing disabled>Ładowanie ewidencji…</button>
+                    <p>Ten tydzień</p>
+                    <div id="unfinished-button-slot" class="pulpit-actions"></div>
+                </section>
+                <section class="pulpit-dashboard-trend" aria-labelledby="pulpit-trend-title">
+                    <h3 id="pulpit-trend-title">Wyfakturowane · ostatnie 3 miesiące</h3>
+                    <div class="metrics-chart" id="fh3m-pulpit"></div>
+                </section>
+            </div>
+            <section class="pulpit-dashboard-stats" aria-label="Statystyki czasu">
                 <div class="pulpit-stats-header">
-                    <h3>Szybkie akcje</h3>
-                </div>
-                <div id="pulpit-quick-actions" class="quick-actions-grid"></div>
-            </section>
-            <section class="pulpit-weekly" aria-label="Ten tydzień">
-                <div class="pulpit-stats-header">
-                    <h3>Ten tydzień</h3>
-                    <button type="button" class="weekly-missing" data-weekly-missing hidden>Braki: 0 dni</button>
-                </div>
-                <div id="pulpit-weekly-preview" class="summary-container-subtle summary-compact"></div>
-            </section>
-            <section class="pulpit-stats-bar pulpit-month-panel" aria-label="Statystyki miesiąca">
-                <div class="pulpit-stats-header">
-                    <h3>Statystyki miesiąca <span id="pulpit-month-label"></span></h3>
-                </div>
-                <div id="kalendarz-podsumowanie" class="summary-container-subtle summary-compact"></div>
-                <div class="pulpit-month-columns">
-                    <div class="pulpit-month-chart" aria-label="Godziny w miesiącu">
-                        <h4>Godziny w miesiącu</h4>
-                        <div id="pulpit-month-hours" class="month-hours-chart"></div>
-                        <div class="pulpit-trend-chart">
-                            <h4>Wyfakturowane — ostatnie 3 mies.</h4>
-                            <div class="metrics-chart" id="fh3m-pulpit"></div>
-                        </div>
+                    <h3>Statystyki <span id="pulpit-month-label"></span></h3>
+                    <div class="pulpit-period-switch" role="group" aria-label="Okres statystyk">
+                        <button type="button" data-pulpit-period="week" aria-pressed="false" aria-controls="pulpit-weekly-preview">Tydzień</button>
+                        <button type="button" data-pulpit-period="month" aria-pressed="true" aria-controls="kalendarz-podsumowanie">Miesiąc</button>
                     </div>
-                    <section class="pulpit-activity" aria-label="Ostatnie działania">
-                        <div class="pulpit-stats-header">
-                            <h4 id="pulpit-activity-title">Ostatnie działania</h4>
-                            <button type="button" id="pulpit-activity-toggle" class="btn-ghost">Pokaż</button>
-                        </div>
-                        <div id="pulpit-activity" class="summary-container-subtle">
-                            <ul id="pulpit-activity-list" class="activity-list"></ul>
-                        </div>
-                    </section>
+                </div>
+                <div id="pulpit-weekly-preview" aria-label="Statystyki tygodnia" hidden></div>
+                <div id="kalendarz-podsumowanie" aria-label="Statystyki miesiąca"></div>
+            </section>
+            <section class="pulpit-activity pulpit-dashboard-activity" aria-label="Ostatnie działania">
+                <div class="pulpit-stats-header">
+                    <h3 id="pulpit-activity-title">Ostatnie działania</h3>
+                    <span id="pulpit-activity-empty" hidden>Brak wpisów</span>
+                    <button type="button" id="pulpit-activity-toggle" class="btn-ghost" aria-controls="pulpit-activity">Pokaż</button>
+                </div>
+                <div id="pulpit-activity" class="summary-container-subtle">
+                    <ul id="pulpit-activity-list" class="activity-list"></ul>
                 </div>
             </section>
         </div>
