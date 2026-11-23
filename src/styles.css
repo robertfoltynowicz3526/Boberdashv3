@@ -1315,11 +1315,19 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 
 .pulpit-more-list .pulpit-shortcut { justify-content: flex-start; }
 
-.pulpit-dashboard-overview {
+.pulpit-dashboard-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
-  gap: 12px;
+  grid-template-areas: "gaps trend" "stats stats" "orders orders" "activity activity";
+  gap: 16px 12px;
+  min-width: 0;
 }
+
+.pulpit-dashboard-column { display: contents; }
+.pulpit-dashboard-missing { grid-area: gaps; }
+.pulpit-dashboard-trend { grid-area: trend; }
+.pulpit-dashboard-stats { grid-area: stats; }
+.pulpit-dashboard-panel { grid-area: orders; }
 
 .pulpit-dashboard-missing,
 .pulpit-dashboard-trend,
@@ -1462,12 +1470,15 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
 #pulpit-active-orders button span { color: var(--text-secondary); }
 .pulpit-dashboard-empty { margin: 8px 0 0; color: var(--text-secondary); }
 
-#pulpit .pulpit-dashboard-activity { grid-column: 1 / -1; padding-block: 9px; }
+#pulpit .pulpit-dashboard-activity { grid-area: activity; padding-block: 9px; }
 #pulpit-activity-empty { color: var(--text-secondary); font-size: 12px; }
 #pulpit .pulpit-dashboard-activity [hidden],
 #pulpit .pulpit-dashboard-stats [hidden] { display: none !important; }
 
 @media (max-width: 780px) {
-  .pulpit-dashboard-overview { grid-template-columns: minmax(0, 1fr); }
+  .pulpit-dashboard-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "gaps" "trend" "stats" "orders" "activity";
+  }
   #pulpit .pulpit-dashboard-stats .metrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

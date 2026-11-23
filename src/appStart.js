@@ -5,6 +5,7 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
+import './styles/jd-serwis.css';
 import { findGlobalResults } from './search/globalSearch.js';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals, resolveManualBilled } from './calendar/computeDayTotals.js';
@@ -217,7 +218,7 @@ function initializeApp() {
     const readOpenYearsFromStorage = () => {
         try {
             const raw = localStorage.getItem(SUMMARY_OPEN_YEARS_STORAGE_KEY);
-            if (!raw) return [];
+            if (!raw) return null;
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed.map(Number).filter(Number.isFinite) : [];
         } catch (_) {
@@ -1789,11 +1790,17 @@ function initializeApp() {
     const showTab = (tabName) => {
         if (activeMainTab === tabName) return;
         document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
-        document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+            button.removeAttribute('aria-current');
+        });
         const target = document.getElementById(tabName);
         if (target) target.style.display = 'block';
         const trigger = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
-        if (trigger) trigger.classList.add('active');
+        if (trigger) {
+            trigger.classList.add('active');
+            trigger.setAttribute('aria-current', 'page');
+        }
         activeMainTab = tabName;
         handleTabActivation(tabName);
     };
@@ -2083,6 +2090,7 @@ function initializeApp() {
                     const entry = plannedLeaveEntries.find(plan => plan.id === id);
                     if (!entry) return;
                     showTab('podsumowanie');
+                    setSummaryTab('vacation');
                     setActiveVacationTab('planned');
                     setPlannedLeaveFormState(entry);
                     plannedLeaveForm?.scrollIntoView({ block: 'center' });
@@ -3943,10 +3951,8 @@ function initializeApp() {
 
     const ensureOpenSummaryYears = (years = []) => {
         const available = new Set((years || []).map(Number).filter(Number.isFinite));
-        const stored = readOpenYearsFromStorage().filter(year => available.has(year));
-        const shouldIgnoreStoredAllOpen = stored.length > 0 && stored.length === available.size;
-        const next = shouldIgnoreStoredAllOpen ? [] : stored;
-        openSummaryYears = new Set(next);
+        const stored = readOpenYearsFromStorage() ?? years.slice(0, 1);
+        openSummaryYears = new Set(stored.filter(year => available.has(year)));
         persistOpenYears([...openSummaryYears]);
         return openSummaryYears;
     };
@@ -4198,10 +4204,36 @@ function initializeApp() {
         </div>
     `;
 
+    function getAnnualHoursMonths(months, year, now = ymNow()) {
+        const lastMonth = year === now.y ? now.m : (months.findLast(month => month.year === year)?.month ?? 12);
+        const billedByMonth = new Map(months.map(month => [month.miesiac, month.billed]));
+        return lastMonthsInclusive(year, lastMonth, 3).map(({ y, m }) => ({
+            month: PL_MONTHS[m - 1],
+            hours: billedByMonth.get(makeMonthKey(y, m)) ?? 0
+        }));
+    }
+
+    function renderAnnualHours(months) {
+        const list = document.getElementById('summary-three-month-values');
+        if (!list) return;
+        const hoursFormat = new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 2 });
+        list.replaceChildren(...months.map(({ month, hours }) => {
+            const item = document.createElement('div');
+            const label = document.createElement('dt');
+            const value = document.createElement('dd');
+            label.textContent = month;
+            value.textContent = `${hoursFormat.format(hours)} h`;
+            item.append(label, value);
+            return item;
+        }));
+    }
+
     function renderRocznePodsumowanie() {
         if (!annualSummaryContainer) return;
         if (summaryBillingModeSelect) summaryBillingModeSelect.value = 'calendar';
-        const years = (ostatnieZestawienieMiesieczne.years || []).sort((a, b) => a.year - b.year);
+        const years = [...(ostatnieZestawienieMiesieczne.years || [])].sort((a, b) => b.year - a.year);
+        renderAnnualHours(getAnnualHoursMonths(ostatnieZestawienieMiesieczne.miesiace || [], selectedYear));
+        if (annualSummaryExportBtn) annualSummaryExportBtn.dataset.exportYear = String(selectedYear);
         if (!years.length) {
             annualSummaryContainer.innerHTML = '<p>Brak danych do wyświetlenia.</p>';
             return;
@@ -4270,10 +4302,6 @@ ${years.map(y => `
     </div>
   </div>
 `).join('')}`;
-        if (annualSummaryExportBtn) {
-            const latestYear = Math.max(...years.map(y => Number(y.year)).filter(Number.isFinite));
-            annualSummaryExportBtn.dataset.exportYear = Number.isFinite(latestYear) ? String(latestYear) : '';
-        }
     }
 
     const getPlannedLeaveTotal = (entries = []) => {
@@ -4299,6 +4327,20 @@ ${years.map(y => `
         contentEl.hidden = Boolean(collapsed);
     };
 
+    function setSummaryTab(name, { focus = false } = {}) {
+        const buttons = document.querySelectorAll('#podsumowanie [data-summary-tab]');
+        for (const button of buttons) {
+            const active = button.dataset.summaryTab === name;
+            button.setAttribute('aria-selected', String(active));
+            button.tabIndex = active ? 0 : -1;
+            document.getElementById(button.getAttribute('aria-controls')).hidden = !active;
+            if (active && focus) button.focus();
+        }
+        summaryYearSelect?.closest('.summary-page-year')?.toggleAttribute('hidden', name !== 'year' && name !== 'l4');
+        if (name === 'vacation' && vacationSectionCollapsed) vacationSectionToggle?.click();
+        if (name === 'l4' && l4SectionCollapsed) l4SectionToggle?.click();
+    }
+
     function updateYearSelectOptions(selectEl, years, selectedValue) {
         if (!selectEl) return;
         const uniqueYears = getYearsSortedDesc(years);
@@ -4322,7 +4364,7 @@ ${years.map(y => `
         }
         const total = yearData.sum.l4Days;
         const monthsWithL4 = yearData.months.filter(m => Number(m.l4Days) > 0).length;
-        if (l4SectionCounter) l4SectionCounter.textContent = `${monthsWithL4} mies. / ${formatDaysValue(total)} dni`;
+        if (l4SectionCounter) l4SectionCounter.textContent = `${monthsWithL4} mies. / ${formatDaysValue(total)}`;
         const rows = yearData.months.map(m => `<tr><td>${m.label}</td><td class="num">${m.l4Days}</td></tr>`).join('');
         l4SummaryContainer.innerHTML = `
             <table class="tbl">
@@ -4489,7 +4531,7 @@ ${years.map(y => `
                         <span class="planned-leave-item__type">${entry.type || '—'}</span>
                     </div>
                     <div class="planned-leave-item__meta">
-                        <span><b>${formatDaysValue(count)}</b> dni</span>
+                        <span><b>${formatDaysValue(count)}</b></span>
                         <span>liczono dni robocze</span>
                     </div>
                     <p class="planned-leave-item__note">Notatka: ${noteText}</p>
@@ -4901,22 +4943,67 @@ ${years.map(y => `
     };
 
     function inicjujMotywJohnDeere() {
+        const sidebar = document.querySelector('.app-sidebar');
+        const nav = sidebar.querySelector('.sidebar-nav');
+        const legacyGroups = [...nav.querySelectorAll('.nav-group')].map(group => ({
+            group,
+            buttons: [...group.querySelectorAll('[data-tab]')]
+        }));
+        const buttons = new Map(legacyGroups.flatMap(({ buttons }) => buttons.map(button => [button.dataset.tab, button])));
+        const serwisGroups = [
+            ['', [['dodaj-zlecenie', '']]],
+            ['Serwis', [['pulpit', '⌂'], ['kalendarz-tab', '▦'], ['zlecenia', '▤'], ['notatnik', '▧']]],
+            ['Baza serwisu', [['maszyny', '⚙︎'], ['klienci', '♙'], ['magazyn', '▣']]],
+            ['Rozliczenia', [['finanse', '◈'], ['podsumowanie', '▥']]]
+        ].map(([title, items]) => {
+            const group = document.createElement('div');
+            group.className = 'nav-group';
+            if (title) {
+                const label = document.createElement('p');
+                label.className = 'nav-group-label';
+                label.textContent = title;
+                group.append(label);
+            }
+            return {
+                group,
+                buttons: items.map(([id, symbol]) => {
+                    const button = buttons.get(id);
+                    if (symbol) {
+                        const icon = document.createElement('span');
+                        icon.className = 'jd-nav-icon';
+                        icon.setAttribute('aria-hidden', 'true');
+                        icon.textContent = symbol;
+                        button.prepend(icon);
+                    }
+                    return button;
+                })
+            };
+        });
+
         const savedTheme = localStorage.getItem('theme') || 'jd-dark';
-        applyTheme(savedTheme);
-        if (themeSelect) {
-            themeSelect.value = savedTheme;
-            themeSelect.addEventListener('change', () => {
-                const newTheme = themeSelect.value || 'jd-dark';
-                applyTheme(newTheme);
-                localStorage.setItem('theme', newTheme);
+        const applyTheme = (theme) => {
+            const resolved = ['jd-serwis', 'jd-contrast'].includes(theme) ? theme : 'jd-dark';
+            const isSerwis = resolved === 'jd-serwis';
+            document.body.dataset.theme = resolved;
+            if (themeSelect) themeSelect.value = resolved;
+            sidebar.querySelector('.app-title').textContent = isSerwis ? 'Boberdash' : 'Agro-Bober';
+            sidebar.querySelector('.brand-icon').textContent = isSerwis ? 'B·' : 'JD';
+            const groups = isSerwis ? serwisGroups : legacyGroups;
+            for (const { group, buttons } of groups) group.append(...buttons);
+            nav.replaceChildren(...groups.map(({ group }) => group));
+            requestAnimationFrame(() => {
+                if (activeMainTab === 'kalendarz-tab') getCalendarApi()?.updateSize?.();
             });
-        } else {
-            console.error("Nie znaleziono przełącznika motywu (themeSelect)");
+        };
+        if (savedTheme === 'jd-contrast') {
+            themeSelect?.add(new Option('John Deere (kontrastowy)', 'jd-contrast'));
         }
-    }
-    function applyTheme(theme) {
-        const resolved = theme === 'jd-contrast' ? 'jd-contrast' : 'jd-dark';
-        document.body.dataset.theme = resolved;
+        applyTheme(savedTheme);
+        themeSelect?.addEventListener('change', () => {
+            const newTheme = themeSelect.value;
+            applyTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
     }
 
     function inicjujZwijanie() {
@@ -9281,6 +9368,26 @@ async function obslugaListyCzesci(event) {
 
     if (modalMagazynLista) modalMagazynLista.addEventListener('click', dodajCzescDoZlecenia);
     if (partsToRemoveList) partsToRemoveList.addEventListener('click', obslugaListyCzesci);
+
+    const summaryTabList = document.querySelector('#podsumowanie [role="tablist"]');
+    summaryTabList?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-summary-tab]');
+        if (button) setSummaryTab(button.dataset.summaryTab);
+    });
+    summaryTabList?.addEventListener('keydown', (event) => {
+        const buttons = [...summaryTabList.querySelectorAll('[data-summary-tab]')];
+        const index = buttons.indexOf(event.target);
+        if (index < 0) return;
+        const nextIndex = {
+            ArrowLeft: (index - 1 + buttons.length) % buttons.length,
+            ArrowRight: (index + 1) % buttons.length,
+            Home: 0,
+            End: buttons.length - 1
+        }[event.key];
+        if (!Number.isInteger(nextIndex)) return;
+        event.preventDefault();
+        setSummaryTab(buttons[nextIndex].dataset.summaryTab, { focus: true });
+    });
 
     if (summaryYearSelect) {
         summaryYearSelect.addEventListener('change', () => {

@@ -16,7 +16,7 @@
     <script type='module' src='/src/main.js' defer></script>
   </head>
   <body class="app-locked">
-    <header>
+    <header class="app-sidebar">
         <div class="brand">
             <div class="brand-icon">JD</div>
             <div class="brand-text">
@@ -54,7 +54,8 @@
             <div class="theme-switcher">
                 <select id="theme-select" class="theme-select" aria-label="Wybierz motyw interfejsu">
                     <option value="jd-dark">John Deere (ciemny, lekki)</option>
-                                    </select>
+                    <option value="jd-serwis">JD Serwis</option>
+                </select>
             </div>
             <button type="button" id="app-lock-button" class="btn-secondary app-lock-button">Zablokuj</button>
             <div id="money-privacy-toggle-slot" class="money-privacy-toggle-slot" aria-label="Przełącznik incognito"></div>
@@ -66,46 +67,50 @@
                 <h2>Pulpit</h2>
                 <nav id="pulpit-quick-actions" class="pulpit-dashboard-shortcuts" aria-label="Szybkie akcje"></nav>
             </div>
-            <div class="pulpit-dashboard-overview">
-                <section class="pulpit-dashboard-missing" aria-label="Braki ewidencji w tym tygodniu">
-                    <button type="button" class="weekly-missing" data-weekly-missing disabled>Ładowanie ewidencji…</button>
-                    <p>Ten tydzień</p>
-                    <div id="unfinished-button-slot" class="pulpit-actions"></div>
-                </section>
+            <div class="pulpit-dashboard-body">
+                <div class="pulpit-dashboard-column pulpit-dashboard-column--service">
+                    <section class="pulpit-dashboard-panel" aria-labelledby="pulpit-active-orders-title">
+                        <div class="pulpit-stats-header">
+                            <h3 id="pulpit-active-orders-title">Aktywne zlecenia</h3>
+                            <a id="pulpit-all-active-orders" href="#zlecenia">Wszystkie aktywne</a>
+                        </div>
+                        <ul id="pulpit-active-orders" class="pulpit-dashboard-list"></ul>
+                        <p id="pulpit-active-orders-empty" class="pulpit-dashboard-empty" hidden>Brak aktywnych zleceń</p>
+                    </section>
+                    <section class="pulpit-activity pulpit-dashboard-activity" aria-label="Ostatnie działania">
+                        <div class="pulpit-stats-header">
+                            <h3 id="pulpit-activity-title">Ostatnie działania</h3>
+                            <span id="pulpit-activity-empty" hidden>Brak wpisów</span>
+                            <button type="button" id="pulpit-activity-toggle" class="btn-ghost" aria-controls="pulpit-activity">Pokaż</button>
+                        </div>
+                        <div id="pulpit-activity" class="summary-container-subtle">
+                            <ul id="pulpit-activity-list" class="activity-list"></ul>
+                        </div>
+                    </section>
+                </div>
+                <div class="pulpit-dashboard-column pulpit-dashboard-column--status">
+                    <section class="pulpit-dashboard-missing" aria-label="Braki ewidencji w tym tygodniu">
+                        <button type="button" class="weekly-missing" data-weekly-missing disabled>Ładowanie ewidencji…</button>
+                        <p>Ten tydzień</p>
+                        <div id="unfinished-button-slot" class="pulpit-actions"></div>
+                    </section>
+                    <section class="pulpit-dashboard-stats" aria-label="Statystyki czasu">
+                        <div class="pulpit-stats-header">
+                            <h3>Statystyki <span id="pulpit-month-label"></span></h3>
+                            <div class="pulpit-period-switch" role="group" aria-label="Okres statystyk">
+                                <button type="button" data-pulpit-period="week" aria-pressed="false" aria-controls="pulpit-weekly-preview">Tydzień</button>
+                                <button type="button" data-pulpit-period="month" aria-pressed="true" aria-controls="kalendarz-podsumowanie">Miesiąc</button>
+                            </div>
+                        </div>
+                        <div id="pulpit-weekly-preview" aria-label="Statystyki tygodnia" hidden></div>
+                        <div id="kalendarz-podsumowanie" aria-label="Statystyki miesiąca"></div>
+                    </section>
+                </div>
                 <section class="pulpit-dashboard-trend" aria-labelledby="pulpit-trend-title">
                     <h3 id="pulpit-trend-title">Wyfakturowane · ostatnie 3 miesiące</h3>
                     <div class="metrics-chart" id="fh3m-pulpit"></div>
                 </section>
             </div>
-            <section class="pulpit-dashboard-stats" aria-label="Statystyki czasu">
-                <div class="pulpit-stats-header">
-                    <h3>Statystyki <span id="pulpit-month-label"></span></h3>
-                    <div class="pulpit-period-switch" role="group" aria-label="Okres statystyk">
-                        <button type="button" data-pulpit-period="week" aria-pressed="false" aria-controls="pulpit-weekly-preview">Tydzień</button>
-                        <button type="button" data-pulpit-period="month" aria-pressed="true" aria-controls="kalendarz-podsumowanie">Miesiąc</button>
-                    </div>
-                </div>
-                <div id="pulpit-weekly-preview" aria-label="Statystyki tygodnia" hidden></div>
-                <div id="kalendarz-podsumowanie" aria-label="Statystyki miesiąca"></div>
-            </section>
-            <section class="pulpit-dashboard-panel" aria-labelledby="pulpit-active-orders-title">
-                <div class="pulpit-stats-header">
-                    <h3 id="pulpit-active-orders-title">Aktywne zlecenia</h3>
-                    <a id="pulpit-all-active-orders" href="#zlecenia">Wszystkie aktywne</a>
-                </div>
-                <ul id="pulpit-active-orders" class="pulpit-dashboard-list"></ul>
-                <p id="pulpit-active-orders-empty" class="pulpit-dashboard-empty" hidden>Brak aktywnych zleceń</p>
-            </section>
-            <section class="pulpit-activity pulpit-dashboard-activity" aria-label="Ostatnie działania">
-                <div class="pulpit-stats-header">
-                    <h3 id="pulpit-activity-title">Ostatnie działania</h3>
-                    <span id="pulpit-activity-empty" hidden>Brak wpisów</span>
-                    <button type="button" id="pulpit-activity-toggle" class="btn-ghost" aria-controls="pulpit-activity">Pokaż</button>
-                </div>
-                <div id="pulpit-activity" class="summary-container-subtle">
-                    <ul id="pulpit-activity-list" class="activity-list"></ul>
-                </div>
-            </section>
         </div>
         <div id="notatnik" class="tab-content page-wide">
             <div class="pulpit-header">
@@ -398,25 +403,51 @@
             </div>
         </div>
         <div id="podsumowanie" class="tab-content" data-section="podsumowanie">
+            <div class="pulpit-header summary-page-heading">
+                <div>
+                    <h2>Podsumowanie</h2>
+                    <p>Rozliczenia roczne, premia kwartalna, urlop i L4.</p>
+                </div>
+            </div>
+            <div class="summary-page-toolbar">
+                <div class="summary-page-tabs" role="tablist" aria-label="Rodzaj podsumowania">
+                    <button type="button" id="summary-tab-year" role="tab" aria-controls="summary-panel-year" aria-selected="true" data-summary-tab="year">Rok</button>
+                    <button type="button" id="summary-tab-quarter" role="tab" aria-controls="sum-premia-kwartalna" aria-selected="false" tabindex="-1" data-summary-tab="quarter">Premia kwartalna</button>
+                    <button type="button" id="summary-tab-vacation" role="tab" aria-controls="sum-urlop" aria-selected="false" tabindex="-1" data-summary-tab="vacation">Urlop</button>
+                    <button type="button" id="summary-tab-l4" role="tab" aria-controls="sum-l4" aria-selected="false" tabindex="-1" data-summary-tab="l4">L4</button>
+                </div>
+                <label class="summary-page-year" for="summary-year-select">Rok
+                    <select id="summary-year-select"></select>
+                </label>
+            </div>
             <div class="summary-stack">
-                <div class="summary-card summary-card--primary" id="sum-roczne">
-                    <div class="card-head">
-                        <h3>Podsumowanie Roczne</h3>
-                        <div class="export-menu">
-                            <button type="button" id="annual-summary-export" class="export-trigger" data-export-year="" aria-haspopup="true" aria-expanded="false">
-                                <span class="icon">⬇</span> Eksport
-                            </button>
-                            <div class="export-menu-panel" role="menu">
-                                <button type="button" class="export-menu-item" data-export-action="summary-csv">CSV – Podsumowanie roczne</button>
-                                <button type="button" class="export-menu-item" data-export-action="orders-csv">CSV – Zlecenia (rok)</button>
-                                <button type="button" class="export-menu-item" data-export-action="pdf">PDF – Raport roczny</button>
+                <div id="summary-panel-year" role="tabpanel" aria-labelledby="summary-tab-year" data-summary-panel="year">
+                    <section class="summary-three-months" aria-labelledby="summary-three-months-title">
+                        <h3 id="summary-three-months-title">Fakturowane · ostatnie 3 miesiące</h3>
+                        <dl id="summary-three-month-values"></dl>
+                    </section>
+                    <div class="summary-card summary-card--primary" id="sum-roczne">
+                        <div class="card-head summary-annual-heading">
+                            <h3>Podsumowanie roczne</h3>
+                            <div class="summary-annual-mode">
+                                <label for="summary-billing-mode">Wyfakturowane:</label>
+                                <select id="summary-billing-mode"><option value="calendar">Zlecenia + ewidencja</option></select>
+                            </div>
+                            <div class="export-menu">
+                                <button type="button" id="annual-summary-export" class="export-trigger" data-export-year="" aria-haspopup="true" aria-expanded="false">
+                                    <span class="icon">⬇</span> Eksport
+                                </button>
+                                <div class="export-menu-panel" role="menu">
+                                    <button type="button" class="export-menu-item" data-export-action="summary-csv">CSV – Podsumowanie roczne</button>
+                                    <button type="button" class="export-menu-item" data-export-action="orders-csv">CSV – Zlecenia (rok)</button>
+                                    <button type="button" class="export-menu-item" data-export-action="pdf">PDF – Raport roczny</button>
+                                </div>
                             </div>
                         </div>
+                        <div id="annual-summary"></div>
                     </div>
-                    <div class="summary-toolbar"><div class="summary-toolbar-left"><label for="summary-billing-mode">Wyfakturowane:</label><select id="summary-billing-mode"><option value="calendar">Zlecenia + ewidencja</option></select></div></div>
-                    <div id="annual-summary"></div>
                 </div>
-                <div class="summary-card" id="sum-urlop">
+                <div class="summary-card" id="sum-urlop" role="tabpanel" aria-labelledby="summary-tab-vacation" data-summary-panel="vacation" hidden>
                     <div class="card-head card-head--collapsible" id="vacation-section-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="vacation-section-content">
                         <div class="collapsible-title-wrap">
                             <span class="section-chevron" id="vacation-section-chevron" aria-hidden="true">▼</span>
@@ -535,25 +566,19 @@
                     <div id="vacation-adjustments" class="vacation-adjustments"></div>
                     </div>
                 </div>
-                <div class="summary-card" id="sum-l4">
+                <div class="summary-card" id="sum-l4" role="tabpanel" aria-labelledby="summary-tab-l4" data-summary-panel="l4" hidden>
                     <div class="card-head card-head--collapsible" id="l4-section-toggle" role="button" tabindex="0" aria-expanded="false" aria-controls="l4-section-content">
                         <div class="collapsible-title-wrap">
                             <span class="section-chevron" id="l4-section-chevron" aria-hidden="true">▼</span>
                             <h3>L4 – zestawienie</h3>
                             <span class="section-counter" id="l4-section-counter">0 wpisów</span>
                         </div>
-                        <div class="summary-toolbar">
-                            <div class="summary-toolbar-left">
-                                <label for="summary-year-select">Rok:</label>
-                                <select id="summary-year-select" data-no-collapse="true"></select>
-                            </div>
-                        </div>
                     </div>
                     <div id="l4-section-content" hidden>
                         <div id="l4-summary"></div>
                     </div>
                 </div>
-                <div class="summary-card" id="sum-premia-kwartalna">
+                <div class="summary-card" id="sum-premia-kwartalna" role="tabpanel" aria-labelledby="summary-tab-quarter" data-summary-panel="quarter" hidden>
                     <div id="quarterly-bonus-summary"></div>
                 </div>
             </div>
