@@ -30,9 +30,6 @@
   --total-text: #182018;
   --total-border: rgba(15, 20, 15, 0.25);
 
-  --total-bg-dark: linear-gradient(90deg, rgba(40, 90, 32, 0.95) 0%, rgba(54, 124, 43, 0.95) 100%);
-  --total-text-dark: #f7fbf7;
-  --total-border-dark: rgba(0, 0, 0, 0.35);
   --bg-color: var(--color-background);
   --bg-elevated: var(--color-surface);
   --bg-elevated-hover: var(--color-surface-2);
@@ -67,26 +64,6 @@
   --chip-text: #182018;
   --text-strong: #f0f5ff;
   --text-mid: #cfd9e2;
-}
-
-body[data-theme="jd-contrast"] {
-  --color-background: #080e0a;
-  --color-surface: #0f1911;
-  --color-surface-2: #172419;
-  --color-border: rgba(255, 255, 255, 0.2);
-  --color-text: #f9fff1;
-  --color-muted-text: #dce7cf;
-  --color-primary: #2e7a1f;
-  --color-primary-hover: #1f5e16;
-  --color-focus-ring: rgba(252, 209, 22, 0.55);
-  --color-accent: #ffdf3a;
-  --color-success: #79d370;
-  --color-warning: #ffd54a;
-  --color-error: #ff8585;
-  --accent-soft: rgba(54, 124, 43, 0.3);
-  --border-strong: rgba(255, 255, 255, 0.36);
-  --table-header: rgba(255, 255, 255, 0.1);
-  --calendar-grid: rgba(255, 255, 255, 0.12);
 }
 
 * {
@@ -267,23 +244,6 @@ header {
   letter-spacing: 0.08em;
 }
 
-.brand-text h1 {
-  margin: 0;
-  font-weight: 700;
-  font-size: 1.5rem;
-  letter-spacing: 0.03em;
-}
-
-.app-title {
-  color: #fff;
-}
-
-.app-subtitle {
-  margin: 0.1rem 0 0;
-  font-size: 0.92rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
 .sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -334,41 +294,6 @@ header {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.sidebar-label {
-  margin: 0;
-  font-size: 0.85rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.theme-switcher {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 0.6rem 0.9rem;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
-}
-
-.theme-select {
-  flex: 1;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  color: var(--text-color);
-  border-radius: 10px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.85rem;
-}
-
-.theme-select:focus {
-  outline: 2px solid var(--input-focus);
-  outline-offset: 2px;
 }
 
 main,
@@ -3108,17 +3033,6 @@ table .summary-total td {
   border-top: 2px solid var(--total-border);
 }
 
-body[data-theme="jd-contrast"] .summary-total {
-  background: var(--total-bg-dark);
-  color: var(--total-text-dark);
-  border-color: var(--total-border-dark);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-}
-
-body[data-theme="jd-contrast"] table .summary-total td {
-  border-top-color: var(--total-border-dark);
-}
-
 .summary-total::before {
   content: "";
   position: absolute;
@@ -3185,23 +3099,6 @@ body[data-theme="jd-contrast"] table .summary-total td {
 @media (max-width: 640px) {
   header {
     padding-bottom: 56px;
-  }
-  .tabs-row {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 50;
-    display: grid;
-    grid-auto-flow: column;
-    gap: 6px;
-    padding: 8px env(safe-area-inset-right) calc(8px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
-    background: var(--header-bg, rgba(22, 27, 34, 0.9));
-    backdrop-filter: blur(8px);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
   }
   .tab-button {
     min-height: 44px;

@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agro-Bober</title>
+    <title>Boberdash</title>
     <link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css'>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales-all.global.min.js'></script>
@@ -13,50 +13,43 @@
     <link rel='stylesheet' href='/src/style.css'>
     <link rel='stylesheet' href='/src/styles.css'>
     <link rel='stylesheet' href='/src/styles/desktop-only.css'>
+    <link rel='stylesheet' href='/src/styles/jd-serwis.css'>
     <script type='module' src='/src/main.js' defer></script>
   </head>
-  <body class="app-locked">
+  <body class="app-locked" data-theme="jd-serwis">
     <header class="app-sidebar">
         <div class="brand">
-            <div class="brand-icon">JD</div>
-            <div class="brand-text">
-                <h1 class="app-title">Agro-Bober</h1>
-                <p class="app-subtitle">Zarządzanie serwisem i magazynem</p>
-            </div>
+            <div class="brand-icon" aria-hidden="true">B·</div>
+            <h1 class="app-title">Boberdash</h1>
         </div>
         <div class="global-search" role="search">
             <input type="search" id="global-search-input" aria-label="Szukaj klientów, maszyn i zleceń" placeholder="Szukaj w serwisie" autocomplete="off" aria-controls="global-search-results">
             <div id="global-search-results" class="global-search-results" hidden></div>
         </div>
-        <nav class="sidebar-nav tabs-row">
+        <nav class="sidebar-nav" aria-label="Menu główne">
             <div class="nav-group">
-                <p class="nav-group-label">Główne</p>
-                <button type="button" class="tab-button" data-tab="pulpit">Pulpit</button>
-                <button type="button" class="tab-button" data-tab="kalendarz-tab">Kalendarz</button>
-                <button type="button" class="tab-button tab-button--accent" data-tab="dodaj-zlecenie">+ Dodaj Zlecenie</button>
+                <button type="button" class="tab-button tab-button--accent" data-tab="dodaj-zlecenie">+ Dodaj zlecenie</button>
             </div>
             <div class="nav-group">
                 <p class="nav-group-label">Serwis</p>
-                <button type="button" class="tab-button" data-tab="zlecenia">Zlecenia</button>
-                <button type="button" class="tab-button" data-tab="klienci">Klienci</button>
-                <button type="button" class="tab-button" data-tab="maszyny">Maszyny</button>
+                <button type="button" class="tab-button" data-tab="pulpit"><span class="jd-nav-icon" aria-hidden="true">⌂</span>Pulpit</button>
+                <button type="button" class="tab-button" data-tab="kalendarz-tab"><span class="jd-nav-icon" aria-hidden="true">▦</span>Kalendarz</button>
+                <button type="button" class="tab-button" data-tab="zlecenia"><span class="jd-nav-icon" aria-hidden="true">▤</span>Zlecenia</button>
+                <button type="button" class="tab-button" data-tab="notatnik"><span class="jd-nav-icon" aria-hidden="true">▧</span>Notatnik</button>
             </div>
             <div class="nav-group">
-                <p class="nav-group-label">Narzędzia</p>
-                <button type="button" class="tab-button" data-tab="notatnik">Notatnik</button>
-                <button type="button" class="tab-button" data-tab="magazyn">Magazyn</button>
-                <button type="button" class="tab-button" data-tab="podsumowanie">Podsumowanie</button>
-                <button type="button" class="tab-button" data-tab="finanse">Finanse</button>
+                <p class="nav-group-label">Baza serwisu</p>
+                <button type="button" class="tab-button" data-tab="maszyny"><span class="jd-nav-icon" aria-hidden="true">⚙︎</span>Maszyny</button>
+                <button type="button" class="tab-button" data-tab="klienci"><span class="jd-nav-icon" aria-hidden="true">♙</span>Klienci</button>
+                <button type="button" class="tab-button" data-tab="magazyn"><span class="jd-nav-icon" aria-hidden="true">▣</span>Magazyn</button>
+            </div>
+            <div class="nav-group">
+                <p class="nav-group-label">Rozliczenia</p>
+                <button type="button" class="tab-button" data-tab="finanse"><span class="jd-nav-icon" aria-hidden="true">◈</span>Finanse</button>
+                <button type="button" class="tab-button" data-tab="podsumowanie"><span class="jd-nav-icon" aria-hidden="true">▥</span>Podsumowanie</button>
             </div>
         </nav>
         <div class="sidebar-footer">
-            <p class="sidebar-label">Motyw interfejsu</p>
-            <div class="theme-switcher">
-                <select id="theme-select" class="theme-select" aria-label="Wybierz motyw interfejsu">
-                    <option value="jd-dark">John Deere (ciemny, lekki)</option>
-                    <option value="jd-serwis">JD Serwis</option>
-                </select>
-            </div>
             <button type="button" id="app-lock-button" class="btn-secondary app-lock-button">Zablokuj</button>
             <div id="money-privacy-toggle-slot" class="money-privacy-toggle-slot" aria-label="Przełącznik incognito"></div>
         </div>
@@ -68,7 +61,7 @@
                 <nav id="pulpit-quick-actions" class="pulpit-dashboard-shortcuts" aria-label="Szybkie akcje"></nav>
             </div>
             <div class="pulpit-dashboard-body">
-                <div class="pulpit-dashboard-column pulpit-dashboard-column--service">
+                <div class="pulpit-dashboard-column">
                     <section class="pulpit-dashboard-panel" aria-labelledby="pulpit-active-orders-title">
                         <div class="pulpit-stats-header">
                             <h3 id="pulpit-active-orders-title">Aktywne zlecenia</h3>
@@ -87,8 +80,12 @@
                             <ul id="pulpit-activity-list" class="activity-list"></ul>
                         </div>
                     </section>
+                    <section class="pulpit-dashboard-trend" aria-labelledby="pulpit-trend-title">
+                        <h3 id="pulpit-trend-title">Wyfakturowane · ostatnie 3 miesiące</h3>
+                        <div class="metrics-chart" id="fh3m-pulpit"></div>
+                    </section>
                 </div>
-                <div class="pulpit-dashboard-column pulpit-dashboard-column--status">
+                <div class="pulpit-dashboard-column">
                     <section class="pulpit-dashboard-missing" aria-label="Braki ewidencji w tym tygodniu">
                         <button type="button" class="weekly-missing" data-weekly-missing disabled>Ładowanie ewidencji…</button>
                         <p>Ten tydzień</p>
@@ -106,10 +103,6 @@
                         <div id="kalendarz-podsumowanie" aria-label="Statystyki miesiąca"></div>
                     </section>
                 </div>
-                <section class="pulpit-dashboard-trend" aria-labelledby="pulpit-trend-title">
-                    <h3 id="pulpit-trend-title">Wyfakturowane · ostatnie 3 miesiące</h3>
-                    <div class="metrics-chart" id="fh3m-pulpit"></div>
-                </section>
             </div>
         </div>
         <div id="notatnik" class="tab-content page-wide">

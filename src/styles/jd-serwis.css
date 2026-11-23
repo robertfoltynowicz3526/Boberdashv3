@@ -85,7 +85,7 @@
 .summary-three-months dd { margin: 2px 0 0; font-weight: 750; }
 .summary-three-months dl > div:last-child dd { color: var(--color-accent); }
 
-/* JD Serwis is an opt-in palette. FullCalendar keeps its layout rules. */
+/* Stała paleta JD Serwis. */
 body[data-theme="jd-serwis"] {
   color-scheme: dark;
   --color-background: #141b16;
@@ -154,8 +154,7 @@ body[data-theme="jd-serwis"] .brand-icon {
   box-shadow: inset 0 -2px #9f8500;
   font-size: 1.2rem;
 }
-body[data-theme="jd-serwis"] .app-title { font-size: 1.3rem; letter-spacing: 0; }
-body[data-theme="jd-serwis"] .app-subtitle { display: none; }
+body[data-theme="jd-serwis"] .app-title { margin: 0; color: #fff; font-size: 1.3rem; letter-spacing: 0; }
 body[data-theme="jd-serwis"] .global-search { padding: 0; }
 body[data-theme="jd-serwis"] .global-search input {
   background: #1a281e;
@@ -222,8 +221,6 @@ body[data-theme="jd-serwis"] .sidebar-nav .tab-button--accent:is(:hover, .active
   color: #172111;
 }
 body[data-theme="jd-serwis"] .sidebar-footer { margin-top: auto; gap: 5px; }
-body[data-theme="jd-serwis"] .sidebar-footer .theme-switcher { padding: 0; border: 0; background: transparent; }
-body[data-theme="jd-serwis"] .sidebar-footer .theme-select { min-height: 34px; padding: 4px 8px; }
 body[data-theme="jd-serwis"] .sidebar-footer :is(.app-lock-button, .money-privacy-toggle-slot) { margin-top: 0; }
 body[data-theme="jd-serwis"] .sidebar-footer :is(.app-lock-button, .money-privacy-toggle) {
   min-height: 32px;
@@ -231,7 +228,14 @@ body[data-theme="jd-serwis"] .sidebar-footer :is(.app-lock-button, .money-privac
   background: var(--bg-panel);
   border-color: var(--input-border);
 }
-body:not([data-theme="jd-serwis"]) .jd-nav-icon { display: none; }
+
+body[data-theme="jd-serwis"] .app-lock-logo {
+  background: var(--color-accent);
+  color: #172111;
+  box-shadow: inset 0 -2px #9f8500;
+}
+body[data-theme="jd-serwis"] .app-lock-title { color: var(--color-text); }
+body[data-theme="jd-serwis"] :is(.app-lock-label, .app-lock-subtitle) { color: var(--color-muted-text); }
 
 body[data-theme="jd-serwis"] :is(.btn-add, .btn-primary, .btn-szczegoly, .pulpit-shortcut--primary,
   #vacation-allowance-save, #planned-leave-submit),
@@ -246,7 +250,7 @@ body[data-theme="jd-serwis"] :is(input, select, textarea) {
   color: var(--color-text);
   border-color: var(--input-border);
 }
-body[data-theme="jd-serwis"] :is(.modal-content, .drawer-panel, .summary-card, .year-section, .quarterly-bonus) {
+body[data-theme="jd-serwis"] :is(.app-lock-card, .modal-content, .drawer-panel, .summary-card, .year-section, .quarterly-bonus) {
   background: var(--color-surface);
   border-color: var(--color-border);
 }
@@ -276,21 +280,6 @@ body[data-theme="jd-serwis"] .pulpit-period-switch [aria-pressed="true"] {
   box-shadow: inset 0 -2px var(--color-accent);
 }
 
-body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-body {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-  grid-template-areas: "service status" "trend trend";
-  gap: 16px;
-  align-items: start;
-}
-body[data-theme="jd-serwis"] .pulpit-dashboard-column {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-body[data-theme="jd-serwis"] .pulpit-dashboard-column--service { grid-area: service; }
-body[data-theme="jd-serwis"] .pulpit-dashboard-column--status { grid-area: status; }
-body[data-theme="jd-serwis"] .pulpit-dashboard-column > section,
-body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-activity { grid-area: auto; }
 body[data-theme="jd-serwis"] #pulpit-active-orders li + li { border-top: 1px solid var(--color-border); }
 body[data-theme="jd-serwis"] #pulpit-active-orders button strong { color: #c0dfa9; }
 
@@ -323,6 +312,10 @@ body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-trend .fh3m-row {
   background: var(--bg-panel);
   border-radius: var(--radius-control);
 }
+body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-trend .fh3m-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-trend .fh3m-track {
   grid-row: 2;
   grid-column: 1 / -1;
@@ -343,9 +336,30 @@ body[data-theme="jd-serwis"] #calendar-shell .fc .fc-daygrid-day:not(.is-selecte
 body[data-theme="jd-serwis"] #calendar-shell .fc .fc-day-other { color: #a0b39f; }
 body[data-theme="jd-serwis"] #calendar-shell .fc .fc-day-other .fc-daygrid-day-number { color: inherit !important; }
 
-@media (max-width: 1000px) {
-  body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "service" "status" "trend";
+@media (max-width: 768px) {
+  body[data-theme="jd-serwis"] > .app-sidebar {
+    position: relative;
+    flex-basis: auto;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
+
+  body[data-theme="jd-serwis"] .sidebar-nav .nav-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  body[data-theme="jd-serwis"] .sidebar-nav .nav-group-label { flex: 0 0 100%; }
+  body[data-theme="jd-serwis"] .sidebar-nav .tab-button { width: auto; }
+  body[data-theme="jd-serwis"] .sidebar-footer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+}
+
+@media (max-width: 550px) {
+  body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-trend .fh3m-rows { grid-template-columns: minmax(0, 1fr); }
+  body[data-theme="jd-serwis"] #pulpit .pulpit-dashboard-stats .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

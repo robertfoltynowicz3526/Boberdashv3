@@ -5,7 +5,6 @@ import './styles.css';
 import './styles/desktop-only.css';
 import './styles/calendar-fixes.css';
 import './styles/calendar.css';
-import './styles/jd-serwis.css';
 import { findGlobalResults } from './search/globalSearch.js';
 import { initCalendar, updateCalendarData } from './calendar/initCalendar.js';
 import { aggregateDayData, computeDayTotals, configureDayTotals, resolveManualBilled } from './calendar/computeDayTotals.js';
@@ -1134,7 +1133,6 @@ function initializeApp() {
     const oilQuickQuantityInput = document.getElementById('oil-quick-quantity');
     const oilQuickUnitSelect = document.getElementById('oil-quick-unit');
     const oilQuickSubmitBtn = document.getElementById('oil-quick-submit');
-    const themeSelect = document.getElementById('theme-select');
     const zakonczoneZleceniaHeader = document.getElementById('zakonczone-zlecenia-header');
     const zlecenieSearchInput = document.getElementById('zlecenie-search-input');
     const kalendarzMultiWrapper = document.getElementById('kalendarz-zlecenia-multi');
@@ -2142,18 +2140,14 @@ function initializeApp() {
     ensureMagazynSummaryPlacement();
     setupUnfinishedUI();
 
-    // --- INICJALIZACJA UI / TABS / MOTYW ---
+    // --- INICJALIZACJA UI / TABS ---
     bindTabNavigation();
     const now = new Date();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const year = now.getFullYear();
     const currentMonth = `${year}-${month}`;
     if (miesiacSummaryInput) miesiacSummaryInput.value = currentMonth;
-    const firstTabButton = document.querySelector('.tab-button');
-    if (firstTabButton) {
-        firstTabButton.click(); // Otwórz pierwszą zakładkę
-    }
-    inicjujMotywJohnDeere();
+    showTab('pulpit');
     ensureZakonczenieNotatkaField(); // wstrzyknięcie pola notatki do modala (index.html bez zmian)
 
     odswiezSelectKlientaDoZlecenia();
@@ -4941,70 +4935,6 @@ ${years.map(y => `
             isExportingYearReport = false;
         }
     };
-
-    function inicjujMotywJohnDeere() {
-        const sidebar = document.querySelector('.app-sidebar');
-        const nav = sidebar.querySelector('.sidebar-nav');
-        const legacyGroups = [...nav.querySelectorAll('.nav-group')].map(group => ({
-            group,
-            buttons: [...group.querySelectorAll('[data-tab]')]
-        }));
-        const buttons = new Map(legacyGroups.flatMap(({ buttons }) => buttons.map(button => [button.dataset.tab, button])));
-        const serwisGroups = [
-            ['', [['dodaj-zlecenie', '']]],
-            ['Serwis', [['pulpit', '⌂'], ['kalendarz-tab', '▦'], ['zlecenia', '▤'], ['notatnik', '▧']]],
-            ['Baza serwisu', [['maszyny', '⚙︎'], ['klienci', '♙'], ['magazyn', '▣']]],
-            ['Rozliczenia', [['finanse', '◈'], ['podsumowanie', '▥']]]
-        ].map(([title, items]) => {
-            const group = document.createElement('div');
-            group.className = 'nav-group';
-            if (title) {
-                const label = document.createElement('p');
-                label.className = 'nav-group-label';
-                label.textContent = title;
-                group.append(label);
-            }
-            return {
-                group,
-                buttons: items.map(([id, symbol]) => {
-                    const button = buttons.get(id);
-                    if (symbol) {
-                        const icon = document.createElement('span');
-                        icon.className = 'jd-nav-icon';
-                        icon.setAttribute('aria-hidden', 'true');
-                        icon.textContent = symbol;
-                        button.prepend(icon);
-                    }
-                    return button;
-                })
-            };
-        });
-
-        const savedTheme = localStorage.getItem('theme') || 'jd-dark';
-        const applyTheme = (theme) => {
-            const resolved = ['jd-serwis', 'jd-contrast'].includes(theme) ? theme : 'jd-dark';
-            const isSerwis = resolved === 'jd-serwis';
-            document.body.dataset.theme = resolved;
-            if (themeSelect) themeSelect.value = resolved;
-            sidebar.querySelector('.app-title').textContent = isSerwis ? 'Boberdash' : 'Agro-Bober';
-            sidebar.querySelector('.brand-icon').textContent = isSerwis ? 'B·' : 'JD';
-            const groups = isSerwis ? serwisGroups : legacyGroups;
-            for (const { group, buttons } of groups) group.append(...buttons);
-            nav.replaceChildren(...groups.map(({ group }) => group));
-            requestAnimationFrame(() => {
-                if (activeMainTab === 'kalendarz-tab') getCalendarApi()?.updateSize?.();
-            });
-        };
-        if (savedTheme === 'jd-contrast') {
-            themeSelect?.add(new Option('John Deere (kontrastowy)', 'jd-contrast'));
-        }
-        applyTheme(savedTheme);
-        themeSelect?.addEventListener('change', () => {
-            const newTheme = themeSelect.value;
-            applyTheme(newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-    }
 
     function inicjujZwijanie() {
   // Zakończone zlecenia
@@ -9566,7 +9496,7 @@ async function obslugaListyCzesci(event) {
                 await addDoc(getPlannedLeaveCollection(), { ...payload, createdAt: serverTimestamp() });
             }
             clearPlannedLeaveForm();
-            await refreshPlannedLeaveEntries();
+            await renderVacationSummary();
         });
     }
 
@@ -9581,7 +9511,7 @@ async function obslugaListyCzesci(event) {
             } else if (btn.dataset.action === 'delete') {
                 if (!confirm('Usunąć zaplanowany urlop?')) return;
                 await deleteDoc(doc(db, 'plannedLeave', entry.id));
-                await refreshPlannedLeaveEntries();
+                await renderVacationSummary();
             }
         });
     }

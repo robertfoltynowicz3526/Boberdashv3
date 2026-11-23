@@ -90,8 +90,8 @@ export const createLockScreen = () => {
   element.className = 'app-lock-screen';
   element.innerHTML = `
     <div class="app-lock-card">
-      <div class="app-lock-logo">JD</div>
-      <div class="app-lock-title">Agro-Bober</div>
+      <div class="app-lock-logo" aria-hidden="true">B·</div>
+      <div class="app-lock-title">Boberdash</div>
       <p class="app-lock-subtitle">Wpisz hasło, aby uruchomić aplikację.</p>
       <form class="app-lock-form">
         <label class="app-lock-label" for="app-lock-input">Hasło</label>
