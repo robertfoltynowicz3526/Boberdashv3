@@ -2,7 +2,7 @@
 
 ## Logowanie Bobereka
 
-Logowanie z jednym polem hasła korzysta z konta e-mail/hasło w Firebase Authentication. W konfiguracji danego wdrożenia ustaw `VITE_BOBEREK_AUTH_EMAIL` i `VITE_BOBEREK_AUTH_UID`. Identyfikatory są dostępne w kodzie przeglądarki. Hasło podaje się w formularzu.
+Logowanie z jednym polem hasła korzysta z konta e-mail/hasło w Firebase Authentication. W konfiguracji danego wdrożenia ustaw `VITE_OWNER_EMAIL` i `VITE_OWNER_UID`. Identyfikatory są dostępne w kodzie przeglądarki. Hasło podaje się w formularzu.
 
 UID musi odpowiadać kontu dopuszczonemu przez reguły Firestore. Domyślnie sesja trwa 12 godzin. Jej długość można zmienić przez `VITE_APP_LOCK_TTL_HOURS`.
 

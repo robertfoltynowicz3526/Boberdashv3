@@ -7,8 +7,8 @@ const DEFAULT_TTL_HOURS = 12;
 export const getAppLockConfig = () => {
   const ttlHours = Number(import.meta.env.VITE_APP_LOCK_TTL_HOURS ?? DEFAULT_TTL_HOURS);
   return {
-    email: (import.meta.env.VITE_BOBEREK_AUTH_EMAIL ?? '').trim(),
-    uid: (import.meta.env.VITE_BOBEREK_AUTH_UID ?? '').trim(),
+    email: (import.meta.env.VITE_OWNER_EMAIL ?? '').trim(),
+    uid: (import.meta.env.VITE_OWNER_UID ?? '').trim(),
     ttlMs: (Number.isFinite(ttlHours) && ttlHours > 0 ? ttlHours : DEFAULT_TTL_HOURS) * 60 * 60 * 1000
   };
 };
