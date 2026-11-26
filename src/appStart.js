@@ -716,6 +716,8 @@ function initializeApp() {
     let activeWarehouseProduct = null;
     let multiZlecenia = [];
     let multiEdytowanyIndex = null;
+    let calendarOrderMode = 'all';
+    let recentCalendarOrderIds = [];
     let manualFakturowaneValue = 0;
     let calendarDayReady = false;
     let calendarDayRequest = 0;
@@ -1142,6 +1144,8 @@ function initializeApp() {
     const kalendarzMultiAddButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-add') : null;
     const kalendarzMultiCancelButton = kalendarzMultiWrapper ? kalendarzMultiWrapper.querySelector('.multi-cancel') : null;
     const kalendarzMultiList = document.getElementById('kalendarz-zlecenia-list');
+    const calendarOrderRow = document.getElementById('calendar-order-row');
+    const calendarOrderModeButtons = kalendarzForm.querySelectorAll('[data-calendar-order-mode]');
     const clientDrawer = document.getElementById('client-drawer');
     const clientDrawerTitle = document.getElementById('client-drawer-title');
     const clientDeleteBtn = document.getElementById('client-delete-btn');
@@ -2284,31 +2288,6 @@ function initializeApp() {
         }
     };
 
-    const bindDayPanelEvents = () => {
-        if (!kalendarzModal) return;
-        kalendarzModal.addEventListener('click', (event) => {
-            const actionEl = event.target.closest('[data-panel-action]');
-            if (!actionEl || !kalendarzModal.contains(actionEl)) return;
-            const action = actionEl.dataset.panelAction;
-            if (!action) return;
-            if (action === 'toggle-orders' || action === 'add') {
-                if (kalendarzMultiWrapper) {
-                    const shouldExpand = !kalendarzMultiWrapper.classList.contains('is-expanded');
-                    kalendarzMultiWrapper.classList.toggle('is-expanded', shouldExpand);
-                    if (shouldExpand && kalendarzMultiSelect) {
-                        kalendarzMultiSelect.focus();
-                    }
-                }
-                return;
-            }
-            if (action === 'edit') {
-                const field = kalendarzForm?.querySelector?.('#godziny-pracy');
-                field?.focus?.();
-                field?.select?.();
-            }
-        });
-    };
-
     window.addEventListener('calendar:summary-display-change', () => {
         renderDayPanel();
     });
@@ -2502,23 +2481,57 @@ function initializeApp() {
         }
     };
 
-    const quickEntry = document.getElementById('calendar-quick-entry');
-    const quickOrder = document.getElementById('calendar-quick-order');
-    const quickHours = document.getElementById('calendar-quick-hours');
-    const quickSave = document.getElementById('calendar-quick-save');
+    const isCalendarOrderActive = order => order?.status === 'aktywne' || order?.status === 'nieprzypisane';
 
-    function renderCalendarQuickEntry() {
-        const orders = buildOrderIndex();
+    function getRecentCalendarOrderIds(orders) {
         const recent = new Set();
-        [...ordersByDay.keys()].sort().reverse().forEach(day => {
+        for (const day of [...ordersByDay.keys()].sort().reverse()) {
             for (const { orderId } of ordersByDay.get(day)) {
-                const order = orders.get(orderId);
-                if (order?.status === 'aktywne' || order?.status === 'nieprzypisane') recent.add(orderId);
+                if (isCalendarOrderActive(orders.get(orderId))) recent.add(orderId);
+                if (recent.size === 5) return [...recent];
             }
+        }
+        return [...recent];
+    }
+
+    function renderCalendarOrderOptions() {
+        const selectedId = kalendarzMultiSelect.value;
+        const orders = buildOrderIndex();
+        const choices = new Map();
+        if (calendarOrderMode === 'recent') {
+            for (const id of recentCalendarOrderIds) choices.set(id, pobierzNazweZlecenia(orders.get(id)));
+        } else {
+            for (const order of _wszystkieZleceniaCache.filter(isCalendarOrderActive)
+                .sort((a, b) => (a.klientNazwa || a.nrZlecenia || '').localeCompare(b.klientNazwa || b.nrZlecenia || ''))) {
+                choices.set(order.id, pobierzNazweZlecenia(order));
+            }
+            for (const entry of multiZlecenia) {
+                const id = canonicalOrderLinkId(entry);
+                if (!choices.has(id)) choices.set(id, pobierzNazweZlecenia(orders.get(id)) || entry.klientNazwa || id);
+            }
+        }
+        const placeholder = calendarOrderMode === 'recent' && choices.size === 0
+            ? 'Brak ostatnio używanych zleceń'
+            : 'Wybierz zlecenie';
+        kalendarzMultiSelect.replaceChildren(new Option(placeholder, ''));
+        for (const [id, label] of choices) kalendarzMultiSelect.add(new Option(label, id));
+        kalendarzMultiSelect.value = choices.has(selectedId) ? selectedId : '';
+        renderCalendarOrderAction();
+    }
+
+    function setCalendarOrderMode(mode) {
+        calendarOrderMode = mode;
+        calendarOrderModeButtons.forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.calendarOrderMode === mode));
         });
-        quickOrder.replaceChildren(new Option('Wybierz ostatnio używane zlecenie', ''));
-        [...recent].slice(0, 5).forEach(id => quickOrder.add(new Option(pobierzNazweZlecenia(orders.get(id)), id)));
-        quickEntry.hidden = !calendarDayReady || !recent.size;
+        renderCalendarOrderOptions();
+    }
+
+    function renderCalendarOrderAction() {
+        kalendarzMultiAddButton.textContent = multiEdytowanyIndex !== null
+            ? 'Zapisz zmiany'
+            : calendarOrderMode === 'recent' ? 'Dodaj i zapisz' : 'Dodaj';
+        kalendarzMultiAddButton.disabled = savingCalendarDay || !calendarDayReady || kalendarzMultiSelect.options.length <= 1;
     }
 
     async function otworzModalGodzin(data, options = {}) {
@@ -2526,10 +2539,9 @@ function initializeApp() {
         if (savingCalendarDay) return;
         const request = ++calendarDayRequest;
         calendarDayReady = false;
-        quickEntry.hidden = true;
         const shouldOpenModal = options?.openModal !== false;
         const dayKey = isoDay(data, 'otworzModalGodzin');
-        kalendarzModalTitle.textContent = `Ewidencja Czasu - ${data}`;
+        kalendarzModalTitle.textContent = `Ewidencja czasu · ${data}`;
         kalendarzForm.reset();
         setDayLeaveValue(DAY_LEAVE_NONE);
         setDayLeaveAmountValue(1);
@@ -2537,15 +2549,9 @@ function initializeApp() {
         if (kalendarzDataInput) kalendarzDataInput.value = data;
 
         multiZlecenia = [];
-        multiEdytowanyIndex = null;
         manualFakturowaneValue = 0;
-        przygotujOpcjeMultiZlecen();
         resetujFormularzMulti();
-        if (kalendarzMultiWrapper) {
-            kalendarzMultiWrapper.classList.remove('is-expanded');
-        }
         renderMultiZlecenia();
-
 
         const docRef = doc(db, "godziny_pracy", data);
         try {
@@ -2559,7 +2565,7 @@ function initializeApp() {
                 kalendarzForm['nadgodziny'].value = dane.nadgodziny || 0;
                 kalendarzForm['czas-jazdy'].value = normalized.drive || 0;
                 kalendarzForm['kalendarz-notatka'].value = dane.notatka || '';
-                const { powiazane, suma, maPowiazania } = normalizujPowiazaneZlecenia(dane);
+                const { powiazane, maPowiazania } = normalizujPowiazaneZlecenia(dane);
                 manualFakturowaneValue = resolveManualBilled(dane, maPowiazania);
                 multiZlecenia = powiazane;
                 renderMultiZlecenia();
@@ -2595,40 +2601,24 @@ function initializeApp() {
             console.error("Błąd podczas pobierania danych ewidencji:", error);
         }
         if (request !== calendarDayRequest) return;
-        renderCalendarQuickEntry();
+        recentCalendarOrderIds = getRecentCalendarOrderIds(buildOrderIndex());
+        setCalendarOrderMode(recentCalendarOrderIds.length ? 'recent' : 'all');
         if (dayKey) {
             renderCalendarModalSummary(dayKey);
         }
         if (shouldOpenModal) {
             openModal(kalendarzModal);
+            kalendarzForm.scrollTop = 0;
             if (options.focusNote) kalendarzForm['kalendarz-notatka'].focus();
         }
     }
 
-    function przygotujOpcjeMultiZlecen() {
-        if (!kalendarzMultiSelect) return;
-        kalendarzMultiSelect.innerHTML = '<option value="">-- Wybierz zlecenie --</option>';
-        _wszystkieZleceniaCache
-            .filter(z => z && (z.status === 'aktywne' || z.status === 'nieprzypisane'))
-            .sort((a, b) => (a.klientNazwa || a.nrZlecenia || '').localeCompare(b.klientNazwa || b.nrZlecenia || ''))
-            .forEach(z => {
-                const label = pobierzNazweZlecenia(z);
-                const option = document.createElement('option');
-                option.value = z.id;
-                option.textContent = label;
-                option.dataset.klientNazwa = pobierzKlientaZlecenia(z) || z.klientNazwa || '';
-                kalendarzMultiSelect.appendChild(option);
-            });
-        zapewnijOpcjePowiazanych();
-    }
-
     function resetujFormularzMulti() {
         multiEdytowanyIndex = null;
-        if (kalendarzMultiSelect) kalendarzMultiSelect.value = '';
-        if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = '';
-        if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = '';
-        if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Dodaj';
-        if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.hidden = true;
+        kalendarzMultiSelect.value = '';
+        kalendarzMultiHoursInput.value = '';
+        kalendarzMultiDriveInput.value = '';
+        renderCalendarOrderAction();
     }
 
     function canonicalOrderLinkId(entry = {}) {
@@ -2659,21 +2649,25 @@ function initializeApp() {
     }
 
     function renderMultiZlecenia() {
-        if (!kalendarzMultiList) return;
-        zapewnijOpcjePowiazanych();
-        const itemsHtml = multiZlecenia.length
-            ? multiZlecenia.map((pozycja, index) => {
-                const nazwa = budujKompaktowaEtykietePowiazania(pozycja);
-                return `<li data-index="${index}">
-                    <span>${nazwa || pozycja.zlecenieId}</span>
-                    <div class="actions">
-                        <button type="button" class="btn-edit multi-edit">Edytuj</button>
-                        <button type="button" class="btn-remove multi-remove">Usuń</button>
-                    </div>
-                </li>`;
-            }).join('')
-            : '<li class="empty">Brak powiązanych zleceń.</li>';
-        kalendarzMultiList.innerHTML = itemsHtml;
+        const orders = buildOrderIndex();
+        const rows = multiZlecenia.map((entry, index) => {
+            const model = buildCalendarOrderRow(entry, orders.get(canonicalOrderLinkId(entry)));
+            const row = calendarOrderRow.content.firstElementChild.cloneNode(true);
+            row.dataset.index = String(index);
+            row.querySelector('[data-order-number]').textContent = model.number;
+            row.querySelector('[data-order-client]').textContent = model.client;
+            row.querySelector('[data-order-machine]').textContent = model.machine;
+            row.querySelector('[data-order-billed]').textContent = model.billed;
+            row.querySelector('[data-order-drive]').textContent = model.drive;
+            return row;
+        });
+        if (!rows.length) {
+            const empty = document.createElement('li');
+            empty.className = 'empty';
+            empty.textContent = 'Brak powiązanych zleceń.';
+            rows.push(empty);
+        }
+        kalendarzMultiList.replaceChildren(...rows);
         const suma = multiZlecenia.reduce((acc, el) => acc + (Number(el.fakturowane) || 0), 0);
         if (multiZlecenia.length > 0) {
             aktualizujPoleFakturowane(suma, true);
@@ -2682,31 +2676,24 @@ function initializeApp() {
         }
     }
 
-    function zapewnijOpcjePowiazanych() {
-        if (!kalendarzMultiSelect) return;
-        const istniejące = new Set(Array.from(kalendarzMultiSelect.options).map(opt => opt.value));
-        multiZlecenia.forEach(pozycja => {
-            if (!pozycja?.zlecenieId || istniejące.has(pozycja.zlecenieId)) return;
-            const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId);
-            const label = pobierzNazweZlecenia(zlecenie) || pozycja.klientNazwa || pozycja.zlecenieId;
-            const option = document.createElement('option');
-            option.value = pozycja.zlecenieId;
-            option.textContent = label || pozycja.zlecenieId;
-            option.dataset.klientNazwa = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || '';
-            kalendarzMultiSelect.appendChild(option);
-            istniejące.add(pozycja.zlecenieId);
-        });
-    }
-
-    function dodajLubZapiszMultiZlecenie() {
-        if (!kalendarzMultiSelect || !kalendarzMultiHoursInput || !kalendarzMultiDriveInput) return;
-        const zlecenieId = kalendarzMultiSelect.value;
-        const godziny = Number(kalendarzMultiHoursInput.value);
-        const czasJazdy = Number(kalendarzMultiDriveInput.value || 0);
-        if (applyCalendarOrderHours(zlecenieId, godziny, czasJazdy, multiEdytowanyIndex)) {
-            resetujFormularzMulti();
+    async function dodajLubZapiszMultiZlecenie(event) {
+        if (savingCalendarDay || !calendarDayReady) return;
+        const saveImmediately = calendarOrderMode === 'recent';
+        if (saveImmediately && !kalendarzForm.reportValidity()) return;
+        const previous = saveImmediately ? multiZlecenia.slice() : null;
+        if (!applyCalendarOrderHours(
+            kalendarzMultiSelect.value,
+            Number(kalendarzMultiHoursInput.value),
+            Number(kalendarzMultiDriveInput.value || 0),
+            multiEdytowanyIndex
+        )) return;
+        renderMultiZlecenia();
+        if (saveImmediately && !await obslugaZapisuGodzin(event)) {
+            multiZlecenia = previous;
             renderMultiZlecenia();
+            return;
         }
+        resetujFormularzMulti();
     }
 
     function applyCalendarOrderHours(zlecenieId, godziny, czasJazdy, editIndex) {
@@ -2769,40 +2756,26 @@ function initializeApp() {
     }
 
     function obslugaListyMulti(event) {
-        const target = event.target?.closest?.('button') || event.target;
-        const li = target.closest('li');
-        if (!li || !li.dataset.index) return;
-        const index = Number(li.dataset.index);
-        if (Number.isNaN(index)) return;
-
-        if (target.classList.contains('multi-remove')) {
+        if (savingCalendarDay || !calendarDayReady) return;
+        const button = event.target.closest('button');
+        const row = button?.closest('li[data-index]');
+        if (!row) return;
+        const index = Number(row.dataset.index);
+        const entry = multiZlecenia[index];
+        if (!entry) return;
+        if (button.classList.contains('multi-remove')) {
             multiZlecenia.splice(index, 1);
             resetujFormularzMulti();
+            renderCalendarOrderOptions();
             renderMultiZlecenia();
-            return;
-        }
-
-        if (target.classList.contains('multi-edit')) {
-            const pozycja = multiZlecenia[index];
-            if (!pozycja) return;
+            kalendarzMultiSelect.focus();
+        } else if (button.classList.contains('multi-edit')) {
             multiEdytowanyIndex = index;
-            zapewnijOpcjePowiazanych();
-            if (kalendarzMultiSelect) {
-                if (!Array.from(kalendarzMultiSelect.options).some(opt => opt.value === pozycja.zlecenieId)) {
-                    const option = document.createElement('option');
-                    const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId);
-                    const label = pobierzNazweZlecenia(zlecenie) || pozycja.klientNazwa || pozycja.zlecenieId;
-                    option.value = pozycja.zlecenieId;
-                    option.textContent = label || pozycja.zlecenieId;
-                    option.dataset.klientNazwa = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || '';
-                    kalendarzMultiSelect.appendChild(option);
-                }
-                kalendarzMultiSelect.value = pozycja.zlecenieId;
-            }
-            if (kalendarzMultiHoursInput) kalendarzMultiHoursInput.value = Number(pozycja.fakturowane) || 0;
-            if (kalendarzMultiDriveInput) kalendarzMultiDriveInput.value = Number(pozycja.jazda) || 0;
-            if (kalendarzMultiAddButton) kalendarzMultiAddButton.textContent = 'Zapisz zmiany';
-            if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.hidden = false;
+            setCalendarOrderMode('all');
+            kalendarzMultiSelect.value = canonicalOrderLinkId(entry);
+            kalendarzMultiHoursInput.value = Number(entry.fakturowane) || 0;
+            kalendarzMultiDriveInput.value = Number(entry.jazda) || 0;
+            kalendarzMultiHoursInput.focus();
         }
     }
 
@@ -2854,7 +2827,7 @@ function initializeApp() {
             flags
         };
         savingCalendarDay = true;
-        quickSave.disabled = true;
+        renderCalendarOrderAction();
         try {
             const dayKey = isoDay(data, 'obslugaZapisuGodzin');
             if (!dayKey) {
@@ -2918,7 +2891,7 @@ function initializeApp() {
             return false;
         } finally {
             savingCalendarDay = false;
-            quickSave.disabled = false;
+            renderCalendarOrderAction();
         }
     }
 
@@ -3553,13 +3526,21 @@ function initializeApp() {
         return pobierzNazweZlecenia(zlecenie) || zlecenieId;
     }
 
-    function budujKompaktowaEtykietePowiazania(pozycja = {}) {
-        const zlecenie = _wszystkieZleceniaCache.find(z => z.id === pozycja.zlecenieId) || {};
-        const maszyna = _wszystkieMaszynyCache.find(m => m.id === zlecenie.maszynaId) || {};
-        const numer = String(pozycja.nrZlecenia || zlecenie.nrZlecenia || '').trim();
-        const klient = pozycja.klientNazwa || pobierzKlientaZlecenia(zlecenie) || 'Klient: brak';
-        const maszynaLabel = [pozycja.maszynaTyp || maszyna.typMaszyny, pozycja.maszynaModel || maszyna.model].filter(Boolean).join(' ').trim() || 'Maszyna: brak';
-        return `${numer ? `#${numer}` : '#?'} • ${klient} • ${maszynaLabel} • F: ${formatujLiczbe(pozycja.fakturowane)} h • J: ${formatujLiczbe(pozycja.jazda)} h`;
+    function buildCalendarOrderRow(entry, order) {
+        const machine = _wszystkieMaszynyCache.find(item => item.id === order?.maszynaId);
+        const id = canonicalOrderLinkId(entry);
+        const savedClient = entry.klientNazwa;
+        const client = savedClient && savedClient !== id && savedClient !== pobierzNazweZlecenia(order)
+            ? savedClient
+            : pobierzKlientaZlecenia(order);
+        return {
+            number: pobierzNumerEtykietaZlecenia({ nrZlecenia: entry.nrZlecenia || order?.nrZlecenia, id }),
+            client: client || 'Klient: brak',
+            machine: [entry.maszynaTyp || machine?.typMaszyny, entry.maszynaModel || machine?.model]
+                .filter(Boolean).join(' ').trim() || 'Maszyna: brak',
+            billed: `${formatujLiczbe(entry.fakturowane)} h`,
+            drive: `${formatujLiczbe(entry.jazda)} h`
+        };
     }
 
     function normalizujPowiazaneZlecenia(dane) {
@@ -9854,17 +9835,16 @@ async function obslugaListyCzesci(event) {
     }
 
     // KALENDARZ (modal + klik w kalendarzu)
-    quickSave.addEventListener('click', async (event) => {
-        if (savingCalendarDay || !calendarDayReady || !kalendarzForm.reportValidity()) return;
-        const previous = multiZlecenia.slice();
-        if (!applyCalendarOrderHours(quickOrder.value, Number(quickHours.value), 0, null)) return;
-        renderMultiZlecenia();
-        if (await obslugaZapisuGodzin(event)) {
-            resetujFormularzMulti();
-            return;
-        }
-        multiZlecenia = previous;
-        renderMultiZlecenia();
+    calendarOrderModeButtons.forEach(button => button.addEventListener('click', () => {
+        const mode = button.dataset.calendarOrderMode;
+        if (savingCalendarDay || mode === calendarOrderMode) return;
+        if (multiEdytowanyIndex !== null) resetujFormularzMulti();
+        setCalendarOrderMode(mode);
+    }));
+    kalendarzMultiWrapper.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.isComposing || !event.target.matches('input')) return;
+        event.preventDefault();
+        kalendarzMultiAddButton.click();
     });
     if (kalendarzForm) kalendarzForm.addEventListener('submit', obslugaZapisuGodzin);
     if (kalendarzForm) {
@@ -9889,7 +9869,11 @@ async function obslugaListyCzesci(event) {
         kalendarzModalCloseButton.onclick = () => { hideModal(kalendarzModal); };
     }
     if (kalendarzMultiAddButton) kalendarzMultiAddButton.addEventListener('click', dodajLubZapiszMultiZlecenie);
-    if (kalendarzMultiCancelButton) kalendarzMultiCancelButton.addEventListener('click', () => { resetujFormularzMulti(); renderMultiZlecenia(); });
+    kalendarzMultiCancelButton.addEventListener('click', () => {
+        if (savingCalendarDay) return;
+        resetujFormularzMulti();
+        kalendarzMultiSelect.focus();
+    });
     if (kalendarzMultiList) kalendarzMultiList.addEventListener('click', obslugaListyMulti);
 
     const wyswietlKlientowDebounced = debounce(() => wyswietlKlientow(), 200);
@@ -10214,7 +10198,6 @@ async function obslugaListyCzesci(event) {
     inicjujZwijanie();
     moveOrdersSearchBetweenSections();
     bindCalendarToolbar();
-    bindDayPanelEvents();
     updateCalendarToolbarState();
     applyDayPanelState();
     renderDayPanel();

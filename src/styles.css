@@ -456,96 +456,218 @@ input::placeholder{color:var(--jd-text-500)}
   overflow: visible;
 }
 
-.calendar-day-form{
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+#kalendarz-modal {
+  padding: clamp(8px, 2vw, 20px);
+  overflow: hidden;
 }
 
-.calendar-day-form__section{
-  border: 1px solid var(--calendar-border);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+#kalendarz-modal .calendar-day-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(900px, 100%);
+  height: auto;
+  max-height: calc(100dvh - 2 * clamp(8px, 2vw, 20px));
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
 }
 
-.calendar-day-form__section-header{
+.calendar-day-dialog__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.calendar-day-form__section-header h4{
+.calendar-day-dialog__header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: clamp(1.1rem, 3vw, 1.35rem);
 }
 
-.calendar-day-form__section-actions{
-  display: inline-flex;
-  gap: 8px;
-  flex-wrap: wrap;
+#kalendarz-modal .calendar-day-dialog__header .close-button {
+  flex: 0 0 auto;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
 }
 
-.calendar-day-form__fields{
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
-  min-width: 0;
-}
-
-.calendar-day-form__orders{
+#kalendarz-form.calendar-day-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 0;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.calendar-day-form__orders .multi-row{
-  display: none;
-}
-
-.calendar-day-form__orders.is-expanded .multi-row{
+#kalendarz-form .calendar-day-form__section {
+  flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background: var(--bg-panel-secondary);
 }
 
-.calendar-day-form__orders .multi-row{
+.calendar-day-form__section-header {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.calendar-day-form__orders .multi-row > *{
+.calendar-day-form__section-header h4 { margin: 0; }
+
+.calendar-order-modes,
+.calendar-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-order-editor .calendar-order-actions { align-self: end; }
+
+#kalendarz-form .calendar-order-modes [aria-pressed="true"] {
+  background: #31562d;
+  border-color: #65855a;
+  box-shadow: inset 0 -2px var(--color-accent);
+}
+
+.calendar-order-editor {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(7.5rem, 8rem) minmax(5.5rem, 7rem) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.calendar-order-editor label {
+  display: grid;
+  gap: 3px;
   min-width: 0;
-  flex: 1 1 120px;
+  color: var(--text-secondary);
 }
 
-.calendar-day-form__actions{
+#kalendarz-form .calendar-order-editor :is(select, input),
+#kalendarz-form :is(.calendar-order-modes, .calendar-order-actions) button {
+  min-height: 36px;
+  padding: 5px 8px;
+  font-size: 0.88rem;
+}
+
+#kalendarz-form .calendar-order-actions .multi-cancel {
+  font-size: 0.8rem;
+}
+
+#kalendarz-zlecenia-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(2, 6.5rem) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--bg-panel);
+}
+
+.calendar-order-row__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.calendar-order-row__identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.calendar-order-row__machine {
+  color: var(--text-secondary);
+  font-size: 0.83rem;
+}
+
+.calendar-order-row__hours {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-order-row__hours strong { color: var(--text-primary); }
+.calendar-order-row__hours abbr { text-decoration: none; }
+
+#kalendarz-form .calendar-order-actions .multi-remove {
+  background: transparent;
+  border-color: #975e5b;
+  color: #f4b9b2;
+}
+
+#kalendarz-form .calendar-order-actions .multi-remove:hover {
+  background: #70383233;
+  border-color: #ce827e;
+}
+
+#kalendarz-zlecenia-list .empty {
+  padding: 3px 0;
+  color: var(--text-secondary);
+}
+
+.calendar-day-form__fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.calendar-day-form__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.calendar-day-form__section .form-group{
-  margin: 0;
-}
+.calendar-day-form__section .form-group { margin: 0; }
 
-.calendar-day-form__section input,
-.calendar-day-form__section select,
-.calendar-day-form__section textarea{
+.calendar-day-form__section :is(input, select, textarea) {
   width: 100%;
   min-width: 0;
 }
 
-.calendar-day-form__section .day-status{
+.calendar-day-form__section .day-status {
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.calendar-day-form__section .day-status .ds-label{
-  font-size: 12px;
+.calendar-day-form__section .day-status .ds-label { font-size: 12px; }
+
+#kalendarz-form .field-hint { margin: 0; }
+
+@media (max-width: 700px) {
+  .calendar-order-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .calendar-order-editor > :first-child,
+  .calendar-order-editor > .calendar-order-actions,
+  .calendar-order-row__identity { grid-column: 1 / -1; }
+
+  .calendar-order-row { grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
+  #kalendarz-form .calendar-day-form__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 420px) {
+  #kalendarz-form.calendar-day-form { padding-inline: 8px; }
+  .calendar-order-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .calendar-order-row > .calendar-order-actions { grid-column: 1 / -1; }
 }
 
 .day-status-badge{
@@ -564,23 +686,6 @@ input::placeholder{color:var(--jd-text-500)}
 
 .day-status-badge.is-hidden{
   display: none;
-}
-
-.calendar-day-form #kalendarz-zlecenia-multi{
-  margin: 0;
-  padding: 0;
-  border-top: 0;
-  gap: 10px;
-}
-
-.calendar-day-form #kalendarz-zlecenia-multi .multi-row{
-  gap: 8px;
-}
-
-.calendar-day-form #kalendarz-zlecenia-list li{
-  border-radius: 10px;
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 @media (min-width: 1100px) {
@@ -614,11 +719,7 @@ input::placeholder{color:var(--jd-text-500)}
   }
 }
 
-@media (max-width: 1023px) {
-  .calendar-day-form__fields{
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+
 
 @media (max-width: 767px) {
   .calendar-day-panel{
@@ -1250,10 +1351,6 @@ tbody tr:hover { background: rgba(242, 203, 36, .045); }
   width: 100%;
   text-align: start;
   overflow-wrap: anywhere;
-}
-
-#calendar-quick-entry[hidden] {
-  display: none;
 }
 
 /* Pulpit: działania, braki ewidencji i statystyki w jednym widoku. */
