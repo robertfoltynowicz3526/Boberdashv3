@@ -1,8 +1,10 @@
 # Agro-Bober
 
-## App lock (blokada ekranu)
+## Logowanie Bobereka
 
-Blokada hasłem służy wyłącznie do ochrony przed podglądem ekranu (np. osoby obok). Pełna ochrona danych wymaga uwierzytelniania po stronie serwera (server-side auth).
+Logowanie z jednym polem hasła korzysta z konta e-mail/hasło w Firebase Authentication. W konfiguracji danego wdrożenia ustaw `VITE_BOBEREK_AUTH_EMAIL` i `VITE_BOBEREK_AUTH_UID`. Identyfikatory są dostępne w kodzie przeglądarki. Hasło podaje się w formularzu.
+
+UID musi odpowiadać kontu dopuszczonemu przez reguły Firestore. Domyślnie sesja trwa 12 godzin. Jej długość można zmienić przez `VITE_APP_LOCK_TTL_HOURS`.
 
 ## Zasada architektury danych (na przyszłość)
 

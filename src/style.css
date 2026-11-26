@@ -100,6 +100,10 @@ body.app-locked main {
   display: none;
 }
 
+body.app-locked > :is(.modal, .modal-backdrop, .drawer, .app-toast) {
+  display: none !important;
+}
+
 .app-lock-button {
   margin-top: 0.75rem;
   width: 100%;

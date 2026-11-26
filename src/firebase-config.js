@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { browserSessionPersistence, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Konfiguracja Firebase (wartości od użytkownika)
@@ -14,7 +14,7 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export const auth = initializeAuth(app, { persistence: browserSessionPersistence });
 export const db = getFirestore(app);
 
 // Analytics opcjonalnie (nie psuj buildu jeśli env/SSR/Brak wsparcia)
